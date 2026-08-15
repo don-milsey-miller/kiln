@@ -1,0 +1,52 @@
+# --- Line endings ----------------------------------------------------------
+#
+# LF in the repository AND in the working copy, on every platform.
+#
+# `core.autocrlf` is a per-machine setting, so without this file the working
+# copy's line endings depend on who cloned it. That matters more here than in
+# most repos: #30 makes a file watcher the integration surface between the app
+# and the agent, and two processes writing the same file (#31) must not disagree
+# about what a line ending is. A CRLF/LF flip rewrites every line of a file —
+# which reads as "everything changed" to a watcher, a diff, and the change
+# feed (#16) alike.
+#
+# It also keeps the handoff package honest (#19): docs/plan/ is committed into
+# someone else's repo, and it should not arrive with this machine's line
+# endings baked in.
+
+* text=auto eol=lf
+
+# --- Windows-native scripts ------------------------------------------------
+#
+# The one real exception. Batch files are interpreted by cmd.exe, which has
+# historically mis-parsed LF-only files. PowerShell handles LF fine, so .ps1
+# stays with everything else above.
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# --- Binary ----------------------------------------------------------------
+#
+# Git detects most of these, but declaring them means no chance of a text
+# heuristic mangling one. references/media/ is ten infographics (#0 source
+# material) and must never be touched.
+
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+
+# --- Diff hints ------------------------------------------------------------
+#
+# Nicer hunk headers when these start existing.
+
+*.md   diff=markdown
+*.ts   diff=typescript
+*.tsx  diff=typescript
+*.js   diff=javascript
+*.jsx  diff=javascript
