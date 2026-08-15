@@ -1,0 +1,5 @@
+# The machine-readable twin — schema.yaml, tasks.json, assertions.yaml,
+# evidence/ and friends.
+#
+# Under principle 2 this is the canonical form; the MDX in ../stages/ is a
+# rendering of it, not a second copy of it.

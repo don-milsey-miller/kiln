@@ -1,0 +1,34 @@
+# --- The tool/content split (#20) ----------------------------------------
+#
+# The tool clones into .planning/ and is gitignored by the project that uses
+# it. User content lives in planning-content/ and output in docs/plan/ — both
+# committed. This repo must be able to improve without a user losing or
+# rewriting their project documents.
+#
+# .planning/ keeps its own remote; that remote is the update channel (#51).
+# Being ignored here is what stops it becoming a nested-repo problem.
+.planning/
+
+# --- Node / Next.js -------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# --- Secrets --------------------------------------------------------------
+#
+# Sandbox tier 3 (#56) is the one place the agent holds credentials. Nothing
+# about that should ever be committable by accident.
+.env
+.env.local
+.env*.local
+*.pem
+
+# --- OS -------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini

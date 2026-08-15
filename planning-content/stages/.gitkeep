@@ -1,0 +1,9 @@
+# Stage documents (MDX) land here.
+#
+# Nothing is scaffolded yet, and that is deliberate: templates are GENERATED
+# from project.yaml's activated artifact types plus their schemas (#43), and
+# neither exists yet. Hand-writing stage documents now would be authoring the
+# exact thing #43 says must be generated — and a template that disagrees with
+# its schema teaches the agent the wrong shape.
+#
+# These appear once step 2 of next-steps.md lands the first schemas.

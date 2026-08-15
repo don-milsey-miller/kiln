@@ -1,0 +1,6 @@
+# Drop a tuned SKILL.md here and it wins over the one shipped in the package
+# (#33).
+#
+# The point: tuning a skill must not mean editing the tool. Editing the tool
+# is a merge conflict on the next `git pull`, which is exactly what the
+# tool/content split (#20) exists to prevent.

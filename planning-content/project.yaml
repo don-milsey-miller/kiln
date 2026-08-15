@@ -1,0 +1,190 @@
+# project.yaml — the manifest
+#
+# Two tiers of state (#4). This file carries the pipeline SHAPE and the
+# project's CAPABILITY declarations. Per-document STATUS lives in each
+# document's own frontmatter. Shape and capability are project-level; status
+# is document-level. Keeping them apart is what stops this file becoming a
+# dumping ground.
+#
+# Decisions referenced as #n are rows in the canonical decision tables in
+# references/notes-transcriptions/notes.md. Where this file and that one
+# disagree, that one wins.
+
+# --- Identity -------------------------------------------------------------
+
+name: visual-project-workflow
+description: >-
+  A staged, schema-first planning pipeline. A local Next.js app for authoring,
+  a Pi package for the agent roster, joined by a file watcher on
+  planning-content/.
+
+# The version of the CONTENT schema that this file and everything under
+# planning-content/ is written against (#50). The tool reads it to detect
+# content written by an older version and migrate it forward.
+#
+# Bump this on a breaking change to the shape of content — never on a tool
+# release. `git pull` inside .planning/ updates the tool; this number is what
+# makes that update safe for content the tool didn't write.
+schemaVersion: 1
+
+# --- Pipeline shape (#4, #14) ---------------------------------------------
+#
+# The 9 stages are a guide, not a fixture. A project declares the set it
+# needs, and once that set is determined it is honoured (#14). Projects
+# differ, and a rigid spine eventually fits some project badly — the cost of
+# that is a half-filled stage nobody believes in.
+#
+# NOTE what is deliberately absent: what each stage PRODUCES and what makes
+# it DONE. Those live in the single stages/ definition set (#34, marked
+# non-negotiable) — the app renders from it, the skills derive from it. Two
+# hand-maintained descriptions of the same pipeline will disagree, and the
+# disagreement surfaces as the agent working confidently to exit criteria the
+# app isn't checking. This file names stages; it does not describe them.
+
+pipeline:
+  stages:
+    - id: 01-intake
+      name: Intake
+      decidedBy: user
+
+    - id: 02-intent-decomposition
+      name: Intent Decomposition
+      decidedBy: agent-proposes-user-confirms
+
+    - id: 03-discovery
+      name: Discovery / Research
+      decidedBy: research-agent
+
+    - id: 04-requirement-gaps
+      name: Requirement Gaps
+      decidedBy: user
+
+    - id: 05-solution-design
+      name: Solution Design
+      decidedBy: agent-proposes-user-approves
+
+    - id: 06-risk-feasibility
+      name: Risk + Feasibility
+      decidedBy: both
+
+    - id: 07-acceptance-criteria
+      name: Acceptance Criteria
+      decidedBy: user
+
+    - id: 08-implementation-plan
+      name: Implementation Plan
+      decidedBy: planning-agent
+
+    - id: 09-handoff
+      name: Developer Handoff
+      decidedBy: user
+
+  # Technical Validation is deliberately NOT a stage. It is cross-cutting —
+  # it can be raised from any stage and feeds back into whichever stage
+  # raised it.
+  #
+  # ⚠️ notes.md flags the thing to watch: without a stage of its own,
+  # validation has no exit criteria of its own, and work without exit
+  # criteria tends not to happen. The stage-6 gate is doing all the
+  # enforcement. If validation keeps getting deferred to the gate and then
+  # done in a panic, that is the signal this decision was wrong and it should
+  # become a real stage.
+  crossCutting:
+    - id: technical-validation
+      name: Technical Validation
+      decidedBy: validation-agent
+
+  gates:
+    # The lint warns continuously and blocks at exactly two boundaries (#46).
+    # Blocking mid-thought is wrong; blocking at a gate is the entire point of
+    # having gates. A lint that blocks while you are drafting gets disabled
+    # within a week.
+    blockOn:
+      - stage-transition
+      - handoff
+
+    # Asymmetric write permissions (#15), and the asymmetry is deliberate.
+    # Stage-3 findings legitimately rewrite stage-2 requirements, so the agent
+    # must be able to reach backwards. The PM's constraint is about ATTENTION,
+    # not permission: the value of a staged process is that it stops you
+    # designing a solution during intake.
+    agentWriteScope: any-stage
+    pmWriteScope: current-stage
+
+# --- Capability declarations (#4) -----------------------------------------
+
+capabilities:
+
+  # Which of the 16-type v1 catalogue (#38) this project actually uses.
+  #
+  # Activation is a stage-2 decision: the agent proposes, the PM approves
+  # (#39). Stage 2 is the first point the project's shape is actually
+  # knowable — activating at setup means guessing before you know anything.
+  #
+  # Templates are GENERATED from the activated set plus their schemas (#43),
+  # never hand-written per stage. So this list is load-bearing: it is what
+  # determines which templates exist at all.
+  #
+  # Empty because stage 2 has not run. next-steps.md step 3 PROPOSES starting
+  # with requirement / decision / schema / api-spec — enough to prove the
+  # loop rather than the catalogue. That is a proposal awaiting approval, not
+  # an approval. Step 4 is where stage 2 runs for real and this list gets
+  # filled in.
+  artifactTypes:
+    activated: []
+
+  # A permission boundary, not a preference (#56). The PM declares which
+  # tiers are available; the validation agent enforces the ceiling and may
+  # not exceed it. This is the one place the agent spends money and holds
+  # credentials, which is why it is a declaration the agent is bound by
+  # rather than a habit it might drift out of.
+  #
+  #   1  Python virtual environment
+  #   2  Docker / Docker Compose
+  #   3  AWS CLI + Terraform      ← credentials, and real cost
+  #
+  # ⚠️ OPEN QUESTION in notes.md: which tiers should be active by default in
+  # a fresh project.yaml? Set to tier 1 only — the conservative reading, and
+  # the one where a wrong default grants nothing. Raise it deliberately;
+  # do not inherit this by accident.
+  sandboxTiers:
+    active:
+      - 1
+
+# --- Confidence thresholds (#57) ------------------------------------------
+#
+# Per step class, not one global number. One number cannot be right for both
+# `cd /opt/app` and `rm -rf /var/lib/pgsql/data`. Too low and the runbook is
+# model guesses wearing an evidence layer; too high and nothing ships.
+#
+# The rungs (#42):
+#   1 unverified · 2 source-supported · 3 experimentally-validated
+#   4 environment-matched · 5 production-validated
+# The MVP tops out at rung 4; rung 5 is on the far side of real deployment
+# by definition.
+#
+# A project may RAISE any threshold. It may never LOWER one — lowering would
+# make "rung 3" mean different things in different projects, which destroys
+# the only property the ladder has.
+#
+# Two rules enforced by the lint rather than by this file: anything
+# hardware / kernel / driver-dependent needs rung 4 regardless of class, and
+# known-destructive command patterns force class `destructive` regardless of
+# what the planning agent assigned (#58).
+
+confidence:
+  thresholds:
+    informational: 2
+    mutating: 3
+    destructive: 4
+
+# --- Deliberately not here ------------------------------------------------
+#
+# roles:  Roles are DISCOVERED from stage-8 task assignments (#18). The agent
+#         recommends, the PM approves, and assignment is by role, never by
+#         name. There is no roster to maintain, so there is nothing to
+#         declare here.
+#
+# status: Per-document, in each document's frontmatter (#4). Status lives on
+#         artifacts and stage status is derived (#16) — "stage 5 is amended"
+#         is not useful when two of forty design components need a look.
