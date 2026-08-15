@@ -610,6 +610,8 @@ You are the research specialist.
 
 The example discovers them from `~/.pi/agent/agents/*.md` or `.pi/agents/*.md` and passes the Markdown body to the child as appended system prompt. **We ship ours in the package instead (#66)**, which is a small change to the discovery path and nothing else.
 
+⚠️ **Two sharp edges found 2026-08-15 in the example's own README, and both argue for #66 rather than against it.** The example **defaults to user-level agents only** (`~/.pi/agent/agents`); project-local `.pi/agents/*.md` load only with `agentScope: "project"` or `"both"`, and when running interactively it **prompts for confirmation** before using them (`confirmProjectAgents: false` disables). Neither behaviour survives a non-interactive child: the default wouldn't find a project roster at all, and a confirmation prompt has nobody to ask. Reading our roster out of the *package* directory — which is what #66 already says — sidesteps both, because it is neither user-level nor project-local as far as that logic is concerned. It does mean the discovery function is ours to own rather than inherited.
+
 **The `tools:` line is stronger than expected**, and it changes the roster from prose into enforcement: it feeds Pi's `--tools` allowlist, which applies to built-in, extension **and** custom tools. So "research may read and search but may not write or provision" becomes a boundary the child physically cannot cross — not a *forbidden actions* bullet it's trusted to honour. That's a direct, mechanical mitigation for role leakage.
 
 ### Design consequences
@@ -1286,6 +1288,76 @@ _Still genuinely open. `_leaning:_` lines are my position — a starting point t
 - #65 launches each specialist as a **non-interactive** child (`--mode json -p`). Non-interactive modes **don't prompt for trust** — they use the saved or default trust decision. Does a child launched that way load the project-local package (#32) and its typed tools?
 - This matters more than the fork question ever did: every contract in the roster is enforced by typed tools (#66), so a child that silently comes up *without* them doesn't fail loudly — it falls back to freehand output, which is exactly the failure principle 2 exists to prevent.
 	- _leaning:_ the setup script records the trust decision for the project directory at install time, same step as `pi install -l`. But this is a **spike, not a leaning** — run one delegated task end to end and confirm the typed tools are present in the child before building three contracts on top of it.
+
+⚠️ **Narrowed 2026-08-15 by reading the shipped docs** (they install with the package, at
+`node_modules/@earendil-works/pi-coding-agent/docs/` — no need to fetch them). Still open, because
+nobody has run it, but the question is now much sharper and the *documented* answer is **no**:
+
+> `security.md`: "Non-interactive modes (`-p`, `--mode json`, and `--mode rpc`) do not show a trust
+> prompt. Without an applicable saved trust decision, `defaultProjectTrust: "ask"` and `"never"`
+> **ignore such resources**, while `"always"` trusts them. Use `--approve`/`-a` or
+> `--no-approve`/`-na` to override project trust for one run."
+
+Three things fall out, and the first is the uncomfortable one:
+
+- **`pi install -l` is what arms the trap.** The resources that *require* trust are
+  `.pi/settings.json`, `.pi/extensions`, `.pi/skills`, `.pi/prompts`, `.pi/themes`,
+  `.pi/SYSTEM.md`. `-l` writes `.pi/settings.json` — so #32's project-local install is precisely the
+  act that makes the project untrusted-by-default. The two decisions interact, and neither row
+  mentions the other.
+- **The official example spawns without `--approve`.** Its launch line is
+  `["--mode","json","-p","--no-session"]` and nothing in it touches trust. So on documented
+  behaviour a specialist child comes up **without our typed tools** — and, per the paragraph above,
+  without erroring.
+- **There are two candidate remedies, and one is far cheaper than the leaning.** Either the setup
+  script writes a decision into `~/.pi/agent/trust.json` (keyed by canonical directory; closest
+  decision on the current-or-parent path wins), or **our delegation extension simply passes
+  `--approve` when it spawns a child**. The second is a one-line change in code we already have to
+  write, needs no new setup step, and cannot drift out of date. The spike should establish which.
+
+⚠️ Note what trust does *not* gate: `AGENTS.md` and `CLAUDE.md` "are loaded regardless of project
+trust unless context loading is disabled." So #66's assumption survives even in the failure case —
+which is the worst combination, since it means a trust-denied child still sounds correctly briefed
+while having none of the tools its contract is enforced by.
+
+### ✅ RUN 2026-08-15 — check 1 answered, and the answer is **no**
+
+_First empirical result in this document. Everything above this line was read; this was run._
+_Environment: pi 0.80.6 · Windows · `defaultProjectTrust: "never"` in user settings._
+
+```
+pi install -l ./pi-package          → .pi/settings.json written, package registered
+pi --mode json -p --no-session ...  → extension NEVER LOADED. No error. No warning.
+pi ... --approve                    → extension loaded
+pi ... -e ./extensions/probe.ts     → extension loaded
+```
+
+The two controls are what make this a finding rather than an anecdote: a broken extension and an
+untrusted one look identical from outside, so "it didn't load" is only a trust result once the same
+file is shown loading by another route. Both controls loaded it.
+
+**So the documented behaviour holds, and the failure is exactly as silent as feared.** The run
+produced a well-formed session — `turn_start`, `turn_end`, `agent_end` all fired — with our typed
+tools simply absent. Nothing anywhere said so.
+
+**The remedy is the cheap one.** `--approve` on the spawn line flips it. That is one flag in the
+delegation extension we already have to write (#65) — no new setup step, nothing for #49 to record
+into `~/.pi/agent/trust.json`, and nothing that can drift out of date or be forgotten on a machine
+that clones the repo later. **The leaning in this section was wrong in an unimportant way and right
+in an important one:** it correctly identified that something must grant trust deliberately; it put
+that something in the wrong half of the product.
+
+⚠️ **But `--approve` is a real decision, not a formality.** It means our delegation extension
+unconditionally trusts the project directory on the user's behalf, every time it spawns a child. For
+a package the PM cloned deliberately that is defensible — it is the same trust they already granted
+by running the setup script. It is worth writing down as a decision with that reasoning attached
+rather than appearing in the code as a flag someone added to make the tests pass. **Needs a number.**
+
+**Side finding — check 4 came back free, and positive.** `turn_end` fired with `mode: "json"`,
+`hasUI: false` — which is precisely the child's invocation (`--mode json -p --no-session`). So
+turn-end hooks *do* work in a non-interactive child, and #48's lint feedback loop can reach
+specialists rather than only the orchestrator. **With one dependency worth stating: no trust means no
+extension, and no extension means no hook.** #48 rides on the `--approve` decision above.
 
 **Try-it panels in API specs**
 - Expandable endpoints and schemas, certainly. But do we want try-it panels in a *plan*? Nothing exists to call yet.

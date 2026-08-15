@@ -8,8 +8,10 @@
 > and the remaining open questions are a default-tier setting, a try-it panel, and one spike.
 > **The next few answers have to come from code rather than from the document.**
 >
-> **Status:** step 0 done (2026-08-14). **Step 1 is next and unblocked** — the layout question in
-> 0(c) turned out to be already answered by notes.md. What actually remains open is 0(d).
+> **Status:** step 0 done (2026-08-14). **Step 1 in progress** — scaffolded and running at
+> `D:\spike-pi-trust`. Check 1 answered **no** on 2026-08-15 (the documented silent failure is real;
+> `--approve` is the remedy) and check 4 answered **yes** as a side effect. Four checks remain, and
+> they need a working model provider — see the ⚠️ under step 1's setup.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -80,6 +82,24 @@ the back door wearing the appearance of success.
 
 Throwaway directory · minimal Pi package with one typed tool and the adapted `subagent` extension ·
 `pi install -l` (#32) · one `agents/research.md` definition · orchestrator delegates one bounded task.
+
+**Scaffolded 2026-08-15 at `D:\spike-pi-trust`** against pi 0.80.6. Prerequisites turned out to be
+already in place — pi installed, provider configured, and the official `subagent` example **on disk**
+inside the installed package rather than only on GitHub, so the adaptation copies from the exact
+version being run.
+
+⚠️ **Reading the shipped docs turned three of these six into predictions** (see the trust block in
+notes.md's Open questions). That doesn't retire the run — the premise of this step is that nobody
+has run it — but it changes what the run is *for*. A prediction that holds is a confirmation; a
+prediction that fails is the most valuable thing this spike can produce. Record both the same way.
+
+⚠️ **The remaining checks need a working provider, and right now there isn't one.** The configured
+model is `llamacpp / qwen35-4b` and the server is not responding (`Connection error`). Check 1 was
+immune — its observable is written at extension-load time, before any model call — but checks 2, 3,
+5 and 6 all read what the model produced, so they cannot run against a dead endpoint. And per #37
+they shouldn't run against a 4B one either: a small model that fails to call a typed tool is
+indistinguishable from a typed tool that isn't there, which is the exact confusion this step exists
+to remove. **Configure a frontier provider before continuing.**
 
 Two setup conditions that are easy to skip and both distort the result:
 
