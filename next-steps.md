@@ -4,8 +4,9 @@
 > where this file and that one disagree, that one wins. This is a running order, not a decision record;
 > decisions belong in notes.md with a number.
 >
-> The framing that produced this list: notes.md is done thinking for now. 66 decisions, ~1,450 lines,
-> and the remaining open questions are a default-tier setting, a try-it panel, and one spike.
+> The framing that produced this list: notes.md is done thinking for now. 67 decisions, ~1,600 lines,
+> and the remaining open questions are a default-tier setting and a try-it panel — the trust spike's
+> first answer became #67 on 2026-08-15.
 > **The next few answers have to come from code rather than from the document.**
 >
 > **Status:** step 0 done (2026-08-14). **Step 1 in progress** — scaffolded and running at
