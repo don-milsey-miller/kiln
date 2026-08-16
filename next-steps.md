@@ -11,8 +11,8 @@
 >
 > **Status:** step 0 done (2026-08-14). **Step 1 in progress** — scaffolded and running at
 > `D:\spike-pi-trust`. Check 1 answered **no** on 2026-08-15 (the documented silent failure is real;
-> `--approve` is the remedy) and check 4 answered **yes** as a side effect. Four checks remain, and
-> they need a working model provider — see the ⚠️ under step 1's setup.
+> trust is the variable — see #67) and checks 3, 4, 5, 6 all answered on 2026-08-15. **Only check 2
+> remains**, and it needs a model that will reliably attempt a write it isn't allowed (#37).
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
