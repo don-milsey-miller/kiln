@@ -116,7 +116,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 30 | App ↔ agent integration | **The file watcher on `planning-content/` is the mechanism** and must work on its own. Typed tools may additionally ping the dev server for instant feedback, but only as an optimization. | #12 puts the agent in a plain terminal that knows nothing about the dev server. Anything that depends on the tools calling the app is broken by construction. |
 | 31 | Two writers, one file | **Partition, don't lock.** The app writes frontmatter and state fields; the agent writes body prose and data files. Where they must genuinely overlap, last-write-wins plus the change feed (#16). | Different regions of different files means there's nothing to clobber. Locking is a big hammer that makes the app feel broken whenever the agent is thinking. |
 | 32 | Pi package location | **In-tree at `.planning/pi-package/`**, installed by the setup script via **`pi install -l ./.planning/pi-package`**. No npm publish. _(Corrected 2026-08-14: the `-l` is load-bearing.)_ | Nothing to fetch, matches the journey, and updates ride the same `git pull` as everything else. Publishing buys nothing while there's one consumer. **`pi install` without `-l` writes to user/global settings** — which for a one-clone-per-project model (#1) would leak one project's roster into every other project on the machine. `-l` writes `.pi/settings.json` in the project. Local paths are referenced, not copied, so `git pull` updates take effect without reinstalling. |
-| 33 | Skill tuning | Skills live **inside the package**, plus a `planning-content/skills-overrides/` drop point where a PM-tuned `SKILL.md` wins over the packaged one. | Tuning a skill shouldn't mean editing the tool — that's a merge conflict on the next update, which is exactly what #20 exists to prevent. |
+| 33 | Skill tuning | Skills live **inside the package**, plus a `planning-content/skills-overrides/` drop point where a PM-tuned `SKILL.md` wins over the packaged one. ⚠️ **The drop-point path is in doubt as of 2026-08-15** — override precedence itself is verified, but only from `.pi/skills/`, which is a Pi discovery location; `planning-content/skills-overrides/` is not. See the spike results in "Pi integration". | Tuning a skill shouldn't mean editing the tool — that's a merge conflict on the next update, which is exactly what #20 exists to prevent. The *intent* survives the spike; the *path* may not. |
 | 34 | Stage definitions | **One `stages/` definition set.** The app renders from it; the skills derive from it. **Non-negotiable.** | Two hand-maintained descriptions of the same pipeline will disagree, and the disagreement surfaces as the agent confidently working to exit criteria the app isn't checking. |
 | 35 | Provider setup | **Defer to `pi-localllm-provider`.** Document the `compat.supportsDeveloperRole: false` sharp edge in the setup docs. | It already does TUI-driven setup for exactly this provider list. Rebuilding it competes with the schemas on the critical path. That compat flag will bite someone on day one. |
 | 36 | Model capability bar | **Warn, never refuse.** Publish a tested-models table instead. | A hard gate is unenforceable — you can't detect "too weak" until it's already produced something bad — and it insults users running perfectly adequate local setups. The real mitigation is templates + typed tools + the lint loop. |
@@ -148,7 +148,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 47 | Lint implementation | **One implementation, three callers** — `npm run lint:plan`, the app on save, and a Pi extension hook. | Three copies of the rules is three sets of rules within a month. |
 | 48 | Lint feedback loop | **A Pi extension hook runs the lint at turn end and feeds failures back to the agent. Build this early, not late.** | Plausibly the single highest-leverage item in this document. It turns the lint from a report into a self-correcting loop, and it's what makes provider-agnosticism (#10) *real* rather than nominal — a 7B model that can't produce a complete document first pass can absolutely fix a named gap on the second. |
 | 49 | Setup script | **Idempotent and re-runnable**, each step checking its own precondition. Provider setup is the one step allowed to **fail without aborting** — the app comes up unconfigured with a banner. | A setup script that can strand you halfway is worse than one that takes two runs. |
-| 50 | Tool updates | **`git pull` inside `.planning/`**, then re-run `pi install -l ./.planning/pi-package` (#32). `project.yaml` carries a **schema version field** so the tool can detect and migrate older content. | One update path for the whole tool, not one per half. #20 makes it safe by construction. |
+| 50 | Tool updates | **`git pull` inside `.planning/`**, then re-run `pi install -l ./.planning/pi-package` (#32). `project.yaml` carries a **schema version field** so the tool can detect and migrate older content. ✅ **Verified 2026-08-15: the reinstall is not required.** Local package paths are referenced, not copied — an edit inside the package took effect on the next run with no reinstall. Keep the reinstall documented as a repair step, not a mandatory one. | One update path for the whole tool, not one per half. #20 makes it safe by construction. |
 | 51 | Clone remote | **`.planning/` keeps its own remote** — that's the update channel. | Being gitignored by the parent repo means no nested-repo confusion. |
 | 52 | App's knowledge of the codebase | **Purely a document tool for v1.** It doesn't read source or link to files. | The *agent* can already read the codebase — that capability exists and doesn't need duplicating in the app. Revisit only if a real need shows up while working an actual plan. |
 
@@ -614,6 +614,34 @@ The example discovers them from `~/.pi/agent/agents/*.md` or `.pi/agents/*.md` a
 ⚠️ **Two sharp edges found 2026-08-15 in the example's own README, and both argue for #66 rather than against it.** The example **defaults to user-level agents only** (`~/.pi/agent/agents`); project-local `.pi/agents/*.md` load only with `agentScope: "project"` or `"both"`, and when running interactively it **prompts for confirmation** before using them (`confirmProjectAgents: false` disables). Neither behaviour survives a non-interactive child: the default wouldn't find a project roster at all, and a confirmation prompt has nobody to ask. Reading our roster out of the *package* directory — which is what #66 already says — sidesteps both, because it is neither user-level nor project-local as far as that logic is concerned. It does mean the discovery function is ours to own rather than inherited.
 
 **The `tools:` line is stronger than expected**, and it changes the roster from prose into enforcement: it feeds Pi's `--tools` allowlist, which applies to built-in, extension **and** custom tools. So "research may read and search but may not write or provision" becomes a boundary the child physically cannot cross — not a *forbidden actions* bullet it's trusted to honour. That's a direct, mechanical mitigation for role leakage.
+
+### ✅ Trust spike results — run 2026-08-15
+
+_pi 0.80.6 · Windows · llama.cpp `qwen35-4b` local · `defaultProjectTrust: "never"`._
+_Five of six checks answered. Everything above this heading was read; this was run._
+
+| # | Check | Result | What it settles |
+|---|---|---|---|
+| 1 | Typed tools present in a non-interactive child | ❌ **no** — silently | → **#67**. `--approve` is the remedy |
+| 3 | `AGENTS.md` reaches the child | ✅ **yes**, and `--no-context-files` suppresses it | #66 holds, *and* its stated fallback is real |
+| 4 | Turn-end hook fires in a child | ✅ **yes** (`mode: "json"`, `hasUI: false`) | #48's loop can reach specialists, not just the orchestrator |
+| 5 | `pi install -l` references vs copies | ✅ **referenced** | #50's `git pull` path needs no reinstall step |
+| 6 | Project skill beats a packaged skill | ✅ **yes**, via `.pi/skills/` | #33's precedence exists — but see the caveat below |
+| 2 | `tools:` allowlist actually blocks a write | ⏳ **unrun** | Needs a model that will reliably *attempt* the write (#37) |
+
+**Check 5 was answered without the model at all**, which is worth noting as technique: editing the
+extension and re-running produced the edited marker in the log at load time, and `.pi/` contained
+nothing but `settings.json` — no copy of the package anywhere. Two independent confirmations, neither
+of which depends on anything the model chose to do.
+
+⚠️ **Check 6 has a caveat that changes #33's shape.** The override won from `.pi/skills/`, which is
+one of Pi's own discovery locations. **`planning-content/skills-overrides/` is not** — it would have
+to be registered through the settings `skills` array, and in the documented discovery order settings
+come *after* packages. Since collisions "warn and keep the first skill found," an override registered
+that way would plausibly **lose** to the packaged skill — the exact opposite of what #33 promises. So
+the mechanism exists and our chosen path may not reach it. Either setup materializes overrides into
+`.pi/skills/`, or the ordering has to be tested directly. **Untested either way; do not assume #33
+works as written.**
 
 ### Design consequences
 
