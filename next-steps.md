@@ -21,8 +21,8 @@
 > un-rejects locking and leaves a decision owed by step 5.
 > **0(c) and 0(d) both closed 2026-08-16** → #69, #70, #71; one fixture test is owed at step 5.
 > **Next: step 3 (four schemas)** — and #72 is now a constraint on the first typed tool written there.
-> ⚠️ Two directories are owed deletion and neither is deleted: `D:\spike-pi-trust` (step 1) and
-> `D:\spikes\watcher` (step 2). Both were refused by a path guard, not skipped — see step 2's footer.
+> ⚠️ `D:\spikes\watcher` (step 2) is deleted. **`D:\spike-pi-trust` (step 1) still is not** — a path
+> guard refuses removal at the drive root. It needs one manual `rm -rf`; nothing in it should survive.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -233,8 +233,7 @@ the one piece of this spike worth re-reading before writing the real one.
 the watcher cross-platform. And check 3's contention rate — 120 writes in about a second — is far above
 anything real; that makes the loss *rarer* in practice, not absent, which is worse to discover.
 
-⚠️ **`D:\spikes\watcher` is owed its deletion and has not been deleted** — the same path guard that
-refused `D:\spike-pi-trust` refused it. Nothing in it is meant to survive.
+✅ **`D:\spikes\watcher` deleted 2026-08-17**, once the answers above were in notes.md.
 
 ---
 
