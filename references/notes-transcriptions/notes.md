@@ -60,7 +60,7 @@ _Softened 2026-08-14:_ the Pi re-verification found an **official `subagent` exa
 
 ## Decided
 
-_#1–13 settled 2026-08-12, #14–22 settled 2026-08-13, #23–64 settled 2026-08-13 during the consolidation, #65–66 settled 2026-08-14 by the Pi re-verification, **#67 settled 2026-08-15 by the trust spike — the first row here settled by running something rather than by reading or arguing.**_
+_#1–13 settled 2026-08-12, #14–22 settled 2026-08-13, #23–64 settled 2026-08-13 during the consolidation, #65–66 settled 2026-08-14 by the Pi re-verification, **#67 settled 2026-08-15 and #68 settled 2026-08-16 by the trust spike — the first rows here settled by running something rather than by reading or arguing.**_
 _Don't re-litigate these without a reason — put the reason in **Rejected** below._
 _Numbers are stable and never reused. The grouping below is for scanning; **#N** references throughout this document still resolve._
 
@@ -112,6 +112,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 65 | Delegation mechanism | **A `subagent`-style typed tool, registered by a shipped extension.** The orchestrator calls it with a task and a role; the extension launches an isolated child Pi process (`--mode json -p --no-session`) with that role's model, tool allowlist, and system prompt. Not a Pi core primitive — it's ours to ship. | Pi deliberately has no built-in sub-agent feature, but the SDK supports it and the Pi repo carries an **official `subagent` example extension** that is very nearly this architecture already — parallel and sequential specialist tasks, per-specialist model and tools, separate context per child. #26 survives without inventing the runtime, which is the single biggest cost reduction in this document since the consolidation. |
 | 66 | Where specialist definitions live | **Inside the shipped package at `.planning/pi-package/agents/{research,validation,planning}.md`**, discovered by our delegation extension — *not* copied into each project's `.pi/agents/`. Each file is frontmatter (`name` · `description` · `tools` · `model`) plus a body that becomes that role's system prompt. `AGENTS.md` carries **shared project invariants only**; role-specific instruction never goes in it. | The roster is *tool configuration*, so it belongs in the tool half (#20), and shipping it in the package means it updates with `git pull` (#50). Keeping `AGENTS.md` free of orchestrator-specific behaviour also matters mechanically: Pi's own example launches children *with* normal context-file discovery, so whatever is in `AGENTS.md` reaches every specialist. Harder separation is available (`--no-context-files`, or an SDK `ResourceLoader` per child) if that turns out not to hold. |
 | 67 | How specialist children get project trust | **Two halves. (a) The setup script asks once and records a trust decision for the project directory in `~/.pi/agent/trust.json` (#49). (b) The delegation extension detects a child that came up without our typed tools and fails the delegation loudly** rather than returning its prose. Explicitly **not** a hardcoded `--approve` on the spawn line, and not a global `defaultProjectTrust` change. | **The empirical half was settled by running it, 2026-08-15** — the first row in this table established by running rather than arguing. Without trust, a non-interactive child comes up with no project package, therefore none of our typed tools, and **does not error**: the session completes normally and the model answers in prose. **The design half was amended the same day.** The first version of this row hardcoded `--approve`, on the grounds that it needs no setup step and cannot be forgotten. That optimizes for fewer moving parts and pays in a permission the PM never granted: `--approve` means our extension overrides the PM's own `defaultProjectTrust` — silently, for every child, permanently, with no way to decline short of editing our code. A recorded decision keeps the grant where Pi puts it: made once, by the PM, in a file they can read and delete, as an explicit exception rather than a standing override. **And the fear that motivated the row is closed by detection, not by approval** — checking whether the child has the tools is a handful of lines and closes the hole directly, which is the better fix regardless of how trust gets granted. |
+| 68 | Every role declares `tools:` explicitly | **A role definition with no `tools:` line is a lint error in our own roster (#66), not a role that inherits safe defaults.** Omitting the line does not narrow the child — it hands it the *default active set*, which includes `bash`, `write` and `edit`. | **Found by running check 2, 2026-08-16.** The allowlist itself turned out to be stronger than claimed (see #26 and the spike results) — but only when it is *present*. With no `--tools` the child's active set came back `read, bash, edit, write` plus every custom tool, while `grep`, `find` and `ls` were configured-but-inactive. So "active tools" is not "all configured tools", the default is *more* permissive than the safe-looking subset, and a forgotten `tools:` line is the one way a specialist silently acquires a shell. Cheap to enforce, expensive to discover later — the same shape as #67's silent failure, in the half of the roster we author ourselves. |
 | 29 | Session persistence | **To disk under `.planning/`** — it's tool state, not content, so it doesn't belong in `planning-content/` (#20). Documents stay the real state. | **Losing a session must never lose a decision.** If it can, something that should have been written to a document wasn't. |
 | 30 | App ↔ agent integration | **The file watcher on `planning-content/` is the mechanism** and must work on its own. Typed tools may additionally ping the dev server for instant feedback, but only as an optimization. | #12 puts the agent in a plain terminal that knows nothing about the dev server. Anything that depends on the tools calling the app is broken by construction. |
 | 31 | Two writers, one file | **Partition, don't lock.** The app writes frontmatter and state fields; the agent writes body prose and data files. Where they must genuinely overlap, last-write-wins plus the change feed (#16). | Different regions of different files means there's nothing to clobber. Locking is a big hammer that makes the app feel broken whenever the agent is thinking. |
@@ -615,19 +616,91 @@ The example discovers them from `~/.pi/agent/agents/*.md` or `.pi/agents/*.md` a
 
 **The `tools:` line is stronger than expected**, and it changes the roster from prose into enforcement: it feeds Pi's `--tools` allowlist, which applies to built-in, extension **and** custom tools. So "research may read and search but may not write or provision" becomes a boundary the child physically cannot cross — not a *forbidden actions* bullet it's trusted to honour. That's a direct, mechanical mitigation for role leakage.
 
-### ✅ Trust spike results — run 2026-08-15
+✅ **Run 2026-08-16 and it holds — by a stronger mechanism than the claim required.** `--tools` does
+not deactivate the omitted tool, it **removes it from the child's registry**. See check 2 below.
 
-_pi 0.80.6 · Windows · llama.cpp `qwen35-4b` local · `defaultProjectTrust: "never"`._
-_Five of six checks answered. Everything above this heading was read; this was run._
+### ✅ Trust spike results — run 2026-08-15, completed 2026-08-16
+
+_pi 0.80.6 · Windows · `defaultProjectTrust: "never"`._
+_Checks 1 and 3–6 on llama.cpp `qwen35-4b`; **check 2 on `openai-codex/gpt-5.4-mini`**, per #37._
+_**Six of six answered.** Everything above this heading was read; this was run._
 
 | # | Check | Result | What it settles |
 |---|---|---|---|
 | 1 | Typed tools present in a non-interactive child | ❌ **no** — silently | → **#67**. Trust is the variable; `--approve` proves it, a recorded decision grants it |
+| 2 | `tools:` allowlist actually blocks a write | ✅ **yes** — at the **registry**, not the prompt | #26's role-leakage mitigation is mechanical, and → **#68** |
 | 3 | `AGENTS.md` reaches the child | ✅ **yes**, and `--no-context-files` suppresses it | #66 holds, *and* its stated fallback is real |
 | 4 | Turn-end hook fires in a child | ✅ **yes** (`mode: "json"`, `hasUI: false`) | #48's loop can reach specialists, not just the orchestrator |
 | 5 | `pi install -l` references vs copies | ✅ **referenced** | #50's `git pull` path needs no reinstall step |
 | 6 | Project skill beats a packaged skill | ✅ **yes**, via `.pi/skills/` | #33's precedence exists — but see the caveat below |
-| 2 | `tools:` allowlist actually blocks a write | ⏳ **unrun** | Needs a model that will reliably *attempt* the write (#37) |
+
+### Check 2 in detail — the allowlist is a registry boundary
+
+_Run 2026-08-16. The blocker recorded against this check was stale: the machine already had a
+working frontier provider (`openai-codex` OAuth, which refreshed itself silently on first use), so
+#37 was satisfied without configuring anything._
+
+**Answer: yes, and the mechanism is stronger than "the harness refuses the call."** There is no
+refusal path, because there is nothing to refuse. `--tools` removes the omitted tool from the child's
+tool registry outright. All three observables collapse to the same list:
+
+| observable | what it is |
+|---|---|
+| `pi.getAllTools()` | everything configured in the process |
+| `pi.getActiveTools()` | what the harness will dispatch |
+| `systemPromptOptions.selectedTools` | what the model is told exists |
+
+With `--tools read,grep,find,ls`, `write` was absent from **all three** — not merely hidden from the
+prompt, and not present-but-inactive. The same held for our custom `spike_record_finding`, which
+settles the one half of the claim that was untested: **`--tools` treats built-in, extension and custom
+tools identically**, in both directions. Named in the allowlist, the custom tool was registered *and
+dispatched* (`typed_tool_called` fired). Omitted, it did not exist.
+
+| run | `--tools` | `write` in registry | custom tool in registry | file written |
+|---|---|---|---|---|
+| A0 | *(none — baseline)* | ✅ | ✅ | — |
+| A1 | `read,grep,find,ls` | ❌ | ❌ | — |
+| A2 | `read,grep,find,ls,write` | ✅ | ❌ | — |
+| A3 | `read,spike_record_finding` | ❌ | ✅ | — |
+| B1 | `research` allowlist, direct | ❌ | ❌ | **absent** |
+| B2 | `scribe` allowlist, direct | ✅ | ❌ | **written** |
+| C1 | `read,spike_record_finding` | ❌ | ✅ | *(tool called)* |
+| D1 | `research`, **via `delegate`** | ❌ | ❌ | **absent** |
+| D2 | `scribe`, **via `delegate`** | ✅ | ❌ | **written** |
+
+⚠️ **The documented false-pass did occur, and the registry dump is the only reason it didn't matter.**
+In B1 and D1 the model never emitted a write call at all — it reported the tool was unavailable and
+stopped. Judged behaviourally, that is exactly the outcome this check was warned would teach nothing.
+What rescues it is that the dump was taken *before* the model ran: the tool was not in the child's
+registry, so "the model didn't try" is a **consequence** of the boundary rather than a confound with
+it. **Technique worth keeping: take the mechanical observable upstream of the model, not downstream
+of its behaviour.** It is the same move that answered check 5 without a model at all.
+
+**Three consequences, in descending order of how much they change:**
+
+- **#26's forbidden-actions contract is now enforcement, and the Risks row can drop its hedge.** A
+  role that omits `write` cannot write, cannot `edit`, and — because `bash` is a separate tool
+  subject to the same allowlist — cannot shell around it either. B1's child was left with
+  `read, grep, find, ls` and had no route to the filesystem at all.
+- **→ #68.** The default active set is *more* permissive than it looks: with no `--tools`, the child
+  came up with `read, bash, edit, write` plus every custom tool, while `grep`, `find` and `ls` were
+  configured but **inactive**. A forgotten `tools:` line is therefore not a narrower role, it is a
+  role with a shell.
+- **The delegation path itself is now exercised end to end** — orchestrator → `delegate` tool →
+  non-interactive child → allowlist applied → result returned. That was an open gap under check 1,
+  which had only ever been run top-level. It is closed in both directions (D1 negative, D2 positive).
+
+⚠️ **And it was only open because our own extension was broken — which is the finding to carry into
+the real one.** No delegated child had ever completed before this run: the spike's `delegate.ts`
+spawned with `shell: true` and inherited an open stdin, so children loaded the extension and then hung
+forever. Two bugs, both ours, neither about Pi: `shell: true` on Windows re-parses argv and splits a
+multi-word task prompt, and `pi -p` reads a prompt from stdin when it doesn't get one, so an inherited
+pipe nothing ever closes blocks the child before `session_start`. The fixes are `spawn(process.execPath,
+[process.argv[1], ...args])` — the orchestrator is itself Pi, so `argv[1]` is already `cli.js` — and
+`stdio: ["ignore", "pipe", "pipe"]`. **Both were applied together and neither was isolated**, so which
+one was load-bearing is unknown; the real extension should do both regardless. It also means a
+delegated child that hangs looks identical to one that is thinking, which argues for a spawn timeout
+in the real extension alongside #67(b)'s toolless-child detection.
 
 **Check 5 was answered without the model at all**, which is worth noting as technique: editing the
 extension and re-running produced the edited marker in the log at load time, and `.pi/` contained
@@ -1189,7 +1262,7 @@ _New section 2026-08-13. Merged from the vision doc §45 and transcript T1 §25,
 |---|---|---|
 | **The schemas are the critical path** | 16 schemas (#38) all have to land before anything can be authored against them. Nothing else can start. This is a project-management risk, not a design one, and it's the biggest. | Sequence honestly. Build stage 5's schemas first (#54) and prove the loop on one stage before doing the other fifteen. |
 | **Orchestrator bloat** | The router starts doing the interesting parts itself. Within a month you're back to one agent. | "Intentionally boring" is a written non-responsibility list, not a vibe. It belongs verbatim in the orchestrator's own instruction file — **not `AGENTS.md`**, which every specialist also reads (#66). |
-| **Agent role leakage** | The research agent starts making architecture decisions; the planning agent starts making claims it hasn't validated. | Contracts with explicit *forbidden actions* (#26), scoped context (#27), and typed tools that simply don't exist for out-of-role writes. **Strengthened 2026-08-14:** each specialist's `tools:` allowlist is enforced by Pi across built-in, extension and custom tools, so the boundary is mechanical rather than instructional. |
+| **Agent role leakage** | The research agent starts making architecture decisions; the planning agent starts making claims it hasn't validated. | Contracts with explicit *forbidden actions* (#26), scoped context (#27), and typed tools that simply don't exist for out-of-role writes. **Strengthened 2026-08-14:** each specialist's `tools:` allowlist is enforced by Pi across built-in, extension and custom tools, so the boundary is mechanical rather than instructional. ✅ **Verified 2026-08-16 by check 2** — and the mechanism is registry removal, so an out-of-role tool is not refused, it is *absent*. The hedge is gone; **the residual risk moved to #68**, a role that forgets to declare `tools:` at all. |
 | **Standing project trust** | #67 has setup record a trust decision for the project directory. That decision persists and is not scoped to the package that prompted it — anything later dropped into `.pi/` or arriving inside the project also loads. The risk moved when #67 was amended: it is no longer "our code grants trust invisibly" but "a grant the PM made once keeps applying to content that arrives later." | Much reduced by the amendment, because the grant is now visible in `~/.pi/agent/trust.json`, was made deliberately, and can be revoked by deleting a line. What remains is the case where `planning-content/` or `.pi/` arrives from somewhere else — a clone, a colleague, a merge — carrying an extension nobody read. #20 makes that path real: content is committed and travels. Partly mitigated by the tool half being gitignored and coming from one remote (#51), and by #67(b) failing loudly rather than silently when tools are missing. If project-supplied extensions ever become a feature, this row is where the argument has to restart. |
 | **Context-window overuse** | The instinct to fix "the agent doesn't know X" by adding X to the context, forever. | Structured state outside the context (#4), isolated child sessions per specialist task (#28, #65), scoped routing (#27). If persistent understanding is being solved by stuffing context, something should have been written to a file. |
 | **False determinism** | Sandbox success gets read as a production guarantee. Rung 4 gets treated as rung 5. | The ladder (#42) is explicit about the gap, and rung 5 is unreachable by construction (#24). Environment match is recorded, not assumed. |
@@ -1282,7 +1355,7 @@ _The ⚠️ at the top of "Pi integration" said everything there had been checke
 **Can one Pi agent hand a bounded task to another with its own instruction file and scoped context?** → _#26 confirmed, new #65_
 - **Yes**, and better than expected. Pi has no sub-agent primitive in core, but the SDK supports building one and the repo carries an official `subagent` example extension covering single, parallel, and sequential specialist tasks with per-specialist process, context, model, tools, and system prompt.
 - So the fear behind the question — *if Pi can't do this, the roster collapses back to one agent* — is retired. **#26 stands as written.**
-- The unexpected bonus: the `tools:` allowlist is real enforcement across built-in, extension and custom tools. "Forbidden actions" stops being a paragraph the model is trusted to obey and becomes a set of tools that aren't there. That's the best mitigation in the document for role leakage, and it arrived free.
+- The unexpected bonus: the `tools:` allowlist is real enforcement across built-in, extension and custom tools. "Forbidden actions" stops being a paragraph the model is trusted to obey and becomes a set of tools that aren't there. That's the best mitigation in the document for role leakage, and it arrived free. ✅ **Read on 2026-08-14, run on 2026-08-16 (check 2). "A set of tools that aren't there" turned out to be literally accurate** — the omitted tool is absent from the child's registry, not merely inactive or unmentioned.
 
 **Or does the orchestrator have to be implemented as session forking?** → _#28 rewritten_
 - **No — and forking wouldn't have worked anyway**, which is the more valuable half of the answer. `AgentSessionRuntime.fork()` *replaces* the runtime's active session rather than spawning a worker beside it, and a fork *inherits* its parent's conversation. #27 asks for the opposite of inheritance.

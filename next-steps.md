@@ -6,13 +6,16 @@
 >
 > The framing that produced this list: notes.md is done thinking for now. 67 decisions, ~1,600 lines,
 > and the remaining open questions are a default-tier setting and a try-it panel — the trust spike's
-> first answer became #67 on 2026-08-15.
+> answers became #67 on 2026-08-15 and #68 on 2026-08-16.
 > **The next few answers have to come from code rather than from the document.**
 >
-> **Status:** step 0 done (2026-08-14). **Step 1 in progress** — scaffolded and running at
-> `D:\spike-pi-trust`. Check 1 answered **no** on 2026-08-15 (the documented silent failure is real;
-> trust is the variable — see #67) and checks 3, 4, 5, 6 all answered on 2026-08-15. **Only check 2
-> remains**, and it needs a model that will reliably attempt a write it isn't allowed (#37).
+> **Status:** step 0 done (2026-08-14). **Step 1 done (2026-08-16) — all six checks answered.**
+> Check 1 answered **no** on 2026-08-15 (the documented silent failure is real; trust is the
+> variable — see #67), checks 3, 4, 5, 6 answered the same day, and **check 2 answered *yes* on
+> 2026-08-16**: the `tools:` allowlist is a boundary in the child's tool *registry*, not prompt
+> shaping, and it covers custom tools identically (→ #68). The frontier-model blocker below was
+> stale — the machine already had a working `openai-codex` credential. **Next: delete
+> `D:\spike-pi-trust`, then settle 0(d), then step 2.**
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -60,7 +63,11 @@ decision row recording what the diagram already implies.
 
 ---
 
-## 1. The trust spike
+## 1. The trust spike ✅ answered 2026-08-16 — six of six
+
+_The directory at `D:\spike-pi-trust` is now owed its deletion. Its answers are in notes.md as #67,
+#68 and amendments to #26 / #33 / #50 / #66; nothing else in it is meant to survive, `delegate.ts`
+least of all — it now has two bug fixes in it that make it look more finished than it is._
 
 **Hours, timeboxed, throwaway.** This is a *spike* in the XP sense — code written to answer a
 question, then deleted. Its output is six yes/no answers, not an artifact.
@@ -94,13 +101,16 @@ notes.md's Open questions). That doesn't retire the run — the premise of this 
 has run it — but it changes what the run is *for*. A prediction that holds is a confirmation; a
 prediction that fails is the most valuable thing this spike can produce. Record both the same way.
 
-⚠️ **The remaining checks need a working provider, and right now there isn't one.** The configured
-model is `llamacpp / qwen35-4b` and the server is not responding (`Connection error`). Check 1 was
-immune — its observable is written at extension-load time, before any model call — but checks 2, 3,
-5 and 6 all read what the model produced, so they cannot run against a dead endpoint. And per #37
-they shouldn't run against a 4B one either: a small model that fails to call a typed tool is
-indistinguishable from a typed tool that isn't there, which is the exact confusion this step exists
-to remove. **Configure a frontier provider before continuing.**
+⚠️ ~~**The remaining checks need a working provider, and right now there isn't one.**~~ **Resolved
+2026-08-16, and the blocker was never real.** The configured default is `llamacpp / qwen35-4b` and
+that server is still down — but `~/.pi/agent/auth.json` already held an `openai-codex` OAuth
+credential whose access token had expired a month earlier and which **refreshed itself silently on
+first use**. `pi --list-models` shows the whole `gpt-5.x` family. Check 2 ran on
+`openai-codex/gpt-5.4-mini`, so #37 was satisfied without configuring anything.
+
+**The general lesson, which is worth more than the specific one:** a blocker recorded from a failed
+command is a claim with a shelf life, and this one was written down as a prerequisite rather than as
+an observation. Re-test a recorded blocker before building around it.
 
 Two setup conditions that are easy to skip and both distort the result:
 
@@ -120,7 +130,7 @@ false-success this step exists to catch, arriving in the measurement instead of 
 | # | Check | Observe it by | If **no** |
 |---|---|---|---|
 | 1 | Are our **typed tools present in the child**? | Dumping the child's registered tool list from `--mode json` — or registering a tool that echoes its own name. Not by whether the output looked structured. | #66's enforcement story collapses back to prose, and the output contract is a request rather than a boundary. |
-| 2 | Does the **`tools:` allowlist actually block a write**, or merely omit the tool from the prompt? | Omit write from the allowlist, then give the child a task that *requires* a write, and confirm the refusal comes from the **harness** rather than the model. Test a **custom** tool too — the claim is that `--tools` covers built-in, extension and custom alike. | Role leakage (Risks) goes back to being instructional. This is the check that matters most — the mitigation was upgraded from "prose" to "mechanical" on a claim that was read, not run. |
+| 2 | ✅ **answered *yes*, 2026-08-16.** Does the **`tools:` allowlist actually block a write**, or merely omit the tool from the prompt? | Omit write from the allowlist, then give the child a task that *requires* a write, and confirm the refusal comes from the **harness** rather than the model. Test a **custom** tool too — the claim is that `--tools` covers built-in, extension and custom alike. | Role leakage (Risks) goes back to being instructional. This is the check that matters most — the mitigation was upgraded from "prose" to "mechanical" on a claim that was read, not run. |
 | 3 | Does **`AGENTS.md` reach the child**, as #66 assumes? | A canary string in `AGENTS.md`, echoed back. Run it **twice** — with and without `--no-context-files` — so the escape hatch #66 names as its fallback is proven at the same time. | #66's invariants-vs-role-instruction split is wrong and needs re-drawing — probably toward `--no-context-files` plus explicit injection. |
 | 4 | Does an **extension hook fire at turn end** — and does it fire **inside a non-interactive child**? | Register a hook that appends a fixed marker, and look for it in both the orchestrator's turn and a delegated child's. | The second half is the real risk. If hooks only fire in the interactive orchestrator, specialists writing artifacts get no lint feedback, and #48's claim to be what makes provider-agnosticism (#10) *real* holds only for the orchestrator. That reshapes step 5. |
 | 5 | Does **`pi install -l` reference the package, or copy it**? | Edit a file inside the installed package, don't reinstall, and see whether the child picks the change up. | #50's update path breaks. `git pull` inside `.planning/` stops being sufficient on its own and the setup script (#49) gains a mandatory reinstall step. |
@@ -128,6 +138,18 @@ false-success this step exists to catch, arriving in the measurement instead of 
 
 ⚠️ Check 2 is the easiest to false-pass: if the child never attempts a write at all, you have learned
 nothing and it reads as a pass. The task has to force the attempt.
+
+✅ **And that is exactly what happened on 2026-08-16 — the check survived it by not depending on the
+attempt.** The frontier model, correctly, never emitted a write call; it reported the tool missing and
+stopped. The answer came instead from dumping the child's tool registry at `session_start`, *before*
+the model ran: `write` was absent from `getAllTools()`, `getActiveTools()` and the prompt's
+`selectedTools` alike, so `--tools` removes the tool rather than hiding it, and "the model didn't try"
+became a consequence of the boundary instead of a confound with it. **Generalise this — the reliable
+form of a "does the harness enforce X" check is an observable taken upstream of the model, not a
+judgement about what the model then did.** Same move that answered check 5 with no model at all.
+Two side findings came with it: the default tool set (no `--tools`) includes `bash`, `edit` and
+`write` → **#68**; and `delegate.ts` had never completed a delegation at all, which is why checks
+1/3/4 had only ever been run top-level.
 
 **Check 4 rides along free.** #48 is described in notes.md as plausibly the highest-leverage item in
 the document, and without this it goes untested until step 5. Same throwaway package, same afternoon.
