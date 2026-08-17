@@ -117,8 +117,10 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 71 | Who writes the consumer's `.gitignore` | **The setup script (#49)**, appending a single marked block containing `.planning/` — created if the file is absent, never rewritten, and **recorded so it is never re-added**. Not a git repo ⇒ notice and continue, don't abort. | Nobody owned this: the `.planning/` line exists only in *this* repo's `.gitignore`, where it is inert, and #49's step chain didn't mention it. The record-and-never-re-add half is #67's principle applied again — a PM who deletes the line has decided to commit `.planning/`, and a setup script that silently restores it on the next run is overriding a decision the PM made, in a file they own. Idempotency keys on **"did we add our block"**, not on "is `.planning/` present". |
 | 68 | Every role declares `tools:` explicitly | **A role definition with no `tools:` line is a lint error in our own roster (#66), not a role that inherits safe defaults.** Omitting the line does not narrow the child — it hands it the *default active set*, which includes `bash`, `write` and `edit`. | **Found by running check 2, 2026-08-16.** The allowlist itself turned out to be stronger than claimed (see #26 and the spike results) — but only when it is *present*. With no `--tools` the child's active set came back `read, bash, edit, write` plus every custom tool, while `grep`, `find` and `ls` were configured-but-inactive. So "active tools" is not "all configured tools", the default is *more* permissive than the safe-looking subset, and a forgotten `tools:` line is the one way a specialist silently acquires a shell. Cheap to enforce, expensive to discover later — the same shape as #67's silent failure, in the half of the roster we author ourselves. |
 | 29 | Session persistence | **To disk under `.planning/`** — it's tool state, not content, so it doesn't belong in `planning-content/` (#20). Documents stay the real state. | **Losing a session must never lose a decision.** If it can, something that should have been written to a document wasn't. |
-| 30 | App ↔ agent integration | **The file watcher on `planning-content/` is the mechanism** and must work on its own. Typed tools may additionally ping the dev server for instant feedback, but only as an optimization. | #12 puts the agent in a plain terminal that knows nothing about the dev server. Anything that depends on the tools calling the app is broken by construction. |
-| 31 | Two writers, one file | **Partition, don't lock.** The app writes frontmatter and state fields; the agent writes body prose and data files. Where they must genuinely overlap, last-write-wins plus the change feed (#16). | Different regions of different files means there's nothing to clobber. Locking is a big hammer that makes the app feel broken whenever the agent is thinking. |
+| 30 | App ↔ agent integration | **The file watcher on `planning-content/` is the mechanism** and must work on its own. Typed tools may additionally ping the dev server for instant feedback, but only as an optimization. ✅ **Survives the watcher spike, 2026-08-17 — with a platform caveat and a library constraint: see #73.** | #12 puts the agent in a plain terminal that knows nothing about the dev server. Anything that depends on the tools calling the app is broken by construction. |
+| 31 | Two writers, one file | ~~**Partition, don't lock.** The app writes frontmatter and state fields; the agent writes body prose and data files. Where they must genuinely overlap, last-write-wins plus the change feed (#16).~~ ⚠️ **REOPENED 2026-08-17 — the partition does not hold.** Two processes editing disjoint regions of one file destroyed the document in 5 runs of 5, and lost updates in 4 of 5 even when both wrote atomically. **Locking comes back off the Rejected list**; the successor decision is open — see "The watcher — what's actually true" and Open questions. | ~~Different regions of different files means there's nothing to clobber.~~ **That was the error.** Different regions of *different files* have nothing to clobber; different regions of the *same file* have nothing **enforcing** them, because neither writer can change its region without rewriting the whole file. The partition described intent, and the filesystem does not read intent. |
+| 72 | Typed tools write atomically | **Every write to `planning-content/` is temp file plus rename — never truncate-in-place — with a bounded retry on `EPERM`/`EBUSY`/`EACCES`.** The rename retry is not optional on Windows. Readers get no debounce; they read on the event. | **Found by running check 1, 2026-08-17.** Against a non-atomic writer, **every single** naive read was a partial read — 120 of 120, and 0 of 40 revisions were ever observed whole. This is not a rare race to be defended against downstream; it is the *normal* case, and it arrives as unparseable frontmatter and truncated bodies. With an atomic writer the same naive reader saw 0 bad reads out of 57. The retry earns its place separately: renaming over an open destination raised `EPERM` on a live run, which without a retry is a hard crash in a typed tool. |
+| 73 | The watcher is `chokidar`, not `fs.watch` | **`chokidar` (v5) with `ignoreInitial`, `awaitWriteFinish` OFF, and the temp suffix from #72 ignored.** Node's built-in `fs.watch({recursive:true})` is disqualified on Windows. Watcher events are **hints that something changed, not a log of what changed** — never derive the change feed (#16) from them. | **Found by running check 2, 2026-08-17, on Windows.** `fs.watch` reported **1 distinct path for 400 file creations**, three runs out of three, with **no error event** — a silent 99.75% loss, which is the #67 failure shape again in the app half. `chokidar` reported 400/400, three of three. `awaitWriteFinish` is off because it is a trap dressed as a fix: it does suppress partial reads, but by collapsing 40 revisions into 1 — the app goes blind for exactly as long as the agent keeps writing. #72 buys the same cleanliness with none of the latency. |
 | 32 | Pi package location | **In-tree at `.planning/pi-package/`**, installed by the setup script via **`pi install -l ./.planning/pi-package`**. No npm publish. _(Corrected 2026-08-14: the `-l` is load-bearing.)_ | Nothing to fetch, matches the journey, and updates ride the same `git pull` as everything else. Publishing buys nothing while there's one consumer. **`pi install` without `-l` writes to user/global settings** — which for a one-clone-per-project model (#1) would leak one project's roster into every other project on the machine. `-l` writes `.pi/settings.json` in the project. Local paths are referenced, not copied, so `git pull` updates take effect without reinstalling. |
 | 33 | Skill tuning | Skills live **inside the package**, plus a `planning-content/skills-overrides/` drop point where a PM-tuned `SKILL.md` wins over the packaged one. ⚠️ **The drop-point path is in doubt as of 2026-08-15** — override precedence itself is verified, but only from `.pi/skills/`, which is a Pi discovery location; `planning-content/skills-overrides/` is not. See the spike results in "Pi integration". | Tuning a skill shouldn't mean editing the tool — that's a merge conflict on the next update, which is exactly what #20 exists to prevent. The *intent* survives the spike; the *path* may not. |
 | 34 | Stage definitions | **One `stages/` definition set.** The app renders from it; the skills derive from it. **Non-negotiable.** | Two hand-maintained descriptions of the same pipeline will disagree, and the disagreement surfaces as the agent confidently working to exit criteria the app isn't checking. |
@@ -1313,6 +1315,152 @@ Re-publish path, for when an unexpected variable genuinely does hit the plan: `n
 
 ---
 
+## The watcher — what's actually true
+
+_Step 2 of the build order, run 2026-08-17. **Windows 11 · Node v24.18.0 · NTFS · chokidar 5.0.0.**
+Three checks, all three answered, and one of them reopens a Decided row. The code was throwaway; it
+ran in a **consumer-shaped layout** — a `.planning/` beside a sibling `planning-content/` — so the
+resolver it bound to was #70's rule and not the dogfood path._
+
+**Check 0, which wasn't one of the three.** Before anything else the spike built #70's resolver and
+pointed it at a consumer layout that also contained the trap: a `<toolRoot>/planning-content/` holding
+a *different* project's manifest, exactly as every consumer install will after cloning this repo. The
+strict rule landed on the sibling; the tool's own copy was present and parsed the whole time. **#70's
+central claim — that the wrong root exists and succeeds — is now demonstrated rather than reasoned.**
+The refusal path names the resolved path and the override. This is a rehearsal of the fixture test
+0(d) still owes at step 5, not a substitute for it.
+
+### The three checks
+
+| # | Check | Result | What it settles |
+|---|---|---|---|
+| 1 | Can the app read a half-written file? | ❌ **yes, always** — 120 of 120 naive reads were partial | → **#72**. Atomic writes are a property of the first typed tool, not a later fix |
+| 2 | Does watching behave on Windows? | ⚠️ **only with the right library** — `fs.watch` lost 399 of 400 events, silently | → **#73**. And events are hints, not a log |
+| 3 | Does the #31 partition hold? | ❌ **no** — the document was destroyed in 5 runs of 5 | **#31 reopens.** Locking comes off the Rejected list |
+
+### Check 1 — the partial read is the normal case, not the edge case
+
+A second process wrote a 300KB MDX doc 40 times over while a watcher parsed on every event. The
+question was how many parse failures. The answer was all of them.
+
+| | writer | reader | bad reads | revisions the app saw |
+|---|---|---|---|---|
+| A | non-atomic | naive on-event read | **120 / 120** | **0 / 40** |
+| B | non-atomic | `awaitWriteFinish` | 0 / 1 | **1 / 40** |
+| C | **atomic** (tmp+rename) | naive on-event read | **0 / 57** | **35 / 40** |
+| D | non-atomic | raw `fs.watch` | 400 / 445 | 40 / 40 |
+| E | **atomic** | `awaitWriteFinish` | 0 / 5 | 5 / 40 |
+
+Two things in that table matter more than the headline.
+
+**The obvious remedy is the wrong one.** Row B looks like a pass — zero bad reads — and is in fact the
+worst row in the table. `awaitWriteFinish` waits for the file to stop changing, so while the agent is
+actively writing, *the file never stops changing*: 40 revisions collapsed into **one** event, delivered
+after the writer exited. An app tuned that way is at its least responsive precisely when the PM is
+watching the agent work. Row C gets clean reads **and** 35 of 40 revisions, because atomic rename means
+there is no such thing as a partially-visible state to wait out.
+
+**The rename is not free on Windows.** Row C crashed on the first attempt with `EPERM` renaming over
+the destination while a reader had it open. Once retried it happened on 1 of 40 renames — rare enough
+to survive development untouched, common enough to fire in front of a user. Hence the retry clause in
+#72, which is the sort of thing that only ever gets written down if a spike hits it.
+
+### Check 2 — `fs.watch` fails the way this project cares about most
+
+| operation | `chokidar` | `fs.watch` recursive |
+|---|---|---|
+| 100 files created at once | **100 / 100** | 2 events, 1 named path |
+| 400 files created at once (×3 runs) | **400 / 400** each run | **1 / 400** each run, **no error** |
+| 150 rapid writes to one file | 13 events (coalesced) | 301 events (amplified) |
+| file in a directory created *after* watch start | ✅ seen | ✅ seen |
+| plain rename `a → b` | `add:b` + `unlink:a` | 5 raw events |
+| **atomic rename over an existing file** | **`change` — one, clean** | 53 events, including the `.tmp` path |
+
+`fs.watch` doesn't merely drop events under burst — it drops them **without reporting an error**, and
+the surviving notification can arrive with a `null` filename. A watcher that says "something happened,
+I won't say what, and I won't say I lost anything" is the same silent-success failure as #67, relocated
+to the app half. That settles the library question.
+
+Three consequences beyond the choice:
+
+- **Events are hints.** Even chokidar coalesced 150 writes into 13. The app may use an event to mean
+  *re-read this path*; it may never use the event stream to mean *this is what changed*. #16's change
+  feed has to be derived from content, from the same source of truth the documents are.
+- **#72 and #73 agree with each other, which is luck worth banking.** Atomic rename shows up in
+  chokidar as a single ordinary `change` — no `unlink`+`add` flap, so the app never sees the document
+  briefly cease to exist. The remedy for check 1 costs the watcher nothing.
+- **`.tmp` must be ignored explicitly.** chokidar hid the temp-file churn here; a hand-rolled watcher
+  did not. Ignore the suffix by rule rather than relying on that.
+
+⚠️ **Measured on Windows only.** Per step 2's own warning: "it works here" and "it works" are not the
+same statement, and the `fs.watch` result in particular is a Windows `ReadDirectoryChangesW` buffer
+behaviour that will look different on macOS and Linux. #73 is safe regardless — chokidar was exact on
+every burst — but the *reason* it's required is platform-specific and should be re-measured before
+anyone claims the watcher is cross-platform.
+
+### Check 3 — "partition, don't lock" was a statement of intent, not a mechanism
+
+Two OS processes, one file, 60 edits each, concurrent. The app writer touched only an `appCounter`
+frontmatter field; the agent writer touched only a body marker. Disjoint regions, exactly as #31
+describes. Five repeats per strategy, because the first pass of this check produced a mode that passed
+once and then leaked updates twice — **one sample is not an answer**, and that near-miss is the most
+useful thing the check produced.
+
+| strategy | result over 5 runs | |
+|---|---|---|
+| truncate-in-place read-modify-write | **CORRUPT, 5 / 5** | frontmatter no longer parsed *at all* |
+| atomic (tmp + rename) | **lost updates, 4 / 5** | well-formed, but up to 24 of 60 edits vanished |
+| atomic + stat-based compare-and-swap | **lost updates, 4 / 5** | narrows the window, does not close it |
+| atomic + exclusive-create lockfile | **holds, 5 / 5** | |
+| separate files (app owns a sidecar) | **holds, 5 / 5** | |
+
+**Why the partition can't work as written.** Neither writer can change its own region without reading
+and rewriting the entire file. So every "frontmatter-only" write is a whole-file write carrying a
+snapshot of the body that may already be stale. The regions are disjoint in *intent* and completely
+overlapping in *operation*. Nothing about being careful which fields you touch changes that.
+
+**Why compare-and-swap doesn't rescue it**, which is the subtle one: checking `mtime`+`size` before
+renaming is a check and then a swap, and the other process fits between them. Two edits in the same
+millisecond, or two edits that leave the file the same length, are invisible to it. It converted a
+frequent loss into an infrequent one — which is strictly worse to *discover*, because it will pass
+in development and lose a PM's status toggle in the wild.
+
+**And the corruption result deserves its own line.** Non-atomic concurrent writes did not produce a
+document with the wrong values in it. They produced a document that **is not a document** — no parseable
+frontmatter, both counters unreadable, 5 runs out of 5. That is not "last-write-wins plus the change
+feed"; there is no version of that file for the change feed to describe.
+
+⚠️ **What this spike did not prove.** Both writers hammered the file 60 times in about a second, which
+is far more contention than reality: the app writes a status toggle on a click, the agent writes a doc
+now and then. The *rate* is unrealistic and I'm not claiming otherwise. But nothing about the failure is
+rate-dependent in kind — lower contention makes the lost update rarer, not impossible, and a rare
+silent data loss with no reproduction is a worse bug to own than a common one. Two of the five runs
+above lost fewer than five edits; one lost none. That distribution is the argument, not the average.
+
+### What #31 becomes — open, with two candidates that both work
+
+Both survivors held 5 of 5, and they are not variations on each other:
+
+- **A lockfile** (exclusive create, retry, atomic write inside it). Keeps status in frontmatter, which
+  is what **#4** deliberately chose. Costs the thing #31 rejected locking *for* — though the original
+  objection ("makes the app feel broken whenever the agent is thinking") is weaker than it reads, since
+  the lock is held for a single read-modify-write, not for the duration of a turn.
+- **A sidecar** — the app owns `<doc>.state.json` outright and never writes the MDX at all. Partition at
+  the **file** level, where the OS actually enforces it, which is the honest version of "partition, don't
+  lock". Costs a direct collision with **#4**: status stops living in per-doc frontmatter, and the
+  handoff, the lint (#47) and the tracker all have to read two files to know one thing.
+
+**Not choosing between these here.** The asymmetric write permissions in the gate model already say
+the app and the agent own different things; whether that ownership is expressed as a lock or as a file
+boundary is a design decision with consequences for #4 and the handoff, and it belongs in the same
+place the other 73 do — decided deliberately, with a number. It is in Open questions.
+
+⚠️ **This blocks nothing at step 3.** #72 is the constraint the schemas' typed tools need, and it is
+settled. The #31 successor only has to be decided before the app writes its first status field, which
+is step 5.
+
+---
+
 ## Risks
 
 _New section 2026-08-13. Merged from the vision doc §45 and transcript T1 §25, filtered to what's actually in scope after #24. Ordered roughly by how likely they are to bite._
@@ -1439,6 +1587,33 @@ _The ⚠️ at the top of "Pi integration" said everything there had been checke
 _Still genuinely open. `_leaning:_` lines are my position — a starting point to argue with, **not** a decision. Items that were promoted to **Decided** on 2026-08-13 are marked `→ #N` and their reasoning is kept in place._
 
 ### Genuinely unresolved
+
+**What replaces #31 — how two writers share one document** _(raised 2026-08-17 by the watcher spike, check 3)_
+
+Not a question about whether there's a problem; that part is measured. Truncate-in-place concurrent
+writes corrupted the document 5 runs of 5, atomic writes lost updates 4 of 5, and stat-based
+compare-and-swap lost them 4 of 5. Two strategies held 5 of 5, and the choice between them is a design
+decision rather than an empirical one:
+
+- **Lockfile** — exclusive create, retry, atomic write inside it. Status stays in per-doc frontmatter,
+  so **#4** is untouched and the handoff/lint/tracker keep reading one file to know one thing. The
+  price is the thing #31 rejected locking for, and #31's objection deserves re-reading rather than
+  re-quoting: "makes the app feel broken whenever the agent is thinking" assumed a lock held across a
+  turn. This one is held across a single read-modify-write — microseconds, not minutes.
+- **Sidecar** — the app owns `<doc>.state.json` and never writes the MDX. Partition at the **file**
+  level, which is the only level the OS enforces, and therefore the honest form of "partition, don't
+  lock." The price is a straight collision with **#4**: status leaves frontmatter, and three consumers
+  (#47's lint, the tracker, the handoff) each have to read two files and reconcile them.
+	- _leaning:_ **the lockfile**, on the grounds that it keeps a document a single object. The sidecar
+	  trades a concurrency problem for a consistency problem — two files that can disagree, with no
+	  mechanism keeping them in step — and #34's argument against two hand-maintained descriptions of
+	  one pipeline is the same argument. But this is a leaning and not a decision: the sidecar's appeal
+	  is that it needs no coordination protocol at all, and #3 already frames app-written state as
+	  *lightweight* and separable.
+- Either way, one thing is already settled by #72 and is not part of this question: **the write itself
+  is temp-file-plus-rename.** Both candidates sit on top of that, neither substitutes for it.
+- Deadline: **step 5.** The app writes its first status field there and cannot do so without an answer.
+  It does not block step 3.
 
 **Sandbox governance defaults** _(narrowed by #56)_
 - #56 answers most of this by construction — tier 1 and tier 2 need almost no policy, and a project that never activates tier 3 has no credentials to govern. What's left: **which tiers are active by default in a fresh `project.yaml`?**
@@ -1652,7 +1827,7 @@ _Dead ends go here with a one-line reason, so they don't get reconsidered six we
 - **MDX as the handoff format** — an agent receives component invocations, not content; MDX is strictly worse than Markdown for a machine reader. Ship data + rendered Markdown instead (#19).
 - **Auto-publishing when stage 9 hits done** — it would silently republish on every subsequent edit, which is precisely the moving target the freeze exists to prevent (#21).
 - **Named-person assignment in the plan** — implies a roster to maintain and breaks the moment the executing "person" is an agent (#18).
-- **Locking documents while the agent has the turn** — partitioning what each writer touches solves the same problem without making the app feel frozen. **Hard-rejected 2026-08-13** by #31; it was previously a leaning.
+- ~~**Locking documents while the agent has the turn**~~ — ⚠️ **UN-rejected 2026-08-17.** The reason given ("partitioning what each writer touches solves the same problem") was measured by the watcher spike and is false: partitioning within a file solves nothing, because neither writer can touch its region without rewriting the whole file. The rejection still stands *as written* — nobody is proposing a lock held for the duration of a turn — but a lock held for one read-modify-write is now a live candidate. See #31 and Open questions. **Hard-rejected 2026-08-13** by #31; it was previously a leaning.
 - **Runbook execution monitoring** — live step state, "paste your output here," pass/fail evaluation of a real run. The far side of #24, and the single most likely thing to creep back in.
 - **Execution-output ingestion** — feeding what actually happened back into the plan. Same line.
 - **Remediation loops driven by production failures** — the runbook ships with *pre-written* remediation from validation; it does not learn from real runs.

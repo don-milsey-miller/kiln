@@ -10,13 +10,19 @@
 > **The next few answers have to come from code rather than from the document.**
 >
 > **Status:** step 0 done (2026-08-14). **Step 1 done (2026-08-16) — all six checks answered.**
-> Check 1 answered **no** on 2026-08-15 (the documented silent failure is real; trust is the
+> **Step 2 done (2026-08-17) — all three checks answered → #72, #73, and #31 reopened.**
+> _Step 1:_ check 1 answered **no** on 2026-08-15 (the documented silent failure is real; trust is the
 > variable — see #67), checks 3, 4, 5, 6 answered the same day, and **check 2 answered *yes* on
 > 2026-08-16**: the `tools:` allowlist is a boundary in the child's tool *registry*, not prompt
 > shaping, and it covers custom tools identically (→ #68). The frontier-model blocker below was
 > stale — the machine already had a working `openai-codex` credential.
+> _Step 2:_ the app **can** read a half-written file (always, not rarely) → #72 · `fs.watch` is
+> unusable on Windows and chokidar is not → #73 · and the #31 partition **does not hold**, which
+> un-rejects locking and leaves a decision owed by step 5.
 > **0(c) and 0(d) both closed 2026-08-16** → #69, #70, #71; one fixture test is owed at step 5.
-> **Next: delete `D:\spike-pi-trust`, then step 2 (the watcher spike).**
+> **Next: step 3 (four schemas)** — and #72 is now a constraint on the first typed tool written there.
+> ⚠️ Two directories are owed deletion and neither is deleted: `D:\spike-pi-trust` (step 1) and
+> `D:\spikes\watcher` (step 2). Both were refused by a path guard, not skipped — see step 2's footer.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -198,7 +204,42 @@ Nobody has run it. That is the entire reason this is step 1.
 
 ---
 
-## 2. The watcher spike
+## 2. The watcher spike ✅ answered 2026-08-17 — three of three
+
+_Ran at `D:\spikes\watcher`, in a **consumer-shaped layout** (`.planning/` beside a sibling
+`planning-content/`) so it bound to #70's rule rather than the dogfood path — per the ⚠️ below.
+**Windows 11 · Node v24.18.0 · chokidar 5.0.0.** Full results in notes.md under "The watcher — what's
+actually true"._
+
+| # | Answer | Landed as |
+|---|---|---|
+| 1 | ❌ **Yes, the app can read a half-written file — 120 of 120 naive reads were partial.** Not an edge case; the normal case. Atomic writes fix it *and* keep the best revision fidelity, where the obvious alternative (`awaitWriteFinish`) collapsed 40 revisions into 1. | **#72** — temp+rename with a bounded `EPERM` retry, which a live run needed |
+| 2 | ⚠️ **Only with the right library.** `fs.watch` recursive reported **1 distinct path for 400 file creations, three runs of three, with no error.** chokidar: 400/400 every run. | **#73** — chokidar, `awaitWriteFinish` off, and events are *hints*, never the #16 change feed |
+| 3 | ❌ **No — the partition does not hold.** Two processes on disjoint regions of one file: **CORRUPT 5 of 5** non-atomically; **lost updates 4 of 5** even when both wrote atomically; compare-and-swap narrowed it and did not close it. Lockfile and sidecar each held 5 of 5. | **#31 reopened**, locking un-rejected, successor decision in Open questions with a leaning |
+
+**The one that reshapes something:** check 3 did what the step said it might — it reopened a Rejected
+item. #31's "partition, don't lock" was intent, not mechanism: neither writer can change its own region
+without rewriting the whole file, so the regions are disjoint in intent and identical in operation.
+Choosing the successor (lockfile vs sidecar) is a decision with a #4 consequence and is **owed by step
+5**, not step 3.
+
+**Check 0, which wasn't on the list.** Building #70's resolver against a real consumer layout —
+including a `<toolRoot>/planning-content/` holding another project's manifest — demonstrated the trap
+#70 was reasoned from. That's a rehearsal of the fixture test 0(d) owes at step 5, and the resolver is
+the one piece of this spike worth re-reading before writing the real one.
+
+⚠️ **Two caveats recorded rather than buried.** The `fs.watch` result is Windows-specific
+(`ReadDirectoryChangesW` buffer behaviour) and re-measuring on macOS/Linux is owed before anyone calls
+the watcher cross-platform. And check 3's contention rate — 120 writes in about a second — is far above
+anything real; that makes the loss *rarer* in practice, not absent, which is worse to discover.
+
+⚠️ **`D:\spikes\watcher` is owed its deletion and has not been deleted** — the same path guard that
+refused `D:\spike-pi-trust` refused it. Nothing in it is meant to survive.
+
+---
+
+<details>
+<summary>The step as written, before it ran</summary>
 
 **Half a day, timeboxed, throwaway.** Same rules as step 1 — code written to answer a question, then
 deleted.
@@ -234,9 +275,16 @@ same statement. Record which it was.
 **Where the answers go:** same as step 1 — notes.md, with numbers. Check 3 in particular can reopen a
 Rejected item, which is the sort of thing that must not live only in a terminal.
 
+</details>
+
 ---
 
 ## 3. Four schemas, not sixteen
+
+⚠️ **Step 2 left a constraint here, which is why it ran first.** #72: the first typed tool writes
+temp-file-plus-rename with a bounded `EPERM`/`EBUSY` retry, never truncate-in-place. That is a property
+of the first one written, not a retrofit across four. #31's successor is *not* owed here — it's owed at
+step 5, when the app first writes a status field.
 
 #38's sixteen types are the stated critical path and the biggest risk in notes.md. #54 makes stage 5
 the flagship. But the minimum set that proves the **loop** rather than the catalogue is:
@@ -310,7 +358,13 @@ it doesn't prove the risky part — and by now step 2 has told you how it has to
 **Carry 0(d)'s outstanding half in here:** the fixture test that builds a consumer layout in a temp
 directory — `.planning/` beside a sibling `planning-content/` — and asserts what #70 resolves. The
 skeleton is the first code with a resolver to test, and until that test exists the consumer path is
-still only exercised by consumers.
+still only exercised by consumers. _Step 2's check 0 rehearsed exactly this and it passed; it does not
+count, because it ran in a throwaway directory that no longer needs to exist._
+
+**And decide #31's successor before the status write-back is written.** Step 2 measured that the
+current answer loses data; lockfile vs sidecar is the open question, it has a leaning, and this is the
+step that forces it — the status write-back in the line above *is* the app's first write into a file
+the agent also writes.
 
 Wire #48's turn-end lint hook in **during** this step rather than after. notes.md already argues
 it's plausibly the highest-leverage item in the document; it's also the thing that tells you
