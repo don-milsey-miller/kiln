@@ -111,7 +111,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 28 | Session model | ~~Per-stage sessions forked from a shared project-context session.~~ **Rewritten 2026-08-14 after Pi re-verification.** **The orchestrator owns the single persistent, user-facing project session. Specialist work runs in isolated child sessions with an explicit task-scoped payload (#27) and a role-specific system prompt.** Stage sessions may be persisted separately where the transcript is worth keeping; **session forking is a lineage / review mechanism, not the mechanism that enforces specialist context scope.** | The old row made one decision do two jobs — historical organization *and* #27's isolation — and Pi's `fork()` turns out not to do the second. `AgentSessionRuntime.fork()` **replaces** the runtime's active session rather than spawning a concurrent worker, and a fork *inherits* the source branch's context, which is the opposite of what #27 asks for. A fresh child with a bounded payload satisfies #27 natively. See "Pi integration". |
 | 65 | Delegation mechanism | **A `subagent`-style typed tool, registered by a shipped extension.** The orchestrator calls it with a task and a role; the extension launches an isolated child Pi process (`--mode json -p --no-session`) with that role's model, tool allowlist, and system prompt. Not a Pi core primitive — it's ours to ship. | Pi deliberately has no built-in sub-agent feature, but the SDK supports it and the Pi repo carries an **official `subagent` example extension** that is very nearly this architecture already — parallel and sequential specialist tasks, per-specialist model and tools, separate context per child. #26 survives without inventing the runtime, which is the single biggest cost reduction in this document since the consolidation. |
 | 66 | Where specialist definitions live | **Inside the shipped package at `.planning/pi-package/agents/{research,validation,planning}.md`**, discovered by our delegation extension — *not* copied into each project's `.pi/agents/`. Each file is frontmatter (`name` · `description` · `tools` · `model`) plus a body that becomes that role's system prompt. `AGENTS.md` carries **shared project invariants only**; role-specific instruction never goes in it. | The roster is *tool configuration*, so it belongs in the tool half (#20), and shipping it in the package means it updates with `git pull` (#50). Keeping `AGENTS.md` free of orchestrator-specific behaviour also matters mechanically: Pi's own example launches children *with* normal context-file discovery, so whatever is in `AGENTS.md` reaches every specialist. Harder separation is available (`--no-context-files`, or an SDK `ResourceLoader` per child) if that turns out not to hold. |
-| 67 | How specialist children get project trust | **Two halves. (a) The setup script asks once and records a trust decision for the project directory in `~/.pi/agent/trust.json` (#49). (b) The delegation extension detects a child that came up without our typed tools and fails the delegation loudly** rather than returning its prose. Explicitly **not** a hardcoded `--approve` on the spawn line, and not a global `defaultProjectTrust` change. | **The empirical half was settled by running it, 2026-08-15** — the first row in this table established by running rather than arguing. Without trust, a non-interactive child comes up with no project package, therefore none of our typed tools, and **does not error**: the session completes normally and the model answers in prose. **The design half was amended the same day.** The first version of this row hardcoded `--approve`, on the grounds that it needs no setup step and cannot be forgotten. That optimizes for fewer moving parts and pays in a permission the PM never granted: `--approve` means our extension overrides the PM's own `defaultProjectTrust` — silently, for every child, permanently, with no way to decline short of editing our code. A recorded decision keeps the grant where Pi puts it: made once, by the PM, in a file they can read and delete, as an explicit exception rather than a standing override. **And the fear that motivated the row is closed by detection, not by approval** — checking whether the child has the tools is a handful of lines and closes the hole directly, which is the better fix regardless of how trust gets granted. |
+| 67 | How specialist children get project trust | **Two halves. (a) The setup script asks once and records a trust decision for the project directory in `~/.pi/agent/trust.json` (#49). (b) The delegation extension detects a child that came up without our typed tools and fails the delegation loudly** rather than returning its prose. Explicitly **not** a hardcoded `--approve` on the spawn line, and not a global `defaultProjectTrust` change. | **The empirical half was settled by running it, 2026-08-15** — the first row in this table established by running rather than arguing. Without trust, a non-interactive child comes up with no project package, therefore none of our typed tools, and **does not error**: the session completes normally and the model answers in prose. **The design half was amended the same day.** The first version of this row hardcoded `--approve`, on the grounds that it needs no setup step and cannot be forgotten. That optimizes for fewer moving parts and pays in a permission the PM never granted: `--approve` means our extension overrides the PM's own `defaultProjectTrust` — silently, for every child, permanently, with no way to decline short of editing our code. A recorded decision keeps the grant where Pi puts it: made once, by the PM, in a file they can read and delete, as an explicit exception rather than a standing override. **And the fear that motivated the row is closed by detection, not by approval** — checking whether the child has the tools is a handful of lines and closes the hole directly, which is the better fix regardless of how trust gets granted. ⚠️ **Amended 2026-08-17 — half of this row is measured and half is not, and the row did not say so.** What the run established is that **trust is the variable**: the extension failed to load by default and loaded via `--approve` and via `-e <path>`, all three run. **Writing `~/.pi/agent/trust.json` was never executed.** Its key format, its closest-decision-on-the-parent-path precedence, and whether a decision written there *by a script* is honoured by a non-interactive child are all read out of `security.md` — the same class of claim as the pre-run predictions above, which is precisely the distinction the RUN block draws with "everything above this line was read; this was run." (b) is likewise unwritten code. So: the **diagnosis** is empirical, the **remedy** is documented behaviour. Verify before #49 is built on it. The cost of being wrong is bounded — both fallbacks are proven, and `-e <path>` is the more interesting one because it loads only the file we ship rather than granting the project blanket trust, though it likely buys typed tools without packaged skills (#33). |
 | 69 | This repo *is* `.planning/` | **The tool half sits at the top level of this repo** — `app/` `pi-package/` `schemas/` `templates/` `stages/` are repo-root directories, because a consumer clones this repo *as* their `.planning/` (#1, #20, #32). `planning-content/` and `docs/plan/` at this repo's top level are **this project dogfooding itself**, not part of the tool. | Recording a reading, not making a choice — the layout diagram below already places those directories inside `.planning/`, and #1/#20/#32 already make this repo the thing that clones into it. It gets a number because it was being re-derived from the diagram every time it came up, and because #70 is unreadable without it. |
 | 70 | How the app finds `planning-content/` | **One rule, no search, no cwd:** `contentRoot = <toolRoot>/../planning-content`, where `toolRoot` comes from the app's own module location. **One documented override**, `PLANNING_CONTENT_DIR`, which is how this repo dogfoods. **Never** a fallback to `<toolRoot>/planning-content`. Missing content root ⇒ refuse to start, naming the resolved path and the override. One resolver, every caller — the watcher (#30), the lint (#47) and the typed tools all take the path from it and none of them joins its own. | **The fallback is the whole decision, and it is a trap that ships.** This repo commits its own `planning-content/`, so every consumer's `.planning/planning-content/project.yaml` exists and parses — as *our* manifest, for a different project. A resolver that tries `./` before `../` finds it, and the consumer authors against the tool's own plan with nothing anywhere saying so. Strict `../` also makes the dogfood case fail **loudly on the developer's own machine** if the rule is ever wrong, because `../planning-content` does not exist here — which is exactly what 0(d) asked for and what a per-checkout config file would not give. See below for the rejected alternatives. |
 | 71 | Who writes the consumer's `.gitignore` | **The setup script (#49)**, appending a single marked block containing `.planning/` — created if the file is absent, never rewritten, and **recorded so it is never re-added**. Not a git repo ⇒ notice and continue, don't abort. | Nobody owned this: the `.planning/` line exists only in *this* repo's `.gitignore`, where it is inert, and #49's step chain didn't mention it. The record-and-never-re-add half is #67's principle applied again — a PM who deletes the line has decided to commit `.planning/`, and a setup script that silently restores it on the next run is overriding a decision the PM made, in a file they own. Idempotency keys on **"did we add our block"**, not on "is `.planning/` present". |
@@ -1615,13 +1615,72 @@ decision rather than an empirical one:
 - Deadline: **step 5.** The app writes its first status field there and cannot do so without an answer.
   It does not block step 3.
 
+**What the schemas are actually written in** _(raised 2026-08-17, on reaching step 3)_
+
+Never decided, and never recorded as undecided until now — it surfaced only when step 3 became the
+next thing to do. Three consumers pull in different directions:
+
+- **#61** needs per-field metadata — the materiality class hangs off every field, so the
+  representation has to carry annotations the validator itself ignores.
+- **#43** *generates* templates from the schema, so it has to be readable as **data**, not only
+  executable as a validator.
+- **#47** wants one implementation and three callers: `npm run lint:plan`, the app on save, and a Pi
+  extension hook. That third one is the binding constraint — it runs inside a **non-interactive child
+  process** with no build step in front of it.
+
+- **Zod, or another TS-first validator** — types come free on the app side, which is TypeScript, and
+  the validator and the type are one artifact that cannot drift. The price is that the schema is
+  *code*: #43's template generation has to introspect a validator rather than read a document, and the
+  Pi extension needs compiled JS or a TS loader. ⚠️ Weaken this fairly — Zod 4 can emit JSON Schema, so
+  "TS-first" and "readable as data" are not strictly exclusive; the question becomes which artifact is
+  the **source of truth** and which is generated.
+- **JSON Schema as the source of truth** — plain data, read cheaply by both halves and by anything
+  added later, with per-field materiality riding in a custom keyword. The price is no TypeScript types
+  without a generation step, and JSON Schema runs out of expressiveness on cross-field rules — which
+  pushes those into the lint (#47), arguably where they belong anyway.
+- **YAML with our own validator** — matches `project.yaml`, and it is the most readable by a human and
+  an agent alike. The price is writing and maintaining the validator, and "our own schema language" is
+  a thing that grows.
+	- _leaning:_ **JSON Schema as the source of truth, types generated from it.** #47's three callers is
+	  what decides it: two of the three are not the Next.js app, and a representation that needs a
+	  TypeScript toolchain to be *read* is one the Pi child cannot read cheaply. Types-from-schema is a
+	  build step; schema-from-types is a coupling.
+- Deadline: **step 3, before the first schema.** Four schemas written one way and rewritten the other
+  is the same retrofit this project keeps arguing against.
+
+**What a trace link to a non-activated artifact type does** _(raised 2026-08-15 in next-steps.md step 3; moved here 2026-08-17, because decisions belong in this file)_
+
+#38 catalogues sixteen types, #39 makes activation a stage-2 decision the agent proposes and the PM
+approves, and step 3 builds four. So `decision` — which carries *linked evidence* and *downstream
+dependencies* — has fields pointing at types the project has not activated. This is not an edge case:
+it is the state of **every** project that activates fewer than all sixteen, which is the intended
+normal.
+
+- **Lint error** — a trace link may only reference an activated type. Clean, and it makes partial
+  activation unusable: `decision` cannot be authored at all until `evidence` is switched on.
+- **Permitted but unresolvable** — the link is allowed, the lint reports an unresolved reference at
+  advisory weight, and it resolves by itself the day the type is activated. The price is that a
+  document can carry references that currently go nowhere, and the tracker has to render that state.
+- **The field doesn't exist on this project** — schemas are projected through the activated set, so a
+  non-activated target means the field is simply absent. The cleanest model and the worst migration:
+  activating a type later changes the shape of documents already written, which is #50's
+  content-migration problem arriving on day one.
+	- _leaning:_ **permitted but unresolvable, at advisory weight.** A hard error makes the normal case
+	  unusable, and projecting fields away turns every later activation into a migration. The
+	  unresolved link is also real information rather than a defect — it records that a decision
+	  *ought* to have evidence behind it, which is #57/#58's machinery showing up early.
+- ⚠️ Note which class this lands in: `advisory` is the one of #61's four that step 3's four types
+  barely exercise, and the one already parked as needing per-*edge* declarations. Choosing it here
+  means the first real advisory rule is this one.
+- Deadline: **step 3, before the first schema** — the same retrofit argument as materiality (#61).
+
 **Sandbox governance defaults** _(narrowed by #56)_
 - #56 answers most of this by construction — tier 1 and tier 2 need almost no policy, and a project that never activates tier 3 has no credentials to govern. What's left: **which tiers are active by default in a fresh `project.yaml`?**
 	- _leaning:_ **tiers 1 and 2 on, tier 3 off.** They cost nothing and need no credentials, so leaving them off just means validation doesn't happen. Tier 3 requires a deliberate act, because a permissive default someone forgets to tighten is worse than a restrictive one someone has to loosen.
 - Does the PM set tiers once at setup, or per stage / per validation task?
 	- _leaning:_ once at setup, changeable at any time, recorded in the change feed (#16) when it changes. Per-task approval sounds safer and would be — for about a week, until it becomes a prompt everyone clicks through.
 
-**Project trust for non-interactive specialist subprocesses** **→ #67, closed 2026-08-15** _(raised 2026-08-14, and it replaced the two questions the re-verification closed)_
+**Project trust for non-interactive specialist subprocesses** **→ #67, closed 2026-08-15 — but the half that ships was never run.** ⚠️ See the amendment in #67: the *diagnosis* is measured, the *remedy* (writing `~/.pi/agent/trust.json`) is documented behaviour nobody has executed. It is not open enough to sit under "Genuinely unresolved" — it is a decision with an unverified mechanism, and the verification is owed before #49 depends on it. _(raised 2026-08-14, and it replaced the two questions the re-verification closed)_
 
 _Reasoning kept in place below, per this section's convention. It is worth keeping in full because the leaning was half-right in an instructive way: it correctly saw that trust has to be granted deliberately, and put the grant in the wrong half of the product._
 - #65 launches each specialist as a **non-interactive** child (`--mode json -p`). Non-interactive modes **don't prompt for trust** — they use the saved or default trust decision. Does a child launched that way load the project-local package (#32) and its typed tools?
@@ -1686,6 +1745,16 @@ question the spike cannot answer. See **#67**, which went to the recorded decisi
 detection — and which was written the `--approve` way first, then amended the same day. The leaning
 in this section turned out to be right after all: **it correctly put the grant in the setup script**,
 and the thing it was missing was not the location but the detection.
+
+⚠️ **And here is what was *not* run, stated plainly, because this block is the empirical record and an
+omission here reads as a measurement** _(added 2026-08-17)_. Three commands above were executed. A
+fourth was not: **nothing ever wrote `~/.pi/agent/trust.json` and re-ran the child.** The route #67
+chose is therefore the one route in this section with no line in the code block. That is not a reason
+to change #67 — the reasoning for preferring a recorded decision over `--approve` stands on its own —
+but it means #67(a) ships on `security.md`'s word, and #67(b) is a design rather than code. The
+verification is cheap and belongs before #49: write the decision the way the setup script would, run
+the same child, and confirm the extension loads without `--approve`. If it doesn't, the fallbacks are
+already proven on this machine and the loss is a setup step, not the design.
 
 ⚠️ **The distinction that matters, and it took being challenged to see it.** `--approve` is not a
 formality — it means the delegation extension overrides the PM's own `defaultProjectTrust` on their

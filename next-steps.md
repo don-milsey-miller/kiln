@@ -23,6 +23,10 @@
 > **Next: step 3 (four schemas)** — and #72 is now a constraint on the first typed tool written there.
 > ⚠️ `D:\spikes\watcher` (step 2) is deleted. **`D:\spike-pi-trust` (step 1) still is not** — a path
 > guard refuses removal at the drive root. It needs one manual `rm -rf`; nothing in it should survive.
+> **One reason to spend it before deleting it:** #67 was amended 2026-08-17 to record that its shipping
+> mechanism — writing `~/.pi/agent/trust.json` — was never actually run, only read out of `security.md`.
+> That directory is the environment that produced the finding, so verifying it there costs minutes and
+> rebuilding it at step 4 costs an afternoon. Owed before #49, not before step 3.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -301,13 +305,22 @@ get done. Note that these four types will only exercise three of the four classe
 thin here, and it's also the class notes.md already parks as needing per-*edge* declarations. Bake
 it in anyway; just don't read "the schemas work" as covering it.
 
-### Decide this before schema one: trace links to types that aren't activated
+### Decide these two before schema one
 
-`decision` carries *linked evidence* and *downstream dependencies* (the decision register). Both
-point at types this set does not activate. So the very first schema hits a question the catalogue
-never had to answer: **what does a trace link to a non-activated type do?** Lint error, permitted
-but unresolvable, or the field doesn't exist on this project at all. Pick now — it's the same
-retrofit argument as materiality, and it lands on day one rather than later.
+Both are now open questions **in notes.md**, with candidates and a leaning each — that file is
+canonical, and these were being tracked here in a running order that says decisions don't live here.
+
+- **What the schemas are written in** _(raised 2026-08-17)_. Never decided anywhere, and it surfaced
+  only on reaching this step. #61 needs per-field metadata, #43 reads the schema as *data* to generate
+  templates, and #47's third caller is a Pi extension hook in a **non-interactive child with no build
+  step**. That last constraint is the one that decides it. _leaning: JSON Schema as source of truth,
+  types generated from it._
+- **What a trace link to a non-activated type does.** `decision` carries *linked evidence* and
+  *downstream dependencies*; both point at types this set does not activate, and that is the normal
+  state of any project activating fewer than all sixteen. Lint error, permitted but unresolvable, or
+  the field doesn't exist on this project at all. _leaning: permitted but unresolvable, at advisory
+  weight_ — which lands the first real advisory rule on the one class these four types barely
+  exercise. Same retrofit argument as materiality.
 
 ### What these four prove, and what they don't
 
