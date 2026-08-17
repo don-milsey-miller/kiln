@@ -7,6 +7,12 @@
 #
 # .planning/ keeps its own remote; that remote is the update channel (#51).
 # Being ignored here is what stops it becoming a nested-repo problem.
+#
+# ⚠️ This line is INERT in this repo — this repo *is* the tool (#69), so there
+# is no .planning/ here to ignore. The line that does real work is the one the
+# setup script appends to the CONSUMER's .gitignore (#71). Keep this one
+# anyway: it costs nothing and it is correct the moment anyone clones the tool
+# inside this checkout.
 .planning/
 
 # --- Node / Next.js -------------------------------------------------------

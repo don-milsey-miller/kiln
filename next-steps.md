@@ -14,8 +14,9 @@
 > variable — see #67), checks 3, 4, 5, 6 answered the same day, and **check 2 answered *yes* on
 > 2026-08-16**: the `tools:` allowlist is a boundary in the child's tool *registry*, not prompt
 > shaping, and it covers custom tools identically (→ #68). The frontier-model blocker below was
-> stale — the machine already had a working `openai-codex` credential. **Next: delete
-> `D:\spike-pi-trust`, then settle 0(d), then step 2.**
+> stale — the machine already had a working `openai-codex` credential.
+> **0(c) and 0(d) both closed 2026-08-16** → #69, #70, #71; one fixture test is owed at step 5.
+> **Next: delete `D:\spike-pi-trust`, then step 2 (the watcher spike).**
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -43,23 +44,38 @@ They arrive with step 4, once activation makes generation possible.
 |---|---|---|
 | a | **Default sandbox tiers in a fresh `project.yaml`** — the open question notes.md already flags. Written as **tier 1 only**: the reading where a wrong default grants nothing. | Provisional. Needs a number in notes.md, or a deliberate raise. |
 | b | **`artifactTypes.activated` is `[]`.** Activation is a stage-2 agent-proposes / PM-approves decision (#39) and stage 2 hasn't run. Step 3's four types are recorded in the file as a *proposal*, not an approval. | Correct as-is. Resolves at step 4, when stage 2 actually runs. |
-| c | **Where the tool half sits in this repo.** This repo *is* the tool — it becomes `.planning/` in a user's project (#1, #20, #32) — so `app/` `pi-package/` `schemas/` `templates/` `stages/` are top-level here, and the `planning-content/` just created is this project dogfooding itself. | **Settled**, and it always was — see below. Needs a number in notes.md, not a decision. |
-| d | **How the app finds content once this repo _is_ `.planning/`.** A consumer's content sits at `../planning-content` relative to the tool root; this repo's own dogfood copy sits at `./planning-content`. Two different paths that look identical from inside this repo. | **Open — and it's the load-bearing half of what (c) was pointing at.** Wants settling before step 2, which is where it first bites. |
+| c | **Where the tool half sits in this repo.** This repo *is* the tool — it becomes `.planning/` in a user's project (#1, #20, #32) — so `app/` `pi-package/` `schemas/` `templates/` `stages/` are top-level here, and the `planning-content/` just created is this project dogfooding itself. | ✅ **Closed 2026-08-16 → #69.** It always was settled; it now has a number. |
+| d | **How the app finds content once this repo _is_ `.planning/`.** A consumer's content sits at `../planning-content` relative to the tool root; this repo's own dogfood copy sits at `./planning-content`. Two different paths that look identical from inside this repo. | ✅ **Closed 2026-08-16 → #70 (resolution) and #71 (the consumer's `.gitignore`).** And the hazard was worse than written — see below. |
 
 **(c) was never a decision — it was a reading of one.** The layout diagram in notes.md
 ("The handoff package" → The layout) already places `app/ pi-package/ schemas/ templates/ stages/
 sessions/` inside `.planning/`, and #1 / #20 / #32 make this repo the thing that clones into it.
 So the spike puts its `pi-package/` at the top level and nothing is blocked. What's owed is a
-decision row recording what the diagram already implies.
+decision row recording what the diagram already implies. ✅ **That row is #69.**
 
-⚠️ **(d) is the one to settle first now**, and it's sharper than (c) was:
+✅ **(d) settled 2026-08-16 — and settling it turned up a sharper version of itself.** Full reasoning
+and the rejected alternatives are in notes.md under "Resolving the content root". In short:
 
-- **Path resolution.** The file watcher (#30) and the lint (#47) must bind to the *parent's*
-  `planning-content/` and never to the tool's dogfood copy. Inside this repo the two resolve to the
-  same directory — so a wrong rule here works perfectly right up until somebody else clones it.
-- **Nobody writes the consumer's `.gitignore`.** The `.planning/` line in this repo's `.gitignore`
-  is inert here; it only does work in a *user's* project, and that file currently has no author.
-  It belongs to the setup script (#49) and it is not in the step chain notes.md sketches for it.
+- **Path resolution → #70.** The problem was not two paths that look alike, it was that **the wrong
+  one exists and parses in every consumer install.** `planning-content/` is committed in this repo, so
+  a consumer's `.planning/planning-content/project.yaml` is present on day one — as *our* manifest,
+  for a different project. Any resolver that tries `./` before `../` succeeds against the wrong
+  project and says nothing. So: **one rule, `<toolRoot>/../planning-content`, with no fallback**, one
+  documented override (`PLANNING_CONTENT_DIR`, which is how this repo dogfoods), and one resolver that
+  the watcher (#30), the lint (#47) and the typed tools all call. A missing content root refuses to
+  start rather than guessing.
+- **Why not record the path at setup time?** Because both checkouts would then hold different correct
+  values, both would work, and the consumer's branch would still be exercised only by consumers.
+  Under #70 a wrong rule breaks **this machine** immediately, since `../planning-content` doesn't
+  exist here. The scarce property was local falsifiability, not explicitness.
+- **The consumer's `.gitignore` → #71.** It goes in the setup script (#49): one marked block,
+  appended once, recorded, and **never re-added if the PM deletes it** — deleting the line is a
+  decision to commit `.planning/`, and silently restoring it is the same override-the-PM move #67
+  rejected.
+- **What's owed in code, not prose:** a fixture test that builds the consumer layout in a temp
+  directory and asserts what resolves. That is the piece that actually closes this, because it
+  exercises the consumer path on the developer's machine. It lands with the first code that resolves
+  anything — **step 5**, and it is the only part of 0(d) still outstanding.
 
 ---
 
@@ -206,6 +222,11 @@ means writing them twice.
 | 2 | Does watching behave on **Windows**? | The same loop, but watching what the real app will watch — nested dirs, renames, rapid successive writes. Look for missed and coalesced events. | The watcher needs polling or a debounce strategy, and #30's "must work on its own" gets a caveat with a platform attached. |
 | 3 | Does the **#31 partition actually hold**? | Two writers on one file — one touching frontmatter only, one touching the body only — running concurrently. | "Partition, don't lock" was chosen over locking on the strength of a prediction. If regions don't stay separate in practice, #31 reopens and locking comes back off the Rejected list. |
 
+⚠️ **Watch what the spike binds to.** #70 now fixes how the content root is found, and this is the
+first code that has to find one. Even throwaway, resolve it the #70 way rather than hard-coding
+`./planning-content` — a spike that hard-codes the dogfood path is a spike that answers its three
+questions against a layout no consumer has.
+
 ⚠️ This is the one spike where **the platform is part of the question.** Development is on Windows;
 file-event semantics differ enough from macOS/Linux that "it works" here and "it works" is not the
 same statement. Record which it was.
@@ -285,6 +306,11 @@ real documents to render.
 Manifest → tracker view → one MDX doc rendering → status write-back → **the file watcher**.
 The watcher is the whole integration surface between the two halves (#12), so a skeleton without
 it doesn't prove the risky part — and by now step 2 has told you how it has to be built.
+
+**Carry 0(d)'s outstanding half in here:** the fixture test that builds a consumer layout in a temp
+directory — `.planning/` beside a sibling `planning-content/` — and asserts what #70 resolves. The
+skeleton is the first code with a resolver to test, and until that test exists the consumer path is
+still only exercised by consumers.
 
 Wire #48's turn-end lint hook in **during** this step rather than after. notes.md already argues
 it's plausibly the highest-leverage item in the document; it's also the thing that tells you

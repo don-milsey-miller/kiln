@@ -60,7 +60,7 @@ _Softened 2026-08-14:_ the Pi re-verification found an **official `subagent` exa
 
 ## Decided
 
-_#1–13 settled 2026-08-12, #14–22 settled 2026-08-13, #23–64 settled 2026-08-13 during the consolidation, #65–66 settled 2026-08-14 by the Pi re-verification, **#67 settled 2026-08-15 and #68 settled 2026-08-16 by the trust spike — the first rows here settled by running something rather than by reading or arguing.**_
+_#1–13 settled 2026-08-12, #14–22 settled 2026-08-13, #23–64 settled 2026-08-13 during the consolidation, #65–66 settled 2026-08-14 by the Pi re-verification, **#67 settled 2026-08-15 and #68 settled 2026-08-16 by the trust spike — the first rows here settled by running something rather than by reading or arguing** — #69–71 settled 2026-08-16, closing next-steps.md's 0(c) and 0(d)._
 _Don't re-litigate these without a reason — put the reason in **Rejected** below._
 _Numbers are stable and never reused. The grouping below is for scanning; **#N** references throughout this document still resolve._
 
@@ -112,6 +112,9 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 65 | Delegation mechanism | **A `subagent`-style typed tool, registered by a shipped extension.** The orchestrator calls it with a task and a role; the extension launches an isolated child Pi process (`--mode json -p --no-session`) with that role's model, tool allowlist, and system prompt. Not a Pi core primitive — it's ours to ship. | Pi deliberately has no built-in sub-agent feature, but the SDK supports it and the Pi repo carries an **official `subagent` example extension** that is very nearly this architecture already — parallel and sequential specialist tasks, per-specialist model and tools, separate context per child. #26 survives without inventing the runtime, which is the single biggest cost reduction in this document since the consolidation. |
 | 66 | Where specialist definitions live | **Inside the shipped package at `.planning/pi-package/agents/{research,validation,planning}.md`**, discovered by our delegation extension — *not* copied into each project's `.pi/agents/`. Each file is frontmatter (`name` · `description` · `tools` · `model`) plus a body that becomes that role's system prompt. `AGENTS.md` carries **shared project invariants only**; role-specific instruction never goes in it. | The roster is *tool configuration*, so it belongs in the tool half (#20), and shipping it in the package means it updates with `git pull` (#50). Keeping `AGENTS.md` free of orchestrator-specific behaviour also matters mechanically: Pi's own example launches children *with* normal context-file discovery, so whatever is in `AGENTS.md` reaches every specialist. Harder separation is available (`--no-context-files`, or an SDK `ResourceLoader` per child) if that turns out not to hold. |
 | 67 | How specialist children get project trust | **Two halves. (a) The setup script asks once and records a trust decision for the project directory in `~/.pi/agent/trust.json` (#49). (b) The delegation extension detects a child that came up without our typed tools and fails the delegation loudly** rather than returning its prose. Explicitly **not** a hardcoded `--approve` on the spawn line, and not a global `defaultProjectTrust` change. | **The empirical half was settled by running it, 2026-08-15** — the first row in this table established by running rather than arguing. Without trust, a non-interactive child comes up with no project package, therefore none of our typed tools, and **does not error**: the session completes normally and the model answers in prose. **The design half was amended the same day.** The first version of this row hardcoded `--approve`, on the grounds that it needs no setup step and cannot be forgotten. That optimizes for fewer moving parts and pays in a permission the PM never granted: `--approve` means our extension overrides the PM's own `defaultProjectTrust` — silently, for every child, permanently, with no way to decline short of editing our code. A recorded decision keeps the grant where Pi puts it: made once, by the PM, in a file they can read and delete, as an explicit exception rather than a standing override. **And the fear that motivated the row is closed by detection, not by approval** — checking whether the child has the tools is a handful of lines and closes the hole directly, which is the better fix regardless of how trust gets granted. |
+| 69 | This repo *is* `.planning/` | **The tool half sits at the top level of this repo** — `app/` `pi-package/` `schemas/` `templates/` `stages/` are repo-root directories, because a consumer clones this repo *as* their `.planning/` (#1, #20, #32). `planning-content/` and `docs/plan/` at this repo's top level are **this project dogfooding itself**, not part of the tool. | Recording a reading, not making a choice — the layout diagram below already places those directories inside `.planning/`, and #1/#20/#32 already make this repo the thing that clones into it. It gets a number because it was being re-derived from the diagram every time it came up, and because #70 is unreadable without it. |
+| 70 | How the app finds `planning-content/` | **One rule, no search, no cwd:** `contentRoot = <toolRoot>/../planning-content`, where `toolRoot` comes from the app's own module location. **One documented override**, `PLANNING_CONTENT_DIR`, which is how this repo dogfoods. **Never** a fallback to `<toolRoot>/planning-content`. Missing content root ⇒ refuse to start, naming the resolved path and the override. One resolver, every caller — the watcher (#30), the lint (#47) and the typed tools all take the path from it and none of them joins its own. | **The fallback is the whole decision, and it is a trap that ships.** This repo commits its own `planning-content/`, so every consumer's `.planning/planning-content/project.yaml` exists and parses — as *our* manifest, for a different project. A resolver that tries `./` before `../` finds it, and the consumer authors against the tool's own plan with nothing anywhere saying so. Strict `../` also makes the dogfood case fail **loudly on the developer's own machine** if the rule is ever wrong, because `../planning-content` does not exist here — which is exactly what 0(d) asked for and what a per-checkout config file would not give. See below for the rejected alternatives. |
+| 71 | Who writes the consumer's `.gitignore` | **The setup script (#49)**, appending a single marked block containing `.planning/` — created if the file is absent, never rewritten, and **recorded so it is never re-added**. Not a git repo ⇒ notice and continue, don't abort. | Nobody owned this: the `.planning/` line exists only in *this* repo's `.gitignore`, where it is inert, and #49's step chain didn't mention it. The record-and-never-re-add half is #67's principle applied again — a PM who deletes the line has decided to commit `.planning/`, and a setup script that silently restores it on the next run is overriding a decision the PM made, in a file they own. Idempotency keys on **"did we add our block"**, not on "is `.planning/` present". |
 | 68 | Every role declares `tools:` explicitly | **A role definition with no `tools:` line is a lint error in our own roster (#66), not a role that inherits safe defaults.** Omitting the line does not narrow the child — it hands it the *default active set*, which includes `bash`, `write` and `edit`. | **Found by running check 2, 2026-08-16.** The allowlist itself turned out to be stronger than claimed (see #26 and the spike results) — but only when it is *present*. With no `--tools` the child's active set came back `read, bash, edit, write` plus every custom tool, while `grep`, `find` and `ls` were configured-but-inactive. So "active tools" is not "all configured tools", the default is *more* permissive than the safe-looking subset, and a forgotten `tools:` line is the one way a specialist silently acquires a shell. Cheap to enforce, expensive to discover later — the same shape as #67's silent failure, in the half of the roster we author ourselves. |
 | 29 | Session persistence | **To disk under `.planning/`** — it's tool state, not content, so it doesn't belong in `planning-content/` (#20). Documents stay the real state. | **Losing a session must never lose a decision.** If it can, something that should have been written to a document wasn't. |
 | 30 | App ↔ agent integration | **The file watcher on `planning-content/` is the mechanism** and must work on its own. Typed tools may additionally ping the dev server for instant feedback, but only as an optimization. | #12 puts the agent in a plain terminal that knows nothing about the dev server. Anything that depends on the tools calling the app is broken by construction. |
@@ -146,9 +149,9 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | # | Question | Decision | Why |
 |---|---|---|---|
 | 46 | Lint enforcement | **Warn continuously, block at exactly two boundaries** — the stage transition and `npm run handoff`. | Blocking mid-thought is wrong; blocking at a gate is the entire point of having gates. A lint that blocks while you're drafting gets disabled within a week. |
-| 47 | Lint implementation | **One implementation, three callers** — `npm run lint:plan`, the app on save, and a Pi extension hook. | Three copies of the rules is three sets of rules within a month. |
+| 47 | Lint implementation | **One implementation, three callers** — `npm run lint:plan`, the app on save, and a Pi extension hook. | Three copies of the rules is three sets of rules within a month. **The same argument applies to the content path (#70)**: one resolver, every caller, and nobody joins their own — three hand-rolled path joins is three chances to find the tool's own shipped `planning-content/` instead of the project's. |
 | 48 | Lint feedback loop | **A Pi extension hook runs the lint at turn end and feeds failures back to the agent. Build this early, not late.** | Plausibly the single highest-leverage item in this document. It turns the lint from a report into a self-correcting loop, and it's what makes provider-agnosticism (#10) *real* rather than nominal — a 7B model that can't produce a complete document first pass can absolutely fix a named gap on the second. |
-| 49 | Setup script | **Idempotent and re-runnable**, each step checking its own precondition. Provider setup is the one step allowed to **fail without aborting** — the app comes up unconfigured with a banner. **Carries the project-trust step (#67a): ask once, record the decision in `~/.pi/agent/trust.json`.** Re-running finds the decision already present and moves on. | A setup script that can strand you halfway is worse than one that takes two runs. The trust step belongs here rather than in the delegation extension because it is a permission the PM grants, not one the tool asserts — and asking once, at the moment they are already setting the project up, is the only point where the question is in context. |
+| 49 | Setup script | **Idempotent and re-runnable**, each step checking its own precondition. Provider setup is the one step allowed to **fail without aborting** — the app comes up unconfigured with a banner. **Carries the project-trust step (#67a): ask once, record the decision in `~/.pi/agent/trust.json`.** Re-running finds the decision already present and moves on. **Also carries the consumer's `.gitignore` block (#71)** — appended once, marked, recorded, never re-added. | A setup script that can strand you halfway is worse than one that takes two runs. The trust step belongs here rather than in the delegation extension because it is a permission the PM grants, not one the tool asserts — and asking once, at the moment they are already setting the project up, is the only point where the question is in context. |
 | 50 | Tool updates | **`git pull` inside `.planning/`**, then re-run `pi install -l ./.planning/pi-package` (#32). `project.yaml` carries a **schema version field** so the tool can detect and migrate older content. ✅ **Verified 2026-08-15: the reinstall is not required.** Local package paths are referenced, not copied — an edit inside the package took effect on the next run with no reinstall. Keep the reinstall documented as a repair step, not a mandatory one. | One update path for the whole tool, not one per half. #20 makes it safe by construction. |
 | 51 | Clone remote | **`.planning/` keeps its own remote** — that's the update channel. | Being gitignored by the parent repo means no nested-repo confusion. |
 | 52 | App's knowledge of the codebase | **Purely a document tool for v1.** It doesn't read source or link to files. | The *agent* can already read the codebase — that capability exists and doesn't need duplicating in the app. Revisit only if a real need shows up while working an actual plan. |
@@ -1227,6 +1230,62 @@ my-project/                  ← the real project repo
 ```
 
 **Why the split matters (#20):** a new developer or PM who clones the project repo finds `planning-content/` sitting there and re-clones the tool beside it. The tool improves independently; nobody's documents are held hostage by a version. It also directly answers "would the repo's contents clutter the workspace" — `.planning/` is gitignored, so no.
+
+### Resolving the content root — #69, #70, #71 _(settled 2026-08-16)_
+
+The diagram above is written from the *consumer's* root. This repo is the tool half of it (#69), so
+the same two directories sit at two different depths depending on who is looking:
+
+```
+a consumer                              this repo, in development
+──────────────────────────────          ────────────────────────────────
+my-project/                             visual-project-workflow/   ← toolRoot
+├── .planning/          ← toolRoot      ├── app/  pi-package/  …
+│   ├── app/  pi-package/  …            ├── planning-content/   ← dogfood content
+│   └── planning-content/  ← OURS       └── docs/plan/
+├── planning-content/   ← THEIRS
+└── docs/plan/
+```
+
+⚠️ **The hazard is worse than "two paths that look alike", and it ships.** `planning-content/` is
+**committed in this repo**, so a consumer's `.planning/planning-content/project.yaml` exists on every
+install and parses cleanly — as *our* manifest, for a different project, with a different pipeline and
+a different `activated` list. A resolver that tries `./planning-content` before `../planning-content`
+therefore does not fail; it succeeds against the wrong project, and nothing anywhere says so. That is
+#67's failure shape — a well-formed success with the wrong contents underneath — reappearing in the
+app half, and it is why #70 has no fallback rather than a carefully-ordered one.
+
+**Why strict `../` and an override, rather than a path recorded at setup.** Both remove the guessing.
+The difference is where a wrong rule surfaces. Under #70, `../planning-content` does not exist in this
+repo, so a broken resolver breaks the developer's own machine on the first run. Under a
+setup-written path file, this checkout and a consumer's checkout hold *different* correct values, both
+work, and the consumer's branch is exercised only by consumers — which is precisely the "works
+perfectly right up until somebody else clones it" property 0(d) was raised to prevent. Explicitness
+was never the scarce thing here; **local falsifiability was.**
+
+Rejected along the way:
+
+| | Why not |
+|---|---|
+| Search upward for the nearest `planning-content/project.yaml` | Finds the shipped copy first in every consumer install. The bug is the search, not the search order. |
+| Resolve relative to `cwd` | cwd is a property of how the process was launched, not of the layout. Works from the project root, silently wrong from anywhere else. |
+| A `contentRoot` written into `.planning/` by setup (#49) | See above — correct, but it makes the dogfood and consumer cases *different configurations of the same code*, so neither tests the other. Also one more file that must be gitignored, because committing it would ship a value pointing at our own content. |
+| Stop shipping `planning-content/` in the tool repo | Would remove the trap, and costs the thing step 0 deliberately built: this project planning itself, in the open, in the repo. #70 contains the trap at the resolver instead, which is one rule rather than a structural amputation. |
+
+**Two guards, both cheap, neither load-bearing:**
+- Refuse to start if the resolved content root lies **inside** the tool root, unless
+  `PLANNING_CONTENT_DIR` was set explicitly. A backstop for a future bug, not part of the mechanism —
+  in this repo the override is set, so it never fires here.
+- A fixture test that **builds the consumer layout in a temp directory** — `.planning/` plus a sibling
+  `planning-content/` — and asserts what resolves. This is the one that actually closes 0(d)'s
+  complaint, because it exercises the consumer path on the developer's machine. It belongs with the
+  first code that resolves anything, i.e. the skeleton (step 5), not later.
+
+**And the second half of 0(d) was the quieter one.** The `.planning/` line in this repo's `.gitignore`
+does nothing here; it only does work in a *user's* project, and that file had no author. → **#71**,
+which puts it in the setup script and makes it a decision the PM can reverse — a deleted line stays
+deleted. Note what this is not: setup does not manage the consumer's `.gitignore`, it appends to it
+once and then leaves it alone forever.
 
 **Why evidence ships with the plan.** A runbook step that says "install via method B" is worth much less than one that also says "method A failed on RHEL 10, here's the output; method B succeeded, here's the output; the test environment matched on OS and package manager but not GPU family." The second one lets the executing team reason when reality diverges. Shipping conclusions without evidence is how a plan becomes something you either obey or abandon.
 
