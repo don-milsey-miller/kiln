@@ -15,10 +15,16 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. 67 decisions, ~1,600 lines,
-> and the remaining open questions are a default-tier setting and a try-it panel — the trust spike's
-> answers became #67 on 2026-08-15 and #68 on 2026-08-16.
+> The framing that produced this list: notes.md is done thinking for now. **80 decisions as of
+> 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
+>
+> ⚠️ **Revised 2026-08-18 from `Visual Project Workflow — Conversation Review and Implementation
+> Readiness Notes.md`.** That document is a review of notes.md written after it, so most of it restates
+> what was already recorded. Four things in it were new: **#78** closes the #31 successor (short-lived
+> lockfile), **#79** names semantic staleness and deliberately doesn't solve it, **#80** writes down the
+> triage rule this project has been following unstated, and **#76 grew from five steps to seven** — two
+> verification spikes before the schemas, and an evidence vertical slice after the skeleton.
 >
 > **Status:** step 0 done (2026-08-14). **Step 1 done (2026-08-16) — all six checks answered.**
 > **Step 2 done (2026-08-17) — all three checks answered → #72, #73, and #31 reopened.**
@@ -29,18 +35,21 @@
 > stale — the machine already had a working `openai-codex` credential.
 > _Step 2:_ the app **can** read a half-written file (always, not rarely) → #72 · `fs.watch` is
 > unusable on Windows and chokidar is not → #73 · and the #31 partition **does not hold**, which
-> un-rejects locking and leaves a decision owed by step 5.
+> un-rejected locking. ✅ **Its successor is now #78 — a short-lived lockfile — decided 2026-08-18,
+> ahead of its step-5 deadline.**
 > **0(c) and 0(d) both closed 2026-08-16** → #69, #70, #71; one fixture test is owed at step 5.
-> **Next: step 3 (four schemas)** — and #72 is now a constraint on the first typed tool written there.
 > **Step 3's two blocking decisions closed 2026-08-18 → #74 (JSON Schema is the source of truth,
 > types generated from it) and #75 (a trace link to a non-activated type is permitted but
-> unresolvable, at advisory weight).** Nothing else stands between here and the first schema.
+> unresolvable, at advisory weight).** #72 is a constraint on the first typed tool written there.
+>
+> **Next: steps 2a and 2b — the two verification spikes.** Hours, not days, and both are already owed:
+> #67's `trust.json` mechanism was never run, and #33's override *path* was never tested. Step 3 is not
+> blocked by either, so run them first only because they are cheap and stale-dated; if something forces
+> a choice, the schemas are the critical path.
+>
 > ⚠️ `D:\spikes\watcher` (step 2) is deleted. **`D:\spike-pi-trust` (step 1) still is not** — a path
-> guard refuses removal at the drive root. It needs one manual `rm -rf`; nothing in it should survive.
-> **One reason to spend it before deleting it:** #67 was amended 2026-08-17 to record that its shipping
-> mechanism — writing `~/.pi/agent/trust.json` — was never actually run, only read out of `security.md`.
-> That directory is the environment that produced the finding, so verifying it there costs minutes and
-> rebuilding it at step 4 costs an afternoon. Owed before #49, not before step 3.
+> guard refuses removal at the drive root; it needs one manual `rm -rf`. **Don't delete it yet:** it is
+> the exact environment step 2a wants. Minutes there versus an afternoon rebuilding it later.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -296,6 +305,66 @@ Rejected item, which is the sort of thing that must not live only in a terminal.
 
 ---
 
+## 2a + 2b. Two verification spikes — hours, not days
+
+_Added 2026-08-18 from the review document; recorded as the amendment to **#76**. Neither is a design
+question any more. Each is one binary result, each is already owed, and each is #80's second branch:
+not blocking, but expensive to be wrong about._
+
+### 2a — Project trust: does writing `trust.json` actually work?
+
+#67 chose "the setup script records the PM's trust decision" over `--approve`, for good reasons that
+still hold. **The mechanism it chose was never run.** Three commands were executed on 2026-08-15
+(default → no extension · `--approve` → loads · `-e <path>` → loads); writing
+`~/.pi/agent/trust.json` was not one of them. It comes from `security.md`, read and not run.
+
+| | Step | Confirm |
+|---|---|---|
+| 1 | Clean project, restrictive `defaultProjectTrust`, `pi install -l` | — |
+| 2 | Launch a non-interactive child | typed tools **absent** |
+| 3 | Write the trust entry **exactly as the setup script would** | — |
+| 4 | Launch the same child | extension loaded · custom tools registered · **no `--approve`** |
+| 5 | **Remove the entry**, launch again | reverts to untrusted |
+
+⚠️ **Step 5 is the control and it is the one that gets skipped.** Without it, a child that loads for
+an unrelated reason — a stale global setting, a parent-path decision already sitting in `trust.json`,
+an inherited environment — reads as a pass. Same discipline that made the original run a finding
+rather than an anecdote.
+
+**If it fails:** nothing architectural. Both fallbacks are already proven on this machine, and the
+loss is a setup step. `-e <path>` is the more interesting one — it loads only the file we ship rather
+than granting the project blanket trust, though it likely buys typed tools without packaged skills.
+
+⚠️ `D:\spike-pi-trust` still exists (a path guard refused its deletion). **That is the environment
+this spike wants** — running it there costs minutes; rebuilding it later costs an afternoon.
+
+### 2b — Skill overrides: does *our* path actually win?
+
+Check 6 proved precedence exists — from `.pi/skills/`, which is one of Pi's own discovery locations.
+**`planning-content/skills-overrides/` is not.** It would be registered through the settings `skills`
+array, and in the documented discovery order settings come *after* packages; since collisions "warn
+and keep the first skill found," an override registered that way plausibly **loses**. The exact
+opposite of what #33 promises.
+
+Ship a packaged skill whose body says `PACKAGED`, an override of the same name saying `OVERRIDE`,
+register the override **through the mechanism this product plans to ship**, and read which body
+reaches the agent.
+
+⚠️ **The framing matters more than the fixture.** The question is *not* whether Pi supports overrides
+— that is answered, and re-answering it from `.pi/skills/` would be a false pass wearing a green tick.
+
+| | Outcome | What it means |
+|---|---|---|
+| A | The override wins | #33 stands as written |
+| B | The packaged skill wins | Setup materializes overrides into `.pi/skills/`. #33's *location* changes; its promise survives |
+| C | Some third loading path gives the right precedence | Record that as the shipped mechanism |
+
+**Close this before the customization story is documented anywhere a user can read it.** #33 exists so
+that tuning a skill doesn't mean editing the tool — which is the merge conflict #20 was written to
+prevent.
+
+---
+
 ## 3. Four schemas, not sixteen
 
 ⚠️ **Step 2 left a constraint here, which is why it ran first.** #72: the first typed tool writes
@@ -399,6 +468,54 @@ Wire #48's turn-end lint hook in **during** this step rather than after. notes.m
 it's plausibly the highest-leverage item in the document; it's also the thing that tells you
 whether the four schemas in step 3 were the right four.
 
+## 6. One evidence vertical slice — the loop nothing else touches
+
+_Added 2026-08-18 from the review document; in **#76**'s amendment. Not the evidence catalogue. **One
+assertion, carried the whole way.**_
+
+Steps 3–5 prove the **authoring** loop: schemas, typed tools, templates, lint, tracing, rendering,
+status write-back, the watcher. That is the right first target and it is real progress. It is also
+**not the product's claim.**
+
+> An authoring loop plus a working UI proves a sophisticated documentation interface for AI-generated
+> planning. The claim is a plan that knows which of its statements are guesses, which are documented,
+> which were tested, and which are safe enough to become instructions someone will run.
+
+Nothing in steps 1–5 exercises the second sentence at all.
+
+### The slice
+
+```
+requirement → assertion → research → source-supported evidence
+  → validation task → sandbox run → observed evidence
+  → confidence rung → planning decision → runbook step → lint → render
+```
+
+One assertion. Something real enough to be meaningful and cheap enough that **the workflow rather than
+the infrastructure is what's under test** — if the experiment itself is hard, the slice is measuring
+the wrong thing.
+
+What it puts under load, none of which steps 3–5 touch: whether a rung is a property anyone can
+compute consistently · whether the tier→rung table survives contact with a real run (#77 already made
+its ceiling machine-dependent) · whether `n/a` with a reason (#45) is enough for a claim that *cannot*
+be validated here · whether the lint's `runbook step → assertion → evidence → threshold` chain (#57,
+#58, #59) is checkable rather than merely stateable · and whether the trace chain is legible to a
+human once it has five hops in it.
+
+### What each result is worth
+
+- **It works and feels natural.** The most novel part of the design is real, and the remaining twelve
+  types are pattern application.
+- **It's awkward, redundant, or expensive.** Learned *before* sixteen schemas and nine stages harden
+  around it — which is the entire point of doing this at step 6 and not step 12.
+
+⚠️ **`assertion` / `evidence` / `runbook-step` are also the types most likely to break conventions
+settled in step 3.** They stress ID identity across revisions, evidence attachment, and confidence as a
+computed rather than authored field. Let them challenge the four-type conventions early; that is a
+feature of this ordering, not a risk of it.
+
+---
+
 ---
 
 ## Why this order
@@ -420,7 +537,15 @@ version of that statement is narrower — **step 3 is the only dependency the tw
 Whether anything actually runs in parallel is a question about how many people are working, and the
 answer here is one.
 
-**Where this stops, deliberately.** The running order ends at the first point the two halves touch.
-It does not cover the three specialist contracts, the remaining twelve artifact types, the sandbox
-tiers, or the runbook — which is to say the evidence loop, the most novel machinery in the design,
-is still ahead. Step 5 is the end of the beginning, not the run-up to done.
+**The two verification spikes are not a third phase.** They are stale-dated debts from step 1 — one
+mechanism chosen but never run (#67's `trust.json`), one behaviour proved on the wrong path (#33's
+override location). They sit before the schemas because they cost hours and get more expensive to run
+the further the code gets from the spike that would answer them, not because anything waits on them.
+
+**Where this stops, deliberately** _(revised 2026-08-18)_. The order used to end at the first point the
+two halves touch, and it named the evidence loop as the thing still ahead of it. **Step 6 changes
+that** — one assertion carried the whole way, which is the smallest thing that tests the product's
+actual claim rather than its authoring machinery. What remains outside: the three specialist contracts,
+the other twelve artifact types, the sandbox tiers beyond whatever the slice needs, and the runbook as
+a produced artifact. **Step 6 is the end of the beginning.** Step 5 is now the end of the part that
+would have looked finished while proving the less interesting half.
