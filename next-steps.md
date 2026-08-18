@@ -51,21 +51,23 @@
 > through the settings `skills` array, the override beats the packaged skill; editing it tracks; removing
 > it restores the packaged one. **#33 stands as written** and the customization story can be documented.
 > The check-6 caveat that predicted the opposite was a documented-order reading, and it was wrong.
-> ⚠️ Still untested: precedence between that path and `.pi/skills/` when both hold the same skill.
+> ⚠️ Precedence between that path and `.pi/skills/` is untested **by choice** — #80 branch 3, with a reopen condition, because the product does not create that configuration.
 >
-> ✅ **Side finding — a step-1 loose end closed.** Every 2b run hung until stdin was closed. That is the
-> inherited-stdin bug from `delegate.ts`, reproduced with no delegation code involved, so **the stdin
-> half is the load-bearing fix** — `stdio: ["ignore", "pipe", "pipe"]`, however the child is spawned.
-> The failure is a silent indefinite hang, which is why the spawn timeout matters more than it looked.
+> ✅ **Side finding — a step-1 loose end closed, and it earned a decision row.** Every 2b run hung until
+> stdin was closed: the inherited-stdin bug from `delegate.ts`, reproduced with no delegation code
+> involved, so **the stdin half is the load-bearing fix**. That plus the hung-child and toolless-child
+> failures are now **#81, the specialist spawn contract** — `stdio: ["ignore","pipe","pipe"]` → bounded
+> spawn timeout → capability check (#67b), and no specialist output is accepted until all three pass.
+> Three defences, three different silent failures, all three observed rather than imagined. It doesn't
+> block step 3; it lands with the delegation extension.
 >
 > **Next: step 3 — the four schemas.** Both verification spikes are answered; nothing is owed before it.
 >
-> ⚠️ **Spike directory state, corrected 2026-08-18.** `D:\spike-pi-trust` **was already gone** — the
-> note that used to sit here saying it survived a path guard was stale, and 2a had to be rebuilt from
-> scratch as a result. Three throwaway directories now exist and are recorded nowhere else:
-> **`D:\spikes\trust-verify`** (2a), **`D:\spikes\override-verify`** (2b), and **`D:\spike-watcher`**
-> (an earlier watcher attempt, 2026-08-16, with `node_modules`), plus an empty **`D:\spikes`** wrapper.
-> All four can go; none of their contents should survive into the product.
+> ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
+> (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
+> `node_modules`), then the `D:\spikes` wrapper. `D:\spike-pi-trust` was already gone before 2a started
+> — the note that used to sit here claiming a path guard had preserved it was stale, which is why 2a
+> had to be rebuilt from scratch. **Nothing throwaway remains on disk; every answer is in notes.md.**
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -431,9 +433,13 @@ from `skills.md`'s location list (Packages before Settings) plus "collisions kee
 and concluded a settings-registered override would lose. **The listing order is not the precedence
 order.** #33 stands as written; the customization story can be documented.
 
-⚠️ **Not tested:** relative precedence between `planning-content/skills-overrides/` and `.pi/skills/`
-when both hold the same skill. That control existed to separate "precedence is broken" from "our path
-isn't in discovery," and neither turned out to be true. Answer it before setup ever writes to both.
+⚠️ **Not tested, and deliberately so — #80 branch 3.** Relative precedence between
+`planning-content/skills-overrides/` and `.pi/skills/` when both hold the same skill. That control
+existed to separate "precedence is broken" from "our path isn't in discovery," and neither turned out
+to be true. **The product does not currently create that configuration**, so testing it now would be
+the premature-architecture half of #80. **Reopen condition:** the first design in which both locations
+can hold the same skill name — most plausibly a setup step that materializes overrides into
+`.pi/skills/`.
 
 **Side finding that closes a step-1 loose end.** Every run hung — nothing emitted, every directory,
 including 2a's fixture and an empty one — **until stdin was closed** (`< /dev/null`). That is the
