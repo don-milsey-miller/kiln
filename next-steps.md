@@ -510,6 +510,27 @@ whose own header says decisions don't live here.
 four these four types barely exercise, and the one already parked as needing per-*edge* declarations.
 Don't read "the schemas work" as covering it.
 
+### Proving the rest of step 3 — one artifact first, then clone
+
+_Ordering agreed 2026-08-18. **Do not build the tools across all four types at once.** Prove the whole
+loop on `requirement` alone, then clone it — a bug in the shared machinery found once is a bug found
+four times if the machinery is written four times first._
+
+```
+#84 resolver → requirement typed tool → validate → #83 allocate → #78 lock
+   → #72 atomic write → generated requirement template (#43) → lint the result (#46/#47)
+```
+
+✅ **`#84` and the `#70`/`#86` resolver are done** — `lib/schema-resolver.mjs`, `lib/content-root.mjs`,
+21 tests. Built as their own modules **before** the lint, deliberately: the lint is the obvious place
+to write resolution and that is exactly the risk — template generation and the renderer would then
+depend on lint internals, which is #47's problem one level further down.
+
+⚠️ **Then feed the same loop malformed artifacts on purpose**, and confirm the lint catches what the
+typed tool prevented. That is what distinguishes **prevent** from **detect** in the four-layer defence
+model — two layers that look identical while everything is working, and are not.
+
+
 ### What these four prove, and what they don't
 
 They prove the **authoring** loop: trace links, a typed tool, a generated template, the lint,

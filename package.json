@@ -1,0 +1,17 @@
+{
+  "name": "visual-project-workflow",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A clonable, local-first planning system. This repo becomes a consumer's .planning/ directory (#1, #20, #32, #69).",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}
