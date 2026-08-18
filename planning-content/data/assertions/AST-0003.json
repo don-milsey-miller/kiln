@@ -4,8 +4,8 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "title": "The concurrency test passes reliably under full-suite parallel load",
-  "statement": "The separate-process concurrency test passes on every full parallel test run.",
+  "title": "The concurrency test passes on every completed full-suite run",
+  "statement": "On Windows 11 with Node v24.18.0, running `node --test` over the full suite, the separate-process concurrency test passes on every completed run. One failing completed run falsifies this.",
   "targetEnvironment": {
     "facts": {
       "os": "Windows 11",
@@ -15,7 +15,7 @@
   "arisesFrom": [
     "REQ-0001"
   ],
-  "notes": "Split out from AST-0002 on 2026-08-18. The observed failure refutes THIS claim; it never bore on serialisation. See #101.",
+  "notes": "Split from AST-0002 on 2026-08-18 (#101), then made precise the same day (#102). The first wording said 'passes reliably under full-suite parallel load', which is a statistical claim permitting some failure rate — a single failure cannot contradict it. Stated universally, EVD-0003 refutes it exactly. If a rate is wanted later it needs a sample size and an acceptable threshold, and that is a different assertion with different evidence.",
   "refutedBy": [
     "EVD-0003"
   ]

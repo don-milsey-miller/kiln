@@ -288,3 +288,49 @@ test("#101: a link is a judgement, so it must be correctable through the typed p
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("#102: reviseArtifact corrects an artifact's own fields, and refuses identity and links", async () => {
+  const { reviseArtifact } = await import("../lib/tools/evidence-tools.mjs");
+  const { base, contentRoot, o } = fresh();
+  try {
+    const ast = await createAssertion({ ...AST_IN, title: "Passes reliably" }, o);
+
+    // The correction #102 is about: a vague claim made into the exact universal one.
+    const r = await reviseArtifact("assertion", ast.id, {
+      title: "Passes on every completed run",
+      statement: "It passes on every completed run under this configuration. One failure falsifies this.",
+    }, o);
+    assert.equal(r.changed, true);
+    assert.match(r.artifact.statement, /One failure falsifies this/);
+
+    // Identity and lifecycle are not revisable.
+    for (const k of ["id", "type", "schemaVersion", "lifecycle", "reviewStatus"])
+      await assert.rejects(() => reviseArtifact("assertion", ast.id, { [k]: "x" }, o), /not revisable/);
+
+    // Trace fields keep their own operations so their guards cannot be bypassed (#101).
+    for (const k of ["supportedBy", "refutedBy"])
+      await assert.rejects(() => reviseArtifact("assertion", ast.id, { [k]: ["EVD-0001"] }, o), /trace field/);
+
+    assert.ok(!existsSync(join(contentRoot, LOCK_FILE)), "lock released");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#16: revising an APPROVED artifact marks it amended; a draft stays draft", async () => {
+  const { reviseArtifact } = await import("../lib/tools/evidence-tools.mjs");
+  const { writeReviewStatus, makeContext } = await import("../app/server.mjs");
+  const { base, contentRoot, o } = fresh();
+  try {
+    const ast = await createAssertion(AST_IN, o);
+    const drafted = await reviseArtifact("assertion", ast.id, { title: "Still a draft" }, o);
+    assert.equal(drafted.artifact.reviewStatus, "draft", "nothing was approved, so nothing is lost");
+
+    const ctx = { ...makeContext(contentRoot), activated: ["assertion"] };
+    await writeReviewStatus(ctx, ast.id, "assertion", "approved");
+    const revised = await reviseArtifact("assertion", ast.id, { title: "Changed after approval" }, o);
+    assert.equal(revised.artifact.reviewStatus, "amended", "an approval was given to something that no longer says the same thing");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
