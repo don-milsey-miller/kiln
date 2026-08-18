@@ -47,14 +47,25 @@
 > `--approve`; entry removed → reverts; entry set to `false` → reverts. **#67(a) is measured rather than
 > documented**, and #67(b) — detecting a toolless child — is now the whole of what's left on that row.
 >
-> **Next: step 2b — the skill-override path.** Then step 3.
+> ✅ **Step 2b done (2026-08-18) — outcome A: `planning-content/skills-overrides/` wins.** Registered
+> through the settings `skills` array, the override beats the packaged skill; editing it tracks; removing
+> it restores the packaged one. **#33 stands as written** and the customization story can be documented.
+> The check-6 caveat that predicted the opposite was a documented-order reading, and it was wrong.
+> ⚠️ Still untested: precedence between that path and `.pi/skills/` when both hold the same skill.
+>
+> ✅ **Side finding — a step-1 loose end closed.** Every 2b run hung until stdin was closed. That is the
+> inherited-stdin bug from `delegate.ts`, reproduced with no delegation code involved, so **the stdin
+> half is the load-bearing fix** — `stdio: ["ignore", "pipe", "pipe"]`, however the child is spawned.
+> The failure is a silent indefinite hang, which is why the spawn timeout matters more than it looked.
+>
+> **Next: step 3 — the four schemas.** Both verification spikes are answered; nothing is owed before it.
 >
 > ⚠️ **Spike directory state, corrected 2026-08-18.** `D:\spike-pi-trust` **was already gone** — the
 > note that used to sit here saying it survived a path guard was stale, and 2a had to be rebuilt from
-> scratch at `D:\spikes\trust-verify` as a result. Two leftovers *do* still exist and are recorded
-> nowhere else: **`D:\spike-watcher`** (an earlier watcher attempt, 2026-08-16, with `node_modules`)
-> and an empty **`D:\spikes`**. Both are throwaway. `D:\spikes\trust-verify` can go once 2b is done, or
-> stay until then for reproducibility.
+> scratch as a result. Three throwaway directories now exist and are recorded nowhere else:
+> **`D:\spikes\trust-verify`** (2a), **`D:\spikes\override-verify`** (2b), and **`D:\spike-watcher`**
+> (an earlier watcher attempt, 2026-08-16, with `node_modules`), plus an empty **`D:\spikes`** wrapper.
+> All four can go; none of their contents should survive into the product.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -396,27 +407,49 @@ loss is a setup step.
 
 </details>
 
-### 2b — Skill overrides: does *our* path actually win?
+### 2b — Skill overrides ✅ answered 2026-08-18 — **outcome A, our path wins**
+
+_Fixture at `D:\spikes\override-verify`. Full write-up in notes.md under the 2b RUN block._
+
+**The observable was provenance, not behaviour.** `before_agent_start` exposes
+`systemPromptOptions.skills`, each entry carrying `filePath` / `baseDir` / `sourceInfo` — so the probe
+recorded **which file Pi loaded**, upstream of the model, and read the marker off that path.
+
+| run | override at `planning-content/skills-overrides/` | skill Pi loaded |
+|---|---|---|
+| 1 | absent (no `skills` entry in settings) | `PACKAGED` ← `pi-package/skills/…` |
+| 2 | `OVERRIDE` | **`OVERRIDE`** ← the override path |
+| 3 | edited to `OVERRIDE-V2` | **`OVERRIDE-V2`** ← same path |
+| 4 | files deleted, settings entry left in place | `PACKAGED` ← `pi-package/skills/…` |
+
+Runs 3 and 4 make it causal: the loaded body tracks edits, and removing the override brings the
+packaged skill back, so it was **shadowed and recoverable**, not broken. Exactly one `plan-check` was
+loaded in runs 2 and 3 — replacement, not coexistence.
+
+⚠️ **The prediction this refutes was mine, and drawn from the shipped docs.** Check 6's caveat reasoned
+from `skills.md`'s location list (Packages before Settings) plus "collisions keep the first skill found"
+and concluded a settings-registered override would lose. **The listing order is not the precedence
+order.** #33 stands as written; the customization story can be documented.
+
+⚠️ **Not tested:** relative precedence between `planning-content/skills-overrides/` and `.pi/skills/`
+when both hold the same skill. That control existed to separate "precedence is broken" from "our path
+isn't in discovery," and neither turned out to be true. Answer it before setup ever writes to both.
+
+**Side finding that closes a step-1 loose end.** Every run hung — nothing emitted, every directory,
+including 2a's fixture and an empty one — **until stdin was closed** (`< /dev/null`). That is the
+inherited-stdin bug from the spike's `delegate.ts`, reproduced with no delegation code involved. Step 1
+applied two fixes together and recorded that which one mattered was unknown. **It is the stdin half**:
+`stdio: ["ignore", "pipe", "pipe"]` is required however the child is spawned. And it raises the value
+of the spawn timeout, because the failure is a *silent indefinite hang* — a child that never speaks
+looks exactly like one that is thinking.
+
+<details>
+<summary>The step as written, before it ran</summary>
 
 Check 6 proved precedence exists — from `.pi/skills/`, which is one of Pi's own discovery locations.
 **`planning-content/skills-overrides/` is not.** It would be registered through the settings `skills`
 array, and in the documented discovery order settings come *after* packages; since collisions "warn
-and keep the first skill found," an override registered that way plausibly **loses**. The exact
-opposite of what #33 promises.
-
-Ship a packaged skill whose body says `PACKAGED`, an override of the same name saying `OVERRIDE`,
-register the override **through the mechanism this product plans to ship**, and establish **which
-source Pi actually loaded**.
-
-⚠️ **Same causal standard as 2a, and it has two halves.** Make the collision **intentional and
-unmistakable** — same name, bodies with nothing in common, so no reading exists in which both sources
-could have produced the result. Then take the observable **upstream of the model**: read which file Pi
-loaded from the skill registry at load time, the way check 2 read `getAllTools()`. **A model that
-behaves like the override is not evidence the override loaded** — that is precisely the false pass
-check 2 was warned about and survived only because the dump came before the model ran.
-
-⚠️ **The framing matters more than the fixture.** The question is *not* whether Pi supports overrides
-— that is answered, and re-answering it from `.pi/skills/` would be a false pass wearing a green tick.
+and keep the first skill found," an override registered that way plausibly **loses**.
 
 | | Outcome | What it means |
 |---|---|---|
@@ -424,9 +457,7 @@ check 2 was warned about and survived only because the dump came before the mode
 | B | The packaged skill wins | Setup materializes overrides into `.pi/skills/`. #33's *location* changes; its promise survives |
 | C | Some third loading path gives the right precedence | Record that as the shipped mechanism |
 
-**Close this before the customization story is documented anywhere a user can read it.** #33 exists so
-that tuning a skill doesn't mean editing the tool — which is the merge conflict #20 was written to
-prevent.
+</details>
 
 ---
 
