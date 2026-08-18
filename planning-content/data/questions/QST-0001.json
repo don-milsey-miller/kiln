@@ -1,0 +1,17 @@
+{
+  "id": "QST-0001",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Why did the concurrency test fail once under full-suite parallel load?",
+  "statement": "What caused the single observed failure of the separate-process concurrency test during a full parallel run on 2026-08-18, and is serialisation implicated at all?",
+  "raisedBy": [
+    "AST-0003"
+  ],
+  "blocks": [
+    "AST-0003"
+  ],
+  "notes": "Carried in a code comment and a commit message until now (#105). maxWaitMs was raised 10s -> 30s as a MITIGATION on an unconfirmed diagnosis; the failure output was never captured, so no observation distinguishes a lock timeout under load from a harness problem. Reopening condition: any recurrence. AST-0003 stays refuted until this is answered or a run of sufficient size supports a restated claim."
+}

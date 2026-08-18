@@ -365,7 +365,7 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
     // And with defs that agree, nothing fires.
     const right = {
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
-      "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision"] },
+      "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision", "question"] },
       "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
       // assertion and evidence are cross-cutting (#25) and carry no x-stage, so no stage
       // claims them and none may. runbook-step is stage 9's, promoted when it was built.
@@ -504,11 +504,18 @@ test("#94: a partial capability gap names only what is missing", () => {
   try {
     const activated = readActivatedTypes(join(ROOT, "planning-content"));
     const gate = evaluateStageGate({ ...ctx, activated }, "04-requirement-gaps");
-    // decision HAS a schema but no typed tool; question has neither.
+    // decision HAS a schema but no typed tool — the partial gap this test exists for.
     const dec = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "decision");
-    const q = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "question");
     assert.deepEqual(dec?.details.missing, ["typed tool"], "schema exists, so only the tool is missing");
-    assert.deepEqual(q?.details.missing, ["schema", "typed tool"]);
+
+    // question is now fully implemented (#105) and must report no gap at all.
+    const q = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "question");
+    assert.equal(q, undefined, "question has both a schema and a typed tool");
+
+    // runbook still has neither — the both-missing case has to stay covered somewhere.
+    const g9 = evaluateStageGate({ ...ctx, activated }, "09-handoff");
+    const rb = g9.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "runbook");
+    assert.deepEqual(rb?.details.missing, ["schema", "typed tool"]);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
