@@ -5,7 +5,25 @@
   "description": "The decision register (stage 4). Consumes the primitives in #82 and introduces no new foundational conventions. Every entry carries the decision, alternatives considered, rationale, linked evidence, assumptions, date and status — the register's stated minimum contract, mapped onto the primitives.",
   "type": "object",
 
-  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/artifactEnvelope" },
+    {
+      "$comment": "The lifecycle/supersededBy invariant. ⚠️ Nested inside allOf on purpose, not stylistically — a TOP-LEVEL `if` beside `allOf: [$ref]` was measured to drop the referenced envelope's evaluated-property annotations, so unevaluatedProperties:false then rejected every valid document for lacking schemaVersion/reviewStatus/lifecycle/title. Same class of trap as additionalProperties (#82). Every conditional in every schema goes here.",
+      "if": {
+        "properties": { "lifecycle": { "const": "superseded" } },
+        "required": ["lifecycle"]
+      },
+      "then": {
+        "required": ["supersededBy"],
+        "properties": { "supersededBy": { "minItems": 1 } },
+        "$comment": "A superseded decision must name what replaced it. The register's value is being able to follow a reversal forward; a superseded entry with no successor is a dead end that looks like a record."
+      },
+      "else": {
+        "properties": { "supersededBy": { "maxItems": 0 } },
+        "$comment": "Nothing that still stands has been replaced. Kept in the schema rather than the lint because it is a structural invariant of this artifact, not a project policy — and an invariant left to the lint is one every other consumer has to re-learn."
+      }
+    }
+  ],
 
   "properties": {
     "id": { "pattern": "^DEC-[0-9]{4,}$" },
@@ -75,7 +93,7 @@
 
     "supersededBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
-      "description": "The decision that replaced this one. Meaningful only when lifecycle is `superseded`; the lint pairs the two rather than the schema, because JSON Schema conditionals here would be harder to read than the rule. May promote to the envelope if a second type needs it.",
+      "description": "The decision that replaced this one. Required when lifecycle is `superseded` and forbidden otherwise — enforced by the conditional in allOf, not left to the lint. May promote to the envelope if a second type needs it.",
       "x-materiality": "structural",
       "x-traceTarget": ["decision"]
     },
@@ -95,7 +113,6 @@
 
   "required": ["statement"],
   "unevaluatedProperties": false,
-
   "x-artifactType": "decision",
   "x-stage": "04-requirement-gaps",
   "x-derivedRelations": {

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/api-spec.schema.json",
+  "title": "API spec",
+  "description": "Stage 5 (#54's flagship). A WRAPPER, not a model. #8's dual-representation rule is explicit that an API spec IS OpenAPI, rendered — not prose describing endpoints, and not a second structure that independently models endpoints, parameters and responses. This artifact carries identity, trace edges and a reference to the OpenAPI document; OpenAPI carries the API. See #86.",
+  "type": "object",
+
+  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
+
+  "properties": {
+    "id": { "pattern": "^API-[0-9]{4,}$" },
+    "type": { "const": "api-spec" },
+
+    "payload": {
+      "$ref": "common.schema.json#/$defs/payloadRef",
+      "description": "The OpenAPI document. This IS the artifact's content — everything else here is metadata about it.",
+      "properties": {
+        "format": { "enum": ["openapi-3.0", "openapi-3.1"] }
+      },
+      "x-materiality": "semantic"
+    },
+
+    "summary": {
+      "type": "string",
+      "description": "One or two lines of human orientation — what this API is for. Not a substitute for the payload and not parsed by anything.",
+      "x-materiality": "cosmetic"
+    },
+
+    "implements": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Requirements this API satisfies. The stage-2-to-stage-5 hop of the traceability chain.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["requirement"]
+    },
+
+    "decidedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Decisions that shaped this API — protocol, versioning, auth model. Without this edge the register records choices nobody can find from the thing they produced.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["decision"]
+    },
+
+    "usesSchemas": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Data-model artifacts whose types this API exposes. A trace edge, NOT a copy — the shapes live in the payloads, and this records that the two are meant to agree.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["schema"]
+    },
+
+    "evidencedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Evidence and assertions supporting that this API is implementable as specified.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["evidence", "assertion"]
+    },
+
+    "openQuestions": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "x-materiality": "structural",
+      "x-traceTarget": ["question"]
+    },
+
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "uniqueItems": true,
+      "x-materiality": "advisory"
+    },
+
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    }
+  },
+
+  "required": ["payload"],
+  "unevaluatedProperties": false,
+
+  "x-artifactType": "api-spec",
+  "x-stage": "05-solution-design",
+  "x-wrapsExternalFormat": {
+    "description": "This artifact defines NO structure of its own for the thing it names. Endpoints, parameters, request and response shapes, auth schemes and examples all live in the OpenAPI document at payload.path and are validated by an OpenAPI validator, not by this schema. If a field is ever proposed here that OpenAPI already expresses, that is the duplication this annotation exists to refuse.",
+    "format": "OpenAPI",
+    "validatedBy": "an OpenAPI validator, invoked by the lint (#47) — out of scope for JSON Schema"
+  },
+  "x-unresolvableTraceTargets": {
+    "description": "#75 in force: evidence, assertion and question are not among step 3's activated four. `schema` IS activated, so usesSchemas resolves.",
+    "targets": ["evidence", "assertion", "question"]
+  }
+}

@@ -58,6 +58,25 @@
       "additionalProperties": false
     },
 
+    "payloadRef": {
+      "type": "object",
+      "description": "A pointer to a canonical payload file governed by an ALREADY-ESTABLISHED format. Used by artifact types that wrap a format rather than define one — #8's dual-representation rule says an API spec IS OpenAPI and a data model IS a definition file, so the artifact carries the envelope, the trace edges and a reference, never a second model of the same thing. Two models of one payload is two sources of truth before the renderer exists. Each type narrows `format` to the formats it can actually render; adding one is a decision, because a format nothing renders is a payload nobody sees.",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Narrowed to an enum by each artifact type."
+        },
+        "path": {
+          "type": "string",
+          "description": "Relative to the content root (#70) — never absolute, never escaping it. One resolver, so a path here means the same thing to the app, the lint and the typed tools.",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+          "examples": ["data/openapi.json", "data/schema.yaml"]
+        }
+      },
+      "required": ["format", "path"],
+      "additionalProperties": false
+    },
+
     "nonEmptyString": {
       "type": "string",
       "minLength": 1,
