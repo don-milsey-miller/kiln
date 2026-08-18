@@ -1,0 +1,20 @@
+{
+  "id": "EVD-0005",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Post-fix matrix: 80 runs, no recurrence",
+  "kind": "experiment",
+  "summary": "After widening acquisition retry to EEXIST/EPERM/EBUSY/EACCES: isolated concurrency file 40/40 passed; full suite at normal parallelism 30/30 passed; full suite serial 10/10 passed. Counts declared before running. Bounded non-reproduction, not proof of absence: at a 10% per-run rate, 30 parallel runs would miss a recurrence about 4% of the time.",
+  "environment": {
+    "tier": 1,
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0",
+      "lockAcquisitionRetry": "EEXIST/EPERM/EBUSY/EACCES"
+    }
+  },
+  "observedAt": "2026-08-18",
+  "outcome": "success"
+}

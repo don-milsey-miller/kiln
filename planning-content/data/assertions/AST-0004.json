@@ -1,0 +1,21 @@
+{
+  "id": "AST-0004",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Windows surfaces exclusive-create contention as EPERM, not only EEXIST",
+  "statement": "On Windows, openSync(lockPath,'wx') can return EPERM while another process holds or is releasing the lock, so a retry loop keyed only on EEXIST treats transient contention as a fatal error.",
+  "targetEnvironment": {
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0001"
+  ],
+  "supportedBy": [
+    "EVD-0004"
+  ]
+}

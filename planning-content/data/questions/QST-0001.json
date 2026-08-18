@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Why did the concurrency test fail once under full-suite parallel load?",
   "statement": "What caused the single observed failure of the separate-process concurrency test during a full parallel run on 2026-08-18, and is serialisation implicated at all?",
   "raisedBy": [
@@ -13,5 +13,12 @@
   "blocks": [
     "AST-0003"
   ],
-  "notes": "Carried in a code comment and a commit message until now (#105). maxWaitMs was raised 10s -> 30s as a MITIGATION on an unconfirmed diagnosis; the failure output was never captured, so no observation distinguishes a lock timeout under load from a harness problem. Reopening condition: any recurrence. AST-0003 stays refuted until this is answered or a run of sufficient size supports a restated claim."
+  "notes": "Reopening condition: any recurrence after the fix. Bounded non-reproduction only — 80 post-fix runs across three cells, which at a 10% per-run rate would miss a recurrence about 4% of the time. AST-0003 stands refuted for the pre-fix code and is now scoped to say so.",
+  "answer": "Lock acquisition, not serialisation. openSync(lockPath,'wx') returned EPERM rather than EEXIST under contention on Windows, and the retry loop keyed only on EEXIST, so a transient was treated as fatal. Reproduced and classified on run 19 of a declared 40: one child of six failed in 507ms with EPERM, the other five allocated distinct IDs, and no duplicate ID occurred. Serialisation was never implicated. The maxWaitMs 10s->30s mitigation applied on 2026-08-18 addressed a timeout that did not happen and has been reverted. Fix: retry EEXIST/EPERM/EBUSY/EACCES on acquisition, the same family as #72's rename retry.",
+  "answeredBy": [
+    "AST-0004",
+    "AST-0005",
+    "EVD-0004",
+    "EVD-0005"
+  ]
 }

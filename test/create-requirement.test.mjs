@@ -127,22 +127,80 @@ test("concurrent creates in SEPARATE PROCESSES receive different IDs (#78 + #83)
   try {
     const N = 6;
     const script = join(base, "one.mjs");
-    // On Windows an absolute path in an ESM import must be a file:// URL.
     const toolUrl = pathToFileURL(join(ROOT, "lib", "tools", "create-requirement.mjs")).href;
+    // ⚠️ INSTRUMENTED (QST-0001). Each child reports a structured outcome so a recurrence can be
+    // CLASSIFIED rather than guessed at. The 2026-08-18 failure was unclassifiable because the
+    // only signal was "the test failed", and an unclassifiable failure cannot be evidence about
+    // anything -- which is what left AST-0003 refuted and the cause unknown.
     writeFileSync(
       script,
-      `import { createRequirement } from ${JSON.stringify(toolUrl)};\n` +
-        `const r = await createRequirement({ title: "t", statement: "s" }, ` +
-        `{ contentRoot: ${JSON.stringify(contentRoot)}, schemasDir: ${JSON.stringify(SCHEMAS)} });\n` +
-        `process.stdout.write(r.id);\n`
+      `import { createRequirement } from ${JSON.stringify(toolUrl)};
+` +
+        `const t0 = Date.now();
+` +
+        `try {
+` +
+        `  const r = await createRequirement({ title: "t", statement: "s" }, ` +
+        `{ contentRoot: ${JSON.stringify(contentRoot)}, schemasDir: ${JSON.stringify(SCHEMAS)} });
+` +
+        `  process.stdout.write(JSON.stringify({ ok: true, id: r.id, ms: Date.now() - t0 }));
+` +
+        `} catch (e) {
+` +
+        `  process.stdout.write(JSON.stringify({ ok: false, name: e.name, code: e.code ?? null, message: String(e.message).slice(0, 300), ms: Date.now() - t0 }));
+` +
+        `  process.exitCode = 3;
+` +
+        `}
+`
     );
 
-    // execFile, NOT execFileSync: a synchronous spawn inside Promise.all runs the children
-    // one after another, which would pass this test without ever exercising contention.
     const run = promisify(execFile);
-    const results = await Promise.all(Array.from({ length: N }, () => run(process.execPath, [script])));
-    const ids = results.map((r) => r.stdout.trim());
+    const settled = await Promise.allSettled(
+      Array.from({ length: N }, () => run(process.execPath, [script], { encoding: "utf-8" }))
+    );
 
+    // Classify every outcome BEFORE asserting anything, so the failure message says which of the
+    // five candidate causes occurred (QST-0001's interpretation rules).
+    const outcomes = settled.map((s, i) => {
+      if (s.status === "fulfilled") {
+        try {
+          return { child: i, ...JSON.parse(s.value.stdout.trim()) };
+        } catch {
+          return { child: i, ok: false, klass: "unparseable-child-output", raw: s.value.stdout.slice(0, 200) };
+        }
+      }
+      const err = s.reason ?? {};
+      const out = String(err.stdout ?? "");
+      let payload = null;
+      try { payload = JSON.parse(out.trim()); } catch {}
+      return {
+        child: i,
+        ok: false,
+        klass: payload?.name === "LockError" ? "lock-acquisition-timeout"
+             : payload?.name ? `tool-error:${payload.name}`
+             : err.killed ? "child-killed"
+             : "child-process-failure",
+        exitCode: err.code ?? null,
+        signal: err.signal ?? null,
+        message: (payload?.message ?? String(err.stderr ?? err.message ?? "")).slice(0, 300),
+      };
+    });
+
+    const failures = outcomes.filter((o) => !o.ok);
+    const ids = outcomes.filter((o) => o.ok).map((o) => o.id);
+    const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+
+    // Ordered so the diagnosis in the message is the true one, not the first assertion to trip.
+    assert.equal(
+      duplicates.length, 0,
+      `SERIALISATION IMPLICATED: duplicate IDs ${JSON.stringify(duplicates)} from ${JSON.stringify(outcomes)}`
+    );
+    assert.equal(
+      failures.length, 0,
+      `NOT a serialisation result — children failed: ${JSON.stringify(failures, null, 2)}`
+    );
+    assert.equal(ids.length, N, `observation point not reached by all children: ${JSON.stringify(outcomes)}`);
     assert.equal(new Set(ids).size, N, `IDs collided: ${ids.join(", ")}`);
     assert.equal(marksOf(contentRoot), N);
     assert.equal(readdirSync(join(contentRoot, "data", "requirements")).length, N);

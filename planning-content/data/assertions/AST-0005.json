@@ -1,0 +1,22 @@
+{
+  "id": "AST-0005",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "With contention codes retried, concurrent creates complete without error",
+  "statement": "On Windows 11 / Node v24.18.0, with lock acquisition retrying EEXIST, EPERM, EBUSY and EACCES, the separate-process concurrency test completes without error across the declared 80-run matrix.",
+  "targetEnvironment": {
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0",
+      "lockAcquisitionRetry": "EEXIST/EPERM/EBUSY/EACCES"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0001"
+  ],
+  "supportedBy": [
+    "EVD-0005"
+  ]
+}

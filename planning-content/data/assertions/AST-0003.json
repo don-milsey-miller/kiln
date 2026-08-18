@@ -5,17 +5,18 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "The concurrency test passes on every completed full-suite run",
-  "statement": "On Windows 11 with Node v24.18.0, running `node --test` over the full suite, the separate-process concurrency test passes on every completed run. One failing completed run falsifies this.",
+  "statement": "On Windows 11 with Node v24.18.0, with lock acquisition retrying EEXIST only, running `node --test` over the full suite, the separate-process concurrency test passes on every completed run. One failing completed run falsifies this.",
   "targetEnvironment": {
     "facts": {
       "os": "Windows 11",
-      "node": "v24.18.0"
+      "node": "v24.18.0",
+      "lockAcquisitionRetry": "EEXIST only"
     }
   },
   "arisesFrom": [
     "REQ-0001"
   ],
-  "notes": "Split from AST-0002 on 2026-08-18 (#101), then made precise the same day (#102). The first wording said 'passes reliably under full-suite parallel load', which is a statistical claim permitting some failure rate — a single failure cannot contradict it. Stated universally, EVD-0003 refutes it exactly. If a rate is wanted later it needs a sample size and an acceptable threshold, and that is a different assertion with different evidence.",
+  "notes": "Scoped to the pre-fix code on 2026-08-18 during stage 3. As first written it named no code version, so EVD-0003 — an observation of the pre-fix system — would have gone on refuting a claim readers would take to be about the current one. An assertion about software behaviour needs the software in its targetEnvironment, or evidence outlives the thing it was about (#79's staleness, arriving through scope rather than through timing).",
   "refutedBy": [
     "EVD-0003"
   ]
