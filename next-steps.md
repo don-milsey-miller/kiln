@@ -247,8 +247,9 @@ actually true"._
 **The one that reshapes something:** check 3 did what the step said it might — it reopened a Rejected
 item. #31's "partition, don't lock" was intent, not mechanism: neither writer can change its own region
 without rewriting the whole file, so the regions are disjoint in intent and identical in operation.
-Choosing the successor (lockfile vs sidecar) is a decision with a #4 consequence and is **owed by step
-5**, not step 3.
+Choosing the successor (lockfile vs sidecar) was a decision with a #4 consequence, ~~owed by step 5~~ —
+✅ **taken 2026-08-18 as #78, the lockfile**, ahead of that deadline. Both candidates were mechanically
+safe, so the spike could not choose; the sidecar's reconciliation ambiguity did.
 
 **Check 0, which wasn't on the list.** Building #70's resolver against a real consumer layout —
 including a `<toolRoot>/planning-content/` holding another project's manifest — demonstrated the trap
@@ -459,10 +460,18 @@ skeleton is the first code with a resolver to test, and until that test exists t
 still only exercised by consumers. _Step 2's check 0 rehearsed exactly this and it passed; it does not
 count, because it ran in a throwaway directory that no longer needs to exist._
 
-**And decide #31's successor before the status write-back is written.** Step 2 measured that the
-current answer loses data; lockfile vs sidecar is the open question, it has a leaning, and this is the
-step that forces it — the status write-back in the line above *is* the app's first write into a file
-the agent also writes.
+**#31's successor is #78, and this is the step that first depends on it** — the status write-back in
+the line above *is* the app's first write into a file the agent also writes. Implement it as the row
+states, in this order: **acquire lock → fresh read → modify → #72 atomic temp+rename → release lock.**
+⚠️ **The fresh read goes after acquisition**, or the lock serializes stale writes rather than
+preventing them — which reproduces the lost update the spike measured, behind a mechanism that looks
+correct. #78 also lists what the implementation owes and calls none of it optional: bounded acquisition
+retry · stale-lock detection · a crashed-writer path · owner identification · cleanup · and
+Windows-specific behaviour, which #72 already proved is not theoretical.
+
+⚠️ **What the lock does not buy you is #79.** It guarantees two writers cannot clobber each other. It
+guarantees nothing about an agent whose reasoning rested on an artifact that changed while it worked.
+Deliberately out of scope here; don't let a working lock read as staleness being handled.
 
 Wire #48's turn-end lint hook in **during** this step rather than after. notes.md already argues
 it's plausibly the highest-leverage item in the document; it's also the thing that tells you
