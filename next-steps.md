@@ -354,8 +354,15 @@ and keep the first skill found," an override registered that way plausibly **los
 opposite of what #33 promises.
 
 Ship a packaged skill whose body says `PACKAGED`, an override of the same name saying `OVERRIDE`,
-register the override **through the mechanism this product plans to ship**, and read which body
-reaches the agent.
+register the override **through the mechanism this product plans to ship**, and establish **which
+source Pi actually loaded**.
+
+⚠️ **Same causal standard as 2a, and it has two halves.** Make the collision **intentional and
+unmistakable** — same name, bodies with nothing in common, so no reading exists in which both sources
+could have produced the result. Then take the observable **upstream of the model**: read which file Pi
+loaded from the skill registry at load time, the way check 2 read `getAllTools()`. **A model that
+behaves like the override is not evidence the override loaded** — that is precisely the false pass
+check 2 was warned about and survived only because the dump came before the model ran.
 
 ⚠️ **The framing matters more than the fixture.** The question is *not* whether Pi supports overrides
 — that is answered, and re-answering it from `.pi/skills/` would be a false pass wearing a green tick.
@@ -532,11 +539,42 @@ settled in step 3.** They stress ID identity across revisions, evidence attachme
 computed rather than authored field. Let them challenge the four-type conventions early; that is a
 feature of this ordering, not a risk of it.
 
+### The tension this ordering creates, stated rather than buried
+
+Running the slice *after* the skeleton means step 3's schemas and trace conventions already exist when
+the novel artifacts finally exercise them. That is acceptable and probably right — conventions need
+something to be conventions *of*. **It is only right while those conventions are still treated as
+revisable.**
+
+> If the slice shows that `assertion`, `evidence` or `runbook-step` need trace semantics the first four
+> did not anticipate, **the slice succeeded.** Change the conventions.
+
+The failure mode is the opposite reflex: contorting the evidence model to fit whatever step 3 happened
+to establish. That converts a finding into debt and wastes the step — you would have paid for the
+experiment and then discarded its result to protect four files.
+
+⚠️ **And a hard constraint from #76: broad catalogue expansion does not begin until this passes.**
+Otherwise the slice is "next" on paper while twelve more schemas and the specialist contracts quietly
+harden around an evidence model nobody has run.
+
 ---
 
 ---
 
 ## Why this order
+
+**It is not a build sequence any more; it is an uncertainty-reduction sequence** _(2026-08-18)_. Each
+step earns the right to make the next implementation commitment — which is #80 branch 1 applied to the
+order itself rather than to individual questions:
+
+> spikes remove mechanical uncertainty → schemas establish the authoring substrate → dogfooding tests
+> the methodology → the skeleton proves the two halves can touch → **the evidence slice proves that what
+> they produce is more than documentation**
+
+That last boundary is the one the original five-step order left implicit. A manifest, a visual UI,
+structured artifacts, file watching, typed writes and lint feedback could all work beautifully and
+leave you with a sophisticated AI planning-document generator. **The skeleton proves the authoring
+product. It does not prove the product thesis.**
 
 **Both spikes come first, and neither is on the critical path by accident.** Step 1 gates the agent
 half — six answers change what #65, #66, #50, #33 and #48 mean. Step 2 gates the app half, and one
