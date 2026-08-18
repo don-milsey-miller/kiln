@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **94 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **95 decisions as of
 > 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -581,8 +581,69 @@ real documents to render.
 
 ---
 
-## 5. Walking skeleton (#55), with the lint loop (#48) wired in early
+## 5a. Pressure-test the evidence types against the substrate — **before** the skeleton
 
+_Reordered 2026-08-18 (#76's third amendment, #95). This used to come after the skeleton._
+
+Implement `assertion`, `evidence` and `runbook-step` and run them hard against everything step 3
+settled: #82's primitives · #83's allocation · #84's resolution · #86's wrap-don't-model rule ·
+#87's one-file-per-artifact · #88's create contract · #89's lint families.
+
+**Expect the conventions to move.** #38 already records that these three stress the substrate in ways
+the first four cannot — identity across revisions, evidence attachment, and **confidence as a computed
+rather than authored field**, which nothing in `requirement`/`decision`/`schema`/`api-spec` exercises at
+all. If they do not move anything, that is a result worth being suspicious of.
+
+⚠️ **Why this moved ahead of the skeleton.** #80 branch 1, in its strengthened form: the skeleton is
+where these conventions get poured into a renderer, a watcher and a status write-back. Building it
+first is a commitment made before the types most able to falsify it exist. Step 4's stage 2 pushed the
+same way independently — **seven of fifteen requirements landed on the evidence loop**, derived from the
+intake rather than from this architecture.
+
+---
+
+## 5b. Walking skeleton (#55), with the lint loop (#48) wired in early
+
+Manifest → tracker view → one MDX doc rendering → status write-back → **the file watcher**.
+
+⚠️ **Render an evidence-oriented artifact, not another easy catalogue type.** The point of doing 5a
+first is lost if the skeleton then proves itself against `requirement` and leaves `assertion` and
+`evidence` untested through the UI.
+
+Everything the previous version of this step carried still applies — 0(d)'s fixture test _(✅ delivered
+early, see #69's amendment)_, #78's lockfile for the status write-back, #79's boundary, and #48's
+turn-end lint hook wired in **during** rather than after.
+
+---
+
+## 5c. Complete the evidence slice end to end
+
+One assertion, carried the whole way: `requirement → assertion → research → evidence → validation →
+confidence rung → runbook step → lint → render`. Immediately after 5b, not later.
+
+---
+
+## 6. Broaden the catalogue — **only after 5c passes**
+
+_#76 constraint, unchanged by the reorder: broad catalogue expansion does not begin until the evidence
+slice passes. What changed is only that the slice now happens around the skeleton rather than after it._
+
+⚠️ **`schema` and `api-spec` typed tools live here, not earlier** (#95). They are implemented and
+**not activated on this project** — this intake never asked for a data model or an API. They are still
+owed for v1 catalogue completeness (#38), but owed to *future consumer projects*, so they rank behind
+the activated evidence path. **Cheap is not a reason:** `decision`'s typed tool is the cheapest item on
+the gate's worklist and is still not next.
+
+⚠️ **The gate is a worklist, not a priority queue.** #94 made it report accurately what is absent;
+nothing in it ranks anything. Priority comes from #80 branch 1 — what blocks the next implementation
+*commitment* — which is what produced this ordering in the first place.
+
+---
+
+<details>
+<summary>Step 5 and 6 as written before the 2026-08-18 reorder</summary>
+
+## 5. Walking skeleton (#55)
 Manifest → tracker view → one MDX doc rendering → status write-back → **the file watcher**.
 The watcher is the whole integration surface between the two halves (#12), so a skeleton without
 it doesn't prove the risky part — and by now step 2 has told you how it has to be built.
@@ -681,6 +742,10 @@ harden around an evidence model nobody has run.
 
 ---
 
+</details>
+
+---
+
 ## Why this order
 
 **It is not a build sequence any more; it is an uncertainty-reduction sequence** _(2026-08-18)_. Each
@@ -725,3 +790,5 @@ actual claim rather than its authoring machinery. What remains outside: the thre
 the other twelve artifact types, the sandbox tiers beyond whatever the slice needs, and the runbook as
 a produced artifact. **Step 6 is the end of the beginning.** Step 5 is now the end of the part that
 would have looked finished while proving the less interesting half.
+
+
