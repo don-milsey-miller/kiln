@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/decision.schema.json",
+  "title": "Decision",
+  "description": "The decision register (stage 4). Consumes the primitives in #82 and introduces no new foundational conventions. Every entry carries the decision, alternatives considered, rationale, linked evidence, assumptions, date and status — the register's stated minimum contract, mapped onto the primitives.",
+  "type": "object",
+
+  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
+
+  "properties": {
+    "id": { "pattern": "^DEC-[0-9]{4,}$" },
+    "type": { "const": "decision" },
+
+    "statement": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "The choice that was made, stated as an outcome rather than a discussion. Same field name as requirement.statement on purpose: the payload field is called `statement` in every type that has one.",
+      "x-materiality": "semantic"
+    },
+
+    "alternatives": {
+      "type": "array",
+      "description": "What else was considered and why it lost. Substantive decision content, not commentary — a decision with no alternatives recorded is a decision nobody can re-open intelligently. Structured rather than prose because the renderer and the handoff both present it, but NOT an artifact type: nothing traces INTO an alternative, so #41's escape-hatch test leaves it inline.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "option": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "whyNot": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+        },
+        "required": ["option", "whyNot"],
+        "additionalProperties": false
+      },
+      "x-materiality": "semantic"
+    },
+
+    "rationale": {
+      "type": "string",
+      "description": "Why the chosen option won. Free prose. #61 names rationale as the archetype of the cosmetic class — it is what a human reads, and nothing downstream traverses it.",
+      "x-materiality": "cosmetic"
+    },
+
+    "decidedAt": {
+      "type": "string",
+      "format": "date",
+      "description": "The date the decision was taken. ISO 8601 date, not a timestamp — decisions are made on days, and a false precision invites a false ordering.",
+      "x-materiality": "advisory"
+    },
+
+    "addresses": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "What this decision resolves — the requirements it settles and the open questions it closes.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["requirement", "question"]
+    },
+
+    "derivedFrom": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Parent decisions this one refines. Same-type edge, so it always resolves.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["decision"]
+    },
+
+    "evidencedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Evidence and assertions the decision rests on.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["evidence", "assertion"]
+    },
+
+    "assumesThat": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Assumptions the decision rests on, as REFERENCES rather than prose. An assumption is an assertion at rung 1 (`unverified`, #42) or an open question (#38) — it is never a string on this artifact. The information-type model says an assumption that loses its hedge becomes a fact nobody checked; a prose field here would be visible to a human and invisible to every mechanism built to stop exactly that. See #85 for the cost this carries until `assertion` is activated.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["assertion", "question"]
+    },
+
+    "supersededBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The decision that replaced this one. Meaningful only when lifecycle is `superseded`; the lint pairs the two rather than the schema, because JSON Schema conditionals here would be harder to read than the rule. May promote to the envelope if a second type needs it.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["decision"]
+    },
+
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "uniqueItems": true,
+      "x-materiality": "advisory"
+    },
+
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    }
+  },
+
+  "required": ["statement"],
+  "unevaluatedProperties": false,
+
+  "x-artifactType": "decision",
+  "x-stage": "04-requirement-gaps",
+  "x-derivedRelations": {
+    "description": "Deliberately NOT stored. `downstreamDependencies` — what depends on this decision — is the register's stated contract, but storing it duplicates the trace graph: every dependent artifact already points here through its own named trace field. Two copies of one graph drift, and the stored copy is the one that goes stale silently. Derived by reverse traversal instead (#84's resolution layer knows every x-traceTarget, so the reverse index is computable from the schemas alone).",
+    "downstreamDependencies": "reverse traversal of any trace field whose x-traceTarget includes `decision`"
+  },
+  "x-unresolvableTraceTargets": {
+    "description": "#75 in force: question, evidence and assertion are NOT among step 3's activated four. Links to them are permitted and reported at advisory weight until activation.",
+    "targets": ["question", "evidence", "assertion"]
+  }
+}
