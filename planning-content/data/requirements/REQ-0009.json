@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0009",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Instructions rest on resolved claims",
+  "statement": "No instruction in the final output may rest on a claim whose basis is below the level required for that instruction.",
+  "priority": "must",
+  "rationale": "Intake: 'the runbook should represent the output of discovery, not the beginning of discovery.'",
+  "tags": [
+    "handoff",
+    "evidence"
+  ]
+}

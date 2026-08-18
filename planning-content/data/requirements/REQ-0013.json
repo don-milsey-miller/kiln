@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0013",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Decisions are recorded with their alternatives",
+  "statement": "Every decision that shapes the plan must be recorded together with the options considered and why the chosen one won.",
+  "priority": "should",
+  "rationale": "Intake: 'continuously capture decisions and evolving requirements.' A decision without alternatives cannot be reopened intelligently.",
+  "tags": [
+    "decisions"
+  ]
+}

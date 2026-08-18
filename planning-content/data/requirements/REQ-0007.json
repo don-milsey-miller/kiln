@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0007",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Every load-bearing claim carries how it is known",
+  "statement": "Every claim the plan depends on must carry a recorded basis — unverified, source-supported, or demonstrated by execution — as structured data rather than prose.",
+  "priority": "must",
+  "rationale": "Intake's central constraint: a guess, a documented claim and a demonstrated one must remain distinguishable to the end.",
+  "tags": [
+    "evidence"
+  ]
+}

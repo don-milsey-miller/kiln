@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0011",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The output serves a human or an agent implementer",
+  "statement": "The output must be consumable both by a person reading it and by an agent processing it, without either form being a lossy rendering of the other.",
+  "priority": "must",
+  "rationale": "Intake stakeholders: the material explicitly declines to assume which the implementer is.",
+  "tags": [
+    "handoff"
+  ]
+}

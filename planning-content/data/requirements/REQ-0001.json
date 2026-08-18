@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0001",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The planning process is defined by the system, not by the session",
+  "statement": "The system must define the sequence of planning activities and their completion conditions, such that two planning sessions on comparable projects follow the same sequence.",
+  "priority": "must",
+  "rationale": "Intake: 'session quality is inconsistent' — the process is currently negotiated per session.",
+  "tags": [
+    "process"
+  ]
+}

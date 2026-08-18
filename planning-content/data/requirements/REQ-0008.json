@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0008",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A reader can distinguish claim strength without reading prose",
+  "statement": "A reader or a consuming agent must be able to tell the basis of any claim by inspecting structure, without interpreting narrative text.",
+  "priority": "must",
+  "rationale": "If telling them apart requires careful reading, it will not survive contact with a long document.",
+  "tags": [
+    "evidence",
+    "handoff"
+  ]
+}

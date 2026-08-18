@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0012",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Validation that costs money or needs credentials requires explicit authorisation",
+  "statement": "The system must not perform a validation that incurs cost or uses credentials unless the operator has explicitly authorised that class of validation.",
+  "priority": "must",
+  "rationale": "Intake constraint: validation cannot assume a free, local, consequence-free environment.",
+  "tags": [
+    "validation",
+    "governance"
+  ]
+}

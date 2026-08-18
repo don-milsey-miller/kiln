@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0004",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A claim taken from a source records that source",
+  "statement": "Any claim the plan rests on that came from an external source must record a reference to that source.",
+  "priority": "must",
+  "rationale": "Without this the distinction between a documented claim and a guess is lost the moment it is written down.",
+  "tags": [
+    "research",
+    "evidence"
+  ]
+}

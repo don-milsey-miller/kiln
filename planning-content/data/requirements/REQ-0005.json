@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0005",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Claims can be tested by execution in a real environment",
+  "statement": "The system must be able to execute a procedure in a real environment and capture the commands run, the output produced, and whether it succeeded.",
+  "priority": "must",
+  "rationale": "Intake problem 3: no sandbox, so testable assumptions are inferred instead.",
+  "tags": [
+    "validation"
+  ]
+}

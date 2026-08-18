@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0015",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The system runs locally for a single operator",
+  "statement": "The system must be usable by one operator on one machine with no hosted service required.",
+  "priority": "must",
+  "rationale": "Intake constraint, stated as the present situation rather than a permanent one — see intake open question 2.",
+  "tags": [
+    "environment"
+  ]
+}

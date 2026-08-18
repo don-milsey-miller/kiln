@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0003",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Implementation questions can be answered from current external sources",
+  "statement": "When a planning question depends on external fact, the system must be able to consult a current external source rather than reason from what it already holds.",
+  "priority": "must",
+  "rationale": "Intake problem 2: 'educated guessing' on vendor docs, OS procedures, versions and known issues.",
+  "tags": [
+    "research"
+  ]
+}

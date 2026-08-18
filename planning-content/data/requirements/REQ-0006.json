@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0006",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A tested claim records the environment it was tested in",
+  "statement": "Any claim validated by execution must record the environment it ran in, in enough detail to judge whether that environment resembles the target.",
+  "priority": "must",
+  "rationale": "A procedure that worked somewhere unlike the target has not been validated for the target.",
+  "tags": [
+    "validation",
+    "evidence"
+  ]
+}

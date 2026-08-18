@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0010",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The handoff is actionable without returning to the planner",
+  "statement": "A recipient of the output must be able to begin their part of the work without asking the planner for information the plan should have contained.",
+  "priority": "must",
+  "rationale": "Intake objective, stated in the PM's own terms.",
+  "tags": [
+    "handoff"
+  ]
+}

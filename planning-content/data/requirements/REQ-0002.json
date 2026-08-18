@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0002",
+  "type": "requirement",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Current project state is inspectable at any time",
+  "statement": "At any point the system must be able to report which stage the project is in and what that stage still requires.",
+  "priority": "must",
+  "rationale": "Intake: the PM cannot currently tell how far a planning session has got.",
+  "tags": [
+    "process"
+  ]
+}
