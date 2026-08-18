@@ -128,6 +128,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 36 | Model capability bar | **Warn, never refuse.** Publish a tested-models table instead. | A hard gate is unenforceable — you can't detect "too weak" until it's already produced something bad — and it insults users running perfectly adequate local setups. The real mitigation is templates + typed tools + the lint loop. |
 | 37 | Development provider order | **Frontier model first for iteration speed, then harden against a local 7–8B before v1 ships.** | Developing against the weak model first confounds every design decision with "is this wrong, or is the model just struggling?" |
 | 56 | Sandbox tier | **Three tiers ship in v1 — (1) Python virtual environment, (2) Docker / Docker Compose, (3) AWS CLI + Terraform. The PM decides which are available; the validation agent enforces the ceiling and may not exceed it.** Declared in `project.yaml`, same as artifact types (#39). | This is a **permission boundary, not a preference** — it's the one place the agent spends money and holds credentials. Making it a PM declaration means "this project validates in Docker and nowhere else" is a fact the agent is bound by, not a habit it might drift out of. Three tiers rather than one also means the cheap tier handles the common case: most claims worth checking are dependency questions, not hardware questions. |
+| 77 | Sandbox tier defaults | **Tier 1 on by default. Tier 2 is capability-detected** — automatically available where Docker / Docker Compose already work on the machine, and where they don't, **recommended to the PM as an approve-or-deny**, never installed on their behalf. **Tier 3 off by default**, activated only when the project's scope calls for it. **The PM is educated on tiers 2 and 3 on demand** — when they ask, or when the project reaches a claim that needs one — never up front. | **This dissolves the question rather than picking a side of it.** The open version was a static choice between "tier 1 only" and "tiers 1 and 2", and both are guesses about a machine the template has never seen — which is why this repo's hand-written manifest and this document's leaning had already drifted apart. Making tier 2's availability a **detection result** means `project.yaml` states a fact rather than a hope. **Probe the capability, not the binary:** `docker compose version` returning successfully, not `which docker` — installed-but-daemon-stopped and installed-but-no-socket-permission both read as "available" to a naive check and then fail at `provision`, which is the silent-tier-downgrade risk arriving through the setup script instead of the agent. ⚠️ Measured here 2026-08-18: `docker` is not on PATH at all, so this repo's `tier 1 only` is **correct as written** — and now owes the PM a tier-2 recommendation rather than nothing. **Recommend, never install:** installing system software on the PM's behalf is #67's rejected move in a different costume. **Tier 3's "when scope calls for it" is #25 by another route** — validation is demand-driven from stage 3 with a gate at 6, so the tier arrives with the claim that needs it; and a project that never activates it still never loads a provider or holds a credential, which is what four rows of the risk register depend on. **Education on demand for the reason per-task approval was rejected:** a governance briefing delivered before anything needs it is a prompt everyone clicks through; delivered at the moment a claim needs the tier, it lands. ⚠️ **Two consequences, both real.** The setup script (#49) grows a capability probe. And the tier declaration in `project.yaml` gains a **third state** — `available` / `recommended-pending-approval` / `off` — which the lint and the validation agent must both read, with `recommended` behaving **exactly like off** until approved. #45's `n/a` reasons gain a second form alongside `tier 3 not activated`. _(Decided 2026-08-18.)_ |
 
 ### Content & schemas
 
@@ -1695,14 +1696,21 @@ normal.
   means the first real advisory rule is this one.
 - Deadline: **step 3, before the first schema** — the same retrofit argument as materiality (#61).
 
-**Sandbox governance defaults** _(narrowed by #56)_
+**Sandbox governance defaults** **→ #77, closed 2026-08-18** _(narrowed by #56)_
 
-⚠️ **This one is currently a disagreement, not just an open question** _(noted 2026-08-18)_. The
-leaning below is tiers 1 **and** 2 on; `planning-content/project.yaml`, written at step 0 of #76,
-ships **tier 1 only** — the reading where a wrong default grants nothing. Neither is wrong yet, but a
-manifest and a document that say different things is how a provisional choice becomes the answer
-without anyone deciding it. Settle it when a fresh `project.yaml` is first *generated* rather than
-hand-written, which is #76's step 4.
+✅ **Closed, and the answer was neither of the two candidates below.** Both leanings were static —
+"tier 1 only" or "tiers 1 and 2 on" — and both are guesses about a machine no template has seen, which
+is exactly why this repo's manifest and this document's leaning had drifted apart into a disagreement
+before anyone decided anything. **#77 makes tier 2 capability-detected** (available where Docker
+already works; recommended for approval where it doesn't; never installed on the PM's behalf), leaves
+tier 1 on and tier 3 off, and makes tier 3 activation follow the project's scope rather than a setup
+question.
+
+**It also answers the second sub-question below, and answers it differently from its leaning.** The
+leaning said "once at setup, changeable at any time." #77 is a **hybrid**: tiers 1 and 2 are settled at
+setup — one detection, one recommendation if needed — while **tier 3 is demand-driven**, arriving with
+the claim that needs it. That is #25's shape, not a per-task prompt, so the objection below still
+holds against what it was aimed at.
 - #56 answers most of this by construction — tier 1 and tier 2 need almost no policy, and a project that never activates tier 3 has no credentials to govern. What's left: **which tiers are active by default in a fresh `project.yaml`?**
 	- _leaning:_ **tiers 1 and 2 on, tier 3 off.** They cost nothing and need no credentials, so leaving them off just means validation doesn't happen. Tier 3 requires a deliberate act, because a permissive default someone forgets to tighten is worse than a restrictive one someone has to loosen.
 - Does the PM set tiers once at setup, or per stage / per validation task?

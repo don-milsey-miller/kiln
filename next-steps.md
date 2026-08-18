@@ -12,8 +12,8 @@
 > rationale and the evidence-loop gap → **#38** · `activated: []` and why this project must run its own
 > stage 2 → **#39** · "re-test a recorded blocker before building around it" and "don't keep the adapted
 > `subagent` extension" → the spike-1 section · the tier-1-vs-tiers-1-and-2 disagreement between this
-> repo's manifest and the sandbox leaning → Open questions. **What remains here is scheduling and
-> scratch: check tables, run records, and what is owed next.**
+> repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
+> remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
 > The framing that produced this list: notes.md is done thinking for now. 67 decisions, ~1,600 lines,
 > and the remaining open questions are a default-tier setting and a try-it panel — the trust spike's
@@ -66,7 +66,7 @@ They arrive with step 4, once activation makes generation possible.
 
 | | Item | State |
 |---|---|---|
-| a | **Default sandbox tiers in a fresh `project.yaml`** — the open question notes.md already flags. Written as **tier 1 only**: the reading where a wrong default grants nothing. | Provisional. Needs a number in notes.md, or a deliberate raise. |
+| a | **Default sandbox tiers in a fresh `project.yaml`** — written as **tier 1 only**: the reading where a wrong default grants nothing. | ✅ **Closed 2026-08-18 → #77**, and the tier-1-only manifest turns out to be **right on this machine for a reason it didn't know**: tier 2 is now capability-detected, `docker` is not on PATH here, so tier 2 is *recommended-pending-approval* rather than available. What's owed is the recommendation to the PM, not an edit to the file. |
 | b | **`artifactTypes.activated` is `[]`.** Activation is a stage-2 agent-proposes / PM-approves decision (#39) and stage 2 hasn't run. Step 3's four types are recorded in the file as a *proposal*, not an approval. | Correct as-is. Resolves at step 4, when stage 2 actually runs. |
 | c | **Where the tool half sits in this repo.** This repo *is* the tool — it becomes `.planning/` in a user's project (#1, #20, #32) — so `app/` `pi-package/` `schemas/` `templates/` `stages/` are top-level here, and the `planning-content/` just created is this project dogfooding itself. | ✅ **Closed 2026-08-16 → #69.** It always was settled; it now has a number. |
 | d | **How the app finds content once this repo _is_ `.planning/`.** A consumer's content sits at `../planning-content` relative to the tool root; this repo's own dogfood copy sits at `./planning-content`. Two different paths that look identical from inside this repo. | ✅ **Closed 2026-08-16 → #70 (resolution) and #71 (the consumer's `.gitignore`).** And the hazard was worse than written — see below. |
