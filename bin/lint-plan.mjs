@@ -76,10 +76,15 @@ if (asJson) {
   const counts = result.findings.reduce((a, f) => ({ ...a, [f.severity]: (a[f.severity] ?? 0) + 1 }), {});
   console.log(`\n${result.records.length} artifact(s) · ${JSON.stringify(counts)}`);
 } else {
-  console.log(render(result.allFindings ?? [...(result.blocking ?? []), ...(result.warnings ?? []), ...(result.advisories ?? [])]));
+  const artifactFindings =
+    result.allFindings ?? [...(result.blocking ?? []), ...(result.warnings ?? []), ...(result.advisories ?? [])];
+  console.log("Artifacts:\n" + render(artifactFindings));
+  if (result.kind === "stage") console.log("\nGate:\n" + render(result.gateFindings));
   console.log(`\nGate: ${result.kind}${result.stageId ? ` ${result.stageId}` : ""} — ${result.ready ? "READY" : "NOT READY"}`);
   if (result.kind === "stage" && !result.stageDefinitionsFound)
     console.log("  (no stages/ definitions found — #34/#90: the gate will not report ready on criteria it has never seen)");
+  if (result.unmechanisedCriteria?.length)
+    console.log(`  ${result.unmechanisedCriteria.length} criterion/criteria need a human decision: ${result.unmechanisedCriteria.join(", ")}`);
 }
 
 // Exit policy: only a gate blocks, and only the gate decides (#46, #47).

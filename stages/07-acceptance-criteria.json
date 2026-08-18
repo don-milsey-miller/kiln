@@ -1,0 +1,21 @@
+{
+  "id": "07-acceptance-criteria",
+  "name": "Acceptance Criteria",
+  "decidedBy": "User",
+  "produces": [
+    "acceptance-criterion"
+  ],
+  "producesProse": "Testable criteria per requirement, definition of done.",
+  "exitCriteria": [
+    {
+      "id": "criteria-objective",
+      "describe": "Criteria are objective — pass/fail without judgment calls.",
+      "mechanised": false
+    }
+  ],
+  "provenance": {
+    "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
+    "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
+  }
+}

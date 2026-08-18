@@ -238,7 +238,7 @@ test("LAYER 3 (gate): a gate with no declared criteria says so rather than passi
   const { base, contentRoot, ctx } = fresh();
   try {
     await createRequirement(GOOD, { contentRoot, schemasDir: SCHEMAS, validators });
-    const gate = evaluateStageGate(ctx, "02-intent-decomposition");
+    const gate = evaluateStageGate(ctx, "02-intent-decomposition", { stageDefinitions: null });
     assert.equal(gate.stageDefinitionsFound, false, "#34's stage definitions do not exist yet");
     assert.equal(gate.criteriaDeclared, false);
     assert.equal(gate.ready, false, "must not report ready on criteria it has never seen");
@@ -329,7 +329,7 @@ test("#90: the gate does NOT infer produced types from x-stage", async () => {
   try {
     // No stage definitions. Stage 5's schemas carry x-stage: 05-solution-design, and no
     // schema or api-spec artifact exists — the old inference would have fired here.
-    const gate = evaluateStageGate(ctx, "05-solution-design");
+    const gate = evaluateStageGate(ctx, "05-solution-design", { stageDefinitions: null });
     assert.equal(gate.stageDefinitionsFound, false);
     assert.deepEqual(gate.gateFindings, [], "produced types must come from stages/ or from nowhere");
     assert.equal(gate.ready, false, "and it still refuses to report ready");
@@ -343,10 +343,15 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
   try {
     const wrong = { "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement", "schema"] } };
     const { findings } = lintProject({ ...ctx, stageDefinitions: wrong });
-    const d = findings.filter((f) => f.ruleId === "stage/x-stage-disagrees");
-    // schema.schema.json says x-stage 05-solution-design; these defs claim stage 2 produces it.
-    assert.ok(d.some((f) => f.details.type === "schema"), JSON.stringify(d, null, 2));
+    const d = findings.filter((f) => f.ruleId.startsWith("stage/x-stage"));
+    // schema.schema.json says x-stage 05-solution-design, which these defs do not contain:
+    // #90's strengthened invariant catches the UNRESOLVABLE case before the disagreement one.
+    const s = d.find((f) => f.details.type === "schema");
+    assert.ok(s, JSON.stringify(findings, null, 2));
+    assert.equal(s.ruleId, "stage/x-stage-unresolvable");
     assert.ok(d.every((f) => f.severity === SEVERITY.ERROR));
+    // requirement IS claimed by these defs but stage 2 also claims schema, so requirement agrees.
+    assert.ok(!d.some((f) => f.details.type === "requirement"));
 
     // And with defs that agree, nothing fires.
     const right = {
@@ -355,7 +360,45 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
       "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
     };
     const ok = lintProject({ ...ctx, stageDefinitions: right }).findings;
-    assert.deepEqual(ok.filter((f) => f.ruleId === "stage/x-stage-disagrees"), []);
+    assert.deepEqual(ok.filter((f) => f.ruleId.startsWith("stage/x-stage")), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#90: the real stages/ definitions agree with every schema's x-stage", () => {
+  // Not a fixture — the nine definitions on disk against the four real schemas. This is the
+  // invariant #90 asks for: every x-stage resolves to an existing stage AND agrees with it.
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    const findings = lintProject(ctx).findings;
+    assert.deepEqual(
+      findings.filter((f) => f.ruleId.startsWith("stage/")),
+      [],
+      "the shipped stage definitions disagree with the shipped schemas"
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a criterion nothing can check does not pass by default — it needs a human decision", async () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    await createRequirement(GOOD, { contentRoot, schemasDir: SCHEMAS, validators });
+    // Stage 2's real criteria are all declared `mechanised: false`.
+    const gate = evaluateStageGate(ctx, "02-intent-decomposition");
+    assert.ok(gate.unmechanisedCriteria.length > 0, "stage 2 has human-judgement criteria");
+    assert.equal(gate.ready, false, "must not pass on criteria nothing checked");
+    assert.ok(gate.gateFindings.every((f) => f.ruleId === "gate/criterion-needs-human-judgement" || f.ruleId === "gate/no-artifacts-for-stage-type"));
+
+    // Acknowledged by the PM, the same shape as #45's justified n/a and #59's signoff.
+    const acked = evaluateStageGate(ctx, "02-intent-decomposition", {
+      acknowledged: gate.unmechanisedCriteria,
+    });
+    assert.deepEqual(acked.unmechanisedCriteria, []);
+    // scope-boundary is not activated, so stage 2 still cannot complete — a real finding.
+    assert.ok(acked.gateFindings.every((f) => f.ruleId === "gate/no-artifacts-for-stage-type"));
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

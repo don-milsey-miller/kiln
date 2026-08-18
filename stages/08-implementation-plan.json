@@ -1,0 +1,27 @@
+{
+  "id": "08-implementation-plan",
+  "name": "Implementation Plan",
+  "decidedBy": "Planning agent",
+  "produces": [
+    "task",
+    "role-assignment"
+  ],
+  "producesProse": "WBS, sequenced tasks, dependencies, estimates.",
+  "exitCriteria": [
+    {
+      "id": "tasks-developer-sized",
+      "describe": "Every task is developer-sized.",
+      "mechanised": false
+    },
+    {
+      "id": "tasks-trace-to-requirement",
+      "describe": "Every task traces to a requirement.",
+      "mechanised": false
+    }
+  ],
+  "provenance": {
+    "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
+    "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
+  }
+}

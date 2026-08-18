@@ -1,0 +1,26 @@
+{
+  "id": "06-risk-feasibility",
+  "name": "Risk + Feasibility",
+  "decidedBy": "Both",
+  "produces": [
+    "risk"
+  ],
+  "producesProse": "Risk register (technical / legal / privacy / operational / cost), mitigations.",
+  "exitCriteria": [
+    {
+      "id": "high-severity-risks-mitigated",
+      "describe": "Every high-severity risk has a mitigation or an accepted-risk signoff.",
+      "mechanised": false
+    },
+    {
+      "id": "load-bearing-assertions-at-rung",
+      "describe": "Every load-bearing assertion has reached its required confidence rung (#25, #42).",
+      "mechanised": false
+    }
+  ],
+  "provenance": {
+    "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
+    "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
+  }
+}

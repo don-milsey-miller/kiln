@@ -1,0 +1,32 @@
+{
+  "id": "02-intent-decomposition",
+  "name": "Intent Decomposition",
+  "decidedBy": "Agent → user confirms",
+  "produces": [
+    "requirement",
+    "scope-boundary"
+  ],
+  "producesProse": "Structured requirements list, glossary, explicit non-goals, activated artifact types (#39).",
+  "exitCriteria": [
+    {
+      "id": "every-requirement-testable",
+      "describe": "Every requirement is testable.",
+      "mechanised": false
+    },
+    {
+      "id": "scope-boundary-drawn",
+      "describe": "The scope boundary is drawn.",
+      "mechanised": false
+    },
+    {
+      "id": "type-activation-approved",
+      "describe": "Artifact type activation is approved (#39).",
+      "mechanised": false
+    }
+  ],
+  "provenance": {
+    "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
+    "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
+  }
+}
