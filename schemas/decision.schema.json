@@ -4,114 +4,148 @@
   "title": "Decision",
   "description": "The decision register (stage 4). Consumes the primitives in #82 and introduces no new foundational conventions. Every entry carries the decision, alternatives considered, rationale, linked evidence, assumptions, date and status — the register's stated minimum contract, mapped onto the primitives.",
   "type": "object",
-
   "allOf": [
-    { "$ref": "common.schema.json#/$defs/artifactEnvelope" },
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    },
     {
       "$comment": "The lifecycle/supersededBy invariant. ⚠️ Nested inside allOf on purpose, not stylistically — a TOP-LEVEL `if` beside `allOf: [$ref]` was measured to drop the referenced envelope's evaluated-property annotations, so unevaluatedProperties:false then rejected every valid document for lacking schemaVersion/reviewStatus/lifecycle/title. Same class of trap as additionalProperties (#82). Every conditional in every schema goes here.",
       "if": {
-        "properties": { "lifecycle": { "const": "superseded" } },
-        "required": ["lifecycle"]
+        "properties": {
+          "lifecycle": {
+            "const": "superseded"
+          }
+        },
+        "required": [
+          "lifecycle"
+        ]
       },
       "then": {
-        "required": ["supersededBy"],
-        "properties": { "supersededBy": { "minItems": 1 } },
+        "required": [
+          "supersededBy"
+        ],
+        "properties": {
+          "supersededBy": {
+            "minItems": 1
+          }
+        },
         "$comment": "A superseded decision must name what replaced it. The register's value is being able to follow a reversal forward; a superseded entry with no successor is a dead end that looks like a record."
       },
       "else": {
-        "properties": { "supersededBy": { "maxItems": 0 } },
+        "properties": {
+          "supersededBy": {
+            "maxItems": 0
+          }
+        },
         "$comment": "Nothing that still stands has been replaced. Kept in the schema rather than the lint because it is a structural invariant of this artifact, not a project policy — and an invariant left to the lint is one every other consumer has to re-learn."
       }
     }
   ],
-
   "properties": {
-    "id": { "pattern": "^DEC-[0-9]{4,}$" },
-    "type": { "const": "decision" },
-
+    "id": {
+      "pattern": "^DEC-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "decision"
+    },
     "statement": {
       "$ref": "common.schema.json#/$defs/nonEmptyString",
       "description": "The choice that was made, stated as an outcome rather than a discussion. Same field name as requirement.statement on purpose: the payload field is called `statement` in every type that has one.",
       "x-materiality": "semantic"
     },
-
     "alternatives": {
       "type": "array",
       "description": "What else was considered and why it lost. Substantive decision content, not commentary — a decision with no alternatives recorded is a decision nobody can re-open intelligently. Structured rather than prose because the renderer and the handoff both present it, but NOT an artifact type: nothing traces INTO an alternative, so #41's escape-hatch test leaves it inline.",
       "items": {
         "type": "object",
         "properties": {
-          "option": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
-          "whyNot": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+          "option": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          },
+          "whyNot": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          }
         },
-        "required": ["option", "whyNot"],
+        "required": [
+          "option",
+          "whyNot"
+        ],
         "additionalProperties": false
       },
       "x-materiality": "semantic"
     },
-
     "rationale": {
       "type": "string",
       "description": "Why the chosen option won. Free prose. #61 names rationale as the archetype of the cosmetic class — it is what a human reads, and nothing downstream traverses it.",
       "x-materiality": "cosmetic"
     },
-
     "decidedAt": {
       "type": "string",
       "format": "date",
       "description": "The date the decision was taken. ISO 8601 date, not a timestamp — decisions are made on days, and a false precision invites a false ordering.",
       "x-materiality": "advisory"
     },
-
     "addresses": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "What this decision resolves — the requirements it settles and the open questions it closes.",
       "x-materiality": "structural",
-      "x-traceTarget": ["requirement", "question"]
+      "x-traceTarget": [
+        "requirement",
+        "question"
+      ]
     },
-
     "derivedFrom": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Parent decisions this one refines. Same-type edge, so it always resolves.",
       "x-materiality": "structural",
-      "x-traceTarget": ["decision"]
+      "x-traceTarget": [
+        "decision"
+      ]
     },
-
     "evidencedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Evidence and assertions the decision rests on.",
       "x-materiality": "structural",
-      "x-traceTarget": ["evidence", "assertion"]
+      "x-traceTarget": [
+        "evidence",
+        "assertion"
+      ]
     },
-
     "assumesThat": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Assumptions the decision rests on, as REFERENCES rather than prose. An assumption is an assertion at rung 1 (`unverified`, #42) or an open question (#38) — it is never a string on this artifact. The information-type model says an assumption that loses its hedge becomes a fact nobody checked; a prose field here would be visible to a human and invisible to every mechanism built to stop exactly that. See #85 for the cost this carries until `assertion` is activated.",
       "x-materiality": "structural",
-      "x-traceTarget": ["assertion", "question"]
+      "x-traceTarget": [
+        "assertion",
+        "question"
+      ]
     },
-
     "supersededBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "The decision that replaced this one. Required when lifecycle is `superseded` and forbidden otherwise — enforced by the conditional in allOf, not left to the lint. May promote to the envelope if a second type needs it.",
       "x-materiality": "structural",
-      "x-traceTarget": ["decision"]
+      "x-traceTarget": [
+        "decision"
+      ]
     },
-
     "tags": {
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
       "uniqueItems": true,
-      "x-materiality": "advisory"
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103) — the clear advisory case, declared rather than inferred."
     },
-
     "notes": {
       "type": "string",
       "x-materiality": "cosmetic"
     }
   },
-
-  "required": ["statement"],
+  "required": [
+    "statement"
+  ],
   "unevaluatedProperties": false,
   "x-artifactType": "decision",
   "x-stage": "04-requirement-gaps",
@@ -121,6 +155,10 @@
   },
   "x-unresolvableTraceTargets": {
     "description": "#75 in force: question, evidence and assertion are NOT among step 3's activated four. Links to them are permitted and reported at advisory weight until activation.",
-    "targets": ["question", "evidence", "assertion"]
+    "targets": [
+      "question",
+      "evidence",
+      "assertion"
+    ]
   }
 }

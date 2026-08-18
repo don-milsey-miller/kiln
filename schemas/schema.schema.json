@@ -4,89 +4,109 @@
   "title": "Schema (data-model design artifact)",
   "description": "Stage 5 (#54's flagship). ⚠️ NAME HAZARD, stated once and loudly: this is the PROJECT'S data-model design artifact — the thing rendered as an ER diagram. It is NOT the meta-format governing planning artifacts, which is JSON Schema 2020-12 (#82). The file name `schema.schema.json` is the collision made visible: the outer `.schema.json` is the meta-format, the inner `schema` is #38's artifact type. See #86 — if the blur bites in practice, the type renames to `data-model` and the prefix stays SCH.",
   "type": "object",
-
-  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
-
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
   "properties": {
-    "id": { "pattern": "^SCH-[0-9]{4,}$" },
-    "type": { "const": "schema" },
-
+    "id": {
+      "pattern": "^SCH-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "schema"
+    },
     "payload": {
       "$ref": "common.schema.json#/$defs/payloadRef",
       "description": "The definition file. #8: 'a schema is a definition file, rendered as an ER diagram — not a diagram that happens to look like a schema.' The format is DECLARED, not invented: this artifact deliberately does not model tables, columns, types, keys or relations, because doing so would be a second schema language written for no reason other than that the artifact is called `schema`.",
       "properties": {
         "format": {
-          "enum": ["json-schema", "sql-ddl", "dbml", "prisma"],
+          "enum": [
+            "json-schema",
+            "sql-ddl",
+            "dbml",
+            "prisma"
+          ],
           "description": "Adding a format is a decision, not a convenience: each one needs a parser for the ER rendering and for the handoff. A format nothing renders is a payload nobody sees."
         }
       },
       "x-materiality": "semantic"
     },
-
     "summary": {
       "type": "string",
       "description": "What this data model covers, in a line or two. Human orientation only.",
       "x-materiality": "cosmetic"
     },
-
     "storageTarget": {
       "description": "Where this model is intended to live — stage 5's exit criterion is 'data model approved; storage target chosen', so the choice belongs on the artifact rather than in prose. #45 applies where a model is storage-agnostic.",
       "oneOf": [
-        { "$ref": "common.schema.json#/$defs/nonEmptyString" },
-        { "$ref": "common.schema.json#/$defs/notApplicable" }
+        {
+          "$ref": "common.schema.json#/$defs/nonEmptyString"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/notApplicable"
+        }
       ],
       "x-materiality": "semantic"
     },
-
     "implements": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Requirements this data model satisfies.",
       "x-materiality": "structural",
-      "x-traceTarget": ["requirement"]
+      "x-traceTarget": [
+        "requirement"
+      ]
     },
-
     "decidedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Decisions that shaped this model — normalisation, storage target, identity strategy.",
       "x-materiality": "structural",
-      "x-traceTarget": ["decision"]
+      "x-traceTarget": [
+        "decision"
+      ]
     },
-
     "derivedFrom": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "A model this one extends or specialises. Same-type edge, so it always resolves.",
       "x-materiality": "structural",
-      "x-traceTarget": ["schema"]
+      "x-traceTarget": [
+        "schema"
+      ]
     },
-
     "evidencedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "x-materiality": "structural",
-      "x-traceTarget": ["evidence", "assertion"]
+      "x-traceTarget": [
+        "evidence",
+        "assertion"
+      ]
     },
-
     "openQuestions": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "x-materiality": "structural",
-      "x-traceTarget": ["question"]
+      "x-traceTarget": [
+        "question"
+      ]
     },
-
     "tags": {
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
       "uniqueItems": true,
-      "x-materiality": "advisory"
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103) — the clear advisory case, declared rather than inferred."
     },
-
     "notes": {
       "type": "string",
       "x-materiality": "cosmetic"
     }
   },
-
-  "required": ["payload"],
+  "required": [
+    "payload"
+  ],
   "unevaluatedProperties": false,
-
   "x-artifactType": "schema",
   "x-stage": "05-solution-design",
   "x-wrapsExternalFormat": {
@@ -96,6 +116,10 @@
   },
   "x-unresolvableTraceTargets": {
     "description": "#75 in force: evidence, assertion and question are not among step 3's activated four.",
-    "targets": ["evidence", "assertion", "question"]
+    "targets": [
+      "evidence",
+      "assertion",
+      "question"
+    ]
   }
 }

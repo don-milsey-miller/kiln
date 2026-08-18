@@ -317,19 +317,59 @@ test("#102: reviseArtifact corrects an artifact's own fields, and refuses identi
   }
 });
 
-test("#16: revising an APPROVED artifact marks it amended; a draft stays draft", async () => {
+test("#103: only a material change amends an approval — cosmetic edits never prompt (#63)", async () => {
   const { reviseArtifact } = await import("../lib/tools/evidence-tools.mjs");
   const { writeReviewStatus, makeContext } = await import("../app/server.mjs");
   const { base, contentRoot, o } = fresh();
   try {
     const ast = await createAssertion(AST_IN, o);
-    const drafted = await reviseArtifact("assertion", ast.id, { title: "Still a draft" }, o);
-    assert.equal(drafted.artifact.reviewStatus, "draft", "nothing was approved, so nothing is lost");
-
     const ctx = { ...makeContext(contentRoot), activated: ["assertion"] };
     await writeReviewStatus(ctx, ast.id, "assertion", "approved");
-    const revised = await reviseArtifact("assertion", ast.id, { title: "Changed after approval" }, o);
-    assert.equal(revised.artifact.reviewStatus, "amended", "an approval was given to something that no longer says the same thing");
+
+    // COSMETIC: title and notes. #63 promises these never prompt, so an approval survives.
+    const cosmetic = await reviseArtifact("assertion", ast.id, { title: "Reworded", notes: "typo fixed" }, o);
+    assert.equal(cosmetic.artifact.reviewStatus, "approved", "a cosmetic edit must not reopen an approval");
+    assert.equal(cosmetic.amends, false);
+    assert.equal(cosmetic.stream, "activity-log", "#63's second stream");
+    assert.deepEqual(cosmetic.changedFields.map((c) => c.materiality).sort(), ["cosmetic", "cosmetic"]);
+
+    // ADVISORY declared exempt: tags carry x-amendsApproval: false.
+    const tagged = await reviseArtifact("assertion", ast.id, { tags: ["concurrency"] }, o);
+    assert.equal(tagged.artifact.reviewStatus, "approved");
+    assert.equal(tagged.changedFields[0].materiality, "advisory");
+    assert.equal(tagged.changedFields[0].amends, false, "declared on the field, not inferred from the class");
+
+    // SEMANTIC: the claim itself. An approval was given to something that no longer says the same thing.
+    const semantic = await reviseArtifact("assertion", ast.id, { statement: "A materially different claim." }, o);
+    assert.equal(semantic.artifact.reviewStatus, "amended");
+    assert.equal(semantic.amends, true);
+    assert.equal(semantic.stream, "change-feed");
+
+    // A draft has no approval to lose, whatever changes.
+    const draft = await createAssertion(AST_IN, o);
+    const revised = await reviseArtifact("assertion", draft.id, { statement: "Changed while still a draft." }, o);
+    assert.equal(revised.artifact.reviewStatus, "draft");
+    assert.equal(revised.amends, true, "still material — it just has no approval to invalidate");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#103: materiality comes from #84's effective schema, not a field-name list", async () => {
+  const { reviseArtifact } = await import("../lib/tools/evidence-tools.mjs");
+  const { base, o } = fresh();
+  try {
+    const ast = await createAssertion(AST_IN, o);
+    // `loadBearing` is semantic and appears in no hardcoded list anywhere in the tool.
+    const r = await reviseArtifact("assertion", ast.id, { loadBearing: false }, o);
+    assert.equal(r.changedFields[0].field, "loadBearing");
+    assert.equal(r.changedFields[0].materiality, "semantic", "resolved through the schema");
+    assert.equal(r.amends, true);
+
+    // A no-op change is not a change at all.
+    const same = await reviseArtifact("assertion", ast.id, { loadBearing: false }, o);
+    assert.equal(same.changed, false);
+    assert.deepEqual(same.changedFields, []);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

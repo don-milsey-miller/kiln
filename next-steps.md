@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **102 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **103 decisions as of
 > 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >

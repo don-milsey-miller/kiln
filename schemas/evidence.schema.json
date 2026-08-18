@@ -4,118 +4,174 @@
   "title": "Evidence",
   "description": "A record of something observed, attached to the assertion it bears on. Cross-cutting rather than owned by a stage (#25), so it carries no x-stage. Consumes #82's primitives and introduces none. ⚠️ Evidence does NOT carry a verdict or a confidence rung — it carries what was observed, and #96's derivation reads those observations. An evidence record that already knew the answer would make the derivation decorative.",
   "type": "object",
-
   "allOf": [
-    { "$ref": "common.schema.json#/$defs/artifactEnvelope" },
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    },
     {
       "$comment": "Kind determines what must be present. Nested inside allOf per #82 — a top-level `if` beside allOf:[$ref] drops the envelope's evaluated-property annotations.",
-      "if": { "properties": { "kind": { "const": "experiment" } }, "required": ["kind"] },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "experiment"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
       "then": {
-        "required": ["environment", "observedAt", "outcome"],
+        "required": [
+          "environment",
+          "observedAt",
+          "outcome"
+        ],
         "$comment": "An experiment with no environment cannot be judged applicable to anything, which is what #96's filtering step needs above all else."
       },
       "else": {
-        "required": ["sources"],
+        "required": [
+          "sources"
+        ],
         "$comment": "A source-based record must say where it came from, or it is an opinion with a citation field."
       }
     }
   ],
-
   "properties": {
-    "id": { "pattern": "^EVD-[0-9]{4,}$" },
-    "type": { "const": "evidence" },
-
+    "id": {
+      "pattern": "^EVD-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "evidence"
+    },
     "kind": {
-      "enum": ["source", "experiment"],
+      "enum": [
+        "source",
+        "experiment"
+      ],
       "description": "Where the observation came from. `source`: authoritative documentation or published material. `experiment`: something was executed and observed. These reach different confidence rungs (#42) and are filtered for applicability differently (#96), so the distinction is structural rather than descriptive.",
       "x-materiality": "structural"
     },
-
     "summary": {
       "$ref": "common.schema.json#/$defs/nonEmptyString",
       "description": "What was observed, in one or two lines. Human orientation; the derivation does not read it.",
       "x-materiality": "semantic"
     },
-
     "sources": {
       "type": "array",
       "description": "Where a `source` record came from. Structured because REQ-0004 requires a claim taken from a source to record that source, and a URL inside prose is not a record of anything.",
       "items": {
         "type": "object",
         "properties": {
-          "title": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
-          "locator": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
-          "publishedAt": { "type": "string", "format": "date" },
-          "retrievedAt": { "type": "string", "format": "date" }
+          "title": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          },
+          "locator": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "retrievedAt": {
+            "type": "string",
+            "format": "date"
+          }
         },
-        "required": ["title", "locator"],
+        "required": [
+          "title",
+          "locator"
+        ],
         "additionalProperties": false
       },
       "x-materiality": "semantic"
     },
-
     "environment": {
       "type": "object",
       "description": "What the experiment ran in. REQ-0006 requires this in enough detail to judge whether it resembles the target, and #96's applicability filter is what does that judging. Free-form keys on purpose: the dimensions that matter differ per claim, and a fixed list would be wrong for most of them.",
       "properties": {
         "tier": {
-          "enum": [1, 2, 3],
+          "enum": [
+            1,
+            2,
+            3
+          ],
           "description": "#56's sandbox tier. Caps the reachable rung (see 'Which tier can reach which rung')."
         },
         "facts": {
           "type": "object",
           "description": "Observed environment facts — os, kernel, interpreter, image, instance type, whatever the claim turns on. Compared against the assertion's targetEnvironment to decide applicability and environment match.",
-          "additionalProperties": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+          "additionalProperties": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          }
         }
       },
-      "required": ["tier", "facts"],
+      "required": [
+        "tier",
+        "facts"
+      ],
       "additionalProperties": false,
       "x-materiality": "semantic"
     },
-
     "outcome": {
-      "enum": ["success", "failure"],
+      "enum": [
+        "success",
+        "failure"
+      ],
       "description": "What happened when it ran. ⚠️ NOT a verdict on the assertion — a successful run can refute a claim, and a failed run can support one. Which way it bears is `assertion.supportedBy` / `refutedBy` (#82's naming rule), not this field.",
       "x-materiality": "semantic"
     },
-
     "observedAt": {
       "type": "string",
       "format": "date",
       "description": "When the observation was made. Load-bearing for #96's applicability filter, which is the only reason it is required on an experiment.",
       "x-materiality": "semantic"
     },
-
     "capture": {
       "$ref": "common.schema.json#/$defs/payloadRef",
       "description": "The raw capture — commands, output, logs. #86 in force: this artifact does not re-model a transcript, it points at one.",
-      "properties": { "format": { "enum": ["text-log", "json-lines"] } },
+      "properties": {
+        "format": {
+          "enum": [
+            "text-log",
+            "json-lines"
+          ]
+        }
+      },
       "x-materiality": "semantic"
     },
-
     "supersededBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "A later evidence record that replaces this one — a re-run, or a corrected observation. Read by #96's applicability filter: superseded evidence is not applicable, which is how a stale record stops manufacturing a contradiction.",
       "x-materiality": "structural",
-      "x-traceTarget": ["evidence"]
+      "x-traceTarget": [
+        "evidence"
+      ]
     },
-
-    "notes": { "type": "string", "x-materiality": "cosmetic" },
-
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
     "tags": {
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
       "uniqueItems": true,
-      "x-materiality": "advisory"
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103) — the clear advisory case, declared rather than inferred."
     }
   },
-
-  "required": ["kind", "summary"],
+  "required": [
+    "kind",
+    "summary"
+  ],
   "unevaluatedProperties": false,
-
   "x-artifactType": "evidence",
   "x-crossCutting": {
     "description": "#25: validation is cross-cutting, not a tenth stage. Evidence is therefore produced by validation whenever a load-bearing assertion needs it, and no stage in stages/ claims it. That is why there is no x-stage here, and why #90's agreement check passes with none."
   },
-  "x-unresolvableTraceTargets": { "targets": [] }
+  "x-unresolvableTraceTargets": {
+    "targets": []
+  }
 }

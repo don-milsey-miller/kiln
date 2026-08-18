@@ -4,26 +4,29 @@
   "title": "Assertion",
   "description": "A claim the plan depends on being true. Cross-cutting rather than stage-owned (#25), so no x-stage. ⚠️ THIS SCHEMA DELIBERATELY HAS NO `confidence` AND NO `verdict` FIELD (#96). Both are derived from this artifact plus its evidence graph by lib/effective-assertion.mjs, and storing either would be a second copy of a value the graph already determines — the copy that goes stale silently, and the one a reader trusts.",
   "type": "object",
-
-  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
-
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
   "properties": {
-    "id": { "pattern": "^AST-[0-9]{4,}$" },
-    "type": { "const": "assertion" },
-
+    "id": {
+      "pattern": "^AST-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "assertion"
+    },
     "statement": {
       "$ref": "common.schema.json#/$defs/nonEmptyString",
       "description": "The claim, stated so that it could be shown false. Same field name as requirement.statement and decision.statement: the payload field is `statement` in every type that has one (#82).",
       "x-materiality": "semantic"
     },
-
     "loadBearing": {
       "type": "boolean",
       "default": true,
       "description": "Whether the plan changes if this claim is false. Drives #57's threshold: a load-bearing claim must reach its rung before anything may rest on it, and a non-load-bearing one need not.",
       "x-materiality": "semantic"
     },
-
     "targetEnvironment": {
       "type": "object",
       "description": "What the claim is asserted ABOUT. This is the other half of #96's applicability filter — evidence is applicable when its observed environment matches these facts, and `environment-matched` (#42 rung 4) means exactly that it did.",
@@ -31,54 +34,70 @@
         "facts": {
           "type": "object",
           "description": "The dimensions this claim turns on. Compared key-by-key against evidence.environment.facts; a key absent from the evidence is not a match, and is not a mismatch either — it is unknown, and unknown does not reach rung 4.",
-          "additionalProperties": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+          "additionalProperties": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          }
         }
       },
-      "required": ["facts"],
+      "required": [
+        "facts"
+      ],
       "additionalProperties": false,
       "x-materiality": "semantic"
     },
-
     "supportedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Evidence bearing IN FAVOUR of the claim. Split from refutedBy because polarity is intrinsic where evidence bears on a claim's truth (#82's naming rule) — and because a single evidencedBy list would make `contested` (#96) underivable.",
       "x-materiality": "structural",
-      "x-traceTarget": ["evidence"]
+      "x-traceTarget": [
+        "evidence"
+      ]
     },
-
     "refutedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "Evidence bearing AGAINST the claim. Its existence is the whole reason a rung alone is ambiguous: `experimentally-validated` is compatible with the claim being false.",
       "x-materiality": "structural",
-      "x-traceTarget": ["evidence"]
+      "x-traceTarget": [
+        "evidence"
+      ]
     },
-
     "arisesFrom": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "What raised this claim — the requirement, decision or research finding that needed it to be true.",
       "x-materiality": "structural",
-      "x-traceTarget": ["requirement", "decision", "research-finding"]
+      "x-traceTarget": [
+        "requirement",
+        "decision",
+        "research-finding"
+      ]
     },
-
     "openQuestions": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "x-materiality": "structural",
-      "x-traceTarget": ["question"]
+      "x-traceTarget": [
+        "question"
+      ]
     },
-
-    "notes": { "type": "string", "x-materiality": "cosmetic" },
-
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
     "tags": {
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
       "uniqueItems": true,
-      "x-materiality": "advisory"
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103) — the clear advisory case, declared rather than inferred."
     }
   },
-
-  "required": ["statement", "targetEnvironment"],
+  "required": [
+    "statement",
+    "targetEnvironment"
+  ],
   "unevaluatedProperties": false,
-
   "x-artifactType": "assertion",
   "x-derivedRelations": {
     "description": "#96. `verdict` and `confidence` are NOT stored here. lib/effective-assertion.mjs computes both from this artifact, its supportedBy/refutedBy evidence, and each evidence record's environment, observedAt, lifecycle and supersededBy. The handoff may materialise the rung, labelled derived rather than authoritative.",
@@ -90,6 +109,9 @@
   },
   "x-unresolvableTraceTargets": {
     "description": "#75: research-finding and question are activated on this project but not yet implemented; scope for links to dangle until they are.",
-    "targets": ["research-finding", "question"]
+    "targets": [
+      "research-finding",
+      "question"
+    ]
   }
 }
