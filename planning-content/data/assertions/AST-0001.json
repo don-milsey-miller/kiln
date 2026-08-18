@@ -1,0 +1,21 @@
+{
+  "id": "AST-0001",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "chokidar sees events fs.watch misses on Windows",
+  "statement": "On Windows, chokidar reports every file creation in a watched tree where Node's fs.watch({recursive:true}) does not.",
+  "targetEnvironment": {
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "supportedBy": [
+    "EVD-0001"
+  ]
+}

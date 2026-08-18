@@ -1,0 +1,25 @@
+{
+  "id": "AST-0002",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The lockfile serialises concurrent creates",
+  "statement": "Concurrent createArtifact calls in separate processes never receive the same allocated ID.",
+  "targetEnvironment": {
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0001"
+  ],
+  "notes": "Contested on purpose: this is the unresolved concurrency flake, not a contrived example.",
+  "supportedBy": [
+    "EVD-0002"
+  ],
+  "refutedBy": [
+    "EVD-0003"
+  ]
+}

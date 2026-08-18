@@ -1,0 +1,19 @@
+{
+  "id": "EVD-0002",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Six concurrent processes, distinct IDs",
+  "kind": "experiment",
+  "summary": "Six node processes creating requirements concurrently received six distinct IDs. Falsified by removing the lock: eight unlocked processes produced 4 distinct IDs of 8.",
+  "environment": {
+    "tier": 1,
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0"
+    }
+  },
+  "observedAt": "2026-08-18",
+  "outcome": "success"
+}

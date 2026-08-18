@@ -1,0 +1,20 @@
+{
+  "id": "EVD-0001",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Watcher spike, check 2",
+  "kind": "experiment",
+  "summary": "400 file creations, three runs of three. fs.watch reported 1 distinct path with no error; chokidar reported 400/400.",
+  "environment": {
+    "tier": 1,
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0",
+      "chokidar": "5.0.0"
+    }
+  },
+  "observedAt": "2026-08-17",
+  "outcome": "success"
+}
