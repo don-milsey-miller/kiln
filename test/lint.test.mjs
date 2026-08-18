@@ -17,6 +17,13 @@ const schemas = loadSchemaSet(SCHEMAS);
 const validators = createValidators(SCHEMAS);
 const ACTIVATED = ["requirement", "decision", "schema", "api-spec"];
 
+// #34/#90: what a stage produces comes from stages/, never from the schemas' x-stage.
+const STAGE_DEFS = {
+  "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
+  "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
+};
+
+
 function fresh() {
   const base = mkdtempSync(join(tmpdir(), "vpw-lint-"));
   const contentRoot = join(base, "planning-content");
@@ -210,7 +217,7 @@ test("LAYER 3 (gate): valid artifacts can still fail a stage gate", async () => 
     assert.deepEqual(lintProject(ctx).findings, []);
 
     // Stage 5 produces `schema` and `api-spec`; neither exists. Nothing is INVALID.
-    const gate = evaluateStageGate(ctx, "05-solution-design");
+    const gate = evaluateStageGate(ctx, "05-solution-design", { stageDefinitions: STAGE_DEFS });
     assert.equal(gate.blockingArtifactFindings.length, 0, "no artifact is bad");
     assert.deepEqual(
       gate.gateFindings.map((f) => f.details.type).sort(),
@@ -220,7 +227,7 @@ test("LAYER 3 (gate): valid artifacts can still fail a stage gate", async () => 
     assert.ok(gate.gateFindings.every((f) => f.ruleId === "gate/no-artifacts-for-stage-type"));
 
     // Stage 2 produces `requirement`, and one exists.
-    const stage2 = evaluateStageGate(ctx, "02-intent-decomposition");
+    const stage2 = evaluateStageGate(ctx, "02-intent-decomposition", { stageDefinitions: STAGE_DEFS });
     assert.deepEqual(stage2.gateFindings, []);
   } finally {
     rmSync(base, { recursive: true, force: true });
@@ -232,10 +239,13 @@ test("LAYER 3 (gate): a gate with no declared criteria says so rather than passi
   try {
     await createRequirement(GOOD, { contentRoot, schemasDir: SCHEMAS, validators });
     const gate = evaluateStageGate(ctx, "02-intent-decomposition");
-    assert.equal(gate.criteriaDeclared, false, "#34's stage definitions do not exist yet");
+    assert.equal(gate.stageDefinitionsFound, false, "#34's stage definitions do not exist yet");
+    assert.equal(gate.criteriaDeclared, false);
     assert.equal(gate.ready, false, "must not report ready on criteria it has never seen");
+    assert.deepEqual(gate.gateFindings, [], "and must not INFER produced types from x-stage (#90)");
 
     const withCriteria = evaluateStageGate(ctx, "02-intent-decomposition", {
+      stageDefinitions: STAGE_DEFS,
       criteria: [{ id: "every-requirement-testable", describe: "Every requirement is testable.", check: () => true }],
     });
     assert.equal(withCriteria.criteriaDeclared, true);
@@ -252,7 +262,7 @@ test("the three layers produce distinguishable outcomes", async () => {
     write(contentRoot, "data/requirements/REQ-0002.json", { id: "REQ-0002", type: "requirement", schemaVersion: 1, reviewStatus: "draft", lifecycle: "active", title: "T" }); // layer 1
     write(contentRoot, "data/requirements/REQ-0009.json", { id: "REQ-0003", type: "requirement", schemaVersion: 1, reviewStatus: "draft", lifecycle: "active", title: "T", statement: "S" }); // layer 2
 
-    const gate = evaluateStageGate(ctx, "05-solution-design");
+    const gate = evaluateStageGate(ctx, "05-solution-design", { stageDefinitions: STAGE_DEFS });
     const rules = new Set(gate.allFindings.map((f) => f.ruleId));
 
     assert.ok(rules.has("schema/invalid"), "layer 1 missing");
@@ -307,6 +317,45 @@ test("#46: the handoff gate blocks on errors and reports advisories without bloc
 
     write(contentRoot, "data/requirements/REQ-0002.json", { id: "REQ-0002", type: "requirement", schemaVersion: 1, reviewStatus: "draft", lifecycle: "active", title: "T" });
     assert.equal(evaluateHandoffGate(ctx).ready, false, "an error must block");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------- #90: stages/ owns the pipeline */
+
+test("#90: the gate does NOT infer produced types from x-stage", async () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    // No stage definitions. Stage 5's schemas carry x-stage: 05-solution-design, and no
+    // schema or api-spec artifact exists — the old inference would have fired here.
+    const gate = evaluateStageGate(ctx, "05-solution-design");
+    assert.equal(gate.stageDefinitionsFound, false);
+    assert.deepEqual(gate.gateFindings, [], "produced types must come from stages/ or from nowhere");
+    assert.equal(gate.ready, false, "and it still refuses to report ready");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the authority", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    const wrong = { "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement", "schema"] } };
+    const { findings } = lintProject({ ...ctx, stageDefinitions: wrong });
+    const d = findings.filter((f) => f.ruleId === "stage/x-stage-disagrees");
+    // schema.schema.json says x-stage 05-solution-design; these defs claim stage 2 produces it.
+    assert.ok(d.some((f) => f.details.type === "schema"), JSON.stringify(d, null, 2));
+    assert.ok(d.every((f) => f.severity === SEVERITY.ERROR));
+
+    // And with defs that agree, nothing fires.
+    const right = {
+      "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
+      "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision"] },
+      "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
+    };
+    const ok = lintProject({ ...ctx, stageDefinitions: right }).findings;
+    assert.deepEqual(ok.filter((f) => f.ruleId === "stage/x-stage-disagrees"), []);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
