@@ -29,6 +29,8 @@
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
-    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
-  }
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used.",
+    "transcriptionNote": "Every type in produces[] is named by the source table's Produces cell."
+  },
+  "producesCandidates": []
 }

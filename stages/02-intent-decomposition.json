@@ -3,8 +3,7 @@
   "name": "Intent Decomposition",
   "decidedBy": "Agent → user confirms",
   "produces": [
-    "requirement",
-    "scope-boundary"
+    "requirement"
   ],
   "producesProse": "Structured requirements list, glossary, explicit non-goals, activated artifact types (#39).",
   "exitCriteria": [
@@ -27,6 +26,18 @@
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
-    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used."
-  }
+    "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used.",
+    "transcriptionNote": "produces[] lists ONLY artifact types the source table names. Anything a reader would infer is in producesCandidates and is NOT enforced by the gate — see #92."
+  },
+  "producesCandidates": [
+    {
+      "type": "scope-boundary",
+      "from": "\"explicit non-goals\"",
+      "note": "The table names non-goals as an OUTPUT, not a scope-boundary artifact. Promoting this is a decision; #39's stage-2 activation is where it gets made."
+    }
+  ],
+  "outputsNotYetTyped": [
+    "glossary",
+    "activated artifact types (#39) — a manifest change, not an artifact"
+  ]
 }

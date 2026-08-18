@@ -10,6 +10,7 @@ import { createValidators } from "../lib/validate.mjs";
 import { lintProject, evaluateStageGate, evaluateHandoffGate, SEVERITY } from "../lib/lint.mjs";
 import { createRequirement } from "../lib/tools/create-requirement.mjs";
 import { artifactDir } from "../lib/layout.mjs";
+import { loadStageDefinitions } from "../lib/stages.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCHEMAS = join(ROOT, "schemas");
@@ -382,23 +383,85 @@ test("#90: the real stages/ definitions agree with every schema's x-stage", () =
   }
 });
 
-test("a criterion nothing can check does not pass by default — it needs a human decision", async () => {
+test("#93: a human-only criterion is ATTESTED, not acknowledged", async () => {
   const { base, contentRoot, ctx } = fresh();
   try {
     await createRequirement(GOOD, { contentRoot, schemasDir: SCHEMAS, validators });
-    // Stage 2's real criteria are all declared `mechanised: false`.
     const gate = evaluateStageGate(ctx, "02-intent-decomposition");
-    assert.ok(gate.unmechanisedCriteria.length > 0, "stage 2 has human-judgement criteria");
-    assert.equal(gate.ready, false, "must not pass on criteria nothing checked");
-    assert.ok(gate.gateFindings.every((f) => f.ruleId === "gate/criterion-needs-human-judgement" || f.ruleId === "gate/no-artifacts-for-stage-type"));
+    assert.ok(gate.pendingHumanCriteria.length > 0, "stage 2 has human-judgement criteria");
+    assert.equal(gate.ready, false, "unevaluated criteria must not pass");
+    assert.ok(gate.gateFindings.some((f) => f.ruleId === "gate/criterion-pending-human"));
 
-    // Acknowledged by the PM, the same shape as #45's justified n/a and #59's signoff.
-    const acked = evaluateStageGate(ctx, "02-intent-decomposition", {
-      acknowledged: gate.unmechanisedCriteria,
+    // Seeing a criterion is not judging it: there is no "acknowledged" result at all.
+    const bogus = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: Object.fromEntries(gate.pendingHumanCriteria.map((id) => [id, { result: "acknowledged" }])),
     });
-    assert.deepEqual(acked.unmechanisedCriteria, []);
-    // scope-boundary is not activated, so stage 2 still cannot complete — a real finding.
-    assert.ok(acked.gateFindings.every((f) => f.ruleId === "gate/no-artifacts-for-stage-type"));
+    assert.ok(bogus.gateFindings.some((f) => f.ruleId === "gate/attestation-malformed"), "acknowledgement must not be a result");
+    assert.equal(bogus.ready, false);
+
+    // Evaluated and found true.
+    const satisfied = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: Object.fromEntries(
+        gate.pendingHumanCriteria.map((id) => [id, { result: "satisfied", decidedBy: "pm", reason: "Reviewed REQ-0001." }])
+      ),
+    });
+    assert.deepEqual(satisfied.pendingHumanCriteria, []);
+    assert.deepEqual(satisfied.gateFindings, [], JSON.stringify(satisfied.gateFindings, null, 2));
+    assert.equal(satisfied.ready, true, "an evaluated, satisfied stage may advance");
+
+    // Evaluated and found false is a DIFFERENT outcome from never evaluated.
+    const failed = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: { ...Object.fromEntries(gate.pendingHumanCriteria.map((id) => [id, { result: "satisfied", decidedBy: "pm" }])),
+        "every-requirement-testable": { result: "not-satisfied", decidedBy: "pm", reason: "REQ-0001 has no observable pass condition." } },
+    });
+    assert.ok(failed.gateFindings.some((f) => f.ruleId === "gate/criterion-not-satisfied"));
+    assert.equal(failed.ready, false);
+
+    // n/a needs a reason, per #45's shape.
+    const naNoReason = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: { ...Object.fromEntries(gate.pendingHumanCriteria.map((id) => [id, { result: "satisfied", decidedBy: "pm" }])),
+        "scope-boundary-drawn": { result: "n/a", decidedBy: "pm" } },
+    });
+    assert.ok(naNoReason.gateFindings.some((f) => f.ruleId === "gate/attestation-unjustified"));
+
+    const naWithReason = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: { ...Object.fromEntries(gate.pendingHumanCriteria.map((id) => [id, { result: "satisfied", decidedBy: "pm" }])),
+        "scope-boundary-drawn": { result: "n/a", decidedBy: "pm", reason: "Single-surface project; no boundary to draw." } },
+    });
+    assert.equal(naWithReason.ready, true);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#92: stage definitions enforce only what the source table NAMES", () => {
+  const defs = JSON.parse(JSON.stringify(STAGE_DEFS)); // unused; read the real files instead
+  const real = loadStageDefinitions(ROOT);
+  // "explicit non-goals" is an output; scope-boundary is a catalogue type someone inferred.
+  assert.deepEqual(real["02-intent-decomposition"].produces, ["requirement"]);
+  assert.ok(real["02-intent-decomposition"].producesCandidates.some((c) => c.type === "scope-boundary"));
+  assert.deepEqual(real["08-implementation-plan"].produces, ["task"]);
+  assert.ok(real["08-implementation-plan"].producesCandidates.some((c) => c.type === "role-assignment"));
+  // Every candidate carries where it came from, so the inference is visible.
+  for (const d of Object.values(real))
+    for (const c of d.producesCandidates) {
+      assert.ok(c.from, `${d.id}: candidate ${c.type} has no provenance`);
+      assert.ok(c.note, `${d.id}: candidate ${c.type} has no note`);
+    }
+});
+
+test("#92: the gate never demands an artifact of a type that has no schema", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    const real = loadStageDefinitions(ROOT);
+    for (const [stageId, def] of Object.entries(real)) {
+      const gate = evaluateStageGate({ ...ctx, activated: Object.keys(ctx.schemas.types) }, stageId);
+      for (const f of gate.gateFindings.filter((x) => x.ruleId === "gate/no-artifacts-for-stage-type"))
+        assert.ok(
+          ctx.schemas.types[f.details.type],
+          `${stageId} demands "${f.details.type}", which has no schema — the definition would make the stage impossible`
+        );
+    }
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

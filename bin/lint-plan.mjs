@@ -83,8 +83,8 @@ if (asJson) {
   console.log(`\nGate: ${result.kind}${result.stageId ? ` ${result.stageId}` : ""} — ${result.ready ? "READY" : "NOT READY"}`);
   if (result.kind === "stage" && !result.stageDefinitionsFound)
     console.log("  (no stages/ definitions found — #34/#90: the gate will not report ready on criteria it has never seen)");
-  if (result.unmechanisedCriteria?.length)
-    console.log(`  ${result.unmechanisedCriteria.length} criterion/criteria need a human decision: ${result.unmechanisedCriteria.join(", ")}`);
+  if (result.pendingHumanCriteria?.length)
+    console.log(`  ${result.pendingHumanCriteria.length} criterion/criteria await a human evaluation (satisfied / not-satisfied / n/a+reason): ${result.pendingHumanCriteria.join(", ")}`);
 }
 
 // Exit policy: only a gate blocks, and only the gate decides (#46, #47).
