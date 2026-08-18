@@ -128,7 +128,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | 36 | Model capability bar | **Warn, never refuse.** Publish a tested-models table instead. | A hard gate is unenforceable — you can't detect "too weak" until it's already produced something bad — and it insults users running perfectly adequate local setups. The real mitigation is templates + typed tools + the lint loop. |
 | 37 | Development provider order | **Frontier model first for iteration speed, then harden against a local 7–8B before v1 ships.** | Developing against the weak model first confounds every design decision with "is this wrong, or is the model just struggling?" |
 | 56 | Sandbox tier | **Three tiers ship in v1 — (1) Python virtual environment, (2) Docker / Docker Compose, (3) AWS CLI + Terraform. The PM decides which are available; the validation agent enforces the ceiling and may not exceed it.** Declared in `project.yaml`, same as artifact types (#39). | This is a **permission boundary, not a preference** — it's the one place the agent spends money and holds credentials. Making it a PM declaration means "this project validates in Docker and nowhere else" is a fact the agent is bound by, not a habit it might drift out of. Three tiers rather than one also means the cheap tier handles the common case: most claims worth checking are dependency questions, not hardware questions. |
-| 77 | Sandbox tier defaults | **Tier 1 on by default. Tier 2 is capability-detected** — automatically available where Docker / Docker Compose already work on the machine, and where they don't, **recommended to the PM as an approve-or-deny**, never installed on their behalf. **Tier 3 off by default**, activated only when the project's scope calls for it. **The PM is educated on tiers 2 and 3 on demand** — when they ask, or when the project reaches a claim that needs one — never up front. | **This dissolves the question rather than picking a side of it.** The open version was a static choice between "tier 1 only" and "tiers 1 and 2", and both are guesses about a machine the template has never seen — which is why this repo's hand-written manifest and this document's leaning had already drifted apart. Making tier 2's availability a **detection result** means `project.yaml` states a fact rather than a hope. **Probe the capability, not the binary:** `docker compose version` returning successfully, not `which docker` — installed-but-daemon-stopped and installed-but-no-socket-permission both read as "available" to a naive check and then fail at `provision`, which is the silent-tier-downgrade risk arriving through the setup script instead of the agent. ⚠️ Measured here 2026-08-18: `docker` is not on PATH at all, so this repo's `tier 1 only` is **correct as written** — and now owes the PM a tier-2 recommendation rather than nothing. **Recommend, never install:** installing system software on the PM's behalf is #67's rejected move in a different costume. **Tier 3's "when scope calls for it" is #25 by another route** — validation is demand-driven from stage 3 with a gate at 6, so the tier arrives with the claim that needs it; and a project that never activates it still never loads a provider or holds a credential, which is what four rows of the risk register depend on. **Education on demand for the reason per-task approval was rejected:** a governance briefing delivered before anything needs it is a prompt everyone clicks through; delivered at the moment a claim needs the tier, it lands. ⚠️ **Two consequences, both real.** The setup script (#49) grows a capability probe. And the tier declaration in `project.yaml` gains a **third state** — `available` / `recommended-pending-approval` / `off` — which the lint and the validation agent must both read, with `recommended` behaving **exactly like off** until approved. #45's `n/a` reasons gain a second form alongside `tier 3 not activated`. _(Decided 2026-08-18.)_ |
+| 77 | Sandbox tier defaults | **Tier 1 on by default. Tier 2 is capability-detected** — automatically available where Docker / Docker Compose already work on the machine, and where they don't, **recommended to the PM as an approve-or-deny**, never installed on their behalf. **Tier 3 off by default**, activated only when the project's scope calls for it. **The PM is educated on tiers 2 and 3 on demand** — when they ask, or when the project reaches a claim that needs one — never up front. | **This dissolves the question rather than picking a side of it.** The open version was a static choice between "tier 1 only" and "tiers 1 and 2", and both are guesses about a machine the template has never seen — which is why this repo's hand-written manifest and this document's leaning had already drifted apart. Making tier 2's availability a **detection result** means `project.yaml` states a fact rather than a hope. **Probe the capability, not the binary:** `docker compose version` returning successfully, not `which docker` — installed-but-daemon-stopped and installed-but-no-socket-permission both read as "available" to a naive check and then fail at `provision`, which is the silent-tier-downgrade risk arriving through the setup script instead of the agent. ⚠️ Measured here 2026-08-18: `docker` is not on PATH at all, so this repo's `tier 1 only` is **correct as written** — and now owes the PM a tier-2 recommendation rather than nothing. **Recommend, never install:** installing system software on the PM's behalf is #67's rejected move in a different costume. **Tier 3's "when scope calls for it" is #25 by another route** — validation is demand-driven from stage 3 with a gate at 6, so the tier arrives with the claim that needs it; and a project that never activates it still never loads a provider or holds a credential, which is what four rows of the risk register depend on. **Education on demand for the reason per-task approval was rejected:** a governance briefing delivered before anything needs it is a prompt everyone clicks through; delivered at the moment a claim needs the tier, it lands. ⚠️ **Two consequences, both real.** The setup script (#49) grows a capability probe. And the tier declaration in `project.yaml` gains a **third state** — `available` / `recommended-pending-approval` / `off` — which the lint and the validation agent must both read, with `recommended` behaving **exactly like off** until approved. #45's `n/a` reasons gain a second form alongside `tier 3 not activated`. ⚠️ **And a third consequence, found the same day and recorded under "Which tier can reach which rung": this makes the confidence ceiling machine-dependent.** The rung table caps confidence by tier, so an OS-packages claim reaches rung 4 under tier 2 and rung 2 at best under tier 1 — meaning the same project, planned by the same agent from the same requirements, tops out lower on a machine without Docker, and via #57 fewer of its claims may become instructions. Not a defect this row introduces; a fact it makes visible, which the static default was hiding. **It is also what the tier-2 recommendation should actually say** — the useful question is not "approve Docker?" but "without it, these claims cannot exceed rung 2." _(Decided 2026-08-18.)_ |
 
 ### Content & schemas
 
@@ -930,6 +930,34 @@ The tier caps the confidence rung, and it caps it **relative to what's being cla
 
 ⚠️ **The specific failure this table exists to prevent:** validating an NVIDIA driver procedure inside a container, seeing it exit zero, and recording rung 4. The tier that ran it has to be recorded on the assertion alongside the environment match, or the ladder is decoration.
 
+⚠️ **Amended 2026-08-18 — #77 makes this table machine-dependent, and that consequence is worth stating
+out loud because it lives between two rows that don't reference each other.** The table caps the rung by
+**tier**, and #77 makes tier 2's availability a **detection result** — Docker is available where Docker
+already works, and merely *recommended* where it doesn't. Put those together and the conclusion is
+uncomfortable in a useful way: **the confidence ceiling of a plan depends on the PM's laptop.** An
+OS-packages claim reaches rung 4 under tier 2 and rung 2 at best under tier 1, so the same project,
+planned by the same agent, from the same requirements, tops out lower on a machine without Docker —
+and via #57, fewer of its claims may become instructions someone runs.
+
+⚠️ **Measured here 2026-08-18: `docker` is not on PATH on this machine, so every OS-level claim in this
+project currently caps at rung 2** until the tier-2 recommendation is approved.
+
+Three things follow, and none of them are arguments against #77:
+
+- **This is not a defect introduced by #77 — it is a fact #77 made visible.** The ceiling was always a
+  function of what could actually be executed. The static-default version simply hid it behind a
+  template value that was a guess about the same machine.
+- **It belongs in the tier-2 recommendation prompt.** "Docker isn't installed; approve tier 2?" is a
+  weaker question than the true one, which is *"without Docker, claims about OS packages, services and
+  the filesystem cannot exceed rung 2, and #57's threshold will block some of them from becoming
+  runbook steps."* That is #77's education-on-demand clause doing exactly what it was written for —
+  and it is the moment the education is actually load-bearing rather than a briefing.
+- **It sharpens the silent-tier-downgrade risk rather than creating it.** The risk row describes an
+  agent approximating a tier-3 claim in a container and reporting success. The same shape now exists
+  one tier down, and the defence is the same: the rung is capped by what ran, so an unavailable tier
+  produces a **capped rung and an `n/a` with a reason** (#45), not a confident answer. What must never
+  happen is a missing tier being treated as a reason to lower the *threshold* instead of the *rung*.
+
 ### The threshold — when may a claim become an instruction (#57)
 
 _"Confidence threshold" was jargon for something concrete, so here it is in plain terms._
@@ -1637,6 +1665,12 @@ decision rather than an empirical one:
 - Deadline: **step 5.** The app writes its first status field there and cannot do so without an answer.
   It does not block step 3.
 
+**Try-it panels in API specs** _(from #54's stage-5 flagship; moved here 2026-08-18 from inside the trust spike's RUN block, where it had been sitting with nothing to do with trust)_
+
+- Expandable endpoints and schemas, certainly. But do we want try-it panels in a *plan*? Nothing exists to call yet.
+	- _leaning:_ **no for v1, and say so in the schema rather than leaving it undecided.** A try-it panel against an API that hasn't been built is either a dead button or a mock, and a mock in a plan is a claim with no evidence behind it — which is the one thing #23's evidence model exists to stop. The honest version of "try it" in a plan is an `assertion` with `evidence`. Revisit when stage 9 ships a handoff to a team that has built the thing.
+- No deadline. This is the only cosmetic item left in this section, and it changes nothing upstream of itself.
+
 **What the schemas are actually written in** **→ #74, closed 2026-08-18** _(raised 2026-08-17, on reaching step 3 — open for one day, which is roughly how long it deserved)_
 
 Never decided, and never recorded as undecided until now — it surfaced only when step 3 became the
@@ -1803,9 +1837,6 @@ made once, by the PM, in a file they can read and delete.
 turn-end hooks *do* work in a non-interactive child, and #48's lint feedback loop can reach
 specialists rather than only the orchestrator. **With one dependency worth stating: no trust means no
 extension, and no extension means no hook.** #48 rides on the `--approve` decision above.
-
-**Try-it panels in API specs**
-- Expandable endpoints and schemas, certainly. But do we want try-it panels in a *plan*? Nothing exists to call yet.
 
 ### Promoted 2026-08-13 — reasoning retained
 
