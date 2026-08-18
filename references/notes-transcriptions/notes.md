@@ -134,8 +134,8 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 | # | Question | Decision | Why |
 |---|---|---|---|
 | 13 | Authoring model | **Schema-first.** Most artifacts are written through typed tools; prose stays freehand. Project-to-project variation is absorbed by the *manifest declaring which artifact types are active* — not by loosening the schemas. | Structure where possible, determinism in what comes out, and room for projects that aren't alike. |
-| 38 | Artifact catalogue | **16 types for v1** — `requirement` · `decision` · `risk` · `acceptance-criterion` · `task` · `role-assignment` · `schema` · `api-spec` · `wireframe` · `scope-boundary` · `question` · `research-finding` · `assertion` · `evidence` · `runbook` · `runbook-step`. | ⚠️ This is **the critical path, not the app** — and #23 grew it from ten to sixteen. All of it has to land before anything can be authored against it. |
-| 39 | Type activation | **Agent proposes at stage 2, PM approves.** Same recommend/approve split as roles (#18). | Stage 2 is the first point the project's shape is actually knowable. Activating at setup means guessing before you know anything. |
+| 38 | Artifact catalogue | **16 types for v1** — `requirement` · `decision` · `risk` · `acceptance-criterion` · `task` · `role-assignment` · `schema` · `api-spec` · `wireframe` · `scope-boundary` · `question` · `research-finding` · `assertion` · `evidence` · `runbook` · `runbook-step`. | ⚠️ This is **the critical path, not the app** — and #23 grew it from ten to sixteen. All of it has to land before anything can be authored against it. **Amended 2026-08-18 — the first four are not the first four alphabetically, and the reason belongs here rather than in the build order.** Step 3 (#76) builds `requirement → decision → schema → api-spec`, chosen as the minimum set that proves the **loop** rather than the catalogue: it is enough to exercise trace links, one typed tool, a generated template (#43), the lint (#46), and #61's per-field propagation classes against real content. Three of the four come straight out of stage 5's *Produces* cell in the stage table, which is why #54 calls stage 5 the flagship. ⚠️ **Name what they do not touch, so the gap is deliberate rather than discovered:** they prove the **authoring** loop and leave the **evidence** loop entirely unproven. Nearly every lint rule with teeth — #57's thresholds, #58's destructive floor, #59's acknowledgement, orphan runbook steps, tier→rung consistency — lives on `assertion` / `evidence` / `runbook-step`, and that is the most novel machinery in this document. It stays untested past the end of #76. |
+| 39 | Type activation | **Agent proposes at stage 2, PM approves.** Same recommend/approve split as roles (#18). | Stage 2 is the first point the project's shape is actually knowable. Activating at setup means guessing before you know anything. ⚠️ **Amended 2026-08-18 — this row has a consequence for *this* project that took until the build order to notice.** `planning-content/project.yaml` here carries `artifactTypes.activated: []`, and correctly so: stage 2 has not run on this project, so there is no approved list and hand-writing one would be the setup-time guess this row rejects. But #43 makes templates **generated** from the activated types, and the skeleton (#76 step 5) renders a template. So the skeleton either needs an `activated` list it cannot legitimately obtain, or it hand-authors the very thing this row forbids. **The way out is to stop treating this repo's `planning-content/` as a placeholder and work stages 1 and 2 of the pipeline on this project, by hand, against the stage definitions** — which is #76's step 4, and which is also the cheapest possible test of whether the pipeline is any good, before nine skills and sixteen schemas are built on the assumption that it is. Step 3's four types (#38) are the *proposal* that step approves or rejects; **if running stage 2 for real produces a different four, that is a finding, not a failure.** |
 | 40 | New artifact types | **Catalogue only for v1.** | A new type is three things, not one — a schema, a typed tool, and a renderer — and a type missing any of them is worse than not having it. The escape hatch covers the gap. |
 | 41 | The escape-hatch line | The operative test is **"will anything downstream have to traverse this?"** Prose is free anywhere; anything that will be traced, filtered, or exported must be an artifact. | Mechanical rather than stylistic, which is what makes it enforceable. If stage 9 slices it by role, the lint checks it, or the change feed cascades through it — it can't be prose. |
 | 42 | Confidence | **Five rungs** — `unverified` → `source-supported` → `experimentally-validated` → `environment-matched` → `production-validated`. Every assertion carries one. **The MVP tops out at rung 4**; rung 5 is on the far side of #24 by definition. | "The agent believes this should work" and "the system has demonstrated this works" are different claims, and a plan that can't tell them apart is the problem being solved. |
@@ -178,6 +178,7 @@ _Numbers are stable and never reused. The grouping below is for scanning; **#N**
 |---|---|---|---|
 | 54 | v1 components | **Schema designer + API spec** (stage 5 is the flagship), plus the **phase status board** and **change feed** as infrastructure. | Confirms the original suspicion. The board and the feed aren't components so much as the frame everything else hangs in. |
 | 55 | Walking skeleton | Manifest → tracker view → one MDX doc rendering → status write-back — **plus the file watcher**. | #12 puts the agent in a separate terminal, which makes the watcher the entire integration surface between the two halves of the product. If it's not in the skeleton, the skeleton doesn't prove the thing that's actually risky. |
+| 76 | The build order | **Five steps, in this order: (1) trust spike · (2) watcher spike · (3) four schemas · (4) run stages 1–2 on this project for real · (5) walking skeleton (#55) with the lint loop (#48) wired in during, not after.** Steps 1 and 2 are throwaway code answering yes/no questions; 3–5 are the product. The running detail lives in `next-steps.md`, which is a **running order, not a decision record** — where the two disagree, this row and this file win. | **Written down because this file kept citing it without defining it.** #72, the #31 successor, #74 and #75 all carry deadlines phrased as "step 3" or "step 5", and the imported-material table resolves an item as "merged into #26 and the build order" — a build order that existed only in the other file, which in turn declares *this* one canonical. That circularity is the whole reason for the row. The ordering itself is not arbitrary: **both spikes come first** because each gates a half of the product and one of step 2's answers (#72) is a constraint on the first typed tool written in step 3, so answering it afterwards means writing the schemas twice. **Step 4 sits between the schemas and the skeleton** because #43 makes templates *generated* from activated types, #39 makes activation a stage-2 decision, and stage 2 has not run — see #39's amendment. ⚠️ **The one claim worth stating precisely:** this is not a sequencing of the two halves. **Step 3 is the only dependency the app half and the agent half share**; whether anything actually runs in parallel is a question about headcount, and the answer here is one. ⚠️ **Where it deliberately stops:** at the first point the two halves touch. It does not cover the three specialist contracts, the remaining twelve artifact types, the sandbox tiers, or the runbook — which is to say the **evidence loop**, the most novel machinery in this document, is still ahead of it. Step 5 is the end of the beginning. _(Recorded 2026-08-18, describing an order in use since 2026-08-14.)_ |
 
 ---
 
@@ -647,6 +648,15 @@ _Run 2026-08-16. The blocker recorded against this check was stale: the machine 
 working frontier provider (`openai-codex` OAuth, which refreshed itself silently on first use), so
 #37 was satisfied without configuring anything._
 
+⚠️ **The general lesson is worth more than the specific one, and it nearly cost this check a day:
+re-test a recorded blocker before building around it.** The configured default (`llamacpp /
+qwen35-4b`) genuinely was down, and the note written from that failed command said "the remaining
+checks need a working provider, and right now there isn't one." That was recorded as a **prerequisite**
+when it was only ever an **observation** — a claim with a shelf life, about a machine that changes
+underneath it. The expired OAuth token refreshed itself on first use and the whole blocker evaporated.
+Sibling lesson to the registry-dump technique further down: both are about not letting a stale or
+downstream signal stand in for the thing itself.
+
 **Answer: yes, and the mechanism is stronger than "the harness refuses the call."** There is no
 refusal path, because there is nothing to refuse. `--tools` removes the omitted tool from the child's
 tool registry outright. All three observables collapse to the same list:
@@ -708,6 +718,15 @@ pipe nothing ever closes blocks the child before `session_start`. The fixes are 
 one was load-bearing is unknown; the real extension should do both regardless. It also means a
 delegated child that hangs looks identical to one that is thinking, which argues for a spawn timeout
 in the real extension alongside #67(b)'s toolless-child detection.
+
+⚠️ **Which is exactly why the adapted `subagent` extension does not survive the spike** _(recorded here
+2026-08-18; it had been sitting in the build order rather than in this file)_. It is the one piece of
+throwaway code that looks production-shaped once it works, and it now carries two bug fixes that make
+it look more finished than it is. Keeping it means the real `pi-package/` inherits code written to
+throwaway standards **before the three contracts (#26) exist to shape it** — and inherits it at the
+one place where a subtle defect looks like a thinking child rather than a broken one. **Rewrite it
+from the shipped example with the answers in hand**, carrying across the two fixes above, the spawn
+timeout, and #67(b) — not the file.
 
 **Check 5 was answered without the model at all**, which is worth noting as technique: editing the
 extension and re-running produced the edited marker in the log at load time, and `.pi/` contained
@@ -1677,6 +1696,13 @@ normal.
 - Deadline: **step 3, before the first schema** — the same retrofit argument as materiality (#61).
 
 **Sandbox governance defaults** _(narrowed by #56)_
+
+⚠️ **This one is currently a disagreement, not just an open question** _(noted 2026-08-18)_. The
+leaning below is tiers 1 **and** 2 on; `planning-content/project.yaml`, written at step 0 of #76,
+ships **tier 1 only** — the reading where a wrong default grants nothing. Neither is wrong yet, but a
+manifest and a document that say different things is how a provisional choice becomes the answer
+without anyone deciding it. Settle it when a fresh `project.yaml` is first *generated* rather than
+hand-written, which is #76's step 4.
 - #56 answers most of this by construction — tier 1 and tier 2 need almost no policy, and a project that never activates tier 3 has no credentials to govern. What's left: **which tiers are active by default in a fresh `project.yaml`?**
 	- _leaning:_ **tiers 1 and 2 on, tier 3 off.** They cost nothing and need no credentials, so leaving them off just means validation doesn't happen. Tier 3 requires a deliberate act, because a permissive default someone forgets to tighten is worse than a restrictive one someone has to loosen.
 - Does the PM set tiers once at setup, or per stage / per validation task?

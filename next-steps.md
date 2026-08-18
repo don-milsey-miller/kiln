@@ -4,6 +4,17 @@
 > where this file and that one disagree, that one wins. This is a running order, not a decision record;
 > decisions belong in notes.md with a number.
 >
+> ✅ **And as of 2026-08-18 the order itself has one: #76.** An audit found the two files were circular —
+> this one deferred to notes.md while notes.md cited "step 3" and "step 5" as deadlines it never
+> defined, and resolved an imported item as "merged into the build order" that lived only here. The
+> five steps, their gating, the only-shared-dependency claim and where the order deliberately stops are
+> now in notes.md. Five other things that were living here alone went with them: the four-type
+> rationale and the evidence-loop gap → **#38** · `activated: []` and why this project must run its own
+> stage 2 → **#39** · "re-test a recorded blocker before building around it" and "don't keep the adapted
+> `subagent` extension" → the spike-1 section · the tier-1-vs-tiers-1-and-2 disagreement between this
+> repo's manifest and the sandbox leaning → Open questions. **What remains here is scheduling and
+> scratch: check tables, run records, and what is owed next.**
+>
 > The framing that produced this list: notes.md is done thinking for now. 67 decisions, ~1,600 lines,
 > and the remaining open questions are a default-tier setting and a try-it panel — the trust spike's
 > answers became #67 on 2026-08-15 and #68 on 2026-08-16.
