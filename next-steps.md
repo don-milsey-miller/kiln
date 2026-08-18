@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **103 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **104 decisions as of
 > 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -662,7 +662,24 @@ turn-end lint hook wired in **during** rather than after.
 
 ---
 
-## 5c. Complete the evidence slice end to end
+## 5c. Complete the evidence slice end to end ✅ done 2026-08-18
+
+✅ **DONE 2026-08-18 → #104.** The slice runs end to end, and the load-bearing half is the three
+refusals before the promotion:
+
+| # | State | Result |
+|---|---|---|
+| 1 | premise `unresolved` | ✖ `instruction/rests-on-unresolved` |
+| 2 | + source support | ✖ `instruction/rests-on-below-threshold` — rung 2 against a required rung 4 |
+| 3 | + experiment in the **wrong** environment | ✖ still rung 2 — the mismatched record is *filtered out*, not counted weakly |
+| 4 | + **applicable** experiment | ✓ promotable |
+
+Then rendered: the assertion, all three evidence records including the excluded one with its reason,
+and the step with no findings. No artifact holds a derived `verdict` or `confidence` at any point.
+
+⚠️ **The control was falsified before being trusted** — short-circuiting `mayBecomeInstruction` to
+always allow makes the slice fail at the first refusal. A check nobody has watched fail is a check
+nobody should trust.
 
 One assertion, carried the whole way: `requirement → assertion → research → evidence → validation →
 confidence rung → runbook step → lint → render`. Immediately after 5b, not later.
