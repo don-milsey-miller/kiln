@@ -256,3 +256,35 @@ test("#94: the capability check reads the tool registry, not filenames", async (
     assert.equal(typeof fn, "function", `${type} registry entry is not callable`);
   assert.ok(!implementedTypes().includes("runbook"), "runbook has no tool yet and must still report the gap");
 });
+
+test("#101: a link is a judgement, so it must be correctable through the typed path", async () => {
+  const { unlinkEvidence } = await import("../lib/tools/evidence-tools.mjs");
+  const { base, contentRoot, o } = fresh();
+  try {
+    const ast = await createAssertion(AST_IN, o);
+    const ev = await createEvidence(EXPERIMENT({ os: "RHEL 10", postgres: "17" }, "failure"), o);
+
+    // A failing run linked as refuting — the mistake #101 records. `outcome: failure` is an
+    // observation; whether it BEARS against the claim is a judgement no schema can check.
+    await linkEvidence(ast.id, ev.id, "refute", o);
+    let doc = JSON.parse(readFileSync(join(contentRoot, artifactRelPath("assertion", ast.id)), "utf-8"));
+    assert.deepEqual(doc.refutedBy, [ev.id]);
+
+    const undone = await unlinkEvidence(ast.id, ev.id, "refute", o);
+    assert.equal(undone.changed, true);
+    doc = JSON.parse(readFileSync(join(contentRoot, artifactRelPath("assertion", ast.id)), "utf-8"));
+    assert.deepEqual(doc.refutedBy, []);
+    assert.ok(validators.assertion(doc));
+
+    assert.equal((await unlinkEvidence(ast.id, ev.id, "refute", o)).changed, false, "unlinking twice is a no-op");
+    assert.ok(!existsSync(join(contentRoot, LOCK_FILE)), "lock released");
+
+    // Correcting a polarity is now: unlink, then link the other way, which the dual-link
+    // guard demands rather than forbids.
+    await linkEvidence(ast.id, ev.id, "support", o);
+    doc = JSON.parse(readFileSync(join(contentRoot, artifactRelPath("assertion", ast.id)), "utf-8"));
+    assert.deepEqual(doc.supportedBy, [ev.id]);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

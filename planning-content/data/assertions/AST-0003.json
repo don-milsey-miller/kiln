@@ -1,0 +1,22 @@
+{
+  "id": "AST-0003",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The concurrency test passes reliably under full-suite parallel load",
+  "statement": "The separate-process concurrency test passes on every full parallel test run.",
+  "targetEnvironment": {
+    "facts": {
+      "os": "Windows 11",
+      "node": "v24.18.0"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0001"
+  ],
+  "notes": "Split out from AST-0002 on 2026-08-18. The observed failure refutes THIS claim; it never bore on serialisation. See #101.",
+  "refutedBy": [
+    "EVD-0003"
+  ]
+}
