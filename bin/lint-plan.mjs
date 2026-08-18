@@ -20,11 +20,12 @@
 
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync, existsSync } from "node:fs";
+
 import { resolveContentRoot } from "../lib/content-root.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { lintProject, evaluateStageGate, evaluateHandoffGate, blocks, SEVERITY } from "../lib/lint.mjs";
+import { readActivatedTypes } from "../lib/activation.mjs";
 import { loadStageAttestations } from "../lib/attestations.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,15 +34,6 @@ const asJson = args.includes("--json");
 const gateArg = (args.find((a) => a.startsWith("--gate")) ?? "").split("=")[1] ?? args[args.indexOf("--gate") + 1];
 
 const ICON = { [SEVERITY.ERROR]: "✖", [SEVERITY.WARNING]: "▲", [SEVERITY.ADVISORY]: "·" };
-
-function activatedTypes(contentRoot) {
-  // #39: activation is a stage-2 decision recorded in project.yaml, never inferred here.
-  const manifest = join(contentRoot, "project.yaml");
-  if (!existsSync(manifest)) return [];
-  const m = /artifactTypes:\s*[\s\S]*?activated:\s*\[([^\]]*)\]/.exec(readFileSync(manifest, "utf-8"));
-  if (!m) return [];
-  return m[1].split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
-}
 
 function render(findings) {
   if (findings.length === 0) return "No findings.";
@@ -62,7 +54,7 @@ const ctx = {
   contentRoot,
   schemas: loadSchemaSet(join(ROOT, "schemas")),
   validators: createValidators(join(ROOT, "schemas")),
-  activated: activatedTypes(contentRoot),
+  activated: readActivatedTypes(contentRoot),
 };
 
 let result;

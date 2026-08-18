@@ -11,6 +11,7 @@ import { lintProject, evaluateStageGate, evaluateHandoffGate, SEVERITY } from ".
 import { createRequirement } from "../lib/tools/create-requirement.mjs";
 import { artifactDir } from "../lib/layout.mjs";
 import { loadStageDefinitions } from "../lib/stages.mjs";
+import { readActivatedTypes } from "../lib/activation.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCHEMAS = join(ROOT, "schemas");
@@ -225,7 +226,14 @@ test("LAYER 3 (gate): valid artifacts can still fail a stage gate", async () => 
       ["api-spec", "schema"],
       "the collection is not ready to advance"
     );
-    assert.ok(gate.gateFindings.every((f) => f.ruleId === "gate/no-artifacts-for-stage-type"));
+    // ⚠️ Both have schemas but no typed tool, so #94 classifies them as capability gaps rather
+    // than as unfinished planning. The point of the layer-3 test survives — every artifact is
+    // valid and the stage still cannot advance — and the REASON is now stated accurately.
+    assert.ok(
+      gate.gateFindings.every((f) => f.ruleId === "gate/type-not-implemented"),
+      gate.gateFindings.map((f) => f.ruleId).join(", ")
+    );
+    assert.ok(gate.gateFindings.every((f) => f.details.missing.includes("typed tool")));
 
     // Stage 2 produces `requirement`, and one exists.
     const stage2 = evaluateStageGate(ctx, "02-intent-decomposition", { stageDefinitions: STAGE_DEFS });
@@ -459,19 +467,71 @@ test("#92: stage definitions enforce only what the source table NAMES", () => {
     }
 });
 
-test("#92: the gate never demands an artifact of a type that has no schema", () => {
+test("#94: against the REAL activation set, an unimplemented type is a capability gap", () => {
+  // The previous version of this test ran with activated = every type that has a schema, so it
+  // could never see the case it claimed to cover. Use what the PM actually approved.
   const { base, contentRoot, ctx } = fresh();
   try {
-    const real = loadStageDefinitions(ROOT);
-    for (const [stageId, def] of Object.entries(real)) {
-      const gate = evaluateStageGate({ ...ctx, activated: Object.keys(ctx.schemas.types) }, stageId);
-      for (const f of gate.gateFindings.filter((x) => x.ruleId === "gate/no-artifacts-for-stage-type"))
-        assert.ok(
-          ctx.schemas.types[f.details.type],
-          `${stageId} demands "${f.details.type}", which has no schema — the definition would make the stage impossible`
-        );
-    }
+    const activated = readActivatedTypes(join(ROOT, "planning-content"));
+    assert.ok(activated.length >= 8, `expected the approved set, got ${JSON.stringify(activated)}`);
+    assert.ok(activated.includes("research-finding"), "the approved set should include an unimplemented type");
+
+    const real = { ...ctx, activated };
+    const gate = evaluateStageGate(real, "03-discovery");
+    const byRule = (id) => gate.gateFindings.filter((f) => f.ruleId === id);
+
+    const gap = byRule("gate/type-not-implemented").find((f) => f.details.type === "research-finding");
+    assert.ok(gap, JSON.stringify(gate.gateFindings, null, 2));
+    assert.equal(gap.severity, SEVERITY.ERROR);
+    assert.deepEqual(gap.details.missing, ["schema", "typed tool"]);
+
+    // ...and the two never fire together for the same type.
+    assert.equal(
+      byRule("gate/no-artifacts-for-stage-type").filter((f) => f.details.type === "research-finding").length,
+      0,
+      "a type that cannot exist must not also be reported as having no artifacts"
+    );
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+test("#94: a partial capability gap names only what is missing", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    const activated = readActivatedTypes(join(ROOT, "planning-content"));
+    const gate = evaluateStageGate({ ...ctx, activated }, "04-requirement-gaps");
+    // decision HAS a schema but no typed tool; question has neither.
+    const dec = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "decision");
+    const q = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "question");
+    assert.deepEqual(dec?.details.missing, ["typed tool"], "schema exists, so only the tool is missing");
+    assert.deepEqual(q?.details.missing, ["schema", "typed tool"]);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#94: an implemented, activated type with no artifacts still reports no-artifacts", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    // requirement has both a schema and a typed tool; this content root is empty.
+    const gate = evaluateStageGate({ ...ctx, activated: ["requirement"] }, "02-intent-decomposition");
+    const f = gate.gateFindings.find((x) => x.ruleId === "gate/no-artifacts-for-stage-type");
+    assert.ok(f, "the ordinary unfinished-work finding must survive");
+    assert.equal(f.details.type, "requirement");
+    assert.equal(gate.gateFindings.filter((x) => x.ruleId === "gate/type-not-implemented").length, 0);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("#39: one reader for the approved activation set, shared by the CLI and the tests", () => {
+  const activated = readActivatedTypes(join(ROOT, "planning-content"));
+  assert.deepEqual(
+    [...activated].sort(),
+    ["assertion", "decision", "evidence", "question", "requirement", "research-finding", "runbook", "runbook-step"],
+    "should match what stage 2 approved in project.yaml"
+  );
+  assert.ok(!activated.includes("schema") && !activated.includes("api-spec"), "stage 2 deliberately did not activate these");
+  assert.deepEqual(readActivatedTypes(tmpdir()), [], "absent manifest yields no activation, never a guess");
 });
