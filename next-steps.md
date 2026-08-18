@@ -617,16 +617,34 @@ gates, the renderer and the handoff. Two axes, never one:
 `experimentally-validated` is compatible with the claim being **false** — and testing only the
 supporting path is how that ambiguity survived being written down.
 
-**Two things this raises that are not yet decided**, both surfaced by writing #96 rather than by using it:
+**Both open items are now closed (#96, #82), and each becomes a required fixture rather than a note.**
 
-- **Conflicting evidence has no verdict.** Supporting *and* refuting evidence on one assertion falls
-  outside `unresolved · supported · refuted`. A fourth value (`contested`) is the obvious move and is
-  not obviously right — an assertion whose evidence disagrees may be a modelling error rather than a
-  state. **Do not pick one before 5a's fixtures show which shape actually occurs.**
-- **Support and refutation are relations, so under #82 they are named fields** — `supportedBy` and
-  `refutedBy`, not one `evidencedBy` list with a polarity inside the value. That follows from the rule
-  already settled, but it makes `requirement.evidencedBy` and `decision.evidencedBy` look
-  under-specified by comparison, and whether those split too is a 5a question.
+**Verdict derivation, with applicability filtering first:**
+
+| applicable evidence remaining | `verdict` |
+|---|---|
+| none | `unresolved` |
+| support only | `supported` |
+| refutation only | `refuted` |
+| **support and refutation both** | **`contested`** |
+
+⚠️ **Filtering before deciding is the load-bearing half.** Without it a stale record or one from a
+mismatched environment manufactures a contradiction, and `contested` becomes noise nobody reads.
+**`contested` blocks promotion into an instruction** (#57, #58). It may mean a modelling error, an
+environment mismatch, stale evidence, or genuinely unsettled reality — **the system exposes the
+condition and does not diagnose the cause**, because diagnosing it automatically would be guessing at
+the moment the plan is least entitled to guess.
+
+**Two fixtures 5a must contain, both of which fail silently if omitted:**
+
+1. **Contradictory but equally applicable evidence must not collapse to a stronger rung.** The failure
+   this catches is a `contested` assertion presenting as `environment-matched` — maximum apparent
+   authority on a claim the evidence disputes.
+2. **Relation names follow domain meaning, not shared target type.** `assertion.supportedBy` /
+   `refutedBy` split; `requirement.evidencedBy` and `decision.evidencedBy` do **not**. A requirement
+   states a desired condition and a decision records a choice — "refuting" either is a different act,
+   not a mirrored one. Split a relation only when #41's test says something downstream must traverse
+   the halves differently.
 
 ---
 
