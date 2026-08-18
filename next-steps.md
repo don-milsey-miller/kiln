@@ -529,6 +529,17 @@ depend on lint internals, which is #47's problem one level further down.
 ⚠️ **Then feed the same loop malformed artifacts on purpose**, and confirm the lint catches what the
 typed tool prevented. That is what distinguishes **prevent** from **detect** in the four-layer defence
 model — two layers that look identical while everything is working, and are not.
+⚠️ **The malformed-artifact pass must fail at three layers, not one** _(added 2026-08-18)_. Otherwise
+"prevent, detect, gate" is three names for JSON validation. Feed each deliberately:
+
+| Layer | Example | Caught by |
+|---|---|---|
+| **Schema-invalid** | no `statement`; `derivedFrom` a bare string; unknown property | the **typed tool** would have prevented it — so this proves the lint still catches what arrives another way |
+| **Schema-valid, structurally inconsistent** | `data/requirements/DEC-0004.json` · `REQ-0007.json` holding `"id": "REQ-0008"` · a trace link to an ID nothing allocated | **only the lint** — the schema cannot see a filename, a directory, or another file |
+| **Schema-valid, structurally valid, incomplete for the stage** | every requirement present and legal, but stage 2's exit criterion unmet — a requirement nothing can test | **only the gate** (#46's two boundaries) |
+
+The three layers look identical while everything is working, which is precisely why each needs a
+deliberate failure of its own to prove it exists.
 
 
 ### What these four prove, and what they don't
