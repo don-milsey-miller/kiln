@@ -312,6 +312,12 @@ _Added 2026-08-18 from the review document; recorded as the amendment to **#76**
 question any more. Each is one binary result, each is already owed, and each is #80's second branch:
 not blocking, but expensive to be wrong about._
 
+⚠️ **#80 requires a branch-2 spike to be bounded before it starts, not bounded by good intentions.**
+Both below carry all three: a narrow question, observable pass/fail criteria, and a stopping condition.
+**Stopping condition for both: the table's last row is observed, either way.** A result of *no* is an
+answer and ends the spike — it does not license exploratory engineering toward a fix. The fix is a
+decision, made afterwards, with the answer in hand.
+
 ### 2a — Project trust: does writing `trust.json` actually work?
 
 #67 chose "the setup script records the PM's trust decision" over `--approve`, for good reasons that
