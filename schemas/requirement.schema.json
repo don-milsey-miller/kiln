@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/requirement.schema.json",
+  "title": "Requirement",
+  "description": "Stage 2 output (#38, #39). The head of the traceability chain: requirement -> design component -> assertion + evidence -> acceptance criterion -> task -> runbook step. Written first because every other schema's trace fields point back here, so its conventions become everyone's conventions.",
+  "type": "object",
+
+  "allOf": [{ "$ref": "common.schema.json#/$defs/artifactEnvelope" }],
+
+  "properties": {
+    "id": { "pattern": "^REQ-[0-9]{4}$" },
+    "type": { "const": "requirement" },
+    "schemaVersion": true,
+    "status": true,
+    "title": true,
+
+    "statement": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "The requirement itself, as a single testable claim about what the system must do. Stage 2's exit criterion is 'every requirement is testable' — a statement that cannot fail is not a requirement, it is a goal.",
+      "x-materiality": "semantic"
+    },
+
+    "rationale": {
+      "type": "string",
+      "description": "Why this is required. Free prose — #41's escape-hatch test says nothing downstream traverses it.",
+      "x-materiality": "cosmetic"
+    },
+
+    "priority": {
+      "description": "#45 applies: a project that does not prioritise says so with a reason rather than leaving this empty.",
+      "oneOf": [
+        { "enum": ["must", "should", "could"] },
+        { "$ref": "common.schema.json#/$defs/notApplicable" }
+      ],
+      "x-materiality": "advisory",
+      "x-cascade-note": "must -> should is one word and completely material to a reader, yet advisory by class. #61 says size and materiality are uncorrelated; this field is the reason the advisory class needs per-edge declarations (parking lot) rather than a single class-wide rule."
+    },
+
+    "derivedFrom": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Parent requirements this one decomposes from. Same-type edge, so it always resolves.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["requirement"]
+    },
+
+    "boundedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Scope boundaries that constrain this requirement — stage 2's explicit non-goals.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["scope-boundary"]
+    },
+
+    "verifiedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Acceptance criteria that test this requirement (stage 7).",
+      "x-materiality": "structural",
+      "x-traceTarget": ["acceptance-criterion"]
+    },
+
+    "evidencedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Evidence supporting that this requirement is achievable. The first field in the catalogue that reaches the evidence loop, and it will dangle for the whole of #76 steps 3-5 by design.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["evidence", "assertion"]
+    },
+
+    "openQuestions": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Questions blocking this requirement (stage 4's question backlog).",
+      "x-materiality": "structural",
+      "x-traceTarget": ["question"]
+    },
+
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "uniqueItems": true,
+      "description": "Free labels for filtering. Deliberately not a trace edge and deliberately not validated against a vocabulary — the moment tags need to resolve, they are an artifact type (#41).",
+      "x-materiality": "advisory"
+    },
+
+    "notes": {
+      "type": "string",
+      "description": "Anything that is not a claim about the system.",
+      "x-materiality": "cosmetic"
+    }
+  },
+
+  "required": ["statement"],
+  "additionalProperties": false,
+
+  "x-artifactType": "requirement",
+  "x-stage": "02-intent-decomposition",
+  "x-unresolvableTraceTargets": {
+    "description": "#75 in force: scope-boundary, acceptance-criterion, evidence, assertion and question are NOT in step 3's activated four. Links to them are permitted and reported by the lint at advisory weight until those types are activated. This annotation is what tells the lint the difference between a dangling link and a typo.",
+    "targets": ["scope-boundary", "acceptance-criterion", "evidence", "assertion", "question"]
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/common.schema.json",
+  "title": "Shared primitives",
+  "description": "Every artifact schema consumes these. Nothing here is specific to one type. Adding a primitive is a decision (notes.md); re-inventing one inside a type schema is the failure this file exists to prevent. See #82.",
+
+  "$defs": {
+    "artifactId": {
+      "type": "string",
+      "description": "Stable identity for one artifact. Prefix names the type, so a trace reference is self-describing without a registry lookup — which is what makes #75's unresolvable-reference check possible at lint time rather than load time. The number is allocated once and never reused, including after deletion.",
+      "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS)-[0-9]{4}$",
+      "examples": ["REQ-0001", "DEC-0014", "AST-0002"]
+    },
+
+    "typePrefixes": {
+      "description": "NOT a validation keyword — the authoritative mapping from #38's sixteen types to their ID prefixes, kept here so the pattern above and the lint agree. Adding a type (#40) edits this file, deliberately.",
+      "const": {
+        "requirement": "REQ",
+        "decision": "DEC",
+        "schema": "SCH",
+        "api-spec": "API",
+        "risk": "RSK",
+        "acceptance-criterion": "ACC",
+        "task": "TSK",
+        "role-assignment": "ROL",
+        "wireframe": "WIR",
+        "scope-boundary": "SCP",
+        "question": "QST",
+        "research-finding": "RFD",
+        "assertion": "AST",
+        "evidence": "EVD",
+        "runbook": "RBK",
+        "runbook-step": "RBS"
+      }
+    },
+
+    "traceLinks": {
+      "type": "array",
+      "description": "A trace field. Always an array of artifact IDs, never a bare string — a field that is sometimes one and sometimes many is two shapes for every consumer. Each artifact schema declares its own named trace fields and annotates them with x-traceTarget; there is no generic 'relation' field, because #61 requires materiality to be declared per field and a relation buried in a value cannot carry one.",
+      "items": { "$ref": "#/$defs/artifactId" },
+      "uniqueItems": true,
+      "default": []
+    },
+
+    "notApplicable": {
+      "type": "object",
+      "description": "#45. An explicit n/a carrying a required reason, so the lint can count *unjustified* absences rather than empty ones. Use as one branch of a oneOf on any field that may legitimately not apply.",
+      "properties": {
+        "na": { "const": true },
+        "reason": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "required": ["na", "reason"],
+      "additionalProperties": false
+    },
+
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A string that is present. Whitespace-only is caught by the lint, not by the schema — JSON Schema cannot express it without a pattern that is worse than the rule."
+    },
+
+    "documentStatus": {
+      "description": "Per-artifact status. #4 puts this in the artifact rather than the manifest: shape is project-level, status is document-level. The app writes this field; the agent writes the payload — which is exactly the two-writer case #78's lockfile governs.",
+      "enum": ["draft", "in-review", "approved", "amended", "superseded", "retired"]
+    },
+
+    "materialityValues": {
+      "description": "NOT a validation keyword — the authoritative values for the x-materiality annotation (#61), which every property in every artifact schema must carry. structural: identity and trace edges. semantic: the payload a reader acts on. advisory: priority, ordering, estimate. cosmetic: rationale, notes, prose.",
+      "const": ["structural", "semantic", "advisory", "cosmetic"]
+    },
+
+    "artifactEnvelope": {
+      "type": "object",
+      "description": "The fields every artifact carries regardless of type. Referenced by allOf from each type schema so the envelope is written once.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/artifactId",
+          "x-materiality": "structural"
+        },
+        "type": {
+          "type": "string",
+          "description": "The artifact type, spelled as in #38. Redundant with the ID prefix on purpose: the prefix is for humans and cheap checks, this is what consumers switch on.",
+          "x-materiality": "structural"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "#50. The content schema version this artifact was written against. Bumped on a breaking change to content shape, never on a tool release.",
+          "x-materiality": "structural"
+        },
+        "status": {
+          "$ref": "#/$defs/documentStatus",
+          "x-materiality": "structural",
+          "x-cascade-note": "Classified structural because superseded/retired must flag everything tracing here. draft->in-review->approved must NOT flag anything. #60's one-hop cascade therefore has to filter on the transition, not merely on the field. Recorded rather than solved."
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Short human label. Not an identifier.",
+          "x-materiality": "cosmetic"
+        }
+      },
+      "required": ["id", "type", "schemaVersion", "status", "title"]
+    }
+  }
+}
