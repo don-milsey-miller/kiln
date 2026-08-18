@@ -4,89 +4,147 @@
   "title": "Question",
   "description": "An unresolved question, tracked as an object rather than a sentence in a document (REQ-0014). Stage 4's question backlog. ⚠️ It owns state nothing else can hold: whether it has been answered, what the answer was, and what is waiting on it — none of which is derivable from any other artifact. That is why it passes #41 where the remaining two activated types still have to argue for themselves (#106).",
   "type": "object",
-
   "allOf": [
-    { "$ref": "common.schema.json#/$defs/artifactEnvelope" },
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    },
     {
       "$comment": "An answered question must say what the answer is, or point at what settled it. Nested inside allOf per #82.",
-      "if": { "properties": { "resolution": { "const": "answered" } }, "required": ["resolution"] },
+      "if": {
+        "properties": {
+          "resolution": {
+            "const": "answered"
+          }
+        },
+        "required": [
+          "resolution"
+        ]
+      },
       "then": {
         "anyOf": [
-          { "required": ["answer"] },
-          { "properties": { "answeredBy": { "minItems": 1 } }, "required": ["answeredBy"] }
+          {
+            "required": [
+              "answer"
+            ]
+          },
+          {
+            "properties": {
+              "answeredBy": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "answeredBy"
+            ]
+          }
         ],
         "$comment": "A question marked answered with neither an answer nor a link to what settled it is the backlog's version of a well-formed false success — it looks closed and records nothing."
       }
     }
   ],
-
   "properties": {
-    "id": { "pattern": "^QST-[0-9]{4,}$" },
-    "type": { "const": "question" },
-
+    "id": {
+      "pattern": "^QST-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "question"
+    },
     "statement": {
       "$ref": "common.schema.json#/$defs/nonEmptyString",
       "description": "The question, stated so that an answer would be recognisable as one. Same field name as every other type's payload (#82).",
       "x-materiality": "semantic"
     },
-
     "resolution": {
-      "enum": ["unanswered", "answered", "deferred", "moot"],
+      "enum": [
+        "unanswered",
+        "answered",
+        "deferred",
+        "moot"
+      ],
       "default": "unanswered",
-      "description": "⚠️ A THIRD axis, distinct from reviewStatus and lifecycle (#82), because it answers a third question. reviewStatus is where the artifact sits in review; lifecycle is whether it still stands; this is whether the QUESTION has been settled. A question can be approved, active and entirely unanswered — collapsing any two of these would lose exactly that state.",
+      "description": "⚠️ A THIRD axis, distinct from reviewStatus and lifecycle (#82), because it answers a third question. reviewStatus is where the artifact sits in review; lifecycle is whether it still stands; this is whether the QUESTION has been settled. A question can be approved, active and entirely unanswered — collapsing any two of these would lose exactly that state. ⚠️ It stays DOMAIN state and must not be generalised into a fourth status axis on the envelope (#107): it is meaningful for a question and meaningless for a requirement, and promoting it would force every type to answer a question only this one is asking. The split-first rule says split when one field carries two meanings — it does not say every split belongs to everybody.",
       "x-materiality": "semantic"
     },
-
     "answer": {
       "type": "string",
       "description": "What the answer turned out to be. Prose is right here: an answer that anything downstream must traverse should be an assertion or a decision, and this field is what remains when nothing does (#41).",
       "x-materiality": "semantic"
     },
-
     "answeredBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "What settled it — a decision taken, evidence gathered, or an assertion that now carries the claim.",
       "x-materiality": "structural",
-      "x-traceTarget": ["decision", "evidence", "assertion", "research-finding"]
+      "x-traceTarget": [
+        "decision",
+        "evidence",
+        "assertion",
+        "research-finding"
+      ]
     },
-
     "blocks": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "What is waiting on this question. Stage 4's exit criterion is that every BLOCKING gap has a decision recorded, so which gaps block is state the gate needs and nothing else holds.",
       "x-materiality": "structural",
-      "x-traceTarget": ["requirement", "decision", "assertion", "runbook-step", "schema", "api-spec"]
+      "x-traceTarget": [
+        "requirement",
+        "decision",
+        "assertion",
+        "runbook-step",
+        "schema",
+        "api-spec"
+      ]
     },
-
     "raisedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
       "description": "What raised it.",
       "x-materiality": "structural",
-      "x-traceTarget": ["requirement", "decision", "assertion", "evidence", "research-finding"]
+      "x-traceTarget": [
+        "requirement",
+        "decision",
+        "assertion",
+        "evidence",
+        "research-finding"
+      ]
     },
-
-    "notes": { "type": "string", "x-materiality": "cosmetic" },
-
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
     "tags": {
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
       "uniqueItems": true,
       "x-materiality": "advisory",
       "x-amendsApproval": false,
       "description": "Changing tags never invalidates an approval (#103)."
     }
   },
-
-  "required": ["statement", "resolution"],
+  "required": [
+    "statement",
+    "resolution"
+  ],
   "unevaluatedProperties": false,
-
   "x-artifactType": "question",
   "x-stage": "04-requirement-gaps",
   "x-ownsIrreducibleState": {
     "description": "#41's test, applied explicitly before building rather than assumed from activation (#106). A question is traversed — decision.addresses, assertion.openQuestions, requirement.openQuestions all point at it — and it holds `resolution`, `answer` and `blocks`, none of which any other artifact can supply. An unanswered question is not the absence of a decision; it is a tracked thing with a state.",
-    "traversedBy": ["decision.addresses", "requirement.openQuestions", "assertion.openQuestions", "schema.openQuestions", "api-spec.openQuestions"]
+    "traversedBy": [
+      "decision.addresses",
+      "requirement.openQuestions",
+      "assertion.openQuestions",
+      "schema.openQuestions",
+      "api-spec.openQuestions"
+    ],
+    "domainStateOnly": "resolution is question-specific. Do not promote it to common.schema.json (#107)."
   },
   "x-unresolvableTraceTargets": {
     "description": "#75: research-finding, runbook-step, schema and api-spec are not all implemented or activated here.",
-    "targets": ["research-finding", "schema", "api-spec"]
+    "targets": [
+      "research-finding",
+      "schema",
+      "api-spec"
+    ]
   }
 }

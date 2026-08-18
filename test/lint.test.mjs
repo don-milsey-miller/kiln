@@ -545,3 +545,27 @@ test("#39: one reader for the approved activation set, shared by the CLI and the
   assert.ok(!activated.includes("schema") && !activated.includes("api-spec"), "stage 2 deliberately did not activate these");
   assert.deepEqual(readActivatedTypes(tmpdir()), [], "absent manifest yields no activation, never a guess");
 });
+
+test("#107: a stage may not claim to produce a type the catalogue does not contain", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    // The quiet contradiction: a type dropped from #38 but left in a stage's produces[].
+    // Deactivating it would make the gate skip it while the methodology still claims it.
+    const orphaned = {
+      "03-discovery": { id: "03-discovery", produces: ["research-finding", "field-notebook"] },
+    };
+    const f = lintProject({ ...ctx, stageDefinitions: orphaned }).findings
+      .filter((x) => x.ruleId === "stage/produces-unknown-type");
+    assert.equal(f.length, 1, JSON.stringify(f));
+    assert.equal(f[0].details.type, "field-notebook");
+    assert.equal(f[0].severity, SEVERITY.ERROR);
+
+    // The real definitions must not trip it.
+    assert.deepEqual(
+      lintProject(ctx).findings.filter((x) => x.ruleId === "stage/produces-unknown-type"),
+      []
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

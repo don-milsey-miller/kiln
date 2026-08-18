@@ -91,3 +91,15 @@ test("#103: answering a question is a semantic change, so it amends an approval"
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("#107: resolution stays domain state and is never promoted to the envelope", () => {
+  const envelope = schemas.common.$defs.artifactEnvelope.properties;
+  assert.ok(!("resolution" in envelope), "resolution must not become a fourth generic status axis");
+  assert.ok(!schemas.common.$defs.resolution, "nor a shared primitive");
+
+  // It is meaningful for a question and meaningless elsewhere — no other type declares it.
+  for (const type of Object.keys(schemas.types)) {
+    if (type === "question") continue;
+    assert.ok(!effectiveSchema(schemas, type).properties.resolution, `${type} should not carry resolution`);
+  }
+});
