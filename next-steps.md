@@ -21,6 +21,9 @@
 > un-rejects locking and leaves a decision owed by step 5.
 > **0(c) and 0(d) both closed 2026-08-16** → #69, #70, #71; one fixture test is owed at step 5.
 > **Next: step 3 (four schemas)** — and #72 is now a constraint on the first typed tool written there.
+> **Step 3's two blocking decisions closed 2026-08-18 → #74 (JSON Schema is the source of truth,
+> types generated from it) and #75 (a trace link to a non-activated type is permitted but
+> unresolvable, at advisory weight).** Nothing else stands between here and the first schema.
 > ⚠️ `D:\spikes\watcher` (step 2) is deleted. **`D:\spike-pi-trust` (step 1) still is not** — a path
 > guard refuses removal at the drive root. It needs one manual `rm -rf`; nothing in it should survive.
 > **One reason to spend it before deleting it:** #67 was amended 2026-08-17 to record that its shipping
@@ -305,22 +308,25 @@ get done. Note that these four types will only exercise three of the four classe
 thin here, and it's also the class notes.md already parks as needing per-*edge* declarations. Bake
 it in anyway; just don't read "the schemas work" as covering it.
 
-### Decide these two before schema one
+### ~~Decide these two before schema one~~ ✅ both closed 2026-08-18
 
-Both are now open questions **in notes.md**, with candidates and a leaning each — that file is
-canonical, and these were being tracked here in a running order that says decisions don't live here.
+Full reasoning is in notes.md, which is canonical — these were being tracked here in a running order
+whose own header says decisions don't live here.
 
-- **What the schemas are written in** _(raised 2026-08-17)_. Never decided anywhere, and it surfaced
-  only on reaching this step. #61 needs per-field metadata, #43 reads the schema as *data* to generate
-  templates, and #47's third caller is a Pi extension hook in a **non-interactive child with no build
-  step**. That last constraint is the one that decides it. _leaning: JSON Schema as source of truth,
-  types generated from it._
-- **What a trace link to a non-activated type does.** `decision` carries *linked evidence* and
-  *downstream dependencies*; both point at types this set does not activate, and that is the normal
-  state of any project activating fewer than all sixteen. Lint error, permitted but unresolvable, or
-  the field doesn't exist on this project at all. _leaning: permitted but unresolvable, at advisory
-  weight_ — which lands the first real advisory rule on the one class these four types barely
-  exercise. Same retrofit argument as materiality.
+- **What the schemas are written in → #74. JSON Schema is the source of truth; TypeScript types are
+  generated from it.** #47's third caller decided it: the lint runs in a Pi extension hook inside a
+  non-interactive child with no build step, and two of the three callers are not the Next.js app.
+  Materiality (#61) rides in a custom keyword; cross-field rules JSON Schema can't express go in the
+  lint. Zod lost narrowly, not badly.
+- **What a trace link to a non-activated type does → #75. Permitted but unresolvable**, reported by
+  the lint at *advisory* weight, resolving itself when the type is activated. Pointing at a
+  non-activated type is the normal state of any project using fewer than all sixteen, so a hard error
+  makes the common case unusable and projecting the field away makes every later activation a
+  migration.
+
+⚠️ **#75 lands the first real advisory rule on the thinnest class.** `advisory` is the one of #61's
+four these four types barely exercise, and the one already parked as needing per-*edge* declarations.
+Don't read "the schemas work" as covering it.
 
 ### What these four prove, and what they don't
 
