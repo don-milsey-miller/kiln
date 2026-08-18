@@ -119,7 +119,8 @@ and the rejected alternatives are in notes.md under "Resolving the content root"
 
 ## 1. The trust spike ✅ answered 2026-08-16 — six of six
 
-_The directory at `D:\spike-pi-trust` is now owed its deletion. Its answers are in notes.md as #67,
+_✅ `D:\spike-pi-trust` **is gone** — confirmed 2026-08-18 while starting 2a, which had to be rebuilt
+elsewhere as a result. Its answers are in notes.md as #67,
 #68 and amendments to #26 / #33 / #50 / #66; nothing else in it is meant to survive, `delegate.ts`
 least of all — it now has two bug fixes in it that make it look more finished than it is._
 
