@@ -42,14 +42,19 @@
 > types generated from it) and #75 (a trace link to a non-activated type is permitted but
 > unresolvable, at advisory weight).** #72 is a constraint on the first typed tool written there.
 >
-> **Next: steps 2a and 2b — the two verification spikes.** Hours, not days, and both are already owed:
-> #67's `trust.json` mechanism was never run, and #33's override *path* was never tested. Step 3 is not
-> blocked by either, so run them first only because they are cheap and stale-dated; if something forces
-> a choice, the schemas are the critical path.
+> ✅ **Step 2a done (2026-08-18) — writing `~/.pi/agent/trust.json` works, and it is causal.** Entry
+> present → the non-interactive child loads the package and registers the typed tools with no
+> `--approve`; entry removed → reverts; entry set to `false` → reverts. **#67(a) is measured rather than
+> documented**, and #67(b) — detecting a toolless child — is now the whole of what's left on that row.
 >
-> ⚠️ `D:\spikes\watcher` (step 2) is deleted. **`D:\spike-pi-trust` (step 1) still is not** — a path
-> guard refuses removal at the drive root; it needs one manual `rm -rf`. **Don't delete it yet:** it is
-> the exact environment step 2a wants. Minutes there versus an afternoon rebuilding it later.
+> **Next: step 2b — the skill-override path.** Then step 3.
+>
+> ⚠️ **Spike directory state, corrected 2026-08-18.** `D:\spike-pi-trust` **was already gone** — the
+> note that used to sit here saying it survived a path guard was stale, and 2a had to be rebuilt from
+> scratch at `D:\spikes\trust-verify` as a result. Two leftovers *do* still exist and are recorded
+> nowhere else: **`D:\spike-watcher`** (an earlier watcher attempt, 2026-08-16, with `node_modules`)
+> and an empty **`D:\spikes`**. Both are throwaway. `D:\spikes\trust-verify` can go once 2b is done, or
+> stay until then for reproducibility.
 >
 > _Revised 2026-08-15 after a review pass: 0(c) closed and 0(d) opened · step 1 given mechanical
 > observables, a remedy path, and three more checks · two new steps — 2 (the watcher spike) and 4
@@ -318,7 +323,55 @@ Both below carry all three: a narrow question, observable pass/fail criteria, an
 answer and ends the spike — it does not license exploratory engineering toward a fix. The fix is a
 decision, made afterwards, with the answer in hand.
 
-### 2a — Project trust: does writing `trust.json` actually work?
+### 2a — Project trust ✅ answered 2026-08-18 — it works, and it is causal
+
+_Full write-up in notes.md under "RUN 2026-08-18". `#67(a)` is now measured rather than documented._
+
+⚠️ **`D:\spike-pi-trust` was already gone** — deleted at some point after the note below was written,
+so the "run it in the existing environment" plan was not available. Rebuilt as a minimal fixture at
+`D:\spikes\trust-verify`: one package, one extension, one custom tool. Same shape, not the same files.
+
+**Preconditions were clean, which matters more than usual here:** `defaultProjectTrust: "never"`, and
+`~/.pi/agent/trust.json` **did not exist at all**, so no decision on any parent path could confound
+the result.
+
+**The observable is upstream of the model** — the extension writes a marker at *load* time, before
+`session_start` and long before inference. The `llamacpp` provider was down for every run and every
+session still completed normally, which is check 1's silent failure reproduced by accident and exactly
+why the marker isn't read from model behaviour.
+
+| run | `~/.pi/agent/trust.json` | `--approve` | extension loaded |
+|---|---|---|---|
+| 1 | file absent | no | ❌ |
+| 2 | file absent | **yes** | ✅ |
+| 3 | `{"D:\spikes\trust-verify": true}` | no | ✅ |
+| 4 | `{"D:\spikes\trust-verify": false}` | no | ❌ |
+| 5 | file absent (removed) | no | ❌ |
+
+**Runs 4 and 5 are why this is an answer rather than a coincidence.** Run 3 alone shows only that tools
+appeared after a file was written. Removing the entry reverts the behaviour, and flipping it to `false`
+reverts it too — so the recorded decision is *causal*. Run 2 is the fixture control.
+
+**The format**, which was the unverified part: a flat JSON object mapping **canonical directory →
+boolean** (`realpathSync(dir)`, so `D:\spikes\trust-verify` on Windows), keys sorted, two-space
+indent, trailing newline. Closest decision on the current-or-parent path wins. A #49 setup step writing
+this is a dozen lines.
+
+**One result worth more than the yes/no:** run 4 turns #67's own argument from an assumption into a
+result. The case against `--approve` was that a recorded decision is one the PM "can read and delete."
+An explicit `false` is honoured — **declining works, and it survives.**
+
+⚠️ **#67(b) is untouched and is now the whole of what's left.** Nothing detects a child that came up
+without our typed tools, and every failing run above completed normally with no error anywhere.
+
+⚠️ **Methodological note.** The first attempt at run 4 wrote an empty transcript — the process was
+killed by a harness timeout before pi produced anything — and its "extension absent" would have read as
+a clean negative. It was re-run. **An absence is only evidence once you can show that the thing which
+would have produced a presence actually ran**; every row above has a same-size transcript for that
+reason.
+
+<details>
+<summary>The step as written, before it ran</summary>
 
 #67 chose "the setup script records the PM's trust decision" over `--approve`, for good reasons that
 still hold. **The mechanism it chose was never run.** Three commands were executed on 2026-08-15
@@ -335,15 +388,12 @@ still hold. **The mechanism it chose was never run.** Three commands were execut
 
 ⚠️ **Step 5 is the control and it is the one that gets skipped.** Without it, a child that loads for
 an unrelated reason — a stale global setting, a parent-path decision already sitting in `trust.json`,
-an inherited environment — reads as a pass. Same discipline that made the original run a finding
-rather than an anecdote.
+an inherited environment — reads as a pass.
 
 **If it fails:** nothing architectural. Both fallbacks are already proven on this machine, and the
-loss is a setup step. `-e <path>` is the more interesting one — it loads only the file we ship rather
-than granting the project blanket trust, though it likely buys typed tools without packaged skills.
+loss is a setup step.
 
-⚠️ `D:\spike-pi-trust` still exists (a path guard refused its deletion). **That is the environment
-this spike wants** — running it there costs minutes; rebuilding it later costs an afternoon.
+</details>
 
 ### 2b — Skill overrides: does *our* path actually win?
 
