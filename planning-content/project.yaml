@@ -125,13 +125,13 @@ capabilities:
   # never hand-written per stage. So this list is load-bearing: it is what
   # determines which templates exist at all.
   #
-  # Empty because stage 2 has not run. next-steps.md step 3 PROPOSES starting
-  # with requirement / decision / schema / api-spec — enough to prove the
-  # loop rather than the catalogue. That is a proposal awaiting approval, not
-  # an approval. Step 4 is where stage 2 runs for real and this list gets
-  # filled in.
+  # Approved at stage 2 after deriving the set from the intake requirements.
+  # `schema` and `api-spec` were useful Step-3 convention testbeds but are not
+  # activated: this project's intake does not call for a data model or API.
+  # The evidence-oriented types dominate because seven of the fifteen authored
+  # requirements concern the evidence loop.
   artifactTypes:
-    activated: []
+    activated: [requirement, decision, assertion, evidence, research-finding, question, runbook, runbook-step]
 
   # A permission boundary, not a preference (#56). The PM declares which
   # tiers are available; the validation agent enforces the ceiling and may

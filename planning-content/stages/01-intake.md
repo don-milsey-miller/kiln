@@ -1,10 +1,11 @@
 # Stage 1 — Intake
 
-> **Status: DRAFT, awaiting PM correction.** Stage 1 is `decidedBy: User` (#34, `stages/01-intake.json`).
+> **Status: PM-CORRECTED.** Stage 1 is `decidedBy: User` (#34, `stages/01-intake.json`).
 > This was reconstructed by the agent from the frozen source material — `Audio Transcription 1.md`,
 > `Audio Transcription 2.md` and the consolidated vision doc — which are the PM's own words recorded
-> **before any solution existed**. That is the most faithful source available, and it is still a
-> reconstruction. Correct it; do not ratify it.
+> before the current architecture settled. The material already contains candidate solutions—one
+> transcript is explicitly labelled architecture refinement—so this stage extracts the problem and
+> requested outcomes rather than pretending the source itself was solution-free.
 >
 > ⚠️ **Written under one deliberate constraint, which is what stage 1 is testing:** *the ask is written
 > down without a solution attached.* Nothing below names a technology, an architecture, a document
@@ -50,9 +51,11 @@ Research → Experiment → Failure / Diagnosis → Correction → Validation
 
 ## Objective
 
-A planning process that removes ambiguity and technical uncertainty **before** implementation starts, so
-that what is handed to whoever implements it can be acted on without returning to the planner to resolve
-missing information.
+A planning process that progressively removes ambiguity and technical uncertainty **before**
+implementation starts, so that by the time a runbook exists most discoverable uncertainty has already
+been resolved. The target is **maximum practical determinism**, not a guarantee that production will be
+perfectly predictable. The resulting handoff should be actionable without returning to the planner for
+information the planning process should have supplied.
 
 ## Stakeholders
 
@@ -77,24 +80,36 @@ present stakeholder.
 - **The distinction between a guess, a documented claim, and a demonstrated one must survive to the
   end.** This is the PM's central complaint restated as a constraint: if the output cannot tell them
   apart, the problem is unsolved.
-- **Single operator, local development.** One person, on one machine, working locally.
 
-## What is explicitly out of scope
+## Scope boundary — corrected by the PM
 
-- Executing the plan.
-- Monitoring or supervising execution.
-- Learning from production outcomes.
-- Any organisation-wide knowledge system.
+The frozen intake does **not** put all post-runbook activity out of scope. Its core vision explicitly
+includes observing implementation results, retaining failures and lessons, and eventually reusing
+organisational knowledge. A later priority list calls production execution, automatic monitoring and
+cross-project reuse "subsequent", but that is sequencing rather than a clean product boundary.
 
-⚠️ These are recorded here as **stated scope**, not derived from the architecture. The source material
-raises all four as future ambitions and none as present work.
+The current project boundary was decided later as #24 and is confirmed here by the PM:
+
+- **In:** planning, research, experimental validation, evidence, and production of the handoff/runbook.
+- **Out:** executing the handoff, monitoring execution, ingesting production results, learning from
+  production outcomes, and organisation-wide knowledge reuse.
+
+This is a scope decision applied to the original request, not something the frozen intake said on its
+own. Keeping the provenance explicit prevents a later product choice from masquerading as initial user
+intent.
+
+## Constraint removed by the PM's review
+
+The first draft called "single operator, local development" an intake constraint. It is not present in
+the frozen material; it came from the later local-first architecture. That architecture decision still
+stands elsewhere, but it is not evidence about the solution-free ask and does not belong in this stage.
 
 ## Enough to determine which stages this project needs?
 
-**Yes — and that is a claim for the PM to confirm, not the agent.** The material describes work spanning
-intake, decomposition, research, decision-capture, design, risk, acceptance, planning and handoff, plus a
-validation activity that does not sit in any one of them. Whether that means nine stages, or a different
-set, is a stage-1 exit decision.
+**Yes — confirmed by the PM after the corrections above.** The material describes work spanning intake,
+decomposition, research, decision-capture, design, risk, acceptance, planning and handoff, plus a
+validation activity that does not sit in any one of them. The current nine-stage set plus cross-cutting
+validation covers the approved through-handoff scope without importing the deferred execution lifecycle.
 
 ---
 
@@ -103,7 +118,7 @@ set, is a stage-1 exit decision.
 | # | Question | Why it matters |
 |---|---|---|
 | 1 | Is the implementer a person, an agent, or both? | The source says do not assume. It changes what "usable output" means. |
-| 2 | Is one operator a constraint or just today's situation? | Determines whether concurrent use is in scope at all. |
+| 2 | Is one operator a constraint or just today's implementation model? | The intake does not answer it; the later architecture chooses one local operator for v1. |
 | 3 | What does "deterministic" mean concretely enough to test? | It is the objective, and as stated it is not yet falsifiable. |
 | 4 | Which claims are worth the cost of real validation? | Not everything can or should be tested against real infrastructure. |
 
@@ -116,7 +131,7 @@ set, is a stage-1 exit decision.
 
 | Criterion | Agent's view, offered as input to the PM's judgement |
 |---|---|
-| `ask-without-solution` | Believed satisfied — no technology, format or architecture appears above. Worth checking adversarially, since the agent writing it knows the solution. |
-| `objective-understood` | Believed satisfied, with the caveat that "deterministic" is open question 3. |
-| `constraints-recorded` | Believed satisfied. |
-| `stage-set-determinable` | **PM's call.** The agent should not decide the pipeline shape. |
+| `ask-without-solution` | **Satisfied after correction.** The local/single-operator back-projection was removed, and the later scope choice is labelled as a PM correction rather than attributed to the intake. |
+| `objective-understood` | **Satisfied.** The objective is maximum practical determinism through earlier uncertainty reduction; open question 3 still owes measurable acceptance criteria later. |
+| `constraints-recorded` | **Satisfied.** Research, experimental validation, governance, and preservation of claim strength are recorded; the unsupported local constraint was removed. |
+| `stage-set-determinable` | **Satisfied.** The approved scope terminates at handoff and is covered by the nine stages plus cross-cutting validation. |

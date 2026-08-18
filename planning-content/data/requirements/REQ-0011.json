@@ -5,9 +5,9 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "The output serves a human or an agent implementer",
-  "statement": "The output must be consumable both by a person reading it and by an agent processing it, without either form being a lossy rendering of the other.",
+  "statement": "For every required item in the handoff, both a human reader and an automated consumer must be able to recover the same information without depending on the other representation.",
   "priority": "must",
-  "rationale": "Intake stakeholders: the material explicitly declines to assume which the implementer is.",
+  "rationale": "Intake stakeholders: the material explicitly declines to assume which the implementer is. This is testable by comparing both consumers against the same required-information inventory.",
   "tags": [
     "handoff"
   ]

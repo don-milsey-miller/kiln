@@ -1,0 +1,20 @@
+{
+  "stageId": "02-intent-decomposition",
+  "attestations": {
+    "every-requirement-testable": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "All 14 active requirements have observable conditions; REQ-0011 was sharpened to compare human and automated consumers against the same required-information inventory, and unsupported REQ-0015 was retired."
+    },
+    "scope-boundary-drawn": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "The corrected intake explicitly separates the current through-handoff product boundary from execution, production feedback, and organisational-learning ambitions in the frozen source."
+    },
+    "type-activation-approved": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Approved: requirement, decision, assertion, evidence, research-finding, question, runbook, and runbook-step. The weak acceptance-criterion inference and deferred types remain inactive; schema and api-spec remain implementation testbeds rather than project requirements."
+    }
+  }
+}

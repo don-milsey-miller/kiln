@@ -25,6 +25,7 @@ import { resolveContentRoot } from "../lib/content-root.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { lintProject, evaluateStageGate, evaluateHandoffGate, blocks, SEVERITY } from "../lib/lint.mjs";
+import { loadStageAttestations } from "../lib/attestations.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -66,7 +67,10 @@ const ctx = {
 
 let result;
 if (gateArg === "handoff") result = { kind: "handoff", ...evaluateHandoffGate(ctx) };
-else if (gateArg?.startsWith("stage:")) result = { kind: "stage", ...evaluateStageGate(ctx, gateArg.slice(6)) };
+else if (gateArg?.startsWith("stage:")) {
+  const stageId = gateArg.slice(6);
+  result = { kind: "stage", ...evaluateStageGate(ctx, stageId, { attestations: loadStageAttestations(contentRoot, stageId) }) };
+}
 else result = { kind: "report", ...lintProject(ctx) };
 
 if (asJson) {

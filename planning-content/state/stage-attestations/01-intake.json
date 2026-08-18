@@ -1,0 +1,25 @@
+{
+  "stageId": "01-intake",
+  "attestations": {
+    "ask-without-solution": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Adversarial review removed the local/single-operator architecture back-projection and labelled the later #24 scope boundary as a PM correction rather than frozen-source intent."
+    },
+    "objective-understood": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "The objective is maximum practical determinism by resolving ambiguity and technical uncertainty before the runbook; complete production predictability is not claimed."
+    },
+    "constraints-recorded": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "The intake records current-source research, experimental validation, consequential-validation governance, and preservation of claim strength, while removing an unsupported local constraint."
+    },
+    "stage-set-determinable": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "The PM-confirmed scope ends at handoff and is covered by the nine declared stages plus cross-cutting technical validation."
+    }
+  }
+}

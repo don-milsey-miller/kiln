@@ -399,6 +399,15 @@ test("#93: a human-only criterion is ATTESTED, not acknowledged", async () => {
     assert.ok(bogus.gateFindings.some((f) => f.ruleId === "gate/attestation-malformed"), "acknowledgement must not be a result");
     assert.equal(bogus.ready, false);
 
+    const noEvaluator = evaluateStageGate(ctx, "02-intent-decomposition", {
+      attestations: Object.fromEntries(gate.pendingHumanCriteria.map((id) => [id, { result: "satisfied" }])),
+    });
+    assert.ok(
+      noEvaluator.gateFindings.some((f) => f.ruleId === "gate/attestation-malformed" && /decidedBy/.test(f.message)),
+      "a verdict without an evaluator is not a recorded human decision"
+    );
+    assert.equal(noEvaluator.ready, false);
+
     // Evaluated and found true.
     const satisfied = evaluateStageGate(ctx, "02-intent-decomposition", {
       attestations: Object.fromEntries(

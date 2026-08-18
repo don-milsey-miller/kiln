@@ -1,7 +1,8 @@
 # Stage 2 — Intent Decomposition
 
-> **Status: AGENT PROPOSAL, awaiting PM confirmation.** Stage 2 is
-> `decidedBy: agent-proposes-user-confirms` (#34, #39). Nothing here is approved.
+> **Status: PM-APPROVED.** Stage 2 is
+> `decidedBy: agent-proposes-user-confirms` (#34, #39). The proposal below is now confirmed with the
+> corrections and explicit activation decision recorded in this document.
 >
 > Derived from `01-intake.md` **only**. Deliberately not from the architecture, and deliberately not
 > from step 3's four artifact types — checking whether the methodology independently produces what the
@@ -12,8 +13,9 @@
 ## Requirements
 
 **15 `requirement` artifacts, written by the typed tool** into `data/requirements/REQ-0001…REQ-0015`.
-They are real artifacts, not a list in a document — `npm run lint:plan` reports 15 artifacts and no
-findings.
+They are real artifacts, not a list in a document. PM review left 14 active and retired REQ-0015 after
+finding that its local/single-operator constraint had been back-projected from the architecture into
+the intake.
 
 | ID | Requirement | Priority | From |
 |---|---|---|---|
@@ -27,11 +29,11 @@ findings.
 | REQ-0008 | A reader can distinguish claim strength without reading prose | must | the central constraint |
 | REQ-0009 | Instructions rest on resolved claims | must | "the runbook is the output of discovery" |
 | REQ-0010 | The handoff is actionable without returning to the planner | must | objective |
-| REQ-0011 | The output serves a human or an agent implementer | must | stakeholders |
+| REQ-0011 | The output serves a human or an agent implementer | must | stakeholders; sharpened during PM review to compare both against one required-information inventory |
 | REQ-0012 | Validation that costs money or needs credentials requires explicit authorisation | must | constraints |
 | REQ-0013 | Decisions are recorded with their alternatives | should | "capture decisions" |
 | REQ-0014 | Open questions are tracked objects, not prose | should | "capture decisions" |
-| REQ-0015 | The system runs locally for a single operator | must | constraints |
+| REQ-0015 | The system runs locally for a single operator | retired | removed from intake: later architecture choice, not a frozen-source constraint |
 
 ## Explicit non-goals
 
@@ -62,13 +64,13 @@ was taken from the existing architecture.
 
 | Type | Called for by | Verdict |
 |---|---|---|
-| `requirement` | the stage itself | **activate** |
-| `assertion` | REQ-0004, 0007, 0008, 0009 | **activate** |
-| `evidence` | REQ-0004, 0005, 0006, 0008 | **activate** |
-| `research-finding` | REQ-0003 | **activate** |
-| `decision` | REQ-0013 | **activate** |
-| `question` | REQ-0014 | **activate** |
-| `runbook`, `runbook-step` | REQ-0009, REQ-0010 | **activate** |
+| `requirement` | the stage itself | **activate — approved** |
+| `assertion` | REQ-0004, 0007, 0008, 0009 | **activate — approved** |
+| `evidence` | REQ-0004, 0005, 0006, 0008 | **activate — approved** |
+| `research-finding` | REQ-0003 | **activate — approved** |
+| `decision` | REQ-0013 | **activate — approved** |
+| `question` | REQ-0014 | **activate — approved** |
+| `runbook`, `runbook-step` | REQ-0009, REQ-0010 | **activate — approved** |
 | `acceptance-criterion` | nothing directly; implied by REQ-0010 | propose, weakly |
 | `task` | nothing directly | defer |
 | `risk` | nothing in the intake | defer |
@@ -107,9 +109,10 @@ reason** — an evaluation, not an acknowledgement.
 
 | Criterion | Agent's input to the PM's judgement |
 |---|---|
-| `every-requirement-testable` | Believed satisfied. Each of the 15 states an observable condition. REQ-0011 is the weakest — "without either form being a lossy rendering of the other" needs a sharper test. |
-| `scope-boundary-drawn` | Believed satisfied as prose. If the PM wants it as artifacts, `scope-boundary` must be activated and its schema built first. |
-| `type-activation-approved` | **Open — this is the decision above, and it is the PM's.** |
+| `every-requirement-testable` | **Satisfied.** All 14 active requirements state observable conditions; REQ-0011 was sharpened during review. REQ-0015 is retired and no longer claims intake provenance. |
+| `scope-boundary-drawn` | **Satisfied.** The corrected intake distinguishes the current through-handoff boundary from the broader frozen-source ambitions. Prose is sufficient because no downstream mechanism currently traverses individual non-goals. |
+| `type-activation-approved` | **Satisfied.** The PM approves the eight strongly-derived types: `requirement`, `decision`, `assertion`, `evidence`, `research-finding`, `question`, `runbook`, and `runbook-step`. The weak `acceptance-criterion` inference and all deferred types remain inactive. |
 
-**Nothing has been written to `project.yaml`.** `artifactTypes.activated` is still `[]`. #39 says the
-agent proposes and the PM approves, and this document is the proposal.
+**The approved set is recorded in `project.yaml`.** This approval deliberately does not activate
+`schema` or `api-spec`: their implementation remains useful shared-infrastructure work, but this
+project's intake does not call for those artifact types.
