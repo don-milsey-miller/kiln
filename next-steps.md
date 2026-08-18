@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **95 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **96 decisions as of
 > 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -599,6 +599,34 @@ where these conventions get poured into a renderer, a watcher and a status write
 first is a commitment made before the types most able to falsify it exist. Step 4's stage 2 pushed the
 same way independently — **seven of fifteen requirements landed on the evidence loop**, derived from the
 intake rather than from this architecture.
+
+---
+
+### What 5a already has to build against (#96)
+
+`confidence` is **derived, not stored**. One shared derivation produces an *effective assertion view*
+— assertion + evidence links + each evidence record's source/experiment/environment — consumed by the
+gates, the renderer and the handoff. Two axes, never one:
+
+| Axis | Values | Answers |
+|---|---|---|
+| `verdict` | `unresolved` · `supported` · `refuted` | what did the examination conclude? |
+| `confidence` | `unverified` · `source-supported` · `experimentally-validated` · `environment-matched` | how well was it examined? |
+
+⚠️ **The pressure test must include refuting evidence.** A rung on its own is ambiguous —
+`experimentally-validated` is compatible with the claim being **false** — and testing only the
+supporting path is how that ambiguity survived being written down.
+
+**Two things this raises that are not yet decided**, both surfaced by writing #96 rather than by using it:
+
+- **Conflicting evidence has no verdict.** Supporting *and* refuting evidence on one assertion falls
+  outside `unresolved · supported · refuted`. A fourth value (`contested`) is the obvious move and is
+  not obviously right — an assertion whose evidence disagrees may be a modelling error rather than a
+  state. **Do not pick one before 5a's fixtures show which shape actually occurs.**
+- **Support and refutation are relations, so under #82 they are named fields** — `supportedBy` and
+  `refutedBy`, not one `evidencedBy` list with a polarity inside the value. That follows from the rule
+  already settled, but it makes `requirement.evidencedBy` and `decision.evidencedBy` look
+  under-specified by comparison, and whether those split too is a 5a question.
 
 ---
 
