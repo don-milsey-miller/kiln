@@ -469,9 +469,12 @@ correct. #78 also lists what the implementation owes and calls none of it option
 retry · stale-lock detection · a crashed-writer path · owner identification · cleanup · and
 Windows-specific behaviour, which #72 already proved is not theoretical.
 
-⚠️ **What the lock does not buy you is #79.** It guarantees two writers cannot clobber each other. It
-guarantees nothing about an agent whose reasoning rested on an artifact that changed while it worked.
-Deliberately out of scope here; don't let a working lock read as staleness being handled.
+⚠️ **What the lock does not buy you is #79.** #78 gives **write integrity**; #79 is **reasoning
+freshness**, and it doesn't exist. A worker reads a dependency set, reasons, one member of that set
+changes, and the worker commits output derived from the old one — cleanly, into a well-formed document
+with resolving trace links and nothing reporting a problem. **A correct lock makes that failure harder
+to see, not easier**, which is why the boundary is worth holding in mind precisely here, at the step
+that first ships a lock. Out of scope; don't let it land as staleness being handled.
 
 Wire #48's turn-end lint hook in **during** this step rather than after. notes.md already argues
 it's plausibly the highest-leverage item in the document; it's also the thing that tells you
