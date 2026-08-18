@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runbook-step.schema.json",
+  "title": "Runbook step",
+  "description": "One instruction someone will actually run. Stage 9 (#34 — promoted from producesCandidate to produces when this schema was built, which is what promoting a candidate means). ⚠️ The type that makes the evidence loop load-bearing: REQ-0009 says no instruction may rest on a claim whose basis is below what that instruction requires, and this is where that is enforced rather than described.",
+  "type": "object",
+
+  "allOf": [
+    { "$ref": "common.schema.json#/$defs/artifactEnvelope" },
+    {
+      "$comment": "#58's destructive floor. Nested inside allOf per #82.",
+      "if": { "properties": { "destructive": { "const": true } }, "required": ["destructive"] },
+      "then": {
+        "required": ["remediation"],
+        "properties": { "restsOn": { "minItems": 1 } },
+        "$comment": "A destructive step with no remediation and no backing claim is the single most dangerous thing this system could emit. The schema refuses it; #57's threshold and #96's verdict are then checked by the lint, which can see the evidence graph."
+      }
+    }
+  ],
+
+  "properties": {
+    "id": { "pattern": "^RBS-[0-9]{4,}$" },
+    "type": { "const": "runbook-step" },
+
+    "instruction": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "What to do, stated so it can be executed without interpretation.",
+      "x-materiality": "semantic"
+    },
+
+    "expectedOutcome": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "How the operator knows it worked. Without this a step cannot fail, only appear to.",
+      "x-materiality": "semantic"
+    },
+
+    "ordinal": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Position within its runbook. Ordering only — dependencies are trace edges, not numbers.",
+      "x-materiality": "advisory"
+    },
+
+    "destructive": {
+      "type": "boolean",
+      "default": false,
+      "description": "#58: whether this step can destroy something. Classified per step; the schema requires remediation and a backing claim when true.",
+      "x-materiality": "structural"
+    },
+
+    "remediation": {
+      "type": "string",
+      "description": "What to do if this step fails or must be undone. Required when destructive (#58's floor).",
+      "x-materiality": "semantic"
+    },
+
+    "restsOn": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The assertions this instruction depends on being true. ⚠️ The edge REQ-0009 is about: the lint reads each target's DERIVED verdict and confidence (#96) and blocks a step resting on a claim that is `refuted`, `contested`, or below its required rung. That check cannot live here — JSON Schema cannot see an evidence graph.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["assertion"]
+    },
+
+    "partOf": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The runbook this step belongs to.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["runbook"]
+    },
+
+    "dependsOn": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Steps that must complete first. A real edge rather than an implication of `ordinal`, so reordering cannot silently break a dependency.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["runbook-step"]
+    },
+
+    "notes": { "type": "string", "x-materiality": "cosmetic" },
+
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "uniqueItems": true,
+      "x-materiality": "advisory"
+    }
+  },
+
+  "required": ["instruction", "expectedOutcome"],
+  "unevaluatedProperties": false,
+
+  "x-artifactType": "runbook-step",
+  "x-stage": "09-handoff",
+  "x-unresolvableTraceTargets": {
+    "description": "#75: runbook is activated but not yet implemented, so partOf dangles until it is.",
+    "targets": ["runbook"]
+  }
+}

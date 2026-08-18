@@ -16,10 +16,14 @@ import {
 
 const SCHEMAS = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
 const set = loadSchemaSet(SCHEMAS);
-const TYPES = ["requirement", "decision", "schema", "api-spec"];
+const TYPES = Object.keys(set.types); // derived: the set grows as 5a lands types
 
-test("loads step 3's four types plus the shared primitives", () => {
-  assert.deepEqual(Object.keys(set.types).sort(), [...TYPES].sort());
+test("loads every type schema plus the shared primitives", () => {
+  // Step 3's four, plus 5a's evidence types. Asserted as a superset so the test does not have
+  // to be edited every time a type lands, but still fails if one disappears.
+  for (const t of ["requirement", "decision", "schema", "api-spec", "assertion", "evidence", "runbook-step"])
+    assert.ok(set.types[t], `${t} schema missing`);
+  assert.ok(set.common.$defs.artifactEnvelope, "shared primitives missing");
 });
 
 test("effective schema sees envelope fields the type never re-lists", () => {

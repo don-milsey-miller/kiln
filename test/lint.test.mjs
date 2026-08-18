@@ -367,6 +367,9 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
       "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision"] },
       "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
+      // assertion and evidence are cross-cutting (#25) and carry no x-stage, so no stage
+      // claims them and none may. runbook-step is stage 9's, promoted when it was built.
+      "09-handoff": { id: "09-handoff", produces: ["runbook", "runbook-step"] },
     };
     const ok = lintProject({ ...ctx, stageDefinitions: right }).findings;
     assert.deepEqual(ok.filter((f) => f.ruleId.startsWith("stage/x-stage")), []);
