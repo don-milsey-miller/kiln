@@ -1,0 +1,17 @@
+{
+  "id": "EVD-0007",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Next.js docs — Caching and Revalidating (Previous Model)",
+  "kind": "source",
+  "summary": "Applies when cacheComponents is NOT enabled, which is the default. States under route segment `revalidate`: 'In Development, Pages are always rendered on-demand and are never cached. This allows you to see changes immediately without waiting for a revalidation period to pass.'",
+  "sources": [
+    {
+      "title": "Next.js — Caching and Revalidating (Previous Model)",
+      "locator": "https://nextjs.org/docs/app/guides/caching-without-cache-components",
+      "retrievedAt": "2026-08-18"
+    }
+  ]
+}

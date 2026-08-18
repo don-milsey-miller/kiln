@@ -1,0 +1,21 @@
+{
+  "id": "AST-0008",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Next.js has no mechanism to learn that an external process wrote a file",
+  "statement": "Cache invalidation in Next.js is triggered by the application's own Server Actions or Route Handlers; a write performed by a process outside the app produces no invalidation and no client refresh, in any mode.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "notes": "#12 makes every artifact write external by construction, so this is the structural half of QST-0004 rather than a configuration detail.",
+  "supportedBy": [
+    "EVD-0008"
+  ]
+}

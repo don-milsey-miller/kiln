@@ -1,0 +1,17 @@
+{
+  "id": "QST-0004",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Can a Next.js dev app reflect externally written files and do lock-protected write-backs?",
+  "statement": "Can a Next.js development app reliably reflect artifact files written by an EXTERNAL process, and perform lock-protected status write-backs, without relying on HMR, stale server state, or framework-owned caching?",
+  "raisedBy": [
+    "AST-0001"
+  ],
+  "blocks": [
+    "REQ-0002"
+  ],
+  "notes": "#100 recorded that the walking skeleton is framework-free and that #5's Next.js choice is therefore untested — with React's state model against #78's lock named as the part most likely to bite. This is the narrow, falsifiable form of that debt. #12 puts the agent in a terminal that knows nothing about the dev server, so every artifact write is external by construction. Answered by reading first, then validation."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "AST-0006",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Without Cache Components, `next dev` renders every page on demand",
+  "statement": "With cacheComponents disabled (the default), Next.js in development renders pages on demand and never caches them, so a Server Component re-reads artifact files on each request.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "mode": "next dev",
+      "cacheComponents": "disabled"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "supportedBy": [
+    "EVD-0007"
+  ]
+}

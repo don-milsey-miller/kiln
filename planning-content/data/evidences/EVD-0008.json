@@ -1,0 +1,22 @@
+{
+  "id": "EVD-0008",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Next.js docs and issue tracker — revalidatePath is server-triggered only",
+  "kind": "source",
+  "summary": "revalidatePath/revalidateTag run only in Server Actions or Route Handlers and cannot be called from a Client Component. Invalidation plus the client Router Cache purge is triggered BY the server action the user performed; nothing observes writes made by a process outside the app.",
+  "sources": [
+    {
+      "title": "Next.js — revalidatePath",
+      "locator": "https://nextjs.org/docs/app/api-reference/functions/revalidatePath",
+      "retrievedAt": "2026-08-18"
+    },
+    {
+      "title": "vercel/next.js discussion 81385 — understanding revalidatePath",
+      "locator": "https://github.com/vercel/next.js/discussions/81385",
+      "retrievedAt": "2026-08-18"
+    }
+  ]
+}

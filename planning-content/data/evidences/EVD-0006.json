@@ -1,0 +1,17 @@
+{
+  "id": "EVD-0006",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Next.js docs — Caching (Cache Components model)",
+  "kind": "source",
+  "summary": "States that module imports, synchronous I/O and pure computations are 'predictable values': 'Components using only these operations are prerendered automatically, and their output becomes part of the static HTML at build time.' Lists `fs.readFileSync` explicitly among them. Contrasts this with `await readFile()` inside a component, which 'would be treated as uncached data that must be either accessed within `use cache` or behind a `<Suspense>` boundary.' Applies when cacheComponents: true.",
+  "sources": [
+    {
+      "title": "Next.js — Getting Started: Caching",
+      "locator": "https://nextjs.org/docs/app/getting-started/caching",
+      "retrievedAt": "2026-08-18"
+    }
+  ]
+}

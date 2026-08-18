@@ -1,0 +1,22 @@
+{
+  "id": "AST-0007",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "With Cache Components, a synchronous fs read is prerendered as a predictable value",
+  "statement": "With cacheComponents enabled, `fs.readFileSync` in a Server Component is classified a predictable value and its output is baked into the static shell, whereas `await readFile()` is treated as uncached data requiring `use cache` or a Suspense boundary.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "cacheComponents": "enabled"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "notes": "⚠️ The dangerous half is that the SIMPLER call is the unsafe one. A synchronous read is the obvious way to load a small JSON artifact, and it is the one that silently freezes.",
+  "supportedBy": [
+    "EVD-0006"
+  ]
+}
