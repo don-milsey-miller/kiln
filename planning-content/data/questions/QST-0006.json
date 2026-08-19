@@ -14,5 +14,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING before the specialist contracts. Same shape as QST-0005 for the validation specialist. #56's controller verbs cannot be promised by a contract until something implements them, and REQ-0012's authorisation rule has nothing to govern until then."
+  "notes": "BLOCKING under DEC-0002 — see the earlier note. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what may execute — which claims justify running code at all; (b) filesystem, network and credential boundaries per tier (#56), and what a tier may NOT reach; (c) resource limits — time, cost, instance count — since #77's authorisation is meaningless without them; (d) cleanup — #56's `destroy` verb, and what happens when it fails; (e) which observations survive as evidence — commands, output, environment facts, and what is discarded, because #96's applicability filter can only work on facts that were actually captured. Only after those does 'which tier first, implemented how' become answerable."
 }

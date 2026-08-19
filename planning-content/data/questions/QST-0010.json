@@ -1,0 +1,14 @@
+{
+  "id": "QST-0010",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Approving artifact type activation has no typed operation",
+  "statement": "#39 authorises a state transition — the PM approves an activation list at stage 2, recorded in project.yaml — and nothing can perform it. readActivatedTypes reads it; no typed operation writes it. Should there be one, and what does it have to do about #107's three-authority update?",
+  "raisedBy": [
+    "DEC-0002"
+  ],
+  "notes": "Found by auditing authorized transitions against typed operations (#121's corrected criterion), not by looking for missing writers. Every other transition has one: create, link/unlink, revise, setLifecycle, writeStageAttestation, writeReviewStatus, allocateId. This is the only authorised transition still performed by hand-editing a file — the same defect as the three already fixed, in the one place that also has to move stages/ and #38 with it (#107). Not blocking under DEC-0002: nothing pending requires an activation change, so it is work rather than a gap."
+}

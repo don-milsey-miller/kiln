@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0003",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A specialist contract may only describe capabilities the host can supply AND detect",
+  "statement": "Every capability named in a specialist contract must be one the host can actually provide and can verify is present. Where a named capability is unavailable, the specialist must produce an explicit refusal or a recorded gap — never proceed by guessing.",
+  "decidedAt": "2026-08-18",
+  "rationale": "#67 measured the failure this prevents: a trust-denied child completed a normal-looking session with the typed tools absent and nothing reported it. #81 answered that for tools specifically, with a capability check before any output is accepted. This generalises it: research and sandboxing are capabilities in exactly the same sense, and a research specialist with no search, or a validation specialist with no sandbox, fails the same way — plausible prose in place of an answer. Detectability is the load-bearing half: a capability the host cannot check is one the contract cannot honestly promise.",
+  "alternatives": [
+    {
+      "option": "Let a specialist degrade gracefully when a capability is missing",
+      "whyNot": "Graceful degradation is indistinguishable from the failure #67 found. The output looks the same and says nothing about what it could not do."
+    },
+    {
+      "option": "Check capabilities once at startup rather than per delegation",
+      "whyNot": "A credential can expire and a sandbox can go away mid-session; #108's stale-blocker lesson is that a capability recorded once is a claim with a shelf life."
+    }
+  ],
+  "addresses": [
+    "QST-0005",
+    "QST-0006"
+  ],
+  "evidencedBy": [
+    "AST-0004"
+  ],
+  "notes": "Generalises #81 from typed tools to any declared capability. #67(b) remains the unwritten half of both."
+}

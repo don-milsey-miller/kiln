@@ -13,5 +13,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING before the specialist contracts. Writing the research specialist's contract is a load-bearing commitment — #26's seven-field shape names allowed tools and output format — and its correctness depends on what actually provides research. A contract promising a capability with no executable substrate is #67's toolless child in a different costume."
+  "notes": "BLOCKING under DEC-0002 — see the earlier note. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what counts as research — which questions a specialist may take externally, and which it must refuse; (b) where external access comes from — the host capability, and who holds the credential; (c) how provenance is retained — every claim taken externally must land as evidence(kind: source) with its citations, since REQ-0004 is otherwise unenforceable at the point it matters; (d) how the system behaves when the capability is UNAVAILABLE — an explicit refusal or recorded gap, never a specialist answering from what it already holds, which is the intake's original complaint restored. Only after those four does the mechanism question — extension, MCP, something else — become answerable."
 }
