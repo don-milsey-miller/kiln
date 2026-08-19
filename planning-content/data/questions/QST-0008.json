@@ -1,0 +1,17 @@
+{
+  "id": "QST-0008",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Is the skeleton's rendering sufficient for the human half of REQ-0011?",
+  "statement": "REQ-0011 requires the output to serve a human reader and an automated consumer without either being a lossy rendering of the other. Artifacts are JSON, so the machine half exists. What satisfies the human half — the skeleton's HTML, #19's site/ build, or #8's interactive components?",
+  "blocks": [
+    "REQ-0011"
+  ],
+  "raisedBy": [
+    "DEC-0001"
+  ],
+  "notes": "#116 defers Next.js to when product UI work begins; this question is what would make that work begin. #8 is recorded as the sharpest constraint in the document and is currently unmet."
+}

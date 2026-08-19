@@ -1,0 +1,18 @@
+{
+  "id": "QST-0006",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "What implements sandboxed execution, and which tier first?",
+  "statement": "REQ-0005 requires claims to be testable by execution in a real environment. #56 decides three tiers and #77 decides how they activate, but no controller exists for any of them. Which tier is built first, and what provisions, executes, observes and destroys?",
+  "blocks": [
+    "REQ-0005",
+    "REQ-0012"
+  ],
+  "raisedBy": [
+    "DEC-0001"
+  ],
+  "notes": "#56's controller verbs — provision, execute, observe, reset, destroy — are specified and unimplemented. REQ-0012's authorisation rule (#77) is decided but unenforceable while nothing validates: there is no code path that could spend money or use a credential."
+}

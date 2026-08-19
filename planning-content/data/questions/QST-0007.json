@@ -1,0 +1,18 @@
+{
+  "id": "QST-0007",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Does the handoff export exist in v1, and what produces it?",
+  "statement": "REQ-0010 requires a handoff actionable without returning to the planner, and #19 specifies docs/plan/ with data, docs, site and PLAN.md. Nothing produces any of it. Is the export in v1, and is it a command, a gate action, or a stage-9 agent task?",
+  "blocks": [
+    "REQ-0010",
+    "REQ-0011"
+  ],
+  "raisedBy": [
+    "DEC-0001"
+  ],
+  "notes": "#21 makes publishing an explicit command rather than automatic, which constrains the answer but does not give it. #87 says the aggregate belongs at handoff as a projection — so the export is where that projection is finally built, and it has no owner."
+}
