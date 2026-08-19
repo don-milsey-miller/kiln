@@ -1,0 +1,27 @@
+{
+  "id": "AST-0010",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "With Cache Components in a PRODUCTION build, a synchronous fs read freezes into the static shell",
+  "statement": "With cacheComponents enabled, under `next build` followed by `next start`, a Server Component reading an artifact with fs.readFileSync produces output baked into the static shell, so a later external write does not change what a fresh request returns.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "cacheComponents": "enabled",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "notes": "Carved out of AST-0007 after the dev refutation. This is what the documentation actually describes, and it is untested. ⚠️ It may never matter: #2 and #22 make the app local-only, so `next dev` may be the only mode this product ever runs in — which is itself a decision nobody has taken.",
+  "supportedBy": [
+    "EVD-0006"
+  ]
+}

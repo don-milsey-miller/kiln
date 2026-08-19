@@ -4,18 +4,23 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "title": "Next.js has no mechanism to learn that an external process wrote a file",
-  "statement": "Cache invalidation in Next.js is triggered by the application's own Server Actions or Route Handlers; a write performed by a process outside the app produces no invalidation and no client refresh, in any mode.",
+  "title": "An external write alone produces no request, re-render or browser update",
+  "statement": "Under Next.js 16.3.1 in `next dev` on Windows 11 / Node v24.18.0, writing an artifact file from a process outside the application causes no new server request, no server re-render, and no browser update within 10 seconds, in either cacheComponents mode.",
   "targetEnvironment": {
     "facts": {
-      "framework": "Next.js 16.3.1"
+      "framework": "Next.js 16.3.1",
+      "mode": "next dev",
+      "os": "Windows 11",
+      "node": "v24.18.0",
+      "observationWindowSeconds": "10"
     }
   },
   "arisesFrom": [
     "REQ-0002"
   ],
-  "notes": "#12 makes every artifact write external by construction, so this is the structural half of QST-0004 rather than a configuration detail.",
+  "notes": "Rewritten 2026-08-18 before validation. It previously claimed 'no mechanism exists', which no experiment can establish — a universal negative is unfalsifiable and would have sat at whatever rung its evidence happened to reach while meaning something no evidence could support. The observable form is bounded in time, scoped to versions and mode, and one counter-observation refutes it.",
   "supportedBy": [
-    "EVD-0008"
+    "EVD-0008",
+    "EVD-0009"
   ]
 }

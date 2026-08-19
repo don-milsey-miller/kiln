@@ -4,8 +4,8 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "title": "With Cache Components, a synchronous fs read is prerendered as a predictable value",
-  "statement": "With cacheComponents enabled, `fs.readFileSync` in a Server Component is classified a predictable value and its output is baked into the static shell, whereas `await readFile()` is treated as uncached data requiring `use cache` or a Suspense boundary.",
+  "title": "With Cache Components, a SYNCHRONOUS fs read freezes into the static shell",
+  "statement": "With cacheComponents enabled, a Server Component that reads an artifact with fs.readFileSync produces output baked into the static shell, so a later external write to that file does not change what a fresh request returns.",
   "targetEnvironment": {
     "facts": {
       "framework": "Next.js 16.3.1",
@@ -15,8 +15,11 @@
   "arisesFrom": [
     "REQ-0002"
   ],
-  "notes": "⚠️ The dangerous half is that the SIMPLER call is the unsafe one. A synchronous read is the obvious way to load a small JSON artifact, and it is the one that silently freezes.",
+  "notes": "⚠️ CONTESTED, AND THE CONTEST IS THE DIAGNOSIS. The documentation (EVD-0006) supports it; the dev experiment (EVD-0012) refutes it. Both are applicable because the claim NAMES NO MODE — and that is the defect. The doc describes prerendering 'at build time'; the experiment ran `next dev`, where there is no build. Scoping resolves it into two claims that do not conflict: AST-0010 (build mode, source-supported, untested) and AST-0011 (dev mode, experimentally confirmed). Kept contested on purpose rather than tidied away: it is a live example of #96's contested verdict doing what it was built for — surfacing a condition without guessing its cause — where the cause turned out to be a modelling error in the claim rather than disagreement about the world.",
   "supportedBy": [
     "EVD-0006"
+  ],
+  "refutedBy": [
+    "EVD-0012"
   ]
 }

@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Can a Next.js dev app reflect externally written files and do lock-protected write-backs?",
   "statement": "Can a Next.js development app reliably reflect artifact files written by an EXTERNAL process, and perform lock-protected status write-backs, without relying on HMR, stale server state, or framework-owned caching?",
   "raisedBy": [
@@ -13,5 +13,12 @@
   "blocks": [
     "REQ-0002"
   ],
-  "notes": "#100 recorded that the walking skeleton is framework-free and that #5's Next.js choice is therefore untested — with React's state model against #78's lock named as the part most likely to bite. This is the narrow, falsifiable form of that debt. #12 puts the agent in a terminal that knows nothing about the dev server, so every artifact write is external by construction. Answered by reading first, then validation."
+  "notes": "Reopening condition: adopting `next build` for any part of the app, or upgrading Next.js past 16.3.1.",
+  "answer": "YES, in `next dev`, with one condition the framework does not supply. Measured across a 2x2 matrix (fs.readFileSync / await readFile x cacheComponents disabled / enabled) on Next.js 16.3.1, React 19.2.8, Node v24.18.0, Windows 11: all four cells re-read the file and returned the new value on a fresh request, with server-side counters confirming a genuine re-read rather than a replay. No stale server state, no reliance on HMR, and no framework caching interfered — including with Cache Components enabled and a synchronous read, which the documentation says would be prerendered. THE CONDITION: an external write alone produces nothing — no request, no re-render, no browser update in a 10-second window, in every cell. The application must supply the change signal itself. An SSE route watching the data directory delivered the event to a connected client in both modes, and a reload then showed the new value. That is precisely what the framework-free skeleton already does, so the pattern carries over rather than needing replacement. ⚠️ SCOPED TO `next dev`. AST-0010 carries the production-build claim and is untested; the documentation describes build-time prerendering, and whether this product ever runs a production build is itself undecided given #2 and #22's local-only stance.",
+  "answeredBy": [
+    "AST-0006",
+    "AST-0008",
+    "AST-0009",
+    "EVD-0009"
+  ]
 }

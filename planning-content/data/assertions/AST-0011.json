@@ -1,0 +1,27 @@
+{
+  "id": "AST-0011",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "In `next dev` with Cache Components, a synchronous fs read does NOT freeze",
+  "statement": "With cacheComponents enabled under `next dev`, a Server Component reading an artifact with fs.readFileSync re-reads the file on a fresh request, so an external write is reflected.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next dev",
+      "cacheComponents": "enabled",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "notes": "The properly-scoped positive half of AST-0007's contested pair. AST-0010 carries the build-mode half.",
+  "supportedBy": [
+    "EVD-0012"
+  ]
+}

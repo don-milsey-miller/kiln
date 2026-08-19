@@ -1,0 +1,24 @@
+{
+  "id": "EVD-0010",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Probe cell — fs.readFileSync, cacheComponents disabled",
+  "kind": "experiment",
+  "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so the default model serves fresh data in dev.",
+  "environment": {
+    "tier": 1,
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next dev",
+      "cacheComponents": "disabled",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "observedAt": "2026-08-18",
+  "outcome": "success"
+}
