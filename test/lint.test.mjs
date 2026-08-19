@@ -470,57 +470,70 @@ test("#92: stage definitions enforce only what the source table NAMES", () => {
     }
 });
 
-test("#94: against the REAL activation set, an unimplemented type is a capability gap", () => {
-  // The previous version of this test ran with activated = every type that has a schema, so it
-  // could never see the case it claimed to cover. Use what the PM actually approved.
+test("#94 (constructed): every branch of the capability check — all four", () => {
   const { base, contentRoot, ctx } = fresh();
   try {
-    const activated = readActivatedTypes(join(ROOT, "planning-content"));
-    assert.ok(activated.length >= 8, `expected the approved set, got ${JSON.stringify(activated)}`);
-    assert.ok(activated.includes("research-finding"), "the approved set should include an unimplemented type");
+    // ⚠️ CONSTRUCTED on purpose (#117). Every branch is exercised from a fixture we control, so
+    // implementing or retiring any real type cannot turn an improvement into a regression.
+    const defs = { S: { id: "S", produces: ["implemented", "schemaOnly", "toolOnly", "neither"] } };
+    const fake = {
+      ...ctx,
+      activated: ["implemented", "schemaOnly", "toolOnly", "neither"],
+      // schemas the checker can see
+      schemas: { ...ctx.schemas, types: { ...ctx.schemas.types, implemented: {}, schemaOnly: {} } },
+      // tools the checker can see
+      typedTools: ["implemented", "toolOnly"],
+    };
+    const gate = evaluateStageGate(fake, "S", { stageDefinitions: defs });
+    const missingFor = (type) =>
+      gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === type)?.details.missing;
 
-    const real = { ...ctx, activated };
-    const gate = evaluateStageGate(real, "03-discovery");
-    const byRule = (id) => gate.gateFindings.filter((f) => f.ruleId === id);
+    assert.equal(missingFor("implemented"), undefined, "schema + tool: no capability gap");
+    assert.deepEqual(missingFor("schemaOnly"), ["typed tool"]);
+    assert.deepEqual(missingFor("toolOnly"), ["schema"]);
+    assert.deepEqual(missingFor("neither"), ["schema", "typed tool"]);
 
-    const gap = byRule("gate/type-not-implemented").find((f) => f.details.type === "research-finding");
-    assert.ok(gap, JSON.stringify(gate.gateFindings, null, 2));
-    assert.equal(gap.severity, SEVERITY.ERROR);
-    assert.deepEqual(gap.details.missing, ["schema", "typed tool"]);
-
-    // ...and the two never fire together for the same type.
-    assert.equal(
-      byRule("gate/no-artifacts-for-stage-type").filter((f) => f.details.type === "research-finding").length,
-      0,
-      "a type that cannot exist must not also be reported as having no artifacts"
+    // And an implemented type with no artifacts falls through to the ordinary finding.
+    assert.ok(
+      gate.gateFindings.some((f) => f.ruleId === "gate/no-artifacts-for-stage-type" && f.details.type === "implemented"),
+      "an implemented type with nothing authored is unfinished work, not a capability gap"
     );
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
 });
 
-test("#94: a partial capability gap names only what is missing", () => {
+test("#94 (live): the real catalogue, activation, schemas and tool registry agree", async () => {
+  const { implementedTypes } = await import("../lib/tools/registry.mjs");
   const { base, contentRoot, ctx } = fresh();
   try {
-    // ⚠️ No type in the REAL activation set is a partial gap any more — decision gained its typed
-    // tool, and schema/api-spec have schemas but are not activated so the gate skips them. The
-    // partial case is constructed rather than borrowed, because borrowing it from live content is
-    // what made this test go stale the moment the gap was closed.
-    const activated = ["requirement", "schema", "question"];
-    const defs = { "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] } };
-    const gate = evaluateStageGate({ ...ctx, activated }, "05-solution-design", { stageDefinitions: defs });
+    // ⚠️ This test asserts CLASSIFICATION IS ACCURATE, never that a particular gap still exists.
+    // Implementing or retiring a type must not fail it (#117).
+    const activated = readActivatedTypes(join(ROOT, "planning-content"));
+    const tools = implementedTypes();
+    const real = { ...ctx, activated };
+    const defs = loadStageDefinitions(ROOT);
 
-    // schema HAS a schema and no typed tool: only the tool is missing.
-    const partial = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "schema");
-    assert.deepEqual(partial?.details.missing, ["typed tool"], JSON.stringify(gate.gateFindings));
+    for (const [stageId, def] of Object.entries(defs)) {
+      const gate = evaluateStageGate(real, stageId);
+      for (const type of def.produces) {
+        if (!activated.includes(type)) continue;
+        const expected = [
+          ...(ctx.schemas.types[type] ? [] : ["schema"]),
+          ...(tools.includes(type) ? [] : ["typed tool"]),
+        ];
+        const found = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === type);
+        assert.deepEqual(
+          found?.details.missing ?? [],
+          expected,
+          `${stageId}/${type}: gate says ${JSON.stringify(found?.details.missing ?? [])}, wiring says ${JSON.stringify(expected)}`
+        );
+      }
+    }
 
-    // api-spec is not activated here, so it reports nothing at all.
-    assert.equal(gate.gateFindings.some((f) => f.details.type === "api-spec"), false);
-
-    // And the both-missing case still has a home: runbook, from the real definitions.
-    const g9 = evaluateStageGate({ ...ctx, activated: readActivatedTypes(join(ROOT, "planning-content")) }, "09-handoff");
-    const rb = g9.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "runbook");
-    assert.deepEqual(rb?.details.missing, ["schema", "typed tool"]);
+    // Every registered tool must have a schema — a tool for a type nothing can validate is worse
+    // than no tool, because #88's second boundary would have nothing to check against.
+    for (const type of tools) assert.ok(ctx.schemas.types[type], `${type} has a typed tool and no schema`);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
