@@ -502,18 +502,23 @@ test("#94: against the REAL activation set, an unimplemented type is a capabilit
 test("#94: a partial capability gap names only what is missing", () => {
   const { base, contentRoot, ctx } = fresh();
   try {
-    const activated = readActivatedTypes(join(ROOT, "planning-content"));
-    const gate = evaluateStageGate({ ...ctx, activated }, "04-requirement-gaps");
-    // decision HAS a schema but no typed tool — the partial gap this test exists for.
-    const dec = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "decision");
-    assert.deepEqual(dec?.details.missing, ["typed tool"], "schema exists, so only the tool is missing");
+    // ⚠️ No type in the REAL activation set is a partial gap any more — decision gained its typed
+    // tool, and schema/api-spec have schemas but are not activated so the gate skips them. The
+    // partial case is constructed rather than borrowed, because borrowing it from live content is
+    // what made this test go stale the moment the gap was closed.
+    const activated = ["requirement", "schema", "question"];
+    const defs = { "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] } };
+    const gate = evaluateStageGate({ ...ctx, activated }, "05-solution-design", { stageDefinitions: defs });
 
-    // question is now fully implemented (#105) and must report no gap at all.
-    const q = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "question");
-    assert.equal(q, undefined, "question has both a schema and a typed tool");
+    // schema HAS a schema and no typed tool: only the tool is missing.
+    const partial = gate.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "schema");
+    assert.deepEqual(partial?.details.missing, ["typed tool"], JSON.stringify(gate.gateFindings));
 
-    // runbook still has neither — the both-missing case has to stay covered somewhere.
-    const g9 = evaluateStageGate({ ...ctx, activated }, "09-handoff");
+    // api-spec is not activated here, so it reports nothing at all.
+    assert.equal(gate.gateFindings.some((f) => f.details.type === "api-spec"), false);
+
+    // And the both-missing case still has a home: runbook, from the real definitions.
+    const g9 = evaluateStageGate({ ...ctx, activated: readActivatedTypes(join(ROOT, "planning-content")) }, "09-handoff");
     const rb = g9.gateFindings.find((f) => f.ruleId === "gate/type-not-implemented" && f.details.type === "runbook");
     assert.deepEqual(rb?.details.missing, ["schema", "typed tool"]);
   } finally {

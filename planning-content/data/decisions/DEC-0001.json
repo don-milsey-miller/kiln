@@ -1,0 +1,36 @@
+{
+  "id": "DEC-0001",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Adopt Next.js when product UI work begins, not as cleanup",
+  "statement": "Do not migrate the walking skeleton to Next.js as cleanup. When product UI work begins, build the product shell in Next.js, carrying forward the validated watcher/SSE/write-back contract. Migration is feature work, not framework conformity.",
+  "decidedAt": "2026-08-18",
+  "rationale": "The skeleton was framework-free because #5's choice was untested; QST-0004 has now tested it, including the surface the skeleton deliberately left open. Nothing forces a migration — the framework-free server already does what Next.js was validated to do. What Next.js buys is product: MDX rendering, the interactive components #54 wants, and #19's site/ build path. Migrating for its own sake would trade a working proof of the risky substrate for no capability.",
+  "alternatives": [
+    {
+      "option": "Migrate the skeleton to Next.js now, as cleanup",
+      "whyNot": "Framework conformity is not a benefit. It would replace a working proof of the substrate with an equivalent that costs effort and adds MDX, components and the site build that nobody needs yet."
+    },
+    {
+      "option": "Commit to staying framework-free",
+      "whyNot": "Forecloses MDX, the interactive components #54 names as the v1 flagship, and #19's site/ output — all real product requirements, none of which the skeleton was built to serve."
+    },
+    {
+      "option": "Decide when the first UI feature is specified",
+      "whyNot": "Chosen, in effect: this IS that decision, taken now so the skeleton's continued existence is deliberate rather than unexamined."
+    }
+  ],
+  "addresses": [
+    "QST-0004"
+  ],
+  "evidencedBy": [
+    "AST-0006",
+    "AST-0008",
+    "AST-0009",
+    "AST-0011",
+    "AST-0012"
+  ],
+  "notes": "AST-0010 — Cache Components under `next build` — becomes BLOCKING only when a production build enters scope. Until then testing it would validate a deployment mode the project has not decided to use, and #2 and #22's local-only stance mean it may never. The skeleton is retained deliberately as proof of the substrate, not as a deviation owing a migration."
+}
