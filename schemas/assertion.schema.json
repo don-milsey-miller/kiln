@@ -7,6 +7,36 @@
   "allOf": [
     {
       "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    },
+    {
+      "$comment": "Same invariant decision carries, and nested inside allOf per #82. A superseded assertion must name its successor, or the record is a dead end that looks like history.",
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "const": "superseded"
+          }
+        },
+        "required": [
+          "lifecycle"
+        ]
+      },
+      "then": {
+        "required": [
+          "supersededBy"
+        ],
+        "properties": {
+          "supersededBy": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "supersededBy": {
+            "maxItems": 0
+          }
+        }
+      }
     }
   ],
   "properties": {
@@ -91,6 +121,12 @@
       "x-materiality": "advisory",
       "x-amendsApproval": false,
       "description": "Changing tags never invalidates an approval (#103) — the clear advisory case, declared rather than inferred."
+    },
+    "supersededBy": {
+      "description": "The assertion(s) that replaced this one — typically properly-scoped successors after an under-scoped claim was split.",
+      "x-traceTarget": [
+        "assertion"
+      ]
     }
   },
   "required": [

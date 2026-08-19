@@ -1,0 +1,24 @@
+{
+  "id": "EVD-0015",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Write-back cell — cacheComponents enabled",
+  "kind": "experiment",
+  "summary": "A Next.js route handler called the repo's REAL writeReviewStatus (lock -> fresh read inside the lock -> validate -> atomic write) via runtime dynamic import; nothing was reimplemented. Results: the write landed and reviewStatus changed; every other field byte-identical, so the reviewStatus-only boundary held; lock released; no temp file left. A request asking for reviewStatus 'retired' was refused 400 and the artifact was unchanged. With the lock held by an EXTERNAL process, the Next.js write did not proceed (artifact unchanged after 1.2s), then completed once the lock was released — total wait ~1.3s. React's state model did not interfere with the lock in either mode.",
+  "environment": {
+    "tier": 1,
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next dev",
+      "cacheComponents": "enabled",
+      "writePath": "route handler -> writeReviewStatus"
+    }
+  },
+  "observedAt": "2026-08-18",
+  "outcome": "success"
+}

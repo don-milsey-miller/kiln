@@ -1,0 +1,27 @@
+{
+  "id": "AST-0012",
+  "type": "assertion",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A Next.js route handler can perform the lock-protected write-back correctly",
+  "statement": "Under Next.js 16.3.1 in `next dev` on Windows 11 / Node v24.18.0, a route handler calling writeReviewStatus writes only reviewStatus, refuses any other lifecycle value, releases the lock, leaves no temp file, and waits rather than proceeding while an external process holds the lock.",
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.1",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next dev",
+      "writePath": "route handler -> writeReviewStatus"
+    }
+  },
+  "arisesFrom": [
+    "REQ-0002"
+  ],
+  "notes": "#100 named React's state model against #78's lock as the interaction most likely to bite. Measured in both cacheComponents modes; it did not.",
+  "supportedBy": [
+    "EVD-0014",
+    "EVD-0015"
+  ]
+}

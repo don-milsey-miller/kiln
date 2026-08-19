@@ -3,7 +3,7 @@
   "type": "assertion",
   "schemaVersion": 1,
   "reviewStatus": "draft",
-  "lifecycle": "active",
+  "lifecycle": "superseded",
   "title": "With Cache Components, a SYNCHRONOUS fs read freezes into the static shell",
   "statement": "With cacheComponents enabled, a Server Component that reads an artifact with fs.readFileSync produces output baked into the static shell, so a later external write to that file does not change what a fresh request returns.",
   "targetEnvironment": {
@@ -21,5 +21,9 @@
   ],
   "refutedBy": [
     "EVD-0012"
+  ],
+  "supersededBy": [
+    "AST-0010",
+    "AST-0011"
   ]
 }
