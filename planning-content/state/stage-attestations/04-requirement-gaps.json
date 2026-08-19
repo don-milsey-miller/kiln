@@ -1,0 +1,10 @@
+{
+  "stageId": "04-requirement-gaps",
+  "attestations": {
+    "every-blocking-gap-decided": {
+      "result": "not-satisfied",
+      "decidedBy": "pm",
+      "reason": "Evaluable now that DEC-0002 defines blocking. QST-0005 and QST-0006 are blocking and undecided, so the criterion is not met. Recorded as not-satisfied rather than left unevaluated: a stage blocked because someone looked and said no is in a known state; one blocked because nobody looked is not (#93)."
+    }
+  }
+}

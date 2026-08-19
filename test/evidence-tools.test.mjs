@@ -374,3 +374,26 @@ test("#103: materiality comes from #84's effective schema, not a field-name list
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("#93: attestations can be written through a typed path, and refuse a non-verdict", async () => {
+  const { writeStageAttestation, loadStageAttestations } = await import("../lib/attestations.mjs");
+  const { base, contentRoot } = fresh();
+  try {
+    const w = (criterion, body) => writeStageAttestation(contentRoot, "04-requirement-gaps", criterion, body);
+
+    await w("c1", { result: "satisfied", decidedBy: "pm", reason: "checked" });
+    await w("c2", { result: "not-satisfied", decidedBy: "pm", reason: "two blocking gaps undecided" });
+    const all = loadStageAttestations(contentRoot, "04-requirement-gaps");
+    assert.equal(all.c1.result, "satisfied");
+    assert.equal(all.c2.result, "not-satisfied", "not-satisfied is a first-class outcome, not an absence");
+
+    // Seeing a criterion is not a verdict on it.
+    await assert.rejects(() => w("c3", { result: "acknowledged", decidedBy: "pm" }), /result must be one of/);
+    await assert.rejects(() => w("c3", { result: "satisfied" }), /who evaluated it/);
+    await assert.rejects(() => w("c3", { result: "n/a", decidedBy: "pm" }), /requires a reason/);
+
+    assert.ok(!existsSync(join(contentRoot, LOCK_FILE)), "lock released");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

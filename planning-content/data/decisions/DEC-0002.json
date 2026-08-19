@@ -1,0 +1,28 @@
+{
+  "id": "DEC-0002",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "What makes a requirement gap BLOCKING",
+  "statement": "An unresolved question is blocking when proceeding would require a load-bearing commitment whose correctness materially depends on its answer, or when its absence makes the current stage's exit criterion unevaluable. Missing implementation alone is work, not a gap.",
+  "decidedAt": "2026-08-18",
+  "rationale": "Stage 4's exit criterion turns on the word and the stage table never defined it, so the stage could not be exited honestly in either direction. The definition separates the two things that were being conflated: a decision whose absence would make the next commitment possibly wrong, and work that is simply not done. The second clause is self-referential on purpose — a question that makes a criterion unevaluable blocks by construction, which is what QST-0009 itself was.",
+  "alternatives": [
+    {
+      "option": "Everything unresolved blocks",
+      "whyNot": "Nothing would ever exit a stage, and the criterion would stop carrying information — the same erosion #46 describes for a lint that blocks mid-thought."
+    },
+    {
+      "option": "Only what stops work today blocks",
+      "whyNot": "Too narrow. It permits making a load-bearing commitment while a question that decides its correctness is open, which is precisely the failure the gate exists to catch."
+    },
+    {
+      "option": "Leave it to judgement each time",
+      "whyNot": "The criterion would mean something different at every gate, and #93's attestation would record a verdict with no shared premise behind it."
+    }
+  ],
+  "addresses": [
+    "QST-0009"
+  ]
+}

@@ -4,12 +4,16 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Which of these gaps BLOCK, and which are simply not done?",
   "statement": "Stage 4's exit criterion is that every BLOCKING gap has a user decision recorded — not every gap. Which of the four questions above block progress, and which are known future work that does not?",
   "blocks": [],
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "⚠️ Raised deliberately: the criterion turns on a word nobody has defined for this project. Without a definition the stage cannot be exited honestly in either direction — everything could be called blocking, or nothing could."
+  "notes": "⚠️ Raised deliberately: the criterion turns on a word nobody has defined for this project. Without a definition the stage cannot be exited honestly in either direction — everything could be called blocking, or nothing could.",
+  "answer": "Blocking = proceeding would require a load-bearing commitment whose correctness materially depends on the answer, OR the absence makes the current stage's exit criterion unevaluable. Missing implementation alone is work, not a gap. See DEC-0002.",
+  "answeredBy": [
+    "DEC-0002"
+  ]
 }

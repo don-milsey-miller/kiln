@@ -13,5 +13,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "⚠️ This is the ORIGINAL complaint. The intake's problem 2 is 'the agent cannot research', described in the PM's own words as 'educated guessing'. Fourteen requirements later the system still cannot. The capability was used during stage 3 by the agent running that session, which is not the same as the product having it."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING before the specialist contracts. Writing the research specialist's contract is a load-bearing commitment — #26's seven-field shape names allowed tools and output format — and its correctness depends on what actually provides research. A contract promising a capability with no executable substrate is #67's toolless child in a different costume."
 }

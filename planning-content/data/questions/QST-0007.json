@@ -14,5 +14,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "#21 makes publishing an explicit command rather than automatic, which constrains the answer but does not give it. #87 says the aggregate belongs at handoff as a projection — so the export is where that projection is finally built, and it has no owner."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING for handoff design only. It gates #19's export and the conditional demand for `task` and `role-assignment` (#119). It does not block unrelated work, so it is a gap for stage 9 rather than for now."
 }

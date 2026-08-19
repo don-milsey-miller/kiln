@@ -13,5 +13,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "#116 defers Next.js to when product UI work begins; this question is what would make that work begin. #8 is recorded as the sharpest constraint in the document and is currently unmet."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING conditionally. It blocks whichever implementation commitment owns REQ-0011's human half. Urgency depends entirely on whether that commitment is next — under #116 it is not, so this is currently latent rather than pressing."
 }

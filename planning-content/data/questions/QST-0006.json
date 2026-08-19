@@ -14,5 +14,5 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "#56's controller verbs — provision, execute, observe, reset, destroy — are specified and unimplemented. REQ-0012's authorisation rule (#77) is decided but unenforceable while nothing validates: there is no code path that could spend money or use a credential."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING before the specialist contracts. Same shape as QST-0005 for the validation specialist. #56's controller verbs cannot be promised by a contract until something implements them, and REQ-0012's authorisation rule has nothing to govern until then."
 }
