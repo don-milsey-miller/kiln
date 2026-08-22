@@ -1,0 +1,17 @@
+{
+  "id": "CMP-0002",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The lint",
+  "responsibility": "Checks storage identity, trace integrity, content completeness, lifecycle and instruction safety across all artifacts, and blocks at the two boundaries #46 names.",
+  "satisfies": [
+    "REQ-0002",
+    "REQ-0009"
+  ],
+  "implementedBy": [
+    "lib/lint.mjs",
+    "bin/lint-plan.mjs"
+  ]
+}

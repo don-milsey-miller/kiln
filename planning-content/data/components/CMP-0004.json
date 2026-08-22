@@ -1,0 +1,19 @@
+{
+  "id": "CMP-0004",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Schema layer",
+  "responsibility": "Owns the artifact schemas, their composition through one envelope, and the effective-schema resolution every consumer reads materiality from.",
+  "satisfies": [
+    "REQ-0007",
+    "REQ-0008"
+  ],
+  "implementedBy": [
+    "schemas/",
+    "lib/schema-resolver.mjs",
+    "lib/validate.mjs",
+    "lib/template.mjs"
+  ]
+}

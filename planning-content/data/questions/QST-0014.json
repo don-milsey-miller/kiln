@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Does `component` join the catalogue? Stage 5 produced demand for it",
   "statement": "Running stage 5 against the 14 active requirements produced demand for a `component` type that #38's sixteen do not include, and demand for NONE of the three the stage declares (`schema`, `api-spec`, `wireframe`). #41 applied: it owns a named unit of the design, its responsibility, and which requirements it satisfies — state no other artifact can hold. Four already-decided consumers must traverse it: #60's cascade (its worked example is `acceptance-criterion -> component`), #19's role slicing, the stage-9 completeness gate's orphan check ('a requirement no component satisfies'), and stage 5's own third exit criterion, which is unevaluable without it. Does it join the catalogue, and is it activated on this project?",
   "raisedBy": [
@@ -14,5 +14,9 @@
     "REQ-0010",
     "REQ-0011"
   ],
-  "notes": "⚠️ NOT BUILT PENDING THIS ANSWER, deliberately. Stage 5 is `decidedBy: Planning agent -> user approves`, and #106 exists precisely so the demand argument is REVIEWED rather than acted on by the agent that made it — #92 recorded what happens when I smuggle inferences into a stage's outputs. The #41 analysis is in planning-content/stages/05-solution-design.md §3 and includes the counter-arguments applied rather than skipped. ⚠️ The traceability chain in notes.md names 'design component' three times and #38 omits it, so four decisions rest on a chain with a missing link. That is the strongest part of the case, and it is also the part that shows the gap is OLD rather than newly created by this run. ⚠️ Adding a type edits common.schema.json's typePrefixes (#40) and is a CATALOGUE change (#95), distinct from activating it on this project — and activation still has no typed operation (QST-0010)."
+  "notes": "⚠️ NOT BUILT PENDING THIS ANSWER, deliberately. Stage 5 is `decidedBy: Planning agent -> user approves`, and #106 exists precisely so the demand argument is REVIEWED rather than acted on by the agent that made it — #92 recorded what happens when I smuggle inferences into a stage's outputs. The #41 analysis is in planning-content/stages/05-solution-design.md §3 and includes the counter-arguments applied rather than skipped. ⚠️ The traceability chain in notes.md names 'design component' three times and #38 omits it, so four decisions rest on a chain with a missing link. That is the strongest part of the case, and it is also the part that shows the gap is OLD rather than newly created by this run. ⚠️ Adding a type edits common.schema.json's typePrefixes (#40) and is a CATALOGUE change (#95), distinct from activating it on this project — and activation still has no typed operation (QST-0010).",
+  "answer": "Yes to both: `component` joins the catalogue as CMP and is activated on this project. Minimal shape - name, responsibility, satisfies. Further links wait for stage 7-8 demand. See DEC-0008.",
+  "answeredBy": [
+    "DEC-0008"
+  ]
 }

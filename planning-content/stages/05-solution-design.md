@@ -1,7 +1,9 @@
 # Stage 5 — Solution Design
 
-> **Status: AGENT PROPOSAL, awaiting PM decisions.** Stage 5 is `decidedBy: Planning agent → user
-> approves` (`stages/05-solution-design.json`). Nothing below is decided.
+> **Status: RUN 2026-08-22; the `component` proposal was APPROVED (`DEC-0008`) and materialised. The gate remains `ready: false`.**
+> _(Originally: AGENT PROPOSAL, awaiting PM decisions.)_ Stage 5 is `decidedBy: Planning agent → user
+> approves` (`stages/05-solution-design.json`). The proposal below was written before the PM ruled on it;
+> the one decision taken since is `DEC-0008`, and it is the PM's.
 >
 > **Run 2026-08-22 for a specific purpose:** step 6 is *"broaden the catalogue"*, and #106 says a type
 > is built when authentic work demands it, never because a list names it. So this stage was run
@@ -14,6 +16,12 @@
 ---
 
 ## 1. Requirements traced to components
+
+> ✅ **MATERIALISED 2026-08-22.** The table below was the prose result of the first run. `component`
+> was approved (`DEC-0008`) and activated through `setTypeActivation`, and the trace now exists as
+> **ten `CMP-` artifacts carrying `satisfies` edges**. The stage-9 orphan check runs over them
+> mechanically and finds **exactly one orphan: REQ-0010** — the same answer the prose gave, now
+> **evaluable rather than merely asserted.**
 
 **The components are the modules that exist.** This is the third exit criterion — *all requirements
 trace to a component* — evaluated against the repository rather than against a diagram.
@@ -38,8 +46,13 @@ trace to a component* — evaluated against the repository rather than against a
 **Twelve of fourteen trace to a component. REQ-0010 has none, and REQ-0011 has half.** Both are the
 handoff, and both are held by `QST-0007`, which waits on handoff design.
 
-⚠️ **This table is what the criterion asks for and it is not an artifact.** That is the finding in
-§3.
+✅ **The table is now backed by artifacts** — `CMP-0001`…`CMP-0010`. It was the finding in §3 and it
+is resolved: what the criterion asks for is a traversable edge, and one exists.
+
+⚠️ **REQ-0011 shows the limit of a mechanical check.** `CMP-0010` satisfies it, so the orphan check is
+silent — but the reader surface renders and **nothing exports**, so the requirement is half met. **An
+orphan check finds absent edges, not partial ones**, and that distinction belongs in the attestation
+rather than in the tool.
 
 ## 2. Storage and data model
 
@@ -59,7 +72,7 @@ it ran the stage that is supposed to design it.
 Stage 5 declares `produces: [schema, api-spec, wireframe]`. **Running it produced demand for none of
 those three, and clear demand for one type that is not in #38's sixteen at all.**
 
-### ✅ Candidate: `component` — passes #41
+### ✅ `component` — passed #41, and is now in the catalogue (`DEC-0008`, #140)
 
 | #41's test | Answer |
 |---|---|
@@ -130,8 +143,9 @@ described a stage.
 |---|---|---|
 | **storage-target-chosen** | ✅ `satisfied` | One JSON file per artifact under `planning-content/data/`, atomic writes under a lockfile. Chosen (#87), implemented, and in use by 67 artifacts. |
 | **data-model-approved** | ✅ `satisfied` | Nine schemas, composed through one envelope, resolved by one layer, exercised by 199 tests. |
-| **requirements-traced-to-components** | ❌ `not-satisfied` | **REQ-0010 traces to no component and REQ-0011 to half of one.** ⚠️ And the trace itself is **prose in §1**, not artifacts — the criterion asks for something the catalogue cannot yet express. Recorded `not-satisfied` rather than left unevaluated: someone looked and said no (#93). |
+| **requirements-traced-to-components** | ❌ `not-satisfied` | **Re-evaluated against artifacts.** Ten components carry `satisfies` edges; the orphan check finds **REQ-0010**, which nothing satisfies because nothing implements the handoff. **REQ-0011 is satisfied by `CMP-0010` but only half** — it renders, nothing exports. Both held by `QST-0007`. ⚠️ **The criterion is now EVALUABLE where it was previously only assertable, and the answer is still no.** |
 
-⚠️ **The third criterion is not blocked by missing work — it is blocked by a missing TYPE**, which is
-the first time a stage's own exit criterion has produced demand for a catalogue addition. That is
-exactly what step 6 was reordered to wait for.
+⚠️ **The third criterion WAS blocked by a missing type; it is now blocked by missing work.** That is
+the whole movement of this run: a stage's own exit criterion produced demand for a catalogue addition
+(the first time), the type was approved and built, and the criterion became answerable — **and the
+answer is no, for an honest reason.** The gate stays `ready: false` until the handoff exists.

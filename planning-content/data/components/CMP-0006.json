@@ -1,0 +1,18 @@
+{
+  "id": "CMP-0006",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Research capability",
+  "responsibility": "Discovers and retrieves public external sources through a typed interface, refuses when unavailable, and never answers from model memory.",
+  "satisfies": [
+    "REQ-0003",
+    "REQ-0004"
+  ],
+  "implementedBy": [
+    "lib/research/",
+    "bin/research.mjs",
+    "bin/research-probe.mjs"
+  ]
+}

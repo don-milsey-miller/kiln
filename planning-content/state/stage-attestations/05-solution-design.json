@@ -14,7 +14,7 @@
     "requirements-traced-to-components": {
       "result": "not-satisfied",
       "decidedBy": "pm",
-      "reason": "REQ-0010 traces to no component and REQ-0011 to half of one - both are the handoff, held by QST-0007. AND the trace itself is prose rather than artifacts: the criterion asks for something the catalogue cannot express, because `component` is not among #38's sixteen. Recorded not-satisfied rather than left unevaluated (#93)."
+      "reason": "Re-evaluated 2026-08-22 against ARTIFACTS rather than prose: 10 component artifacts (CMP-0001..0010) now carry `satisfies` edges, and the stage-9 orphan check runs mechanically over them. It finds exactly one orphan - REQ-0010, which no component satisfies, because nothing implements the handoff. REQ-0011 is satisfied by CMP-0010 but only half: the reader surface renders, and nothing exports. Both are held by QST-0007, which waits on handoff design. The criterion is now EVALUABLE where it was previously only assertable, and the answer is still no."
     }
   }
 }

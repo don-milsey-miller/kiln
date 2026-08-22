@@ -7,7 +7,7 @@
     "artifactId": {
       "type": "string",
       "description": "Stable identity for one artifact. The prefix names the type, so a trace reference is self-describing without a registry lookup — which is what lets #75's unresolvable-reference check run at lint time from the reference alone. Four digits MINIMUM, not exactly four: a format intended never to change must not carry a 9,999-artifact ceiling.",
-      "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS)-[0-9]{4,}$",
+      "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
       "examples": [
         "REQ-0001",
         "DEC-0014",
@@ -29,7 +29,7 @@
       "default": []
     },
     "typePrefixes": {
-      "description": "NOT a validation keyword — the authoritative mapping from #38's sixteen types to their ID prefixes, kept here so the pattern above, the allocator and the lint agree. Adding a type (#40) edits this file, deliberately.",
+      "description": "NOT a validation keyword — the authoritative mapping from #38's catalogue to their ID prefixes — SEVENTEEN as of 2026-08-22, when `component` was added because stage 5 demanded it (#140), kept here so the pattern above, the allocator and the lint agree. Adding a type (#40) edits this file, deliberately.",
       "const": {
         "requirement": "REQ",
         "decision": "DEC",
@@ -46,7 +46,8 @@
         "assertion": "AST",
         "evidence": "EVD",
         "runbook": "RBK",
-        "runbook-step": "RBS"
+        "runbook-step": "RBS",
+        "component": "CMP"
       }
     },
     "notApplicable": {

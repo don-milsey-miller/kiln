@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/component.schema.json",
+  "title": "Component",
+  "description": "A named unit of the design, its responsibility, and which requirements it satisfies. ⚠️ Added to the catalogue 2026-08-22 (#140) — the FIRST type added because authentic work demanded it rather than because a list named it. Stage 5, run against the 14 active requirements, could not express its own third exit criterion without it. ⚠️ DELIBERATELY MINIMAL: a name, a responsibility, and `satisfies`. Further links wait for authentic stage 7-8 demand (#41) — a field added now for an acceptance criterion nobody has written is the catalogue justifying itself again (#106).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
+  "properties": {
+    "id": {
+      "pattern": "^CMP-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "component"
+    },
+    "responsibility": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "What this unit is responsible for, in one statement. ⚠️ NOT a description of how it works: the implementation is the code, and a second prose model of it is #8's dual-representation failure. This is the boundary — what falls inside this component and what does not.",
+      "x-materiality": "semantic"
+    },
+    "satisfies": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Which requirements this component satisfies. ⚠️ MANY-TO-MANY, which is why the edge lives here and not on the requirement: one component satisfies several requirements and one requirement needs several components. It is also what the stage-9 completeness gate reverses to find a requirement no component satisfies, and what #60's cascade traverses from an acceptance criterion.",
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "requirement"
+      ]
+    },
+    "implementedBy": {
+      "type": "array",
+      "description": "Where the component lives, as content-root-relative or repository-relative paths. ⚠️ Paths rather than a trace field on purpose: code is not an artifact, and pretending it is would put the repository inside the planning model. A path here is a POINTER for a human, never something the lint resolves (#75 does not apply).",
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "examples": [
+        [
+          "lib/lint.mjs",
+          "bin/lint-plan.mjs"
+        ]
+      ]
+    },
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103)."
+    }
+  },
+  "required": [
+    "responsibility",
+    "satisfies"
+  ],
+  "unevaluatedProperties": false,
+  "x-artifactType": "component",
+  "x-stage": "05-solution-design",
+  "x-ownsIrreducibleState": {
+    "description": "#41 applied before building, and the case is that FOUR consumers were already decided and none could be served. The traceability chain in notes.md names 'design component' three times and #38's sixteen omitted it, so the chain #16, #19, the stage-9 gate and #25 all rest on had a missing link.",
+    "owns": "A named design unit, its responsibility, and the many-to-many satisfies edge. A requirement cannot hold this: a requirement states what must be true, not what implements it.",
+    "traversedBy": [
+      "stage-9 completeness gate — a requirement no component satisfies is an orphan",
+      "#60 cascade — its worked example is acceptance-criterion -> component",
+      "#19 role slicing — a handoff slice is over components",
+      "stage 5 exit criterion requirements-traced-to-components"
+    ],
+    "rejectedAlternatives": {
+      "string field on requirement": "#85's prose assumption in a different costume — a string cannot be traced, counted or flagged, and the orphan check needs traversal.",
+      "prose in an architecture document": "Same failure. planning-content/stages/05-solution-design.md section 1 IS that prose, and no gate can read it.",
+      "scope-boundary": "A scope boundary says what is OUT of scope, not what implements what."
+    }
+  },
+  "x-unresolvableTraceTargets": {
+    "description": "#75: none. `satisfies` targets `requirement`, which is implemented and activated.",
+    "targets": []
+  }
+}

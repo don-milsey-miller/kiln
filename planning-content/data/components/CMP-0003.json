@@ -1,0 +1,19 @@
+{
+  "id": "CMP-0003",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Artifact store",
+  "responsibility": "Persists one artifact per file, resolves the content root, and serialises every read-modify-write so concurrent writers cannot destroy each other.",
+  "satisfies": [
+    "REQ-0002"
+  ],
+  "implementedBy": [
+    "lib/layout.mjs",
+    "lib/content-root.mjs",
+    "lib/atomic-write.mjs",
+    "lib/lock.mjs",
+    "lib/id-allocator.mjs"
+  ]
+}

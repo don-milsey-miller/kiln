@@ -1,0 +1,17 @@
+{
+  "id": "CMP-0007",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Validation controller",
+  "responsibility": "Runs declared jobs under a tier-1 sandbox through provision-execute-observe-destroy, refuses jobs above the approved ceiling before provisioning, and records what was observed including cleanup outcome.",
+  "satisfies": [
+    "REQ-0005",
+    "REQ-0006",
+    "REQ-0012"
+  ],
+  "implementedBy": [
+    "lib/validation/"
+  ]
+}

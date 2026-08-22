@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0009",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Specialist contracts",
+  "responsibility": "Describes each role's measured capabilities, write boundary and credential scope, and refuses a child's output that cannot demonstrate them.",
+  "satisfies": [
+    "REQ-0012"
+  ],
+  "implementedBy": [
+    "lib/specialists/contract.mjs"
+  ]
+}

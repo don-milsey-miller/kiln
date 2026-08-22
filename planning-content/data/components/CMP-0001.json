@@ -1,0 +1,19 @@
+{
+  "id": "CMP-0001",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage definitions and the gate",
+  "responsibility": "Defines the pipeline's stages, what each produces, and evaluates whether a stage may be exited.",
+  "satisfies": [
+    "REQ-0001",
+    "REQ-0002"
+  ],
+  "implementedBy": [
+    "stages/*.json",
+    "lib/stages.mjs",
+    "lib/lint.mjs",
+    "lib/attestations.mjs"
+  ]
+}

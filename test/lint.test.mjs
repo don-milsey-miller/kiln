@@ -366,7 +366,7 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
     const right = {
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
       "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision", "question"] },
-      "05-solution-design": { id: "05-solution-design", produces: ["schema", "api-spec"] },
+      "05-solution-design": { id: "05-solution-design", produces: ["component", "schema", "api-spec"] },
       // assertion and evidence are cross-cutting (#25) and carry no x-stage, so no stage
       // claims them and none may. runbook-step is stage 9's, promoted when it was built.
       "09-handoff": { id: "09-handoff", produces: ["runbook", "runbook-step"] },
@@ -557,8 +557,9 @@ test("#39: one reader for the approved activation set, shared by the CLI and the
   const activated = readActivatedTypes(join(ROOT, "planning-content"));
   assert.deepEqual(
     [...activated].sort(),
-    ["assertion", "decision", "evidence", "question", "requirement", "research-finding", "runbook", "runbook-step"],
-    "should match what stage 2 approved in project.yaml"
+    ["assertion", "component", "decision", "evidence", "question", "requirement", "research-finding", "runbook", "runbook-step"],
+    "should match what the PM has approved in project.yaml — stage 2's set, plus `component` (DEC-0008), " +
+      "activated through setTypeActivation rather than by hand"
   );
   assert.ok(!activated.includes("schema") && !activated.includes("api-spec"), "stage 2 deliberately did not activate these");
   assert.deepEqual(readActivatedTypes(tmpdir()), [], "absent manifest yields no activation, never a guess");

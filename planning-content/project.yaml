@@ -131,8 +131,9 @@ capabilities:
   # The evidence-oriented types dominate because seven of the fifteen authored
   # requirements concern the evidence loop.
   artifactTypes:
-    activated: [requirement, decision, assertion, evidence, research-finding, question, runbook, runbook-step]
-
+    # Activated `component` — approved by pm: stage 5 could not express its own third exit criterion without it (#140, QST-0014)
+    # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
+    activated: [assertion, component, decision, evidence, question, requirement, research-finding, runbook, runbook-step]
   # A permission boundary, not a preference (#56). The PM declares which
   # tiers are available; the validation agent enforces the ceiling and may
   # not exceed it. This is the one place the agent spends money and holds

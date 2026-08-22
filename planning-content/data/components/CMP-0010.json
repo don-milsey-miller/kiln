@@ -1,0 +1,17 @@
+{
+  "id": "CMP-0010",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Reader surface",
+  "responsibility": "Renders the derived view of artifacts for a human, and reflects external writes without a reload.",
+  "satisfies": [
+    "REQ-0002",
+    "REQ-0011"
+  ],
+  "implementedBy": [
+    "app/server.mjs",
+    "lib/view/assertion-view.mjs"
+  ]
+}

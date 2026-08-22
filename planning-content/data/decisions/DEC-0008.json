@@ -1,0 +1,34 @@
+{
+  "id": "DEC-0008",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "`component` joins the catalogue as CMP and is activated on this project",
+  "statement": "`component` joins the v1 catalogue with prefix CMP and is approved for activation here. Minimal shape: a named design unit (the envelope's title), a `responsibility`, `satisfies` links to requirements, and the standard lifecycle/review envelope. Additional links wait for authentic stage 7-8 demand. Separately: a stage's `produces[]` is a CAPABILITY ENVELOPE across project types, and the applicable set for a particular project is `produces[] INTERSECT activatedTypes`. Activation describes the project type; the stage definition owns where an applicable type is produced. `component` is added to stage 5's produces; `schema`, `api-spec` and `wireframe` are RETAINED, because the stage 5 run showed them inapplicable here rather than invalid globally.",
+  "rationale": "The #41 case is conclusive rather than speculative: `component` owns irreducible many-to-many design state that a requirement cannot hold, and four independent consumers were already decided before the type existed — #60's cascade, #19's role slicing, the stage-9 orphan check, and stage 5's own third exit criterion. The gap was old: notes.md names 'design component' three times in the traceability chain and #38's sixteen omitted it, so a chain four decisions rest on had a missing link that nothing noticed until a stage was actually run. The produces[] reframing preserves the useful draft table while correcting its overstatement: two stage runs found declared types legitimately unused, and the honest reading is that the table describes a project type rather than a stage. The gate already computed the intersection, so this is wording catching up with behaviour rather than a change of behaviour.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0014",
+    "QST-0010"
+  ],
+  "alternatives": [
+    {
+      "option": "Record the requirement-to-component edge as a string on the requirement",
+      "whyNot": "#85's prose assumption in a different costume. A string cannot be traced, counted or flagged, and the stage-9 orphan check needs traversal."
+    },
+    {
+      "option": "Leave the trace as prose in an architecture document",
+      "whyNot": "Section 1 of the stage 5 document IS that prose, and no gate can read it. The criterion asks for something a reader can check mechanically."
+    },
+    {
+      "option": "Drop schema, api-spec and wireframe from stage 5 since this run needed none",
+      "whyNot": "It confuses inapplicable-here with invalid-globally. A consumer project designing a real service would need all three, and produces[] is the envelope across project types."
+    },
+    {
+      "option": "Add richer links now (acceptance criteria, tasks, dependencies)",
+      "whyNot": "No consumer has demanded them. A field added for an acceptance criterion nobody has written is the catalogue justifying itself again (#106)."
+    }
+  ],
+  "notes": "⚠️ Approving this made QST-0010 an IMMEDIATE prerequisite rather than deferred work: activating by hand once more would have been the fifth instance of #126's pattern, committed knowingly. `lib/tools/activate-type.mjs` now performs the transition — validating catalogue membership, authorability (schema AND typed tool) and reachability (some stage must produce it) before writing only `capabilities.artifactTypes.activated`. It never edits stages/, schemas/ or the catalogue (#95, #121's correction). Deactivation refuses while live artifacts of the type exist, so #107's silence cannot start with a manifest edit."
+}

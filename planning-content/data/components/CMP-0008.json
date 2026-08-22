@@ -1,0 +1,17 @@
+{
+  "id": "CMP-0008",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Evidence derivation",
+  "responsibility": "Derives verdict and confidence from the evidence graph at read time, filtering for applicability first, and decides whether a claim may become an instruction.",
+  "satisfies": [
+    "REQ-0007",
+    "REQ-0008",
+    "REQ-0009"
+  ],
+  "implementedBy": [
+    "lib/effective-assertion.mjs"
+  ]
+}
