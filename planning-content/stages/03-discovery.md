@@ -78,8 +78,13 @@ claim, not a conflict in the world.
 the applicability filter was built to do. A single unscoped claim would have been contested by its own
 evidence and would have read as a defect in the docs rather than a difference between dev and build.
 
-⚠️ **`AST-0010` is still owed an experiment.** It rests on documentation alone. Recording that here
-rather than letting it pass as settled is the point of a provenance document.
+⚠️ **`AST-0010`'s validation is DEFERRED until its deployment mode enters scope**, which is not the
+same as owed. It rests on documentation alone, and `DEC-0001` makes it blocking **when a production
+build enters scope** — the product is local and runs `next dev`, so running it now would validate an
+**undeclared deployment mode** and break #80's demand-driven sequencing. **Reopening condition:**
+*execute before adopting `next build` / `next start`, or when upgrading beyond the currently tested
+Next.js version.* Recording the deferral WITH its trigger, rather than letting the claim pass as
+settled, is the point of a provenance document.
 
 ## What this says about `research-finding`
 
@@ -113,7 +118,7 @@ authoritative (#90), not correct (#91).**
 
 | Criterion | Why it is not attested here |
 |---|---|
-| **unknowns-resolved** — all flagged unknowns answered, promoted, or raised as a validation task | `AST-0010` is documentation-supported with **no experiment**, and it is a flagged unknown that is neither answered nor raised as a validation task. |
+| **unknowns-resolved** — all flagged unknowns answered, promoted, or raised as a validation task | ⚠️ **This may now be substantively true**: `AST-0010` is a **registered validation task with a reopening condition**, which is the third of the three dispositions the criterion allows. It is still not attested, for the reason in the row below — the disposition is real, the attestation would not be. |
 | **sources-reconciled** — contradictory sources resolved or surfaced | The Next.js contradiction **was** resolved by scoping. But this document is reconstructed, and **a criterion attested from a reconstruction is attested from a document rather than from a run.** |
 
 ⚠️ **Attesting either would make this document do the one thing it says it is not doing.** #93 gives

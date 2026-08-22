@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **136 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **138 decisions as of
 > 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -792,12 +792,32 @@ holds, the other is a habit the PM holds.
 3. **Cover the hard cases, not the happy path:** timeout · unavailable fact · redaction · **cleanup
    failure** · and the explicit **"a venv is not containment"** boundary.
 
-### 7c. Specialist contracts — only after their capabilities pass
+### 7c. Specialist contracts — ✅ built 2026-08-22 (#138)
 
 Contracts describe the **measured** tool signatures and limitations, never the planned ones, and
-**#81 rejects any child that cannot prove those signatures.** A contract written against a planned
-signature promises what the host *might* supply; #81 has something real to compare against only in the
-measured case. This is DEC-0003 executed rather than restated.
+**#81 rejects any child that cannot prove those signatures.** This is DEC-0003 executed rather than
+restated.
+
+- ✅ **Built by REFERENCE, not by copying** — a test asserts the contract holds the same object as the
+  signature table, so a tool change cannot leave a contract describing an older shape.
+- ✅ **`verifyChild`: stdin → timeout → capability → signature**, in that order, and **no refusal
+  passes the output through**. A refusal that returns the text is an invitation to use it.
+- ✅ **`childEnv(role)` is the injection point `DEC-0006` named and nothing implemented.**
+  `TAVILY_API_KEY` reaches the research child only — **proven by spawning real children and asking
+  them what they can read**, because that claim is about a process, not about a dictionary.
+- ✅ **Write boundaries are per-role allowlists** over the typed tools, enforced by absence.
+- ⚠️ **One defect found by building it:** the validation contract required `validation_controller`,
+  a name with **no signature anywhere**, so the check would have compared the child against an empty
+  object and passed. `lib/validation/tools.mjs` now publishes `validation_capability` and
+  `validation_run`, and `contractFor` **reports** any capability nothing defines.
+- ✅ **#79 does NOT reopen.** Checked, not assumed: 7c defines contracts and spawns nothing
+  concurrently. **The trigger is the first time two specialists run concurrently over overlapping
+  dependency sets** — #79's own condition, still unbuilt.
+- ⚠️ **`AST-0010` is deferred, not owed** (#137): validating a production build now would test an
+  **undeclared deployment mode**. Reopens on adopting `next build` / `next start`, or on upgrading
+  past the tested Next.js version.
+
+**199 tests. Ten guards mutation-tested, all caught.**
 
 ⚠️ **`QST-0010` remains legitimate work and does not jump the queue.** The transition audit is a
 **worklist, not a priority queue** — the same distinction #94 drew for the capability gate, worth
