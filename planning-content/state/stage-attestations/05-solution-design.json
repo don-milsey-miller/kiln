@@ -12,9 +12,9 @@
       "reason": "Nine schemas composed through common.schema.json#/$defs/artifactEnvelope, resolved by lib/schema-resolver.mjs, exercised by 199 tests. Approved as the model this project runs on."
     },
     "requirements-traced-to-components": {
-      "result": "not-satisfied",
+      "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "Re-evaluated 2026-08-22 against ARTIFACTS rather than prose: 10 component artifacts (CMP-0001..0010) now carry `satisfies` edges, and the stage-9 orphan check runs mechanically over them. It finds exactly one orphan - REQ-0010, which no component satisfies, because nothing implements the handoff. REQ-0011 is satisfied by CMP-0010 but only half: the reader surface renders, and nothing exports. Both are held by QST-0007, which waits on handoff design. The criterion is now EVALUABLE where it was previously only assertable, and the answer is still no."
+      "reason": "Re-evaluated 2026-08-22 after CMP-0011. The orphan check over eleven components finds NO requirement unsatisfied: every one of the 14 active requirements now traces to a component. ⚠️ This attests EDGE COMPLETENESS and nothing more — the criterion asks whether every requirement traces to a component, not whether every component is built. CMP-0011 is planned and its implementation now exists but is unproven against acceptance criteria (QST-0015), and REQ-0011 is satisfied by CMP-0010 only in part. Neither fact is what this criterion asks about, and the remaining handoff gates keep the distinction: `npm run handoff` still refuses this project."
     }
   }
 }

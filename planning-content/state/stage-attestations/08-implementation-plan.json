@@ -1,0 +1,15 @@
+{
+  "stageId": "08-implementation-plan",
+  "attestations": {
+    "tasks-trace-to-requirement": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Six rows of remaining work; every one traces to a requirement or is explicitly not-work-today with a stated trigger (AST-0010's deployment mode, QST-0002's same-configuration conflict, DEC-0001's product UI). ⚠️ Basis is prose - the same limit stage 5 had before `component` existed, and it is precisely what this stage's demand for `task` is about."
+    },
+    "tasks-developer-sized": {
+      "result": "n/a",
+      "decidedBy": "pm",
+      "reason": "Three of six rows are not tasks at all but triggered conditions, and the three that are cannot be sized as developer work until the types they depend on (`task`, `acceptance-criterion`) are approved. Recorded n/a WITH a reason rather than guessed: #45's shape, and #93's point that a PM who looked and said 'does not apply' is a different state from nobody having looked."
+    }
+  }
+}

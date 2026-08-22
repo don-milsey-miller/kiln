@@ -1,0 +1,15 @@
+{
+  "stageId": "03-discovery",
+  "attestations": {
+    "unknowns-resolved": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Evaluated in the PRESENT TENSE 2026-08-22, not from the reconstruction. Stage 3's flagged unknowns: QST-0001 answered (AST-0004, AST-0005); QST-0004 answered (AST-0006..AST-0012, DEC-0001); AST-0010 is a REGISTERED VALIDATION TASK with a reopening condition (#137), which is the third of the three dispositions this criterion allows. ⚠️ QST-0002 remains open and RETAINS ITS TRIGGER because it is outside this criterion's scope: it asks whether `research-finding` owns irreducible state, which is a catalogue design question raised by #106, not a research unknown flagged by stage 3's own work. Counting it here would let a criterion about research completeness be blocked by a modelling question it never asked."
+    },
+    "sources-reconciled": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Satisfied through the 'or surfaced' branch, which is the honest one. The Next.js documentation contradiction was RESOLVED by environment scoping: AST-0009 and AST-0011 carry the scoped claims, and AST-0007 remains visibly `contested` with its reasons rendered rather than being quietly repaired — a contested verdict on an under-scoped claim is information about the claim (#112). The Tavily figure (documented 1,000 vs measured 1500) is SURFACED in DEC-0006 and deliberately not reconciled, because this run cannot distinguish a changed tier from a different plan. ⚠️ Nothing was resolved by choosing a side, which is what would have made this attestation false."
+    }
+  }
+}

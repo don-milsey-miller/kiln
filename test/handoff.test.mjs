@@ -91,10 +91,17 @@ test("the REAL project is refused, despite a clean lint", () => {
 
   assert.equal(c.ready, false, "a clean lint must not be enough to publish");
   const notSatisfied = c.blockers.filter((b) => b.reason === BLOCKED.NOT_SATISFIED);
+  // ⚠️ The blocker MOVED on 2026-08-22 and the test moved with it, which is the point rather than
+  // maintenance: stage 5's criterion became `satisfied` once every requirement traced to a component,
+  // and stage 9's `role-slice-self-sufficient` took over — no `task` type, so no slices, so no
+  // recipient can start. The refusal now names a MISSING CAPABILITY rather than an unexamined
+  // project, which is the difference between "nobody looked" and "we looked, and it is not ready".
   assert.ok(
-    notSatisfied.some((b) => b.stageId === "05-solution-design" && b.criterion === "requirements-traced-to-components"),
-    "stage 5's not-satisfied criterion must be a blocker"
+    notSatisfied.some((b) => b.stageId === "09-handoff" && b.criterion === "role-slice-self-sufficient"),
+    `expected stage 9's role-slice criterion to block; got ${JSON.stringify(notSatisfied.map((b) => b.criterion))}`
   );
+  // Nothing is merely unattested any more: every criterion has been looked at.
+  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.PENDING), [], "every criterion should now be attested");
   // ...and the lint itself has nothing to say, which is exactly the gap this predicate closes.
   assert.equal(c.blockers.filter((b) => b.reason === BLOCKED.LINT).length, 0);
 });

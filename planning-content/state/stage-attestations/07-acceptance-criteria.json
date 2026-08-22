@@ -1,0 +1,10 @@
+{
+  "stageId": "07-acceptance-criteria",
+  "attestations": {
+    "criteria-objective": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Run against CMP-0011, the only component whose acceptance bar was written BEFORE the code. Eight of its nine criteria are pass/fail outright and all nine pass. ⚠️ AC-9 ('include the snapshot identity without introducing authored state') is objective only in its testable half: no test can look at a string and tell whether a human wrote it. What is testable are proxies - no wall-clock anywhere, and byte-identical reproduction from the same input - and they are strong proxies that remain proxies. Recorded rather than rounded up. ⚠️ Basis is prose: the criteria are a table in the stage document, not artifacts, pending the PM's decision on `acceptance-criterion` (demand recorded, #41 applied, not built)."
+    }
+  }
+}

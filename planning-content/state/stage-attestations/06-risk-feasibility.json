@@ -1,0 +1,15 @@
+{
+  "stageId": "06-risk-feasibility",
+  "attestations": {
+    "high-severity-risks-mitigated": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Evaluated against the 19-row risk register in notes.md. Every row carries a mitigation in the design, and the highest-cost rows are mitigated structurally rather than by intention: credential exposure, cost runaway, resource leakage and destructive experimentation are ALL TIER-3-ONLY and tier 3 is not activated here, so they are not live risks on this project rather than accepted ones. False determinism and environment mismatch are mitigated by #42's ladder and #96's applicability filter, both implemented and tested. ⚠️ HONEST BASIS: the register is PROSE in notes.md, so this criterion is evaluable only by reading. That is acceptable because nothing traverses a risk - see the stage document for the #41 analysis - but it means this attestation rests on a human reading a table, where stage 5's now rests on a mechanical check."
+    },
+    "load-bearing-assertions-at-rung": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "One assertion is flagged loadBearing: AST-0013, at `supported` / `environment-matched`, the top rung the MVP reaches. So the criterion as written is met. ⚠️ AND THE CRITERION IS WEAKER THAN IT LOOKS, which the stage document records as a finding: RBS-0001 rests on AST-0002, which is NOT flagged loadBearing. An instruction resting on an unflagged claim would pass this criterion while being exactly what #57 exists to prevent. AST-0002 is at environment-matched so nothing is actually wrong here, and the real enforcement is `mayBecomeInstruction` in the lint rather than this flag - but a criterion that can pass vacuously is worth naming."
+    }
+  }
+}

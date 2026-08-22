@@ -1,0 +1,20 @@
+{
+  "stageId": "09-handoff",
+  "attestations": {
+    "role-slice-self-sufficient": {
+      "result": "not-satisfied",
+      "decidedBy": "pm",
+      "reason": "There are no role slices, so no assigned team member can start anything. Slices are a query over the task graph (#19), `task` is not built, and stage 8 recorded the demand without building it. ⚠️ This is REQ-0010 itself - a recipient must be able to begin without asking the planner - and it is the requirement whose only component was designed before it existed. The command works; what it produces is not yet something a person could be handed a slice of."
+    },
+    "runbook-steps-above-threshold": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "One step. RBS-0001 rests on AST-0002, derived supported / environment-matched - rung 4, above every threshold in project.yaml, and the step is non-destructive so its floor is lower still. ⚠️ One step is a CHECK rather than an exercise of the rule; the enforcement that matters is `mayBecomeInstruction`, tested against constructed refuted and contested claims."
+    },
+    "no-unresolved-critical-questions": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "QST-0002 and QST-0015 are open and neither is critical: applying DEC-0002's definition by analogy, neither makes a load-bearing commitment's correctness depend on its answer and neither makes a criterion unevaluable, and both carry explicit triggers. ⚠️ 'Critical' is UNDEFINED in the stage table - the same drafting defect stage 4 hit with 'blocking', which took DEC-0002 to resolve. Recorded as a second instance rather than fixed here."
+    }
+  }
+}
