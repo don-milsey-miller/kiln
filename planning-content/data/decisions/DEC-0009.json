@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0009",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The v1 handoff export exists, and is produced by an explicit deterministic command",
+  "statement": "A v1 export exists. It is produced by an explicit deterministic command — `npm run handoff` — that reads planning-content and writes the frozen package under docs/plan/. Generation is NEVER a gate side effect and never a freeform agent task: the gate stays READ-ONLY and reports whether the package may be produced, and the command is what produces it. `CMP-0011` is the component that will implement it, and it satisfies REQ-0010 and REQ-0011.",
+  "rationale": "Separating the gate from the generator keeps two different failure modes apart. A gate that generated as a side effect could not be run to ASK a question — every check would mutate the repository, and #46's 'warn continuously' becomes 'rewrite continuously'. A freeform agent task fails the other way: the package would differ between runs, and a handoff that cannot be reproduced cannot be reviewed. An explicit command is reproducible, inspectable in a diff, and callable by a human or by CI without either of them approving anything. The folder in the repo IS the delivery (docs/plan/README.md), so there is no service to keep alive and the artifact of the handoff is a commit.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0007"
+  ],
+  "alternatives": [
+    {
+      "option": "Generate the package as part of the stage-9 gate",
+      "whyNot": "The gate would stop being answerable: running it to ask 'are we ready' would rewrite the repository. A read-only check and a writing generator are different tools with different safety properties."
+    },
+    {
+      "option": "Let the planning agent assemble the handoff freeform",
+      "whyNot": "Two runs would differ, and a package that cannot be reproduced cannot be reviewed or diffed. It also reintroduces the model as the source of truth for content the artifacts already hold."
+    },
+    {
+      "option": "Defer the export to v2 and hand over planning-content directly",
+      "whyNot": "REQ-0010 requires a recipient to begin without asking the planner, and raw planning-content is a store, not a package: no role slice, no ordering, and no rendering for the human half of REQ-0011."
+    }
+  ],
+  "notes": "⚠️ This decides that the export EXISTS and how it is invoked. It does not yet decide the package's contents beyond what DEC-0011 settles about surfaces, nor the role-slicing algorithm (#19), which is stage 8 work."
+}

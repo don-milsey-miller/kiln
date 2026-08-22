@@ -4,8 +4,12 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Does `runbook` own state not derivable from its steps?",
   "statement": "Is there runbook-level state — preconditions, abort criteria, rollback strategy, role slice — that no runbook-step holds and that cannot be derived by reverse traversal of runbook-step.partOf?",
-  "notes": "#87 says an aggregate belongs at handoff as a projection, not as an authored artifact, so membership and ordering do not justify the type: partOf gives membership by reverse index (#84), and ordinal plus dependsOn give ordering. The strongest candidate is sequence-level state no single step owns: a precondition for the whole run, abort criteria, and a rollback strategy spanning steps. #58's floor is per-step; a runbook-level abort is not. Role slice is NOT a candidate: #19 slices the handoff per role and #18 discovers roles from stage-8 assignments, so role-assignment owns that. Resolve by naming those fields concretely, or accept that stage 9 produces runbook-step artifacts and the runbook is assembled at handoff."
+  "notes": "#87 says an aggregate belongs at handoff as a projection, not as an authored artifact, so membership and ordering do not justify the type: partOf gives membership by reverse index (#84), and ordinal plus dependsOn give ordering. The strongest candidate is sequence-level state no single step owns: a precondition for the whole run, abort criteria, and a rollback strategy spanning steps. #58's floor is per-step; a runbook-level abort is not. Role slice is NOT a candidate: #19 slices the handoff per role and #18 discovers roles from stage-8 assignments, so role-assignment owns that. Resolve by naming those fields concretely, or accept that stage 9 produces runbook-step artifacts and the runbook is assembled at handoff.",
+  "answer": "No, not for v1. The real handoff needs none of the three candidate fields: it has no whole-run preconditions, `runbook-step` already carries per-step remediation and dependsOn, and no rollback spans steps. `runbook` is not built and is deactivated here; it stays in the catalogue with a reopening condition, because one thin handoff shows the type is inapplicable HERE rather than wrong. See DEC-0011.",
+  "answeredBy": [
+    "DEC-0011"
+  ]
 }

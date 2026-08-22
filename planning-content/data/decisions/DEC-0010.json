@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0010",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The authoring skeleton is not the delivery surface; v1 delivers JSON and generated Markdown",
+  "statement": "For v1: canonical JSON serves automated consumers, and generated Markdown — including a top-level PLAN.md — serves human readers. The authoring skeleton (app/server.mjs) is a tool for working ON the plan and is NOT the delivery surface. An interactive site for the recipient requires separate demonstrated demand; it is not assumed by REQ-0011.",
+  "rationale": "REQ-0011 requires that both a human reader and an automated consumer can recover every required item. It does not require that they use the same surface, and reading it as 'therefore build an app for the recipient' inflates a requirement about legibility into a commitment about product. Generated Markdown satisfies the human half with no infrastructure — it renders in any editor, in the repository host, and in a diff — while the JSON the artifacts already are satisfies the agent half without a second serialisation to keep in sync. Keeping the authoring surface out of the delivery also preserves the property that the handoff is a frozen package: a live app shows current state, and a handoff must show the state that was approved.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0008"
+  ],
+  "alternatives": [
+    {
+      "option": "Ship the skeleton as the delivery surface",
+      "whyNot": "It renders CURRENT state, and a handoff must be frozen. It also requires the recipient to run a server to read a plan, which contradicts the zero-infrastructure delivery."
+    },
+    {
+      "option": "Markdown only, no canonical JSON",
+      "whyNot": "The automated half of REQ-0011 would be served by parsing prose, which is what the whole artifact model exists to avoid."
+    },
+    {
+      "option": "Build an interactive recipient site now",
+      "whyNot": "No demand has been demonstrated. QST-0008 asked whether the skeleton suffices; the answer is that the QUESTION was mis-framed - the delivery surface is a different artifact from the authoring surface, and neither needs to be an app for v1."
+    }
+  ],
+  "notes": "⚠️ Reframes rather than answers QST-0008 as asked. The question was 'is the skeleton's rendering sufficient for the human half', and the answer is that the skeleton is the wrong candidate — sufficiency should be judged of the GENERATED package, not of the authoring tool."
+}

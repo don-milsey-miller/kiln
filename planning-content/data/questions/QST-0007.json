@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Does the handoff export exist in v1, and what produces it?",
   "statement": "REQ-0010 requires a handoff actionable without returning to the planner, and #19 specifies docs/plan/ with data, docs, site and PLAN.md. Nothing produces any of it. Is the export in v1, and is it a command, a gate action, or a stage-9 agent task?",
   "blocks": [
@@ -14,5 +14,9 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING for handoff design only. It gates #19's export and the conditional demand for `task` and `role-assignment` (#119). It does not block unrelated work, so it is a gap for stage 9 rather than for now."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING for handoff design only. It gates #19's export and the conditional demand for `task` and `role-assignment` (#119). It does not block unrelated work, so it is a gap for stage 9 rather than for now.",
+  "answer": "Yes. The v1 export exists and is produced by `npm run handoff`, an explicit deterministic command. The gate stays read-only; generation is never a gate side effect or a freeform agent task. CMP-0011 is the planned component. See DEC-0009.",
+  "answeredBy": [
+    "DEC-0009"
+  ]
 }

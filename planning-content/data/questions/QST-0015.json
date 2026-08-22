@@ -1,0 +1,15 @@
+{
+  "id": "QST-0015",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "A component records no distinction between planned and built",
+  "statement": "CMP-0011 satisfies REQ-0010 and nothing implements it. The stage-9 orphan check counts EDGES, so its creation takes the orphan count to zero while the handoff remains unbuilt — 'all requirements trace to a component' becomes true, and 'the handoff exists' does not. Does `component` need a planned/built axis, or does that distinction belong entirely to attestation and, later, to acceptance criteria?",
+  "raisedBy": [
+    "CMP-0011"
+  ],
+  "blocks": [],
+  "notes": "⚠️ RAISED RATHER THAN BUILT. The PM's instruction for `component` was explicitly minimal — further fields wait for authentic stage 7-8 demand — and adding a state axis the same day would be the catalogue justifying itself again (#106). ⚠️ The case FOR a field: nothing else can hold 'is this built', the stage-9 gate will plausibly need it to distinguish a plan that lists built components from one that lists intentions, and `implementedBy` being empty is an ADVISORY absence rather than a claim. The case AGAINST: acceptance criteria are the type that says whether something works, the distinction may be theirs, and #57's thresholds already govern what may become an instruction. ⚠️ NOT BLOCKING under DEC-0002 — the attestation carries the distinction today and says so explicitly, so nothing is currently silent."
+}

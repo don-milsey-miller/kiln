@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Is the skeleton's rendering sufficient for the human half of REQ-0011?",
   "statement": "REQ-0011 requires the output to serve a human reader and an automated consumer without either being a lossy rendering of the other. Artifacts are JSON, so the machine half exists. What satisfies the human half — the skeleton's HTML, #19's site/ build, or #8's interactive components?",
   "blocks": [
@@ -13,5 +13,9 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING conditionally. It blocks whichever implementation commitment owns REQ-0011's human half. Urgency depends entirely on whether that commitment is next — under #116 it is not, so this is currently latent rather than pressing."
+  "notes": "BLOCKING STATUS under DEC-0002: BLOCKING conditionally. It blocks whichever implementation commitment owns REQ-0011's human half. Urgency depends entirely on whether that commitment is next — under #116 it is not, so this is currently latent rather than pressing.",
+  "answer": "The question was mis-framed: the authoring skeleton is not the delivery surface. For v1, canonical JSON serves agents and generated Markdown plus PLAN.md serves humans. An interactive recipient site needs separately demonstrated demand. See DEC-0010.",
+  "answeredBy": [
+    "DEC-0010"
+  ]
 }

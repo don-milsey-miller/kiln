@@ -96,14 +96,15 @@
     },
     "raisedBy": {
       "$ref": "common.schema.json#/$defs/traceLinks",
-      "description": "What raised it.",
+      "description": "What raised it. ⚠️ WIDENED 2026-08-22 to include `component`: the list was written before the type existed, and the FIRST question a component raised (QST-0015, about planned versus built) hit the gap immediately. A design unit can plainly raise a question, and the exclusion was staleness rather than a rule. ⚠️ Widened only where demand appeared — `blocks` is untouched, because no question yet blocks a component.",
       "x-materiality": "structural",
       "x-traceTarget": [
         "requirement",
         "decision",
         "assertion",
         "evidence",
-        "research-finding"
+        "research-finding",
+        "component"
       ]
     },
     "notes": {
