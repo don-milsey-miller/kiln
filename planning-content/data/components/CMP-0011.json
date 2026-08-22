@@ -10,5 +10,12 @@
     "REQ-0010",
     "REQ-0011"
   ],
-  "notes": "⚠️ PLANNED, NOT BUILT — 2026-08-22. This is the first component designed BEFORE it exists rather than recorded after; every other CMP describes a module already on disk. `implementedBy` is absent for exactly that reason, and its absence is the only signal in the artifact that says so. ⚠️ THE HAZARD THIS CREATES IS REAL AND IS RAISED AS QST-0015: the orphan check counts EDGES, so creating this record takes the orphan count to zero while REQ-0010 remains unimplemented. 'All requirements trace to a component' becomes true; 'the handoff exists' does not. A correct rule producing an invisible outcome is the pattern #94, #107 and #122 all describe, and the attestation carries the distinction until something better does. ⚠️ Design decided in DEC-0009: an explicit deterministic command (`npm run handoff`), NEVER a gate side effect. The gate stays read-only."
+  "notes": "⚠️ PLANNED, NOT BUILT — 2026-08-22. This is the first component designed BEFORE it exists rather than recorded after; every other CMP describes a module already on disk. `implementedBy` is absent for exactly that reason, and its absence is the only signal in the artifact that says so. ⚠️ THE HAZARD THIS CREATES IS REAL AND IS RAISED AS QST-0015: the orphan check counts EDGES, so creating this record takes the orphan count to zero while REQ-0010 remains unimplemented. 'All requirements trace to a component' becomes true; 'the handoff exists' does not. A correct rule producing an invisible outcome is the pattern #94, #107 and #122 all describe, and the attestation carries the distinction until something better does. ⚠️ Design decided in DEC-0009: an explicit deterministic command (`npm run handoff`), NEVER a gate side effect. The gate stays read-only. ⚠️ IMPLEMENTED 2026-08-22 — and `implementedBy` now pointing somewhere proves CODE EXISTS, not that the component satisfies its acceptance criteria. QST-0015 stays open for exactly that reason: a path is not a verdict, and nothing here has yet been judged against criteria nobody has written (stage 7's job). ⚠️ The command REFUSES this project today, by design: stage 5's third criterion is attested not-satisfied, so `npm run handoff` reports 11 blockers and writes nothing.",
+  "implementedBy": [
+    "bin/handoff.mjs",
+    "lib/handoff/publish.mjs",
+    "lib/handoff/render.mjs",
+    "lib/handoff/completeness.mjs",
+    "test/handoff.test.mjs"
+  ]
 }
