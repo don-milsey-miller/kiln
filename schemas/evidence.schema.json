@@ -103,12 +103,12 @@
             2,
             3
           ],
-          "description": "#56's sandbox tier. Caps the reachable rung. ⚠️ Present ONLY when a controller supplied the isolation. A host run has no tier — not the lowest tier, NO tier: a rung implies a comparison, and 'isolation is not a thing this run has an answer to' is not the bottom of a ladder.",
+          "description": "#56's sandbox tier: WHICH isolation the controller provisioned. ⚠️ Present ONLY when a controller supplied it. A host run has no tier — not the lowest tier, NO tier: a rung implies a comparison, and 'isolation is not a thing this run has an answer to' is not the bottom of a ladder. ⚠️ AMENDED 2026-08-22 (#134): this does NOT cap the confidence rung. Tier is a permission and an execution boundary, not an epistemic rank. What bears on confidence is `isolationBoundary`, compared claim-relatively against the assertion's `requiresIsolation`.",
           "x-materiality": "structural"
         },
         "isolationBoundary": {
           "type": "object",
-          "description": "What the tier did and did not claim, travelling WITH the record (DEC-0005). A reader of this evidence must be able to see that tier 1 is not containment without going to find the decision that said so.",
+          "description": "What the run's isolation did and did not claim, travelling WITH the record (DEC-0005). A reader of this evidence must be able to see that tier 1 is not containment without going to find the decision that said so. ⚠️ This is the field the confidence derivation actually reads (#134): `doesNotClaim` is a CONTRADICTION of a requirement, not silence about it, which is why DEC-0005 made tier 1 state what it does not do.",
           "properties": {
             "isolates": {
               "type": "array",

@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0007",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Tier is a permission and execution boundary, not an epistemic rank",
+  "statement": "There is NO global isolation-to-confidence cap. Sandbox tier describes how execution was provisioned and what boundary it supplied; confidence describes how well applicable evidence matches a particular claim. A host run may legitimately reach environment-matched for a claim specifically about that host, and tier 1 cannot lift an OS-containment claim merely because a virtual environment existed. `isolationBoundary` therefore enters the same claim-relative comparison as every other environment fact, via the assertion's `requiresIsolation`: required and matched may reach environment-matched; required but absent is unknown and capped; required and incompatible means the evidence does not apply to that claim; not required by the claim carries no penalty at all. The older 'tier determines the confidence ceiling' language is AMENDED rather than implemented.",
+  "rationale": "QST-0013 looked like a missing implementation and was actually a category error preserved in the wording. Building the cap would have made two axes into one and produced wrong answers in both directions: it would have penalised AST-0013 — a claim about the PM's host, evidenced by a run on that host, where the absence of isolation is not a shortfall but an irrelevance — and it would have rewarded a tier-1 run for a containment claim tier 1 explicitly does not support. Routing isolation through the existing three-state comparison keeps one mechanism where there might have been two, and it makes DEC-0005's `doesNotClaim` list load-bearing: an explicit denial is a CONTRADICTION of a requirement, where silence is only unknown. The neutral 'not-required' state is the part most easily got wrong — collapsing it into 'unknown' would reintroduce the global penalty in different words, by capping every claim that never asked about isolation.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0013"
+  ],
+  "alternatives": [
+    {
+      "option": "Implement the tier→rung ceiling as written",
+      "whyNot": "It conflates provisioning with epistemic strength. A host run would be capped for a claim about that host, and a tier-1 run would be credited for containment it states it does not provide."
+    },
+    {
+      "option": "Invent a rank ordering host < tier 1 < tier 2 < tier 3",
+      "whyNot": "A rank implies more isolation is always better evidence, which is false: for a claim about the host's own behaviour, the host IS the matching environment and a container is a mismatch."
+    },
+    {
+      "option": "Leave confidence untouched by isolation entirely",
+      "whyNot": "Then a container run could carry a kernel-module claim to the top rung — the NVIDIA-driver failure the rung table was written to prevent."
+    }
+  ],
+  "notes": "⚠️ Amends prose in two places rather than only adding code: #77's third consequence and the 'Which tier can reach which rung' section both stated the ceiling as the mechanism. The table survives as a summary of what usually follows — the isolation an OS-packages claim needs is what tier 1 says it does not supply — but it is a consequence, not a lookup the code performs. ⚠️ Consequence for the tier-2 recommendation's wording: not 'without Docker nothing exceeds rung 2', but 'without Docker, these specific claims cannot be settled here'."
+}

@@ -59,7 +59,7 @@
     },
     "targetEnvironment": {
       "type": "object",
-      "description": "What the claim is asserted ABOUT. This is the other half of #96's applicability filter — evidence is applicable when its observed environment matches these facts, and `environment-matched` (#42 rung 4) means exactly that it did.",
+      "description": "What the claim is asserted ABOUT. This is the other half of #96's applicability filter — evidence is applicable when its observed environment matches these facts, and `environment-matched` (#42 rung 4) means exactly that it did. ⚠️ AMENDED 2026-08-22 (#134): isolation is one of these dimensions rather than a separate ceiling, via `requiresIsolation`.",
       "properties": {
         "facts": {
           "type": "object",
@@ -67,6 +67,24 @@
           "additionalProperties": {
             "$ref": "common.schema.json#/$defs/nonEmptyString"
           }
+        },
+        "requiresIsolation": {
+          "type": "array",
+          "description": "Isolation properties this claim DEPENDS ON, compared claim-relatively against evidence.environment.isolationBoundary (#134). Required and matched -> may reach rung 4. Required but absent (e.g. a host run, which claims no isolation) -> unknown, capped below rung 4. Required and explicitly NOT claimed by the run -> the evidence does not apply at all. ⚠️ Absent or empty means this claim does not turn on isolation, and NO penalty follows: a claim that never asked about containment is not weakened for failing to have it. ⚠️ This is why there is no tier-to-confidence ceiling. Sandbox tier is a PERMISSION and an execution boundary, not an epistemic rank: a host run can legitimately reach `environment-matched` for a claim about that host, and tier 1 cannot lift an OS-containment claim merely because a virtual environment existed.",
+          "items": {
+            "$ref": "common.schema.json#/$defs/nonEmptyString"
+          },
+          "uniqueItems": true,
+          "examples": [
+            [
+              "containment-of-hostile-code"
+            ],
+            [
+              "network-isolation",
+              "host-filesystem-denial"
+            ]
+          ],
+          "x-materiality": "semantic"
         }
       },
       "required": [

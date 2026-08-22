@@ -4,11 +4,15 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Nothing caps the confidence rung by isolation level",
   "statement": "#56 and DEC-0005 both say a sandbox tier CAPS the reachable confidence rung, and the derivation does not implement it: `effectiveAssertion` computes confidence from evidence kind and environment match only. Since #131 a host run carries no tier at all, which makes the question concrete — an unsandboxed host run currently reaches `environment-matched`, the top rung, on facts alone. What caps a rung: the tier, the execution axis, the claim's own requirements, or nothing?",
   "raisedBy": [
     "DEC-0005"
   ],
-  "notes": "⚠️ PRE-EXISTING, not caused by #131 — `environment.tier` was carried through the derivation and never read, so the cap has never existed. #131 made it visible by removing the value that looked like it was doing the work. Recording that distinction matters: a reshape that introduced a gap and a reshape that exposed one call for different responses. ⚠️ NOT BLOCKING under DEC-0002, but it is close to it: AST-0013 derives `environment-matched` from a run executed directly on the PM's machine, which is the maximum rung on the weakest possible isolation. Nothing currently rests on that claim, so nothing is yet wrong. ⚠️ Belongs to 7b, because the answer depends on what the tier-1 controller can actually attest — and per DEC-0005 tier 1 explicitly claims no containment, so 'tier 1 caps higher than host' needs an argument rather than an assumption."
+  "notes": "⚠️ PRE-EXISTING, not caused by #131 — `environment.tier` was carried through the derivation and never read, so the cap has never existed. #131 made it visible by removing the value that looked like it was doing the work. Recording that distinction matters: a reshape that introduced a gap and a reshape that exposed one call for different responses. ⚠️ NOT BLOCKING under DEC-0002, but it is close to it: AST-0013 derives `environment-matched` from a run executed directly on the PM's machine, which is the maximum rung on the weakest possible isolation. Nothing currently rests on that claim, so nothing is yet wrong. ⚠️ Belongs to 7b, because the answer depends on what the tier-1 controller can actually attest — and per DEC-0005 tier 1 explicitly claims no containment, so 'tier 1 caps higher than host' needs an argument rather than an assumption.",
+  "answer": "Nothing caps by isolation level, and nothing should. Tier is a permission and execution boundary, not an epistemic rank. Isolation enters the same claim-relative comparison as every other environment fact through the assertion's `requiresIsolation`. See DEC-0007.",
+  "answeredBy": [
+    "DEC-0007"
+  ]
 }
