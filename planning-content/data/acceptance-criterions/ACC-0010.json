@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0010",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Every role slice is self-sufficient",
+  "statement": "For each role in the task graph, the generated slice contains every task assigned to that role together with the requirements and acceptance criteria those tasks trace to, and nothing is a reference to a file outside the package.",
+  "evaluates": [
+    "CMP-0011"
+  ],
+  "verifies": [
+    "REQ-0010"
+  ],
+  "notes": "⚠️ Written BEFORE the code, unlike ACC-0001..0009. `not-evaluated` is the honest state and is exactly the distinction QST-0015 was about: the criterion exists, the work does not. ⚠️ EVALUATED 2026-08-22: `test/handoff.test.mjs` covers it in four parts — a slice carries its tasks' requirements, criteria and components; a cross-role dependency is visible to the blocked role; no tasks means no slices; and slugs are stable. ⚠️ The cross-role case is covered by a CONSTRUCTED fixture, because this project has exactly one role — so the case the criterion is really about has been tested but not lived."
+}

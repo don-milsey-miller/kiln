@@ -1,0 +1,41 @@
+[
+  {
+    "acceptedBy": [
+      "ACC-0010"
+    ],
+    "dependsOn": [],
+    "fulfils": [
+      "REQ-0010",
+      "REQ-0011"
+    ],
+    "id": "TSK-0001",
+    "implements": [
+      "CMP-0011"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "draft",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
+    "title": "Generate role slices from the task graph",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [],
+    "dependsOn": [],
+    "fulfils": [
+      "REQ-0009"
+    ],
+    "id": "TSK-0002",
+    "implements": [
+      "CMP-0002"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "draft",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
+    "title": "Derive stage 6's scope from graph use rather than a flag",
+    "type": "task"
+  }
+]

@@ -1,0 +1,399 @@
+[
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "chokidar": "5.0.0",
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      }
+    },
+    "id": "EVD-0001",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-17",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "400 file creations, three runs of three. fs.watch reported 1 distinct path with no error; chokidar reported 400/400.",
+    "title": "Watcher spike, check 2",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      }
+    },
+    "id": "EVD-0002",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Six node processes creating requirements concurrently received six distinct IDs. Falsified by removing the lock: eight unlocked processes produced 4 distinct IDs of 8.",
+    "title": "Six concurrent processes, distinct IDs",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      }
+    },
+    "id": "EVD-0003",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "failure",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The same test failed once during a full 92-test parallel run and did not reproduce in three subsequent runs. The failure output was not captured, so the cause is unconfirmed; maxWaitMs was raised as a mitigation on an unproven diagnosis.",
+    "title": "One unexplained failure in a full parallel run",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "lockAcquisitionRetry": "EEXIST only",
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      }
+    },
+    "id": "EVD-0004",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "Instrumentation validated before use: forcing maxWaitMs=1 produced five children classified lock-acquisition-timeout and the assertion 'NOT a serialisation result', confirming the classifier distinguishes causes rather than reporting the first assertion to trip. ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "failure",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Instrumented the concurrency test so each child reports a structured outcome, then ran the isolated test file repeatedly. Run 19 of a declared 40 failed. Classification: one child of six, `lock-acquisition-timeout` class, message `Could not acquire ....planning.lock: EPERM`, elapsed 507ms. No duplicate IDs; the other five children allocated distinct IDs. openSync(path,'wx') returned EPERM rather than EEXIST, and the retry loop treated anything but EEXIST as fatal.",
+    "title": "Recurrence reproduced and classified — lock acquisition returned EPERM",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "lockAcquisitionRetry": "EEXIST/EPERM/EBUSY/EACCES",
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      }
+    },
+    "id": "EVD-0005",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "After widening acquisition retry to EEXIST/EPERM/EBUSY/EACCES: isolated concurrency file 40/40 passed; full suite at normal parallelism 30/30 passed; full suite serial 10/10 passed. Counts declared before running. Bounded non-reproduction, not proof of absence: at a 10% per-run rate, 30 parallel runs would miss a recurrence about 4% of the time.",
+    "title": "Post-fix matrix: 80 runs, no recurrence",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0006",
+    "kind": "source",
+    "lifecycle": "active",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/caching",
+        "retrievedAt": "2026-08-18",
+        "title": "Next.js — Getting Started: Caching"
+      }
+    ],
+    "summary": "States that module imports, synchronous I/O and pure computations are 'predictable values': 'Components using only these operations are prerendered automatically, and their output becomes part of the static HTML at build time.' Lists `fs.readFileSync` explicitly among them. Contrasts this with `await readFile()` inside a component, which 'would be treated as uncached data that must be either accessed within `use cache` or behind a `<Suspense>` boundary.' Applies when cacheComponents: true.",
+    "title": "Next.js docs — Caching (Cache Components model)",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0007",
+    "kind": "source",
+    "lifecycle": "active",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/guides/caching-without-cache-components",
+        "retrievedAt": "2026-08-18",
+        "title": "Next.js — Caching and Revalidating (Previous Model)"
+      }
+    ],
+    "summary": "Applies when cacheComponents is NOT enabled, which is the default. States under route segment `revalidate`: 'In Development, Pages are always rendered on-demand and are never cached. This allows you to see changes immediately without waiting for a revalidation period to pass.'",
+    "title": "Next.js docs — Caching and Revalidating (Previous Model)",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0008",
+    "kind": "source",
+    "lifecycle": "active",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/api-reference/functions/revalidatePath",
+        "retrievedAt": "2026-08-18",
+        "title": "Next.js — revalidatePath"
+      },
+      {
+        "locator": "https://github.com/vercel/next.js/discussions/81385",
+        "retrievedAt": "2026-08-18",
+        "title": "vercel/next.js discussion 81385 — understanding revalidatePath"
+      }
+    ],
+    "summary": "revalidatePath/revalidateTag run only in Server Actions or Route Handlers and cannot be called from a Client Component. Invalidation plus the client Router Cache purge is triggered BY the server action the user performed; nothing observes writes made by a process outside the app.",
+    "title": "Next.js docs and issue tracker — revalidatePath is server-triggered only",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "both",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "both"
+      }
+    },
+    "id": "EVD-0009",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "Kept as the summary of the whole run and deliberately UNATTACHED. Its environment says cacheComponents:'both' and readApi:'both', which environment-MISMATCHES every claim about one configuration — the applicability filter excluded it from all four, correctly, and that is how the modelling error was caught. A matrix run is N experiments and must be recorded as N. The per-cell records carry the bearing; this one carries the protocol. ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Minimal Next.js 16.3.1 app reading data/artifact.json in a Server Component. Matrix: read API {fs.readFileSync, await readFile} x cacheComponents {disabled, enabled}. Protocol per cell: render A; write B from a separate process touching no application code; wait 10s; read module-scope server counters via a route handler so browser behaviour cannot be mistaken for server caching; then make a fresh request. RESULT — ALL FOUR CELLS IDENTICAL: nothing happened during the quiet window (0 page requests, 0 file reads); the fresh request returned B; counters confirmed the server re-read the file and re-rendered. Step 6: an app-supplied SSE route watching the data directory delivered a change event to a connected client within the window in both cacheComponents modes, and a reload then showed B.",
+    "title": "Next.js probe — matrix SUMMARY (not attachable to a single-cell claim)",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "disabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "id": "EVD-0010",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so the default model serves fresh data in dev.",
+    "title": "Probe cell — fs.readFileSync, cacheComponents disabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "disabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "await readFile"
+      }
+    },
+    "id": "EVD-0011",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so an awaited read is equally fresh in dev.",
+    "title": "Probe cell — await readFile, cacheComponents disabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "enabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "id": "EVD-0012",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so a SYNCHRONOUS read did NOT freeze into a static shell in dev.",
+    "title": "Probe cell — fs.readFileSync, cacheComponents enabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "enabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "await readFile"
+      }
+    },
+    "id": "EVD-0013",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so an awaited read behaves as uncached data in dev.",
+    "title": "Probe cell — await readFile, cacheComponents enabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "disabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "writePath": "route handler -> writeReviewStatus"
+      }
+    },
+    "id": "EVD-0014",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A Next.js route handler called the repo's REAL writeReviewStatus (lock -> fresh read inside the lock -> validate -> atomic write) via runtime dynamic import; nothing was reimplemented. Results: the write landed and reviewStatus changed; every other field byte-identical, so the reviewStatus-only boundary held; lock released; no temp file left. A request asking for reviewStatus 'retired' was refused 400 and the artifact was unchanged. With the lock held by an EXTERNAL process, the Next.js write did not proceed (artifact unchanged after 1.2s), then completed once the lock was released — total wait ~1.3s. React's state model did not interfere with the lock in either mode.",
+    "title": "Write-back cell — cacheComponents disabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cacheComponents": "enabled",
+        "framework": "Next.js 16.3.1",
+        "mode": "next dev",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "writePath": "route handler -> writeReviewStatus"
+      }
+    },
+    "id": "EVD-0015",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had.",
+    "observedAt": "2026-08-18",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A Next.js route handler called the repo's REAL writeReviewStatus (lock -> fresh read inside the lock -> validate -> atomic write) via runtime dynamic import; nothing was reimplemented. Results: the write landed and reviewStatus changed; every other field byte-identical, so the reviewStatus-only boundary held; lock released; no temp file left. A request asking for reviewStatus 'retired' was refused 400 and the artifact was unchanged. With the lock held by an EXTERNAL process, the Next.js write did not proceed (artifact unchanged after 1.2s), then completed once the lock was released — total wait ~1.3s. React's state model did not interfere with the lock in either mode.",
+    "title": "Write-back cell — cacheComponents enabled",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0016",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"1,000 credits/month\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "locator": "https://docs.tavily.com/documentation/api-credits",
+        "retrievedAt": "2026-08-22",
+        "title": "Credits & Pricing - Tavily Docs"
+      }
+    ],
+    "summary": "Tavily's published documentation states the free plan provides 1,000 credits per month",
+    "title": "Source: Credits & Pricing - Tavily Docs",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "backend": "tavily",
+        "credential-source": "host environment variable",
+        "os": "Windows",
+        "quota-limit": "1500",
+        "quota-used": "0"
+      },
+      "omissions": [
+        {
+          "fact": "node-version",
+          "reason": "No capture plan existed: this run predates the validation controller. It was not collected then, and it must not be filled in now from a re-run.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "os-build",
+          "reason": "Nothing collected it at the time.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "tavily-plan-name",
+          "reason": "The /usage response body was not retained; only the figures the probe printed survive.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "timing",
+          "reason": "The probe does not time itself, and no external timing was recorded.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0017",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ PROVENANCE: executed by the PM in their own terminal and the OUTPUT WAS PASTED. Not collected by an instrumented run, so what survives is the eight lines it printed and nothing more. ⚠️ RECORDED 2026-08-22 FROM THAT ORIGINAL OUTPUT, four days of decisions later, and deliberately NOT re-run. A fresh probe would observe a fresh moment — by now at least one search credit has been spent — and presenting it as evidence of the 1500/1500, 0-used event would be a later observation wearing an earlier date. ⚠️ `execution: host` with NO sandboxTier: this ran directly on the machine, so it makes no isolation claim (#131). The facts above are exactly those the output carried; everything else is listed as an omission with its reason.",
+    "observedAt": "2026-08-22",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "`npm run research:probe` printed: available, backend=tavily, probed live, no search credit spent; quota 1500 of 1500 credits remaining (0 used); tools research_capability, research_search, research_fetch.",
+    "title": "npm run research:probe, PM's host, 2026-08-22",
+    "type": "evidence"
+  }
+]

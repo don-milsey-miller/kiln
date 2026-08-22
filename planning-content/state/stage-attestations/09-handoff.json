@@ -2,9 +2,9 @@
   "stageId": "09-handoff",
   "attestations": {
     "role-slice-self-sufficient": {
-      "result": "not-satisfied",
+      "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "There are no role slices, so no assigned team member can start anything. Slices are a query over the task graph (#19), `task` is not built, and stage 8 recorded the demand without building it. ⚠️ This is REQ-0010 itself - a recipient must be able to begin without asking the planner - and it is the requirement whose only component was designed before it existed. The command works; what it produces is not yet something a person could be handed a slice of."
+      "reason": "Re-evaluated 2026-08-22 after `task` and `acceptance-criterion` were approved and built. Two tasks exist, both `platform`, and the renderer now emits `slices/platform.json` as a QUERY over the task graph - pulling each task's traced requirements, acceptance criteria and components into the slice so it stands alone, plus `blockedByOtherRoles` for dependencies assigned elsewhere. ⚠️ HONEST LIMITS, both recorded rather than rounded away: (1) there is exactly ONE role on this project, so the slicing is exercised but the CROSS-ROLE case - the one the criterion is really about - is covered by a constructed test rather than by real content; (2) ACC-0010, the criterion for the slice itself, was written BEFORE the code and is now `pass`, evaluated by test rather than by a recipient actually starting work. The criterion asks whether a recipient could start without coming back, and the strongest evidence available is that everything a task traces to travels with it."
     },
     "runbook-steps-above-threshold": {
       "result": "satisfied",

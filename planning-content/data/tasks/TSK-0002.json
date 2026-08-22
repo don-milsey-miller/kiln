@@ -1,0 +1,18 @@
+{
+  "id": "TSK-0002",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Derive stage 6's scope from graph use rather than a flag",
+  "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
+  "role": "platform",
+  "implements": [
+    "CMP-0002"
+  ],
+  "fulfils": [
+    "REQ-0009"
+  ],
+  "acceptedBy": [],
+  "dependsOn": []
+}

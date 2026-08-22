@@ -1,0 +1,404 @@
+[
+  {
+    "addresses": [
+      "QST-0004"
+    ],
+    "alternatives": [
+      {
+        "option": "Migrate the skeleton to Next.js now, as cleanup",
+        "whyNot": "Framework conformity is not a benefit. It would replace a working proof of the substrate with an equivalent that costs effort and adds MDX, components and the site build that nobody needs yet."
+      },
+      {
+        "option": "Commit to staying framework-free",
+        "whyNot": "Forecloses MDX, the interactive components #54 names as the v1 flagship, and #19's site/ output — all real product requirements, none of which the skeleton was built to serve."
+      },
+      {
+        "option": "Decide when the first UI feature is specified",
+        "whyNot": "Chosen, in effect: this IS that decision, taken now so the skeleton's continued existence is deliberate rather than unexamined."
+      }
+    ],
+    "decidedAt": "2026-08-18",
+    "evidencedBy": [
+      "AST-0006",
+      "AST-0008",
+      "AST-0009",
+      "AST-0011",
+      "AST-0012"
+    ],
+    "id": "DEC-0001",
+    "lifecycle": "active",
+    "notes": "AST-0010 — Cache Components under `next build` — becomes BLOCKING only when a production build enters scope. Until then testing it would validate a deployment mode the project has not decided to use, and #2 and #22's local-only stance mean it may never. The skeleton is retained deliberately as proof of the substrate, not as a deviation owing a migration.",
+    "rationale": "The skeleton was framework-free because #5's choice was untested; QST-0004 has now tested it, including the surface the skeleton deliberately left open. Nothing forces a migration — the framework-free server already does what Next.js was validated to do. What Next.js buys is product: MDX rendering, the interactive components #54 wants, and #19's site/ build path. Migrating for its own sake would trade a working proof of the risky substrate for no capability.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Do not migrate the walking skeleton to Next.js as cleanup. When product UI work begins, build the product shell in Next.js, carrying forward the validated watcher/SSE/write-back contract. Migration is feature work, not framework conformity.",
+    "title": "Adopt Next.js when product UI work begins, not as cleanup",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0009"
+    ],
+    "alternatives": [
+      {
+        "option": "Everything unresolved blocks",
+        "whyNot": "Nothing would ever exit a stage, and the criterion would stop carrying information — the same erosion #46 describes for a lint that blocks mid-thought."
+      },
+      {
+        "option": "Only what stops work today blocks",
+        "whyNot": "Too narrow. It permits making a load-bearing commitment while a question that decides its correctness is open, which is precisely the failure the gate exists to catch."
+      },
+      {
+        "option": "Leave it to judgement each time",
+        "whyNot": "The criterion would mean something different at every gate, and #93's attestation would record a verdict with no shared premise behind it."
+      }
+    ],
+    "decidedAt": "2026-08-18",
+    "id": "DEC-0002",
+    "lifecycle": "active",
+    "rationale": "Stage 4's exit criterion turns on the word and the stage table never defined it, so the stage could not be exited honestly in either direction. The definition separates the two things that were being conflated: a decision whose absence would make the next commitment possibly wrong, and work that is simply not done. The second clause is self-referential on purpose — a question that makes a criterion unevaluable blocks by construction, which is what QST-0009 itself was.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "An unresolved question is blocking when proceeding would require a load-bearing commitment whose correctness materially depends on its answer, or when its absence makes the current stage's exit criterion unevaluable. Missing implementation alone is work, not a gap.",
+    "title": "What makes a requirement gap BLOCKING",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0005",
+      "QST-0006"
+    ],
+    "alternatives": [
+      {
+        "option": "Let a specialist degrade gracefully when a capability is missing",
+        "whyNot": "Graceful degradation is indistinguishable from the failure #67 found. The output looks the same and says nothing about what it could not do."
+      },
+      {
+        "option": "Check capabilities once at startup rather than per delegation",
+        "whyNot": "A credential can expire and a sandbox can go away mid-session; #108's stale-blocker lesson is that a capability recorded once is a claim with a shelf life."
+      }
+    ],
+    "decidedAt": "2026-08-18",
+    "evidencedBy": [
+      "AST-0004"
+    ],
+    "id": "DEC-0003",
+    "lifecycle": "active",
+    "notes": "Generalises #81 from typed tools to any declared capability. #67(b) remains the unwritten half of both.",
+    "rationale": "#67 measured the failure this prevents: a trust-denied child completed a normal-looking session with the typed tools absent and nothing reported it. #81 answered that for tools specifically, with a capability check before any output is accepted. This generalises it: research and sandboxing are capabilities in exactly the same sense, and a research specialist with no search, or a validation specialist with no sandbox, fails the same way — plausible prose in place of an answer. Detectability is the load-bearing half: a capability the host cannot check is one the contract cannot honestly promise.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Every capability named in a specialist contract must be one the host can actually provide and can verify is present. Where a named capability is unavailable, the specialist must produce an explicit refusal or a recorded gap — never proceed by guessing.",
+    "title": "A specialist contract may only describe capabilities the host can supply AND detect",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0005"
+    ],
+    "alternatives": [
+      {
+        "option": "Let the specialist call an MCP server's tools directly",
+        "whyNot": "The contract would name tools the host does not own. Renaming or replacing the backend would silently change what the specialist can promise, and DEC-0003's detectability requirement would have nothing stable to probe."
+      },
+      {
+        "option": "Allow authenticated and private sources from the start",
+        "whyNot": "Side effects and credentials are a different risk class from public reads. Deferring them keeps the first contract honest and leaves activation as a deliberate, separate act (#77's shape)."
+      },
+      {
+        "option": "Let the specialist fall back to model memory when retrieval fails",
+        "whyNot": "That is the exact failure the project exists to fix, and it is indistinguishable from success in the output. A structured refusal is a worse answer and a better record."
+      }
+    ],
+    "assumesThat": [],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0004",
+    "lifecycle": "active",
+    "notes": "Sources for the Pi facts: packages/coding-agent/docs/usage.md and docs/extensions.md (badlogic/pi-mono). ⚠️ Those are documentation reads, not experiments — if a claim about Pi's extension API becomes load-bearing it needs evidence(kind: source) with retrieval time, per this decision's own rule. The first adapter is implementation work, not a blocking design question, BECAUSE changing it cannot alter the specialist contract — that is what makes the backend replaceable rather than merely intended to be.",
+    "rationale": "This answers QST-0005 at the level DEC-0003 requires: a capability the host can supply AND detect. Naming three typed tools rather than a backend makes the contract falsifiable — the specialist can be asked whether it has research, and the answer is a probe result rather than an assumption. Pi has no built-in MCP and its extension API registers custom tools, so the adapter layer is where a vendor belongs; a contract written against vendor tool names would change every time the backend did, which is #67's toolless child arriving through the supply chain instead of through trust. The refusal clause is the load-bearing half: the intake's problem 2 was 'educated guessing', and a research specialist that answers from model memory when retrieval is down reproduces exactly that failure while looking like success. Discovery-is-not-evidence keeps #123's boundary intact at the point new observations enter — a search hit is an observation about what exists, not an observation about the claim.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "The shipped Pi extension owns a stable, typed research interface — `research_search`, `research_fetch`, `research_capability` — and the research specialist depends on THOSE capabilities, never on a search vendor, model provider or arbitrary MCP tool name. An MCP server may sit behind the extension as an adapter; it must not become the specialist contract. Boundary: public, read-only internet research is permitted when a delegated question depends on a current external fact. Authenticated or private sources, purchases, submissions and other side effects are unavailable unless separately activated later. Credentials live in the PM's host environment, outside the repository and the planning content; the extension consumes them and they are never placed in a child prompt or returned in tool output. Every delegation probes tool registration AND backend health/authentication — installed-but-unusable is unavailable. Search results are discovery observations, not automatically evidence: a fetched source supporting a recorded claim must become evidence(kind: source) carrying URL, retrieval time, source metadata and a retained citation. If search or retrieval is unavailable the specialist returns a structured capability refusal and records the gap, and MUST NOT answer from model memory.",
+    "title": "Research capability is a typed extension interface, not a vendor",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0006"
+    ],
+    "alternatives": [
+      {
+        "option": "Start at tier 2 (containers) for real isolation",
+        "whyNot": "#77 makes tier 2 conditional on Docker already being present and otherwise a recommendation for the PM to approve. Building it first would make the default path depend on something not guaranteed, and tier 1's honest boundary is sufficient for trusted, non-destructive validation, which is what the current claims need."
+      },
+      {
+        "option": "Give the validation specialist a shell and a working directory",
+        "whyNot": "A shell is not a declarable job. Nothing could be refused before provisioning, no capture plan could be enforced, and the observation record would be whatever the specialist chose to report — which is the record deciding its own completeness."
+      },
+      {
+        "option": "Call the venv a sandbox and move on",
+        "whyNot": "It would silently inflate the confidence rung of every claim validated in it. The cost of the honest boundary is a smaller set of claims tier 1 may settle; the cost of the dishonest one is not knowing which claims those are."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0005",
+    "lifecycle": "active",
+    "notes": "⚠️ The omission states are now DECIDED as a contract, but the `evidence` schema field that carries them is still unbuilt — #122's deferred consequence lands here. Implementing the extension, the first research adapter and the tier-1 controller is work, not a stage 4 gap (DEC-0002).",
+    "rationale": "This answers QST-0006 by settling boundaries before mechanism, as DEC-0003 requires. Four things make it a contract rather than an intention. (1) The honest tier-1 boundary: a venv called a sandbox would let a claim inherit containment it never had, and every claim validated in tier 1 would carry a strength nothing earned. Naming what tier 1 does NOT do is what keeps the rung ceiling truthful. (2) Argument arrays rather than shell strings remove a whole class of interpolation defect at the type level rather than by review. (3) The four omission states are exactly what #122 said the schema needed and #123 said it must not exceed: each is a fact about the observer, none is a judgement about a claim, and each is stated only because a capture plan can actually distinguish it — a state nothing can detect would repeat #121's error one layer down. (4) Cleanup failure as a first-class result closes the gap where a destroy step that silently failed would leave the record saying the environment was gone. Refusal before provisioning is what makes #77's authorisation real: a ceiling checked after spending is a report, not a control.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Build tier 1 first, since #77 already makes it the default. The shipped extension provides a typed validation controller; the specialist NEVER receives unrestricted shell execution. A validation job declares: required tier and capabilities; input files or hashes; commands as an ARGUMENT ARRAY, never an interpolated shell string; a capture plan; timeout and output limits; expected outputs; and any network, credential or cost requirement. The controller owns provision -> execute -> observe -> destroy and refuses a job BEFORE provisioning if it exceeds the project's approved ceiling. Tier 1 is a fresh temporary workspace and Python virtual environment. Its boundary is stated, not implied: a virtual environment isolates Python dependencies; it is NOT an OS security sandbox. Tier 1 therefore does not claim to contain hostile code, deny host-filesystem access or enforce network isolation; it supplies no credentials and uses an allowlisted process environment, and is suitable only for trusted, non-destructive validation that does not need those guarantees. Claims requiring real containment, OS/package fidelity, credentials or external infrastructure require a higher tier. Every run produces an observation record: commands, inputs, outputs, exit status, timing, versions, environment facts, permission failures and cleanup outcome. The capture plan makes omission states DETECTABLE — `not captured` (collection deliberately disabled), `not observable` (no available collector), `unavailable` (collection ran, fact absent), `redacted` (obtained, policy suppressed) — each requiring a reason. Unrequested facts remain simply absent. These describe the OBSERVER only; bearing, applicability, verdict and confidence stay claim-relative (#123). Cleanup failure is a first-class run result: preserve the evidence, report the retained path, and never present destruction as successful.",
+    "title": "Tier 1 first, through a typed validation controller with an honest boundary",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0011"
+    ],
+    "alternatives": [
+      {
+        "option": "A billing-backed free allowance (major cloud search APIs)",
+        "whyNot": "A free tier that keeps serving past the allowance and bills for it puts REQ-0012's authorisation ceiling outside the system's control. Stopping at exhaustion is the property that was wanted."
+      },
+      {
+        "option": "Probe by performing a cheap search",
+        "whyNot": "It spends a credit to learn the capability exists, and it cannot distinguish 'auth is fine but quota is gone' from 'auth failed' as cleanly as the usage endpoint does."
+      },
+      {
+        "option": "Let the caller choose search depth and result richness",
+        "whyNot": "Those parameters are what the query costs. A caller that can set them can spend more than the PM authorised, which converts a control into a suggestion."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0006",
+    "lifecycle": "active",
+    "notes": "⚠️ RESIDUAL RISK, stated rather than closed: DNS rebinding. The guard resolves and checks every address, then fetch resolves the name again itself, so a hostile authority answering differently the second time can still move the destination. Closing it needs a connection to the checked IP with an explicit Host header and SNI, which Node's fetch does not expose. The honest position is that the boundary raises the cost of an attack rather than eliminating it — the same kind of statement DEC-0005 makes about tier 1. ⚠️ The Tavily facts here (free-plan behaviour, the usage endpoint, per-search cost) are DOCUMENTATION READS supplied by the PM, not experiments. Under DEC-0004's own rule they become evidence(kind: source) only when fetched and recorded with retrieval time — which is exactly what 7a step 4 will do, using this adapter, once the credential exists. ⚠️ MEASURED 2026-08-22, and it differs from the documentation read this decision cites: the live probe reported a plan limit of 1500 credits, not 1,000. Recorded rather than reconciled — the difference could be a changed free tier, a different plan, or a promotion, and this run cannot distinguish them. It does not disturb the decision, because the property that mattered was 'no payment card, stops when exhausted', and NEITHER figure is what carried it. ⚠️ The stopping behaviour itself remains UNTESTED under either reading.",
+    "rationale": "Tavily fits REQ-0012 better than the alternatives for a specific reason: its free plan grants 1,000 monthly credits with no payment card and STOPS when exhausted, so the authorisation ceiling is enforced by the plan rather than by the PM watching a bill. GET /usage is what makes the capability probe meaningful — DEC-0003 requires a capability the host can DETECT, and a backend that could only be tested by performing a search would charge a credit to answer 'are you there'. Fixing the spend-relevant search parameters in the adapter rather than exposing them keeps cost predictable at one credit per search, which is a REQ-0012 control and not a default. The public-web boundary is the sharper half: a fetch tool with no destination boundary is not a research capability but a request forger inside the host — 169.254.169.254 is cloud metadata and localhost is whatever the PM is running — so DEC-0004's 'public, read-only' scope needed a mechanism rather than a sentence. Revalidating every redirect is what makes the boundary hold, since checking only the URL the caller supplied inspects the doormat and lets the server choose the destination.",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "The first adapter behind DEC-0004's typed interface is the Tavily Search API. Basic search is configured with search_depth 'basic', auto_parameters false, include_answer false and include_raw_content false, and returns discovery results only. GET /usage is the capability probe: it validates authentication and reports remaining quota WITHOUT performing a search. CREDENTIAL CONTRACT: the PM creates the account and supplies TAVILY_API_KEY through the host environment; it is injected only into the research child, never into planning or validation children; the specialist has no shell and no generic environment-reading tool; the extension reads the key but never places it in prompts, logs, errors or tool results; and missing key, failed authentication, exhausted quota and an unreachable backend each produce a DISTINCT unavailable reason. PUBLIC-WEB BOUNDARY on research_fetch: reject non-HTTP(S) schemes, URLs carrying credentials, loopback/private/link-local destinations, and oversized or unsupported responses, and revalidate EVERY redirect. Tavily discovers candidate URLs; the project's own guarded fetch reads the authoritative page; neither becomes evidence until the specialist records the fetched source through the typed evidence path.",
+    "title": "Tavily is the first research adapter, with a stated credential and public-web boundary",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0013"
+    ],
+    "alternatives": [
+      {
+        "option": "Implement the tier→rung ceiling as written",
+        "whyNot": "It conflates provisioning with epistemic strength. A host run would be capped for a claim about that host, and a tier-1 run would be credited for containment it states it does not provide."
+      },
+      {
+        "option": "Invent a rank ordering host < tier 1 < tier 2 < tier 3",
+        "whyNot": "A rank implies more isolation is always better evidence, which is false: for a claim about the host's own behaviour, the host IS the matching environment and a container is a mismatch."
+      },
+      {
+        "option": "Leave confidence untouched by isolation entirely",
+        "whyNot": "Then a container run could carry a kernel-module claim to the top rung — the NVIDIA-driver failure the rung table was written to prevent."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0007",
+    "lifecycle": "active",
+    "notes": "⚠️ Amends prose in two places rather than only adding code: #77's third consequence and the 'Which tier can reach which rung' section both stated the ceiling as the mechanism. The table survives as a summary of what usually follows — the isolation an OS-packages claim needs is what tier 1 says it does not supply — but it is a consequence, not a lookup the code performs. ⚠️ Consequence for the tier-2 recommendation's wording: not 'without Docker nothing exceeds rung 2', but 'without Docker, these specific claims cannot be settled here'.",
+    "rationale": "QST-0013 looked like a missing implementation and was actually a category error preserved in the wording. Building the cap would have made two axes into one and produced wrong answers in both directions: it would have penalised AST-0013 — a claim about the PM's host, evidenced by a run on that host, where the absence of isolation is not a shortfall but an irrelevance — and it would have rewarded a tier-1 run for a containment claim tier 1 explicitly does not support. Routing isolation through the existing three-state comparison keeps one mechanism where there might have been two, and it makes DEC-0005's `doesNotClaim` list load-bearing: an explicit denial is a CONTRADICTION of a requirement, where silence is only unknown. The neutral 'not-required' state is the part most easily got wrong — collapsing it into 'unknown' would reintroduce the global penalty in different words, by capping every claim that never asked about isolation.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "There is NO global isolation-to-confidence cap. Sandbox tier describes how execution was provisioned and what boundary it supplied; confidence describes how well applicable evidence matches a particular claim. A host run may legitimately reach environment-matched for a claim specifically about that host, and tier 1 cannot lift an OS-containment claim merely because a virtual environment existed. `isolationBoundary` therefore enters the same claim-relative comparison as every other environment fact, via the assertion's `requiresIsolation`: required and matched may reach environment-matched; required but absent is unknown and capped; required and incompatible means the evidence does not apply to that claim; not required by the claim carries no penalty at all. The older 'tier determines the confidence ceiling' language is AMENDED rather than implemented.",
+    "title": "Tier is a permission and execution boundary, not an epistemic rank",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0014",
+      "QST-0010"
+    ],
+    "alternatives": [
+      {
+        "option": "Record the requirement-to-component edge as a string on the requirement",
+        "whyNot": "#85's prose assumption in a different costume. A string cannot be traced, counted or flagged, and the stage-9 orphan check needs traversal."
+      },
+      {
+        "option": "Leave the trace as prose in an architecture document",
+        "whyNot": "Section 1 of the stage 5 document IS that prose, and no gate can read it. The criterion asks for something a reader can check mechanically."
+      },
+      {
+        "option": "Drop schema, api-spec and wireframe from stage 5 since this run needed none",
+        "whyNot": "It confuses inapplicable-here with invalid-globally. A consumer project designing a real service would need all three, and produces[] is the envelope across project types."
+      },
+      {
+        "option": "Add richer links now (acceptance criteria, tasks, dependencies)",
+        "whyNot": "No consumer has demanded them. A field added for an acceptance criterion nobody has written is the catalogue justifying itself again (#106)."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0008",
+    "lifecycle": "active",
+    "notes": "⚠️ Approving this made QST-0010 an IMMEDIATE prerequisite rather than deferred work: activating by hand once more would have been the fifth instance of #126's pattern, committed knowingly. `lib/tools/activate-type.mjs` now performs the transition — validating catalogue membership, authorability (schema AND typed tool) and reachability (some stage must produce it) before writing only `capabilities.artifactTypes.activated`. It never edits stages/, schemas/ or the catalogue (#95, #121's correction). Deactivation refuses while live artifacts of the type exist, so #107's silence cannot start with a manifest edit.",
+    "rationale": "The #41 case is conclusive rather than speculative: `component` owns irreducible many-to-many design state that a requirement cannot hold, and four independent consumers were already decided before the type existed — #60's cascade, #19's role slicing, the stage-9 orphan check, and stage 5's own third exit criterion. The gap was old: notes.md names 'design component' three times in the traceability chain and #38's sixteen omitted it, so a chain four decisions rest on had a missing link that nothing noticed until a stage was actually run. The produces[] reframing preserves the useful draft table while correcting its overstatement: two stage runs found declared types legitimately unused, and the honest reading is that the table describes a project type rather than a stage. The gate already computed the intersection, so this is wording catching up with behaviour rather than a change of behaviour.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`component` joins the v1 catalogue with prefix CMP and is approved for activation here. Minimal shape: a named design unit (the envelope's title), a `responsibility`, `satisfies` links to requirements, and the standard lifecycle/review envelope. Additional links wait for authentic stage 7-8 demand. Separately: a stage's `produces[]` is a CAPABILITY ENVELOPE across project types, and the applicable set for a particular project is `produces[] INTERSECT activatedTypes`. Activation describes the project type; the stage definition owns where an applicable type is produced. `component` is added to stage 5's produces; `schema`, `api-spec` and `wireframe` are RETAINED, because the stage 5 run showed them inapplicable here rather than invalid globally.",
+    "title": "`component` joins the catalogue as CMP and is activated on this project",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0007"
+    ],
+    "alternatives": [
+      {
+        "option": "Generate the package as part of the stage-9 gate",
+        "whyNot": "The gate would stop being answerable: running it to ask 'are we ready' would rewrite the repository. A read-only check and a writing generator are different tools with different safety properties."
+      },
+      {
+        "option": "Let the planning agent assemble the handoff freeform",
+        "whyNot": "Two runs would differ, and a package that cannot be reproduced cannot be reviewed or diffed. It also reintroduces the model as the source of truth for content the artifacts already hold."
+      },
+      {
+        "option": "Defer the export to v2 and hand over planning-content directly",
+        "whyNot": "REQ-0010 requires a recipient to begin without asking the planner, and raw planning-content is a store, not a package: no role slice, no ordering, and no rendering for the human half of REQ-0011."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0009",
+    "lifecycle": "active",
+    "notes": "⚠️ This decides that the export EXISTS and how it is invoked. It does not yet decide the package's contents beyond what DEC-0011 settles about surfaces, nor the role-slicing algorithm (#19), which is stage 8 work.",
+    "rationale": "Separating the gate from the generator keeps two different failure modes apart. A gate that generated as a side effect could not be run to ASK a question — every check would mutate the repository, and #46's 'warn continuously' becomes 'rewrite continuously'. A freeform agent task fails the other way: the package would differ between runs, and a handoff that cannot be reproduced cannot be reviewed. An explicit command is reproducible, inspectable in a diff, and callable by a human or by CI without either of them approving anything. The folder in the repo IS the delivery (docs/plan/README.md), so there is no service to keep alive and the artifact of the handoff is a commit.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A v1 export exists. It is produced by an explicit deterministic command — `npm run handoff` — that reads planning-content and writes the frozen package under docs/plan/. Generation is NEVER a gate side effect and never a freeform agent task: the gate stays READ-ONLY and reports whether the package may be produced, and the command is what produces it. `CMP-0011` is the component that will implement it, and it satisfies REQ-0010 and REQ-0011.",
+    "title": "The v1 handoff export exists, and is produced by an explicit deterministic command",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0008"
+    ],
+    "alternatives": [
+      {
+        "option": "Ship the skeleton as the delivery surface",
+        "whyNot": "It renders CURRENT state, and a handoff must be frozen. It also requires the recipient to run a server to read a plan, which contradicts the zero-infrastructure delivery."
+      },
+      {
+        "option": "Markdown only, no canonical JSON",
+        "whyNot": "The automated half of REQ-0011 would be served by parsing prose, which is what the whole artifact model exists to avoid."
+      },
+      {
+        "option": "Build an interactive recipient site now",
+        "whyNot": "No demand has been demonstrated. QST-0008 asked whether the skeleton suffices; the answer is that the QUESTION was mis-framed - the delivery surface is a different artifact from the authoring surface, and neither needs to be an app for v1."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0010",
+    "lifecycle": "active",
+    "notes": "⚠️ Reframes rather than answers QST-0008 as asked. The question was 'is the skeleton's rendering sufficient for the human half', and the answer is that the skeleton is the wrong candidate — sufficiency should be judged of the GENERATED package, not of the authoring tool.",
+    "rationale": "REQ-0011 requires that both a human reader and an automated consumer can recover every required item. It does not require that they use the same surface, and reading it as 'therefore build an app for the recipient' inflates a requirement about legibility into a commitment about product. Generated Markdown satisfies the human half with no infrastructure — it renders in any editor, in the repository host, and in a diff — while the JSON the artifacts already are satisfies the agent half without a second serialisation to keep in sync. Keeping the authoring surface out of the delivery also preserves the property that the handoff is a frozen package: a live app shows current state, and a handoff must show the state that was approved.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For v1: canonical JSON serves automated consumers, and generated Markdown — including a top-level PLAN.md — serves human readers. The authoring skeleton (app/server.mjs) is a tool for working ON the plan and is NOT the delivery surface. An interactive site for the recipient requires separate demonstrated demand; it is not assumed by REQ-0011.",
+    "title": "The authoring skeleton is not the delivery surface; v1 delivers JSON and generated Markdown",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0003"
+    ],
+    "alternatives": [
+      {
+        "option": "Build `runbook` now so the aggregate exists when it is needed",
+        "whyNot": "It would be built on an imagined use. #106 exists for exactly this, and a type built early hardens conventions around a shape nobody has exercised."
+      },
+      {
+        "option": "Remove `runbook` from the catalogue entirely",
+        "whyNot": "That is #107's three-authority update - catalogue, stages/, and any project activation - and it is the PM's act, not a consequence of one project's handoff being thin. This project is a planning system; a deployment-shaped project would plausibly need the aggregate."
+      },
+      {
+        "option": "Move the three fields onto `runbook-step`",
+        "whyNot": "They are SEQUENCE-level by definition. A whole-run precondition on every step is the same fact repeated, and the first divergence between copies is a contradiction with no owner."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0011",
+    "lifecycle": "active",
+    "notes": "⚠️ REOPENING CONDITION, because this is a deferral and not a refutation: build `runbook` when a project's handoff contains a MULTI-STEP procedure with at least one destructive step and a rollback that spans steps — that is when cross-step state stops being imaginable and starts being owed. ⚠️ HONEST LIMIT ON THE EVIDENCE: this is one project's handoff, and this project is a planning system rather than a deployment. The same caution as #139's `produces[]` finding applies — it shows the type is inapplicable HERE, not that it is wrong. That is precisely why catalogue removal is not part of this decision. ⚠️ Deactivating it also makes `runbook-step.partOf` point at an unactivated type, which #75 already permits and declares; the edge dangles VISIBLY rather than being removed, so nothing is lost if the type is later built.",
+    "rationale": "Applied to the real handoff rather than to the idea of a runbook. (1) WHOLE-RUN PRECONDITIONS: this project's package is generated by `npm run handoff` and read; it has no preconditions to satisfy before executing anything, and where a real deployment would have them, an ordered first step expresses them without an aggregate. (2) ABORT CRITERIA: `runbook-step` already carries `remediation`, `destructive` and `dependsOn`, and #58's floor is per-step by decision — an abort spanning steps is meaningful only for a multi-step destructive procedure, and v1's handoff contains one step that is `partOf` nothing. (3) CROSS-STEP ROLLBACK: the same, and it is the strongest of the three — a rollback spanning steps genuinely has nowhere to live. But nothing in this handoff needs one, and #106 is explicit that a type is built when work demands it, not when a plausible use can be imagined. Membership is derived by reversing `partOf` (#84), and ordering is `ordinal` plus `dependsOn`, so an aggregate is a PROJECTION at handoff rather than stored state.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`runbook` is NOT built and is deactivated on this project. The three fields that would have justified it — whole-run preconditions, abort criteria, and cross-step rollback — are not needed by the handoff v1 actually produces. Membership in #38's catalogue is a separate act under #107's three-authority rule and is NOT performed here; the type remains in the catalogue, unimplemented and unactivated, with the condition that would reopen it recorded. `runbook-step.partOf` keeps its declared unresolvable target (#75), which is the mechanism that lets the edge exist while the aggregate does not.",
+    "title": "`runbook` is not retained for v1: the real handoff needs none of its candidate fields",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0015"
+    ],
+    "alternatives": [
+      {
+        "option": "Add `state: planned | built` to component",
+        "whyNot": "Stored derived state. Someone sets `built`, the code is deleted, and the field still says built. It also says nothing about whether the thing works, which is the question that actually matters."
+      },
+      {
+        "option": "Infer built from a non-empty implementedBy alone",
+        "whyNot": "That is the right signal for 'code exists' and the wrong one for 'accepted'. Collapsing them would let an unevaluated component read as finished."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0012",
+    "lifecycle": "active",
+    "notes": "⚠️ The three owners are now all real: `implementedBy` on component, `outcome` on acceptance-criterion (#144), and the stage attestation. Before #144 only two thirds existed, which is why the question was worth keeping open rather than closing on the argument alone.",
+    "rationale": "QST-0015 was raised when CMP-0011 took the orphan count to zero while nothing was built, and running stage 7 dissolved it rather than answering it: the single question was three questions. The decisive objection to a field is #96's, applied in a new place - `built` is DERIVABLE from implementedBy plus criteria outcomes, and a derived value that gets stored is a value that can disagree with reality without anything noticing. The hazard the question named is real and is answered by making the derivation available rather than by adding a flag: ACC-0010 was written BEFORE the code and sat at `not-evaluated`, which is exactly the state a planned-versus-built boolean was wanted for.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "No status axis is added to `component`. Planned, implemented and accepted are three separate facts and each already has an owner: `implementedBy` says whether code exists, an acceptance criterion's `outcome` says whether it works, and the stage attestation says whether the plan claims it is finished. A `state: planned | built` field would answer none of them well and would be stored derived state, which can lie the moment the code it describes is deleted.",
+    "title": "Planned, implemented and accepted are separate facts with existing owners",
+    "type": "decision"
+  },
+  {
+    "addresses": [],
+    "alternatives": [
+      {
+        "option": "Activate `risk` so stage 6's criterion is mechanical",
+        "whyNot": "It would make the criterion evaluable by satisfying its own premise. The prose register works, and the cost - a human reads a table - is stated in the attestation rather than hidden."
+      },
+      {
+        "option": "Remove `risk` from the catalogue",
+        "whyNot": "#107's three-authority act, and one project's absence of demand is not evidence about the type. The same restraint was applied to `runbook` and `research-finding`."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0013",
+    "lifecycle": "active",
+    "notes": "⚠️ Reopening condition: build `risk` when something OTHER than a stage-6 criterion must traverse one - a handoff carrying a risk register to a recipient, a cascade flagging risks when an assumption moves, or a requirement asking for risk tracking.",
+    "rationale": "Stage 6 was run and produced exactly one consumer for `risk`: its own `high-severity-risks-mitigated` criterion. Compare `component`, whose four consumers were all decided before the type was proposed, and `acceptance-criterion` and `task`, which had the same property. The distinction is not how MANY consumers but whether any exists independently of the demand: a criterion saying 'every risk must be mitigated' cannot be evidence that risks need to be artifacts, because it presupposes it. Keeping the type in the catalogue rather than deleting it preserves the possibility that a deployment-shaped project has real downstream use, which this planning-system project does not.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`risk` stays INACTIVE on this project and REMAINS in the catalogue. The general rule: when the only consumer that would traverse a type is the stage criterion that declares the type, that is circular demand and does not satisfy #41. A type is retained in the catalogue - not removed - until a project produces authentic downstream use.",
+    "title": "A stage criterion demanding a type is circular demand, not an independent consumer",
+    "type": "decision"
+  },
+  {
+    "addresses": [],
+    "alternatives": [
+      {
+        "option": "Leave `critical` undefined and judge case by case",
+        "whyNot": "An exit criterion turning on an undefined word is unevaluable in either direction, which is what took DEC-0002 to fix once already."
+      },
+      {
+        "option": "Define a severity scale for questions",
+        "whyNot": "A second subjective category. DEC-0002's test is about consequence rather than felt importance, which is what makes it checkable."
+      }
+    ],
+    "decidedAt": "2026-08-22",
+    "id": "DEC-0014",
+    "lifecycle": "active",
+    "notes": "⚠️ Applied before it was written: QST-0002 and QST-0015 were judged non-critical during the stage-9 run, by analogy to DEC-0002. That order is backwards and is recorded rather than tidied - the judgement stands, and the definition is what makes it reproducible by someone else.",
+    "rationale": "Stage 9's run found `critical` undefined - the second instance of the defect stage 4 hit with `blocking`. Inventing a fresh category would double the vocabulary and leave two words that both mean 'important' with different unstated tests. DEC-0002 already separates a decision whose absence would make a commitment possibly wrong from work that is simply not done, and the handoff needs exactly that distinction scoped to what it publishes: a question is critical if the package would carry something wrong without its answer, or if a criterion cannot be judged.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "An unanswered question is CRITICAL for stage 9's `no-unresolved-critical-questions` when it blocks active handoff content or makes a handoff criterion unevaluable. This reuses DEC-0002's shape rather than inventing a second subjective scale, and the stage definition's criterion text is amended to say so.",
+    "title": "Stage 9's `critical` is DEC-0002's definition, not a new category",
+    "type": "decision"
+  }
+]

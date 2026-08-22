@@ -20,7 +20,7 @@
     },
     {
       "id": "no-unresolved-critical-questions",
-      "describe": "No unresolved critical questions remain.",
+      "describe": "No unresolved critical questions remain. CRITICAL, per DEC-0014: the question blocks active handoff content, or makes a handoff criterion unevaluable.",
       "mechanised": false
     }
   ],

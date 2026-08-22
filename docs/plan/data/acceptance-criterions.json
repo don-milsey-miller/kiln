@@ -1,0 +1,172 @@
+[
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0001",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`publishHandoff` calls `handoffCompleteness` inside the lock before reading any content, and exposes no parameter through which a caller can assert readiness.",
+    "title": "Completeness is re-evaluated immediately before snapshotting",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0002",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Holding the content lock delays a concurrent `publishHandoff` until it is released.",
+    "title": "Gate evaluation and input snapshot share one content lock",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0003",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After a refused publish, every file under the output directory is byte-identical to before.",
+    "title": "A refusal writes nothing and preserves the previous package",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0004",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After a publish whose renderer throws, the output directory is byte-identical to before and no `.handoff-tmp-` or `.previous-` directory remains.",
+    "title": "A rendering failure preserves the previous package and leaves no temporary directory",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0005",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A package whose written bytes differ from what was rendered is refused and never replaces the previous one.",
+    "title": "The package is rendered to a temporary directory, validated against the disk, then swapped atomically",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0006",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Publishing twice without changing content yields the same snapshot identity and the same bytes in every file.",
+    "title": "Two runs over identical input and tool version produce byte-identical output",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0007",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After deleting an artifact and republishing, the package contains no trace of it.",
+    "title": "Removed source material does not survive as a stale generated file",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0008",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The package contains no `site/` directory, no aggregate runbook file, and a data file for every activated type and no others.",
+    "title": "Only approved surfaces and activated content are generated",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0009",
+    "lifecycle": "active",
+    "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "MANIFEST.json holds a content-hash snapshot and tool version, and no generated file contains an ISO timestamp.",
+    "title": "The package carries a snapshot identity and no wall-clock time",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0011"
+    ],
+    "id": "ACC-0010",
+    "lifecycle": "active",
+    "notes": "⚠️ Written BEFORE the code, unlike ACC-0001..0009. `not-evaluated` is the honest state and is exactly the distinction QST-0015 was about: the criterion exists, the work does not. ⚠️ EVALUATED 2026-08-22: `test/handoff.test.mjs` covers it in four parts — a slice carries its tasks' requirements, criteria and components; a cross-role dependency is visible to the blocked role; no tasks means no slices; and slugs are stable. ⚠️ The cross-role case is covered by a CONSTRUCTED fixture, because this project has exactly one role — so the case the criterion is really about has been tested but not lived.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For each role in the task graph, the generated slice contains every task assigned to that role together with the requirements and acceptance criteria those tasks trace to, and nothing is a reference to a file outside the package.",
+    "title": "Every role slice is self-sufficient",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0010"
+    ]
+  }
+]

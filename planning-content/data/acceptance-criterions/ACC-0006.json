@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0006",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Two runs over identical input and tool version produce byte-identical output",
+  "statement": "Publishing twice without changing content yields the same snapshot identity and the same bytes in every file.",
+  "evaluates": [
+    "CMP-0011"
+  ],
+  "verifies": [
+    "REQ-0010"
+  ],
+  "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "DEC-0013",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A stage criterion demanding a type is circular demand, not an independent consumer",
+  "statement": "`risk` stays INACTIVE on this project and REMAINS in the catalogue. The general rule: when the only consumer that would traverse a type is the stage criterion that declares the type, that is circular demand and does not satisfy #41. A type is retained in the catalogue - not removed - until a project produces authentic downstream use.",
+  "rationale": "Stage 6 was run and produced exactly one consumer for `risk`: its own `high-severity-risks-mitigated` criterion. Compare `component`, whose four consumers were all decided before the type was proposed, and `acceptance-criterion` and `task`, which had the same property. The distinction is not how MANY consumers but whether any exists independently of the demand: a criterion saying 'every risk must be mitigated' cannot be evidence that risks need to be artifacts, because it presupposes it. Keeping the type in the catalogue rather than deleting it preserves the possibility that a deployment-shaped project has real downstream use, which this planning-system project does not.",
+  "decidedAt": "2026-08-22",
+  "addresses": [],
+  "alternatives": [
+    {
+      "option": "Activate `risk` so stage 6's criterion is mechanical",
+      "whyNot": "It would make the criterion evaluable by satisfying its own premise. The prose register works, and the cost - a human reads a table - is stated in the attestation rather than hidden."
+    },
+    {
+      "option": "Remove `risk` from the catalogue",
+      "whyNot": "#107's three-authority act, and one project's absence of demand is not evidence about the type. The same restraint was applied to `runbook` and `research-finding`."
+    }
+  ],
+  "notes": "⚠️ Reopening condition: build `risk` when something OTHER than a stage-6 criterion must traverse one - a handoff carrying a risk register to a recipient, a cascade flagging risks when an assumption moves, or a requirement asking for risk tracking."
+}

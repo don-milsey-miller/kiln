@@ -1,0 +1,25 @@
+{
+  "id": "DEC-0012",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Planned, implemented and accepted are separate facts with existing owners",
+  "statement": "No status axis is added to `component`. Planned, implemented and accepted are three separate facts and each already has an owner: `implementedBy` says whether code exists, an acceptance criterion's `outcome` says whether it works, and the stage attestation says whether the plan claims it is finished. A `state: planned | built` field would answer none of them well and would be stored derived state, which can lie the moment the code it describes is deleted.",
+  "rationale": "QST-0015 was raised when CMP-0011 took the orphan count to zero while nothing was built, and running stage 7 dissolved it rather than answering it: the single question was three questions. The decisive objection to a field is #96's, applied in a new place - `built` is DERIVABLE from implementedBy plus criteria outcomes, and a derived value that gets stored is a value that can disagree with reality without anything noticing. The hazard the question named is real and is answered by making the derivation available rather than by adding a flag: ACC-0010 was written BEFORE the code and sat at `not-evaluated`, which is exactly the state a planned-versus-built boolean was wanted for.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0015"
+  ],
+  "alternatives": [
+    {
+      "option": "Add `state: planned | built` to component",
+      "whyNot": "Stored derived state. Someone sets `built`, the code is deleted, and the field still says built. It also says nothing about whether the thing works, which is the question that actually matters."
+    },
+    {
+      "option": "Infer built from a non-empty implementedBy alone",
+      "whyNot": "That is the right signal for 'code exists' and the wrong one for 'accepted'. Collapsing them would let an unevaluated component read as finished."
+    }
+  ],
+  "notes": "⚠️ The three owners are now all real: `implementedBy` on component, `outcome` on acceptance-criterion (#144), and the stage attestation. Before #144 only two thirds existed, which is why the question was worth keeping open rather than closing on the argument alone."
+}

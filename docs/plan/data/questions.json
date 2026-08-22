@@ -1,0 +1,298 @@
+[
+  {
+    "answer": "A pre-fix defect could fail lock acquisition under Windows contention because EPERM was not retried: openSync(lockPath,'wx') returns EPERM rather than EEXIST while another process holds or releases the lock, and the retry loop was keyed only on EEXIST. The instrumented matrix reproduced that defect on run 19 of a declared 40 — one child of six, 507ms, no duplicate ID, the other five allocating distinct IDs — so serialisation remained intact IN THE REPRODUCED EVENT. ⚠️ The ORIGINAL 2026-08-18 occurrence remains UNCLASSIFIABLE: its output was never captured, so nothing observed distinguishes this defect from any other cause. What can be said is that this defect explains its observed shape — a full-suite run failing with no duplicate ID reported — and that it did not recur across the bounded post-fix matrix of 80 runs. Fix: retry EEXIST/EPERM/EBUSY/EACCES on acquisition, the same family as #72's rename retry. The maxWaitMs 10s->30s mitigation addressed a timeout not present in the reproduced failure and is reverted.",
+    "answeredBy": [
+      "AST-0004",
+      "AST-0005",
+      "EVD-0004",
+      "EVD-0005"
+    ],
+    "blocks": [
+      "AST-0003"
+    ],
+    "id": "QST-0001",
+    "lifecycle": "active",
+    "notes": "Reopening condition: any recurrence after the fix. Bounded non-reproduction only — 80 post-fix runs across three cells, which at a 10% per-run rate would miss a recurrence about 4% of the time. ⚠️ EVD-0003, the original failure, supports 'the test failed once' and NOTHING about why. It refutes AST-0003 and is deliberately not linked to AST-0004: an unclassifiable observation cannot bear on a claim about a cause (#101). Answering this question did not make that record classifiable in hindsight.",
+    "raisedBy": [
+      "AST-0003"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "What caused the single observed failure of the separate-process concurrency test during a full parallel run on 2026-08-18, and is serialisation implicated at all?",
+    "title": "Why did the concurrency test fail once under full-suite parallel load?",
+    "type": "question"
+  },
+  {
+    "id": "QST-0002",
+    "lifecycle": "active",
+    "notes": "SECOND PARTIAL RESULT, 2026-08-18 — a READING-based stage 3 was run (QST-0004, the Next.js debt), which is the case the first result said was missing. It still needed no research-finding. Source inventory: three evidence(kind: source) records, each carrying its citations in evidence.sources. Claims: three assertions, each scoped by targetEnvironment to the mode it is about. ⚠️ CONTRADICTORY SOURCES WERE ENCOUNTERED — the case this type's strongest argument rests on. Two pages of the SAME official documentation give the same operation opposite treatment: the previous-model guide says pages in development are never cached, while the Cache Components page says a synchronous fs read is a predictable value prerendered into the static shell. ⚠️ AND THE CONTRADICTION DISSOLVED RATHER THAN NEEDING A HOME. The two sources do not disagree; they describe two different modes. Scoping each assertion's targetEnvironment by cacheComponents enabled/disabled resolved it completely — which is what targetEnvironment is for, and it is the same move that fixed AST-0003. So 'contradictory sources resolved or surfaced' was satisfied by SCOPING THE CLAIMS, not by a narrative artifact. Still not conclusive: this contradiction was RESOLVABLE. A genuine unresolved disagreement between authorities — two sources making incompatible claims about the SAME configuration — has not yet been met, and that remains the one case research-finding might own. Remains unanswered, with the evidence against it now covering both the experimental and the documentary half of stage 3.",
+    "resolution": "unanswered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Is there state a research-finding artifact would hold that is not already held by evidence(kind: source), assertion, or question — and that something downstream must traverse (#41)?",
+    "title": "Does `research-finding` own anything irreducible, or is it a projection?",
+    "type": "question"
+  },
+  {
+    "answer": "No, not for v1. The real handoff needs none of the three candidate fields: it has no whole-run preconditions, `runbook-step` already carries per-step remediation and dependsOn, and no rollback spans steps. `runbook` is not built and is deactivated here; it stays in the catalogue with a reopening condition, because one thin handoff shows the type is inapplicable HERE rather than wrong. See DEC-0011.",
+    "answeredBy": [
+      "DEC-0011"
+    ],
+    "id": "QST-0003",
+    "lifecycle": "active",
+    "notes": "#87 says an aggregate belongs at handoff as a projection, not as an authored artifact, so membership and ordering do not justify the type: partOf gives membership by reverse index (#84), and ordinal plus dependsOn give ordering. The strongest candidate is sequence-level state no single step owns: a precondition for the whole run, abort criteria, and a rollback strategy spanning steps. #58's floor is per-step; a runbook-level abort is not. Role slice is NOT a candidate: #19 slices the handoff per role and #18 discovers roles from stage-8 assignments, so role-assignment owns that. Resolve by naming those fields concretely, or accept that stage 9 produces runbook-step artifacts and the runbook is assembled at handoff.",
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Is there runbook-level state — preconditions, abort criteria, rollback strategy, role slice — that no runbook-step holds and that cannot be derived by reverse traversal of runbook-step.partOf?",
+    "title": "Does `runbook` own state not derivable from its steps?",
+    "type": "question"
+  },
+  {
+    "answer": "YES, in `next dev`, with one condition the framework does not supply. Measured across a 2x2 matrix (fs.readFileSync / await readFile x cacheComponents disabled / enabled) on Next.js 16.3.1, React 19.2.8, Node v24.18.0, Windows 11: all four cells re-read the file and returned the new value on a fresh request, with server-side counters confirming a genuine re-read rather than a replay. No stale server state, no reliance on HMR, and no framework caching interfered — including with Cache Components enabled and a synchronous read, which the documentation says would be prerendered. THE CONDITION: an external write alone produces nothing — no request, no re-render, no browser update in a 10-second window, in every cell. The application must supply the change signal itself. An SSE route watching the data directory delivered the event to a connected client in both modes, and a reload then showed the new value. That is precisely what the framework-free skeleton already does, so the pattern carries over rather than needing replacement. ⚠️ SCOPED TO `next dev`. AST-0010 carries the production-build claim and is untested; the documentation describes build-time prerendering, and whether this product ever runs a production build is itself undecided given #2 and #22's local-only stance.",
+    "answeredBy": [
+      "AST-0006",
+      "AST-0008",
+      "AST-0009",
+      "EVD-0009"
+    ],
+    "blocks": [
+      "REQ-0002"
+    ],
+    "id": "QST-0004",
+    "lifecycle": "active",
+    "notes": "Reopening condition: adopting `next build` for any part of the app, or upgrading Next.js past 16.3.1. ⚠️ WRITE-BACK HALF ADDED 2026-08-18 after review pointed out the first answer proved only the read/refresh side. AST-0012 now carries it, measured in both cacheComponents modes: reviewStatus-only boundary held, non-reviewStatus values refused, lock released, no temp file, and the Next.js write BLOCKED while an external process held the lock and completed after release. #100's specific worry — React's state model against #78's lock — did not materialise.",
+    "raisedBy": [
+      "AST-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Can a Next.js development app reliably reflect artifact files written by an EXTERNAL process, and perform lock-protected status write-backs, without relying on HMR, stale server state, or framework-owned caching?",
+    "title": "Can a Next.js dev app reflect externally written files and do lock-protected write-backs?",
+    "type": "question"
+  },
+  {
+    "answer": "The shipped Pi extension owns typed research tools (research_search, research_fetch, research_capability); the specialist depends on those, not on a vendor. Public read-only research only; credentials stay host-side; every delegation probes registration and backend health; results are discovery observations until promoted to evidence(kind: source); unavailable retrieval produces a structured refusal, never a memory answer. See DEC-0004.",
+    "answeredBy": [
+      "DEC-0004"
+    ],
+    "blocks": [
+      "REQ-0003"
+    ],
+    "id": "QST-0005",
+    "lifecycle": "active",
+    "notes": "BLOCKING under DEC-0002 — see the earlier note. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what counts as research — which questions a specialist may take externally, and which it must refuse; (b) where external access comes from — the host capability, and who holds the credential; (c) how provenance is retained — every claim taken externally must land as evidence(kind: source) with its citations, since REQ-0004 is otherwise unenforceable at the point it matters; (d) how the system behaves when the capability is UNAVAILABLE — an explicit refusal or recorded gap, never a specialist answering from what it already holds, which is the intake's original complaint restored. Only after those four does the mechanism question — extension, MCP, something else — become answerable.",
+    "raisedBy": [
+      "DEC-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "REQ-0003 requires that implementation questions be answerable from current external sources. Nothing in the shipped package provides that. What gives the research specialist the ability — a Pi extension wrapping a search API, an MCP server, something else — and who holds the credential?",
+    "title": "How does a specialist obtain internet research capability?",
+    "type": "question"
+  },
+  {
+    "answer": "Tier 1 first, behind a typed validation controller owning provision -> execute -> observe -> destroy, refusing jobs above the approved ceiling before provisioning. Jobs are declared (tier, inputs, argument-array commands, capture plan, limits, expected outputs, network/credential/cost needs); the specialist never gets a shell. Tier 1 is a temp workspace plus a Python venv, which isolates dependencies and is NOT an OS security sandbox — so it makes no containment, filesystem or network-isolation claim, and claims needing those require a higher tier. Every run yields an observation record whose capture plan makes omissions detectable: not captured / not observable / unavailable / redacted, each with a reason. Cleanup failure is a first-class result: keep the evidence, report the retained path. See DEC-0005.",
+    "answeredBy": [
+      "DEC-0005"
+    ],
+    "blocks": [
+      "REQ-0005",
+      "REQ-0012"
+    ],
+    "id": "QST-0006",
+    "lifecycle": "active",
+    "notes": "BLOCKING under DEC-0002. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what may execute; (b) filesystem/network/credential boundaries per tier (#56) and what a tier may NOT reach; (c) resource limits — time, cost, instance count — since #77's authorisation is meaningless without them; (d) cleanup via #56's `destroy`, and what happens when it fails; (e) ⚠️ AN EVIDENCE-SURVIVAL CONTRACT (#122). What survives a run: environment facts, tool and runtime VERSIONS, inputs, outputs, exit status, timing, permission denials, and explicit omission or redaction reasons. ⚠️ Stated precisely: an absent fact does NOT make the record inapplicable. It stays applicable with an `unknown` comparison; what the absence changes is the attainable RUNG, capping it below environment-matched. So a silent omission decides how strong a claim can ever become, invisibly. ⚠️ And the recorded states describe the OBSERVER, never relevance. Relevance is claim-relative (#105) — the same record may be decisive for another assertion — so `not relevant` is not something evidence can hold. The honest states are: not captured · not observable · unavailable · redacted, with a reason. The applicability layer decides whether the gap matters to a given claim. ⚠️ Which of those states to declare is part of THIS question, because only the states a sandbox can genuinely DETECT are worth declaring — declaring one nothing can distinguish repeats #121's error of promising a capability the host cannot check. Only after all of this does 'which tier first, implemented how' become answerable. ⚠️ AND THE FIELD'S SHAPE IS GOVERNED BY #123: evidence stores observations and provenance, never what they mean for a claim. So whatever this question settles must record why the OBSERVER lacks a fact, and must not smuggle in polarity, relevance, applicability, verdict or confidence — all of which are derived per claim and would be wrong the moment a second assertion cited the same record.",
+    "raisedBy": [
+      "DEC-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "REQ-0005 requires claims to be testable by execution in a real environment. #56 decides three tiers and #77 decides how they activate, but no controller exists for any of them. Which tier is built first, and what provisions, executes, observes and destroys?",
+    "title": "What implements sandboxed execution, and which tier first?",
+    "type": "question"
+  },
+  {
+    "answer": "Yes. The v1 export exists and is produced by `npm run handoff`, an explicit deterministic command. The gate stays read-only; generation is never a gate side effect or a freeform agent task. CMP-0011 is the planned component. See DEC-0009.",
+    "answeredBy": [
+      "DEC-0009"
+    ],
+    "blocks": [
+      "REQ-0010",
+      "REQ-0011"
+    ],
+    "id": "QST-0007",
+    "lifecycle": "active",
+    "notes": "BLOCKING STATUS under DEC-0002: BLOCKING for handoff design only. It gates #19's export and the conditional demand for `task` and `role-assignment` (#119). It does not block unrelated work, so it is a gap for stage 9 rather than for now.",
+    "raisedBy": [
+      "DEC-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "REQ-0010 requires a handoff actionable without returning to the planner, and #19 specifies docs/plan/ with data, docs, site and PLAN.md. Nothing produces any of it. Is the export in v1, and is it a command, a gate action, or a stage-9 agent task?",
+    "title": "Does the handoff export exist in v1, and what produces it?",
+    "type": "question"
+  },
+  {
+    "answer": "The question was mis-framed: the authoring skeleton is not the delivery surface. For v1, canonical JSON serves agents and generated Markdown plus PLAN.md serves humans. An interactive recipient site needs separately demonstrated demand. See DEC-0010.",
+    "answeredBy": [
+      "DEC-0010"
+    ],
+    "blocks": [
+      "REQ-0011"
+    ],
+    "id": "QST-0008",
+    "lifecycle": "active",
+    "notes": "BLOCKING STATUS under DEC-0002: BLOCKING conditionally. It blocks whichever implementation commitment owns REQ-0011's human half. Urgency depends entirely on whether that commitment is next — under #116 it is not, so this is currently latent rather than pressing.",
+    "raisedBy": [
+      "DEC-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "REQ-0011 requires the output to serve a human reader and an automated consumer without either being a lossy rendering of the other. Artifacts are JSON, so the machine half exists. What satisfies the human half — the skeleton's HTML, #19's site/ build, or #8's interactive components?",
+    "title": "Is the skeleton's rendering sufficient for the human half of REQ-0011?",
+    "type": "question"
+  },
+  {
+    "answer": "Blocking = proceeding would require a load-bearing commitment whose correctness materially depends on the answer, OR the absence makes the current stage's exit criterion unevaluable. Missing implementation alone is work, not a gap. See DEC-0002.",
+    "answeredBy": [
+      "DEC-0002"
+    ],
+    "blocks": [],
+    "id": "QST-0009",
+    "lifecycle": "active",
+    "notes": "⚠️ Raised deliberately: the criterion turns on a word nobody has defined for this project. Without a definition the stage cannot be exited honestly in either direction — everything could be called blocking, or nothing could.",
+    "raisedBy": [
+      "DEC-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "Stage 4's exit criterion is that every BLOCKING gap has a user decision recorded — not every gap. Which of the four questions above block progress, and which are known future work that does not?",
+    "title": "Which of these gaps BLOCK, and which are simply not done?",
+    "type": "question"
+  },
+  {
+    "answer": "Implemented as `lib/tools/activate-type.mjs` (`setTypeActivation`), and used to activate `component` rather than hand-editing the manifest. It validates catalogue membership, authorability and stage reachability, writes only the activated list, and refuses to deactivate a type whose artifacts still exist. See DEC-0008.",
+    "answeredBy": [
+      "DEC-0008"
+    ],
+    "id": "QST-0010",
+    "lifecycle": "active",
+    "notes": "Found by auditing authorised transitions against typed operations (#121's corrected criterion). Every other transition has one: create, link/unlink, revise, setLifecycle, writeStageAttestation, writeReviewStatus, allocateId. This is the only authorised transition still performed by hand-editing a file. ⚠️ CORRECTED 2026-08-18: an earlier note said this operation must also move stages/ and #38 with it. That is wrong and crosses the line #95 draws. PROJECT ACTIVATION MUST NOT REWRITE THE CATALOGUE OR THE METHODOLOGY — #107's three-authority update applies when a type is RETIRED FROM THE CATALOGUE, not when a project activates or deactivates an existing one. A project-scoped approval that edited stages/ or #38 would silently become a product-wide design change. The contract is therefore: update the project's approved activation set; record or require the approving decision (#39 makes it agent-proposes/PM-approves, so an activation with no decision behind it is the attestation problem again); and VALIDATE that the type exists in the catalogue and is compatible with the stage definitions. Validate against stages/ and #38 — never write to them. Not blocking under DEC-0002: nothing pending requires an activation change, so it is work rather than a gap.",
+    "raisedBy": [
+      "DEC-0002"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "#39 authorises a state transition — the PM approves an activation list at stage 2, recorded in project.yaml — and nothing can perform it. readActivatedTypes reads it; no typed operation writes it. Should there be one, and what must it validate?",
+    "title": "Approving artifact type activation has no typed operation",
+    "type": "question"
+  },
+  {
+    "answer": "Tavily Search API, basic depth, discovery results only, probed via GET /usage. TAVILY_API_KEY is supplied by the PM through the host environment and injected only into the research child. See DEC-0006.",
+    "answeredBy": [
+      "DEC-0006"
+    ],
+    "blocks": [
+      "REQ-0003"
+    ],
+    "id": "QST-0011",
+    "lifecycle": "active",
+    "notes": "⚠️ BLOCKING for 7a step 4 only, under DEC-0002 — and precisely scoped, because most of 7a does not wait on it. `research_fetch` is plain HTTP and needs no credential; tool registration, the capability signature and the live probe are all buildable and testable without a backend, and the probe's most important behaviour is what it reports when the backend is ABSENT — which is exactly the state this question describes. So 7a can be built and its refusal path proven before this is answered; what cannot happen without it is the end-to-end run that produces real evidence(kind: source). ⚠️ It is the PM's to answer because it costs money or a signup and because of where DEC-0004 puts the credential. ⚠️ CORRECTED 2026-08-22: the first phrasing here said 'outside anything this project can read', which is false — the extension MUST read the key to use it. The enforceable boundary is that it stays outside project FILES, planning content, and every MODEL-VISIBLE interface: prompts, logs, errors and tool results. That is a boundary code can hold; the original was a boundary nothing could.",
+    "raisedBy": [
+      "DEC-0004"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "DEC-0004 makes the backend replaceable and puts credentials in the PM's host environment, outside the repository. Step 7a still has to pick ONE first adapter and have a working key for it to run a real external question end to end. Which provider, and how is its credential supplied to the extension on this machine?",
+    "title": "Which search backend is the first adapter, and where do its credentials come from?",
+    "type": "question"
+  },
+  {
+    "answer": "Neither. `environment` was reshaped into two axes (#131): every experiment declares `execution` (host or controller) and `facts`; `sandboxTier` is required only when a controller supplied the isolation, and is FORBIDDEN on a host run. There is no tier 0 — a rung implies a comparison, and a host run has no answer to isolation rather than the weakest one. Settled by pressuring the model with two fixtures before changing it, per the PM's instruction.",
+    "answeredBy": [],
+    "blocks": [
+      "AST-0013"
+    ],
+    "id": "QST-0012",
+    "lifecycle": "active",
+    "notes": "⚠️ FOUND BY BEING BLOCKED, not by review: creating the evidence record for `npm run research:probe` failed validation with `must have required property 'environment'`. The first real observation the research capability produced could not be recorded. ⚠️ The two available workarounds are both dishonest and both were refused: recording `tier: 1` claims an isolation that did not exist, and recording `kind: source` calls an execution a document. ⚠️ NOT BLOCKING under DEC-0002 — no committed work's correctness depends on the answer and no stage criterion is unevaluable without it — but it does block THIS record, which is a smaller and more concrete thing worth stating separately. ⚠️ It belongs with 7b and must NOT be fixed by guessing now: 7b builds the controller and the omission field together precisely so that what an environment record carries is decided against a real collector rather than ahead of one (#127). Changing the schema today to unblock one record would be that error in miniature. ⚠️ Note also that the schema is not simply wrong. REQ-0006 says a tested claim records its environment, and the conditional enforces it; what is missing is a way to say 'observed here, under no isolation' — an absence the tier enum cannot express.",
+    "raisedBy": [
+      "DEC-0005"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "statement": "`evidence` requires `environment` whenever `kind` is `experiment`, and `environment` requires a sandbox `tier` of 1, 2 or 3. A run executed directly on the host sits under NO tier, so the typed path refuses the record outright — there is no honest value for `tier`, and omitting `environment` fails validation. Is a direct host run a tier (a 'tier 0' with no isolation), or must `environment` be restructured so observed facts can be recorded without asserting an isolation level that did not exist?",
+    "title": "An experiment run under no sandbox tier cannot be recorded at all",
+    "type": "question"
+  },
+  {
+    "answer": "Nothing caps by isolation level, and nothing should. Tier is a permission and execution boundary, not an epistemic rank. Isolation enters the same claim-relative comparison as every other environment fact through the assertion's `requiresIsolation`. See DEC-0007.",
+    "answeredBy": [
+      "DEC-0007"
+    ],
+    "id": "QST-0013",
+    "lifecycle": "active",
+    "notes": "⚠️ PRE-EXISTING, not caused by #131 — `environment.tier` was carried through the derivation and never read, so the cap has never existed. #131 made it visible by removing the value that looked like it was doing the work. Recording that distinction matters: a reshape that introduced a gap and a reshape that exposed one call for different responses. ⚠️ NOT BLOCKING under DEC-0002, but it is close to it: AST-0013 derives `environment-matched` from a run executed directly on the PM's machine, which is the maximum rung on the weakest possible isolation. Nothing currently rests on that claim, so nothing is yet wrong. ⚠️ Belongs to 7b, because the answer depends on what the tier-1 controller can actually attest — and per DEC-0005 tier 1 explicitly claims no containment, so 'tier 1 caps higher than host' needs an argument rather than an assumption.",
+    "raisedBy": [
+      "DEC-0005"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "#56 and DEC-0005 both say a sandbox tier CAPS the reachable confidence rung, and the derivation does not implement it: `effectiveAssertion` computes confidence from evidence kind and environment match only. Since #131 a host run carries no tier at all, which makes the question concrete — an unsandboxed host run currently reaches `environment-matched`, the top rung, on facts alone. What caps a rung: the tier, the execution axis, the claim's own requirements, or nothing?",
+    "title": "Nothing caps the confidence rung by isolation level",
+    "type": "question"
+  },
+  {
+    "answer": "Yes to both: `component` joins the catalogue as CMP and is activated on this project. Minimal shape - name, responsibility, satisfies. Further links wait for stage 7-8 demand. See DEC-0008.",
+    "answeredBy": [
+      "DEC-0008"
+    ],
+    "blocks": [
+      "REQ-0010",
+      "REQ-0011"
+    ],
+    "id": "QST-0014",
+    "lifecycle": "active",
+    "notes": "⚠️ NOT BUILT PENDING THIS ANSWER, deliberately. Stage 5 is `decidedBy: Planning agent -> user approves`, and #106 exists precisely so the demand argument is REVIEWED rather than acted on by the agent that made it — #92 recorded what happens when I smuggle inferences into a stage's outputs. The #41 analysis is in planning-content/stages/05-solution-design.md §3 and includes the counter-arguments applied rather than skipped. ⚠️ The traceability chain in notes.md names 'design component' three times and #38 omits it, so four decisions rest on a chain with a missing link. That is the strongest part of the case, and it is also the part that shows the gap is OLD rather than newly created by this run. ⚠️ Adding a type edits common.schema.json's typePrefixes (#40) and is a CATALOGUE change (#95), distinct from activating it on this project — and activation still has no typed operation (QST-0010).",
+    "raisedBy": [
+      "REQ-0001"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Running stage 5 against the 14 active requirements produced demand for a `component` type that #38's sixteen do not include, and demand for NONE of the three the stage declares (`schema`, `api-spec`, `wireframe`). #41 applied: it owns a named unit of the design, its responsibility, and which requirements it satisfies — state no other artifact can hold. Four already-decided consumers must traverse it: #60's cascade (its worked example is `acceptance-criterion -> component`), #19's role slicing, the stage-9 completeness gate's orphan check ('a requirement no component satisfies'), and stage 5's own third exit criterion, which is unevaluable without it. Does it join the catalogue, and is it activated on this project?",
+    "title": "Does `component` join the catalogue? Stage 5 produced demand for it",
+    "type": "question"
+  },
+  {
+    "answer": "No status axis. Planned, implemented and accepted are three facts with three owners: `implementedBy`, an acceptance criterion's `outcome`, and the stage attestation. A stored `built` flag would be derived state that can lie. See DEC-0012.",
+    "answeredBy": [
+      "DEC-0012"
+    ],
+    "blocks": [],
+    "id": "QST-0015",
+    "lifecycle": "active",
+    "notes": "⚠️ RAISED RATHER THAN BUILT. The PM's instruction for `component` was explicitly minimal — further fields wait for authentic stage 7-8 demand — and adding a state axis the same day would be the catalogue justifying itself again (#106). ⚠️ The case FOR a field: nothing else can hold 'is this built', the stage-9 gate will plausibly need it to distinguish a plan that lists built components from one that lists intentions, and `implementedBy` being empty is an ADVISORY absence rather than a claim. The case AGAINST: acceptance criteria are the type that says whether something works, the distinction may be theirs, and #57's thresholds already govern what may become an instruction. ⚠️ NOT BLOCKING under DEC-0002 — the attestation carries the distinction today and says so explicitly, so nothing is currently silent.",
+    "raisedBy": [
+      "CMP-0011"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "CMP-0011 satisfies REQ-0010 and nothing implements it. The stage-9 orphan check counts EDGES, so its creation takes the orphan count to zero while the handoff remains unbuilt — 'all requirements trace to a component' becomes true, and 'the handoff exists' does not. Does `component` need a planned/built axis, or does that distinction belong entirely to attestation and, later, to acceptance criteria?",
+    "title": "A component records no distinction between planned and built",
+    "type": "question"
+  }
+]

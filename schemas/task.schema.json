@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/task.schema.json",
+  "title": "Task",
+  "description": "A developer-sized unit of work, tracing to the component it builds, the requirements it serves and the criteria that accept it, with dependencies and an assigned role. ⚠️ Approved 2026-08-22 after stage 8 was RUN (#144). It closes the trace chain: requirement -> component -> acceptance-criterion -> task -> runbook-step. ⚠️ `role` is a STRING, not a link, and that is a decision rather than an omission — see below.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
+  "properties": {
+    "id": {
+      "pattern": "^TSK-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "task"
+    },
+    "statement": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "What is to be done, stated so that a recipient could start without asking what was meant. Same field name as every other type's payload (#82).",
+      "x-materiality": "semantic"
+    },
+    "role": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "Who does it, BY ROLE and never by name (#18). ⚠️ A string rather than a link to a `role-assignment` artifact, and stage 8 is where that was settled: #18 says roles are DISCOVERED from task assignments and there is no roster to maintain, so the set of roles on a project is derived by collecting these values. An artifact holding this string plus an identity would store what a traversal derives — the same refusal as #138's tool signatures, #141's runbook aggregate and #143's roster.",
+      "x-materiality": "structural",
+      "examples": [
+        "backend",
+        "platform",
+        "technical writer"
+      ]
+    },
+    "implements": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The component this task builds. Required and non-empty: a task that implements nothing is the orphan the stage-9 completeness gate looks for.",
+      "minItems": 1,
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "component"
+      ]
+    },
+    "fulfils": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The requirements this task serves. Stage 8's `tasks-trace-to-requirement` criterion reads exactly this, which is what makes it mechanical rather than a reading of prose.",
+      "minItems": 1,
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "requirement"
+      ]
+    },
+    "acceptedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The criteria that decide whether this task is done. ⚠️ Not required: a task may legitimately exist before anyone has written how it will be judged, and forcing the link would push people to invent a criterion to satisfy a schema. The lint is the right place to notice the absence.",
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "acceptance-criterion"
+      ]
+    },
+    "dependsOn": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Tasks that must be done first. Ordering is derived from this rather than stored as a sequence number, for the same reason runbook membership is derived from `partOf` (#84): a stored order and a dependency graph disagree the first time anything moves.",
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "task"
+      ]
+    },
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103)."
+    }
+  },
+  "required": [
+    "statement",
+    "role",
+    "implements",
+    "fulfils"
+  ],
+  "unevaluatedProperties": false,
+  "x-artifactType": "task",
+  "x-stage": "08-implementation-plan",
+  "x-ownsIrreducibleState": {
+    "description": "#41 applied in the stage-8 run.",
+    "owns": "A unit of work, who does it, what it builds, and what it waits on. Not derivable: a requirement says what must be true, a component says what implements it, an acceptance criterion says how you would know — none of them says what someone should do next.",
+    "traversedBy": [
+      "#19 role slices — a slice is a query over the task graph, grouped by role",
+      "stage 9 exit criterion role-slice-self-sufficient",
+      "stage 9 completeness gate — a task nothing traces to is an orphan",
+      "#60 cascade — requirement -> component -> acceptance-criterion -> task"
+    ],
+    "deliberatelyNotAType": "role. #18 gives it no roster, so it is a task property and the role SET is derived by collecting."
+  },
+  "x-unresolvableTraceTargets": {
+    "description": "#75: none. component, requirement, acceptance-criterion and task are all implemented and activated.",
+    "targets": []
+  }
+}

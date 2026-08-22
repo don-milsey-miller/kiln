@@ -1,0 +1,16 @@
+[
+  {
+    "expectedOutcome": "Every child receives distinct IDs and no artifact is overwritten.",
+    "id": "RBS-0001",
+    "instruction": "Launch specialist children concurrently; each allocates its own artifact IDs.",
+    "lifecycle": "active",
+    "partOf": [],
+    "restsOn": [
+      "AST-0002"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 1,
+    "title": "Run specialists in parallel",
+    "type": "runbook-step"
+  }
+]

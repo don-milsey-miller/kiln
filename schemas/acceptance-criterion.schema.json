@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/acceptance-criterion.schema.json",
+  "title": "Acceptance criterion",
+  "description": "An objective pass/fail condition, tracing to the component it evaluates and the requirement it verifies. ⚠️ Approved 2026-08-22 after stage 7 was RUN (#144) — the second type added on demand rather than from a list, and the first where the stage's declared output and the demanded output agree. It answers the question neither a requirement nor a component can: a requirement says what must be true, a component says what implements it, and NEITHER says how you would know it worked.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    },
+    {
+      "$comment": "A criterion recorded as failed must say what showed that. Nested inside allOf per #82.",
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "fail"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "evidencedBy": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "evidencedBy"
+            ]
+          },
+          {
+            "required": [
+              "notes"
+            ]
+          }
+        ],
+        "$comment": "A bare `fail` is an accusation with no basis. A `pass` may stand on a link or on nothing yet — see `outcome` — but a failure must at least say what was seen."
+      }
+    }
+  ],
+  "properties": {
+    "id": {
+      "pattern": "^ACC-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "acceptance-criterion"
+    },
+    "statement": {
+      "$ref": "common.schema.json#/$defs/nonEmptyString",
+      "description": "The condition, stated so that passing or failing it requires no judgment call. ⚠️ Stage 7's exit criterion is exactly this property, so a statement that reads 'the handoff should be good' is not a criterion — it is a wish with an ID.",
+      "x-materiality": "semantic"
+    },
+    "evaluates": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The component this criterion tests. Required and non-empty: a criterion that evaluates nothing cannot be run, and it is the edge #60's cascade traverses — its worked example is `acceptance-criterion -> component`.",
+      "minItems": 1,
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "component"
+      ]
+    },
+    "verifies": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The requirement this criterion demonstrates. Separate from `evaluates` because the two answer different questions — WHAT is being tested versus WHY it matters — and the handoff slice pulls the traced requirement along with the criterion (#19).",
+      "minItems": 1,
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "requirement"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "not-evaluated",
+        "pass",
+        "fail"
+      ],
+      "default": "not-evaluated",
+      "description": "⚠️ A RECORDED JUDGEMENT, not a derivation, and the distinction is deliberate. `assertion`'s verdict is derived because an evidence graph determines it (#96); a criterion's outcome is determined by somebody running it and looking. Deriving it from `evidencedBy` would require the polarity machinery assertions already have, and would make an acceptance criterion a second, weaker assertion. ⚠️ `not-evaluated` is the default and is a real state: a criterion that exists and has never been run is exactly what distinguishes a component that is IMPLEMENTED from one that is ACCEPTED (QST-0015).",
+      "x-materiality": "semantic"
+    },
+    "evidencedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "What was observed when it was evaluated. Optional on a `pass` because a criterion may be self-evident from the artifact graph; REQUIRED in substance on a `fail` (see the conditional), because a failure that records nothing cannot be acted on.",
+      "x-materiality": "structural",
+      "x-traceTarget": [
+        "evidence"
+      ]
+    },
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "x-amendsApproval": false,
+      "description": "Changing tags never invalidates an approval (#103)."
+    }
+  },
+  "required": [
+    "statement",
+    "evaluates",
+    "verifies",
+    "outcome"
+  ],
+  "unevaluatedProperties": false,
+  "x-artifactType": "acceptance-criterion",
+  "x-stage": "07-acceptance-criteria",
+  "x-ownsIrreducibleState": {
+    "description": "#41 applied in the stage-7 run, with consumers that were decided BEFORE the type was proposed.",
+    "owns": "A pass/fail condition and whether it has been evaluated. Neither a requirement nor a component can hold this, and an assertion cannot either: an assertion is a claim about the world, where a criterion is a test someone runs against a build.",
+    "traversedBy": [
+      "#60 cascade — its worked example is acceptance-criterion -> component",
+      "#19 role slices — a slice pulls the traced requirements and acceptance criteria along with each task",
+      "task.acceptedBy — a task is done when its criteria pass",
+      "stage 7 exit criterion criteria-objective"
+    ]
+  },
+  "x-unresolvableTraceTargets": {
+    "description": "#75: none. component, requirement and evidence are all implemented and activated.",
+    "targets": []
+  }
+}

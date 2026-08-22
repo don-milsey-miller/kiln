@@ -1,10 +1,12 @@
 /**
  * `npm run handoff` — CMP-0011, against the PM's acceptance bar.
  *
- * ⚠️ **The decisive test is the negative one, and it runs against the REAL project**: this repo lints
- * clean and must still be refused, because stage 5's `requirements-traced-to-components` is attested
- * `not-satisfied`. Every other test here uses a complete fixture; that one uses the dogfood project,
- * because a publish gate that has only ever been shown succeeding has not been shown to gate.
+ * ⚠️ **The real project was the negative control until 2026-08-22, and then it passed.** It refused
+ * for as long as something real was missing — first eleven unattested criteria, then stage 5's
+ * traceability, then stage 9's role slices — and it publishes now because `task` and
+ * `acceptance-criterion` were built and the slices exist. **The negative controls did not go away
+ * with it**: the refusal, render-failure and validation-failure paths are all exercised against
+ * fixtures below, because a publish gate only ever shown succeeding has not been shown to gate.
  */
 
 import { test } from "node:test";
@@ -16,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { publishHandoff, HandoffRefused, swapIntoPlace, validatePackage } from "../lib/handoff/publish.mjs";
 import { handoffCompleteness, BLOCKED } from "../lib/handoff/completeness.mjs";
-import { canonicalJson } from "../lib/handoff/render.mjs";
+import { canonicalJson, roleSlices, slugify } from "../lib/handoff/render.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
@@ -82,28 +84,24 @@ const publish = (f, extra = {}) => publishHandoff(f.ctx, { outDir: f.outDir, too
 
 /* ------------------------------------------------ the decisive negative control: the real project */
 
-test("the REAL project is refused, despite a clean lint", () => {
-  // ⚠️ This is the test the whole gate exists for. planning-content lints clean today, and stage 5's
-  // third criterion is attested not-satisfied — so artifact validity says yes and completeness says no.
+test("the REAL project is now publishable, and not vacuously", () => {
+  // ⚠️ THIS TEST USED TO ASSERT A REFUSAL, and the history is the point rather than trivia. It
+  // refused while eleven criteria were unattested, then while stage 5's traceability was
+  // not-satisfied, then while stage 9 had no role slices. Each blocker named something real, and each
+  // was cleared by building the thing rather than by relaxing the predicate.
   const contentRoot = join(ROOT, "planning-content");
   const ctx = { contentRoot, schemas, validators, activated: readActivatedTypes(contentRoot) };
   const c = handoffCompleteness(ctx, { toolRoot: ROOT });
 
-  assert.equal(c.ready, false, "a clean lint must not be enough to publish");
-  const notSatisfied = c.blockers.filter((b) => b.reason === BLOCKED.NOT_SATISFIED);
-  // ⚠️ The blocker MOVED on 2026-08-22 and the test moved with it, which is the point rather than
-  // maintenance: stage 5's criterion became `satisfied` once every requirement traced to a component,
-  // and stage 9's `role-slice-self-sufficient` took over — no `task` type, so no slices, so no
-  // recipient can start. The refusal now names a MISSING CAPABILITY rather than an unexamined
-  // project, which is the difference between "nobody looked" and "we looked, and it is not ready".
-  assert.ok(
-    notSatisfied.some((b) => b.stageId === "09-handoff" && b.criterion === "role-slice-self-sufficient"),
-    `expected stage 9's role-slice criterion to block; got ${JSON.stringify(notSatisfied.map((b) => b.criterion))}`
-  );
-  // Nothing is merely unattested any more: every criterion has been looked at.
-  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.PENDING), [], "every criterion should now be attested");
-  // ...and the lint itself has nothing to say, which is exactly the gap this predicate closes.
-  assert.equal(c.blockers.filter((b) => b.reason === BLOCKED.LINT).length, 0);
+  assert.equal(c.ready, true, `expected publishable; blocked by ${JSON.stringify(c.blockers.map((b) => b.detail))}`);
+
+  // ⚠️ Ready is only meaningful if it was EARNED. A predicate that passed because nobody had looked
+  // would report exactly the same boolean, so the test checks the reason as well as the verdict:
+  // every declared criterion is attested, and none is merely pending.
+  const defs = loadStageDefinitions(ROOT);
+  const declared = Object.values(defs).flatMap((d) => (d.exitCriteria ?? []).map((x) => `${d.id}:${x.id}`));
+  assert.ok(declared.length >= 12, "the stage set should still declare the criteria this is checking");
+  assert.deepEqual(c.blockers, [], "no blockers of any kind");
 });
 
 /* ------------------------------------------------------------------- the fixture path: publishing */
@@ -412,4 +410,47 @@ test("publish itself refuses when the written package differs from what was rend
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------------------------ role slices: ACC-0010's actual evaluation */
+
+const TASK = (id, role, over = {}) => env(id, "task", { statement: "do the thing", role, implements: ["CMP-0001"], fulfils: ["REQ-0001"], acceptedBy: ["ACC-0001"], dependsOn: [], ...over });
+
+const sliceInput = () =>
+  new Map([
+    ["task", [TASK("TSK-0001", "backend"), TASK("TSK-0002", "frontend", { dependsOn: ["TSK-0001"] }), TASK("TSK-0003", "backend")]],
+    ["requirement", [env("REQ-0001", "requirement", { statement: "must work", priority: "must" })]],
+    ["acceptance-criterion", [env("ACC-0001", "acceptance-criterion", { statement: "it works", evaluates: ["CMP-0001"], verifies: ["REQ-0001"], outcome: "pass" })]],
+    ["component", [env("CMP-0001", "component", { responsibility: "r", satisfies: ["REQ-0001"] })]],
+  ]);
+
+test("ACC-0010: a slice carries everything its tasks trace to", () => {
+  const slices = new Map(roleSlices(sliceInput()));
+  assert.deepEqual([...slices.keys()], ["backend", "frontend"], "roles are COLLECTED from tasks, not from a roster");
+
+  const backend = slices.get("backend");
+  assert.deepEqual(backend.tasks.map((t) => t.id), ["TSK-0001", "TSK-0003"]);
+  // ⚠️ The criterion is "can start without coming back to ask". A slice listing only task IDs would
+  // satisfy the filename and not the requirement, so the traced material must travel WITH it.
+  assert.deepEqual(backend.requirements.map((r) => r.id), ["REQ-0001"]);
+  assert.deepEqual(backend.acceptanceCriteria.map((a) => a.id), ["ACC-0001"]);
+  assert.deepEqual(backend.components.map((c) => c.id), ["CMP-0001"]);
+});
+
+test("ACC-0010: a cross-role dependency is visible to the blocked role", () => {
+  // ⚠️ The case one real role cannot exercise. A recipient reading a "self-sufficient" slice while
+  // silently waiting on another team has been handed a slice that lies by omission.
+  const slices = new Map(roleSlices(sliceInput()));
+  assert.deepEqual(slices.get("frontend").blockedByOtherRoles, [{ task: "TSK-0001", role: "backend" }]);
+  assert.deepEqual(slices.get("backend").blockedByOtherRoles, [], "a dependency within your own role is not a block from elsewhere");
+});
+
+test("ACC-0010: with no tasks there are no slices, and no empty slice files", () => {
+  // A role exists exactly when a task is assigned to it (#18). No tasks, no roles, nothing to emit.
+  assert.deepEqual(roleSlices(new Map([["task", []]])), []);
+});
+
+test("slice filenames are stable and filesystem-safe", () => {
+  assert.equal(slugify("technical writer"), "technical-writer");
+  assert.equal(slugify("Back End / API"), "back-end-api");
 });

@@ -1,0 +1,23 @@
+{
+  "id": "DEC-0014",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage 9's `critical` is DEC-0002's definition, not a new category",
+  "statement": "An unanswered question is CRITICAL for stage 9's `no-unresolved-critical-questions` when it blocks active handoff content or makes a handoff criterion unevaluable. This reuses DEC-0002's shape rather than inventing a second subjective scale, and the stage definition's criterion text is amended to say so.",
+  "rationale": "Stage 9's run found `critical` undefined - the second instance of the defect stage 4 hit with `blocking`. Inventing a fresh category would double the vocabulary and leave two words that both mean 'important' with different unstated tests. DEC-0002 already separates a decision whose absence would make a commitment possibly wrong from work that is simply not done, and the handoff needs exactly that distinction scoped to what it publishes: a question is critical if the package would carry something wrong without its answer, or if a criterion cannot be judged.",
+  "decidedAt": "2026-08-22",
+  "addresses": [],
+  "alternatives": [
+    {
+      "option": "Leave `critical` undefined and judge case by case",
+      "whyNot": "An exit criterion turning on an undefined word is unevaluable in either direction, which is what took DEC-0002 to fix once already."
+    },
+    {
+      "option": "Define a severity scale for questions",
+      "whyNot": "A second subjective category. DEC-0002's test is about consequence rather than felt importance, which is what makes it checkable."
+    }
+  ],
+  "notes": "⚠️ Applied before it was written: QST-0002 and QST-0015 were judged non-critical during the stage-9 run, by analogy to DEC-0002. That order is backwards and is recorded rather than tidied - the judgement stands, and the definition is what makes it reproducible by someone else."
+}

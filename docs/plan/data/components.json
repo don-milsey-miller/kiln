@@ -1,0 +1,197 @@
+[
+  {
+    "id": "CMP-0001",
+    "implementedBy": [
+      "stages/*.json",
+      "lib/stages.mjs",
+      "lib/lint.mjs",
+      "lib/attestations.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Defines the pipeline's stages, what each produces, and evaluates whether a stage may be exited.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0001",
+      "REQ-0002"
+    ],
+    "schemaVersion": 2,
+    "title": "Stage definitions and the gate",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0002",
+    "implementedBy": [
+      "lib/lint.mjs",
+      "bin/lint-plan.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Checks storage identity, trace integrity, content completeness, lifecycle and instruction safety across all artifacts, and blocks at the two boundaries #46 names.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0002",
+      "REQ-0009"
+    ],
+    "schemaVersion": 2,
+    "title": "The lint",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0003",
+    "implementedBy": [
+      "lib/layout.mjs",
+      "lib/content-root.mjs",
+      "lib/atomic-write.mjs",
+      "lib/lock.mjs",
+      "lib/id-allocator.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Persists one artifact per file, resolves the content root, and serialises every read-modify-write so concurrent writers cannot destroy each other.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0002"
+    ],
+    "schemaVersion": 2,
+    "title": "Artifact store",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0004",
+    "implementedBy": [
+      "schemas/",
+      "lib/schema-resolver.mjs",
+      "lib/validate.mjs",
+      "lib/template.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Owns the artifact schemas, their composition through one envelope, and the effective-schema resolution every consumer reads materiality from.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0007",
+      "REQ-0008"
+    ],
+    "schemaVersion": 2,
+    "title": "Schema layer",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0005",
+    "implementedBy": [
+      "lib/tools/"
+    ],
+    "lifecycle": "active",
+    "responsibility": "The only way an artifact is created or mutated (#88), including the guards that make each transition refusable.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0013",
+      "REQ-0014"
+    ],
+    "schemaVersion": 2,
+    "title": "Typed tools",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0006",
+    "implementedBy": [
+      "lib/research/",
+      "bin/research.mjs",
+      "bin/research-probe.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Discovers and retrieves public external sources through a typed interface, refuses when unavailable, and never answers from model memory.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0003",
+      "REQ-0004"
+    ],
+    "schemaVersion": 2,
+    "title": "Research capability",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0007",
+    "implementedBy": [
+      "lib/validation/"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Runs declared jobs under a tier-1 sandbox through provision-execute-observe-destroy, refuses jobs above the approved ceiling before provisioning, and records what was observed including cleanup outcome.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0012"
+    ],
+    "schemaVersion": 2,
+    "title": "Validation controller",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0008",
+    "implementedBy": [
+      "lib/effective-assertion.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Derives verdict and confidence from the evidence graph at read time, filtering for applicability first, and decides whether a claim may become an instruction.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0007",
+      "REQ-0008",
+      "REQ-0009"
+    ],
+    "schemaVersion": 2,
+    "title": "Evidence derivation",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0009",
+    "implementedBy": [
+      "lib/specialists/contract.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Describes each role's measured capabilities, write boundary and credential scope, and refuses a child's output that cannot demonstrate them.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0012"
+    ],
+    "schemaVersion": 2,
+    "title": "Specialist contracts",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0010",
+    "implementedBy": [
+      "app/server.mjs",
+      "lib/view/assertion-view.mjs"
+    ],
+    "lifecycle": "active",
+    "responsibility": "Renders the derived view of artifacts for a human, and reflects external writes without a reload.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0002",
+      "REQ-0011"
+    ],
+    "schemaVersion": 2,
+    "title": "Reader surface",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0011",
+    "implementedBy": [
+      "bin/handoff.mjs",
+      "lib/handoff/publish.mjs",
+      "lib/handoff/render.mjs",
+      "lib/handoff/completeness.mjs",
+      "test/handoff.test.mjs"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT — 2026-08-22. This is the first component designed BEFORE it exists rather than recorded after; every other CMP describes a module already on disk. `implementedBy` is absent for exactly that reason, and its absence is the only signal in the artifact that says so. ⚠️ THE HAZARD THIS CREATES IS REAL AND IS RAISED AS QST-0015: the orphan check counts EDGES, so creating this record takes the orphan count to zero while REQ-0010 remains unimplemented. 'All requirements trace to a component' becomes true; 'the handoff exists' does not. A correct rule producing an invisible outcome is the pattern #94, #107 and #122 all describe, and the attestation carries the distinction until something better does. ⚠️ Design decided in DEC-0009: an explicit deterministic command (`npm run handoff`), NEVER a gate side effect. The gate stays read-only. ⚠️ IMPLEMENTED 2026-08-22 — and `implementedBy` now pointing somewhere proves CODE EXISTS, not that the component satisfies its acceptance criteria. QST-0015 stays open for exactly that reason: a path is not a verdict, and nothing here has yet been judged against criteria nobody has written (stage 7's job). ⚠️ The command REFUSES this project today, by design: stage 5's third criterion is attested not-satisfied, so `npm run handoff` reports 11 blockers and writes nothing.",
+    "responsibility": "Produce the frozen handoff package under docs/plan/ from planning-content, on an explicit deterministic command, such that a recipient can begin their part of the work without asking the planner for information the plan should already contain.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0010",
+      "REQ-0011"
+    ],
+    "schemaVersion": 2,
+    "title": "Handoff export",
+    "type": "component"
+  }
+]

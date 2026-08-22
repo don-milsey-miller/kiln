@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0004",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "A rendering failure preserves the previous package and leaves no temporary directory",
+  "statement": "After a publish whose renderer throws, the output directory is byte-identical to before and no `.handoff-tmp-` or `.previous-` directory remains.",
+  "evaluates": [
+    "CMP-0011"
+  ],
+  "verifies": [
+    "REQ-0010"
+  ],
+  "notes": "Evaluated by test/handoff.test.mjs. ⚠️ `pass` here means the condition was RUN and held, not that someone judged the code good — and #144 records the residual honestly: these criteria were written by the same agent that wrote the code, which is a weaker independence than a separate reviewer would give."
+}

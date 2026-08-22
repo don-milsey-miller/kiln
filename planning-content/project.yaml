@@ -135,7 +135,11 @@ capabilities:
     # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
     # Deactivated `runbook` — approved by pm: the real handoff needs none of its candidate fields (DEC-0011); stays in the catalogue with a reopening condition
     # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
-    activated: [assertion, component, decision, evidence, question, requirement, research-finding, runbook-step]
+    # Activated `acceptance-criterion` — approved by pm: stage 7 demand; #41 passed with consumers decided before the type was proposed (#144)
+    # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
+    # Activated `task` — approved by pm: stage 8 demand; closes the trace chain and is what role slices query (#144)
+    # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
+    activated: [acceptance-criterion, assertion, component, decision, evidence, question, requirement, research-finding, runbook-step, task]
   # A permission boundary, not a preference (#56). The PM declares which
   # tiers are available; the validation agent enforces the ceiling and may
   # not exceed it. This is the one place the agent spends money and holds
