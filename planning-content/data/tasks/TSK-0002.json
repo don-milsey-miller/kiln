@@ -17,5 +17,6 @@
     "ACC-0011",
     "ACC-0012"
   ],
-  "dependsOn": []
+  "dependsOn": [],
+  "notes": "⚠️ IMPLEMENTED 2026-08-22 as `lib/stage-scope.mjs`, evaluated by `test/stage-scope.test.mjs`. ACC-0011 and ACC-0012 both pass, so this task's derived status is `accepted` — nothing here is stored, and deleting the tests would move it back (#96, DEC-0012). ⚠️ The vacuity the finding named has MOVED rather than gone: with RBS-0001 retired the live scope is empty, so stage 6's criterion is again satisfiable with nothing checked. That is now a fact about the plan rather than about an author's attention, which is why it is attested `n/a` with a stated basis rather than `satisfied`."
 }

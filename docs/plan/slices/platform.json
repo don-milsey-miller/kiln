@@ -23,8 +23,8 @@
       ],
       "id": "ACC-0011",
       "lifecycle": "active",
-      "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
-      "outcome": "not-evaluated",
+      "notes": "Evaluated 2026-08-22 by test/stage-scope.test.mjs. `stage6Scope` computes the set from `restsOn` on ACTIVE instruction-bearing artifacts, and a name check asserts the module never mentions `loadBearing` (comments stripped first, per the #142 lesson). ⚠️ Falsified: replacing the derivation with a `loadBearing` filter fails four tests, including this criterion's own.",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "The set of assertions stage 6 checks is computed from `restsOn` on active runbook steps (and any other graph use decided at the time), and contains no reference to the `loadBearing` field.",
@@ -40,8 +40,8 @@
       ],
       "id": "ACC-0012",
       "lifecycle": "active",
-      "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
-      "outcome": "not-evaluated",
+      "notes": "Evaluated 2026-08-22 by test/stage-scope.test.mjs. An assertion whose `loadBearing` is absent OR false is in scope when an active step rests on it — the exact case that passed vacuously (RBS-0001 on AST-0002). ⚠️ CONSTRUCTED, and it had to be: RBS-0001 was retired, so the live graph no longer contains the case its own finding was about.",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "Given a runbook step resting on an assertion whose `loadBearing` is absent or false, that assertion appears in stage 6's evaluated set. This is the exact case that passes vacuously today: RBS-0001 rests on AST-0002, which is unflagged.",
@@ -77,6 +77,33 @@
       "schemaVersion": 2,
       "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
       "title": "Generate role slices from the task graph",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0011",
+        "ACC-0012"
+      ],
+      "dependsOn": [],
+      "derivedStatus": {
+        "passed": 2,
+        "status": "accepted",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0009"
+      ],
+      "id": "TSK-0002",
+      "implements": [
+        "CMP-0002"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ IMPLEMENTED 2026-08-22 as `lib/stage-scope.mjs`, evaluated by `test/stage-scope.test.mjs`. ACC-0011 and ACC-0012 both pass, so this task's derived status is `accepted` — nothing here is stored, and deleting the tests would move it back (#96, DEC-0012). ⚠️ The vacuity the finding named has MOVED rather than gone: with RBS-0001 retired the live scope is empty, so stage 6's criterion is again satisfiable with nothing checked. That is now a fact about the plan rather than about an author's attention, which is why it is attested `n/a` with a stated basis rather than `satisfied`.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
+      "title": "Derive stage 6's scope from graph use rather than a flag",
       "type": "task"
     }
   ],
@@ -168,32 +195,5 @@
     }
   ],
   "role": "platform",
-  "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0011",
-        "ACC-0012"
-      ],
-      "dependsOn": [],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 2
-      },
-      "fulfils": [
-        "REQ-0009"
-      ],
-      "id": "TSK-0002",
-      "implements": [
-        "CMP-0002"
-      ],
-      "lifecycle": "active",
-      "reviewStatus": "approved",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
-      "title": "Derive stage 6's scope from graph use rather than a flag",
-      "type": "task"
-    }
-  ]
+  "tasks": []
 }

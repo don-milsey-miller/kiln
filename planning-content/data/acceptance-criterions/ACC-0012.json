@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "An unflagged premise of an active runbook step is in scope",
   "statement": "Given a runbook step resting on an assertion whose `loadBearing` is absent or false, that assertion appears in stage 6's evaluated set. This is the exact case that passes vacuously today: RBS-0001 rests on AST-0002, which is unflagged.",
   "evaluates": [
@@ -13,5 +13,5 @@
   "verifies": [
     "REQ-0009"
   ],
-  "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing."
+  "notes": "Evaluated 2026-08-22 by test/stage-scope.test.mjs. An assertion whose `loadBearing` is absent OR false is in scope when an active step rests on it — the exact case that passed vacuously (RBS-0001 on AST-0002). ⚠️ CONSTRUCTED, and it had to be: RBS-0001 was retired, so the live graph no longer contains the case its own finding was about."
 }

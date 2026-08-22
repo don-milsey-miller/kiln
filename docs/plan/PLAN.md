@@ -390,7 +390,7 @@ Extend the handoff renderer to emit one slice per role, as a query over tasks gr
 
 Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0002 · fulfils: REQ-0009*
 
 ## Retired and superseded

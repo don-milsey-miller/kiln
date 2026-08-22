@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Stage 6's scope is derived from the graph, not from a flag",
   "statement": "The set of assertions stage 6 checks is computed from `restsOn` on active runbook steps (and any other graph use decided at the time), and contains no reference to the `loadBearing` field.",
   "evaluates": [
@@ -13,5 +13,5 @@
   "verifies": [
     "REQ-0009"
   ],
-  "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing."
+  "notes": "Evaluated 2026-08-22 by test/stage-scope.test.mjs. `stage6Scope` computes the set from `restsOn` on ACTIVE instruction-bearing artifacts, and a name check asserts the module never mentions `loadBearing` (comments stripped first, per the #142 lesson). ⚠️ Falsified: replacing the derivation with a `loadBearing` filter fails four tests, including this criterion's own."
 }
