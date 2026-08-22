@@ -1,0 +1,20 @@
+{
+  "stageId": "05-solution-design",
+  "attestations": {
+    "storage-target-chosen": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "One JSON file per artifact under planning-content/data/<type>s/, atomic temp+rename under a lockfile (#87, #72, #78). Chosen, implemented, and carrying 67 artifacts."
+    },
+    "data-model-approved": {
+      "result": "satisfied",
+      "decidedBy": "pm",
+      "reason": "Nine schemas composed through common.schema.json#/$defs/artifactEnvelope, resolved by lib/schema-resolver.mjs, exercised by 199 tests. Approved as the model this project runs on."
+    },
+    "requirements-traced-to-components": {
+      "result": "not-satisfied",
+      "decidedBy": "pm",
+      "reason": "REQ-0010 traces to no component and REQ-0011 to half of one - both are the handoff, held by QST-0007. AND the trace itself is prose rather than artifacts: the criterion asks for something the catalogue cannot express, because `component` is not among #38's sixteen. Recorded not-satisfied rather than left unevaluated (#93)."
+    }
+  }
+}
