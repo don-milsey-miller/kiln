@@ -61,7 +61,17 @@ let result;
 if (gateArg === "handoff") result = { kind: "handoff", ...evaluateHandoffGate(ctx) };
 else if (gateArg?.startsWith("stage:")) {
   const stageId = gateArg.slice(6);
-  result = { kind: "stage", ...evaluateStageGate(ctx, stageId, { attestations: loadStageAttestations(contentRoot, stageId) }) };
+  try {
+    result = { kind: "stage", ...evaluateStageGate(ctx, stageId, { attestations: loadStageAttestations(contentRoot, stageId) }) };
+  } catch (e) {
+    // A mistyped stage id used to exit with a stack trace. The gate is the thing people run at a
+    // transition, and a tool that crashes on a typo teaches them to distrust its output on a real
+    // failure — the same reason the research CLI stopped calling process.exit() after a fetch.
+    const { loadStageDefinitions } = await import("../lib/stages.mjs");
+    const known = Object.keys(loadStageDefinitions()).sort();
+    console.error(`${e.message}\n\nKnown stages:\n  ${known.join("\n  ")}`);
+    process.exit(2);
+  }
 }
 else result = { kind: "report", ...lintProject(ctx) };
 
