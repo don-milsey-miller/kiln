@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "Which search backend is the first adapter, and where do its credentials come from?",
   "statement": "DEC-0004 makes the backend replaceable and puts credentials in the PM's host environment, outside the repository. Step 7a still has to pick ONE first adapter and have a working key for it to run a real external question end to end. Which provider, and how is its credential supplied to the extension on this machine?",
   "raisedBy": [
@@ -13,5 +13,9 @@
   "blocks": [
     "REQ-0003"
   ],
-  "notes": "⚠️ BLOCKING for 7a step 4 only, under DEC-0002 — and precisely scoped, because most of 7a does not wait on it. `research_fetch` is plain HTTP and needs no credential; tool registration, the capability signature and the live probe are all buildable and testable without a backend, and the probe's most important behaviour is what it reports when the backend is ABSENT — which is exactly the state this question describes. So 7a can be built and its refusal path proven before this is answered; what cannot happen without it is the end-to-end run that produces real evidence(kind: source). ⚠️ It is the PM's to answer because it costs money or a signup and because DEC-0004 deliberately keeps credentials outside anything this project can read."
+  "notes": "⚠️ BLOCKING for 7a step 4 only, under DEC-0002 — and precisely scoped, because most of 7a does not wait on it. `research_fetch` is plain HTTP and needs no credential; tool registration, the capability signature and the live probe are all buildable and testable without a backend, and the probe's most important behaviour is what it reports when the backend is ABSENT — which is exactly the state this question describes. So 7a can be built and its refusal path proven before this is answered; what cannot happen without it is the end-to-end run that produces real evidence(kind: source). ⚠️ It is the PM's to answer because it costs money or a signup and because of where DEC-0004 puts the credential. ⚠️ CORRECTED 2026-08-22: the first phrasing here said 'outside anything this project can read', which is false — the extension MUST read the key to use it. The enforceable boundary is that it stays outside project FILES, planning content, and every MODEL-VISIBLE interface: prompts, logs, errors and tool results. That is a boundary code can hold; the original was a boundary nothing could.",
+  "answer": "Tavily Search API, basic depth, discovery results only, probed via GET /usage. TAVILY_API_KEY is supplied by the PM through the host environment and injected only into the research child. See DEC-0006.",
+  "answeredBy": [
+    "DEC-0006"
+  ]
 }

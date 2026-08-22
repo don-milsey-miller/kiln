@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **127 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **129 decisions as of
 > 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -704,23 +704,44 @@ conditionally, none for `acceptance-criterion`, and **none at all for `risk`**.
 
 ### 7a. Research vertical slice — first
 
-1. **Register the three typed tools** — `research_search` · `research_fetch` · `research_capability`.
-2. **Implement the capability signature and a live backend probe.** Registration *and* health/auth:
-   installed-but-unusable is unavailable (#124).
-3. **Add the first adapter.**
-4. **Run one real external question end to end** — search → fetch → `evidence(kind: source)` carrying
-   URL, retrieval time, source metadata and a retained citation.
-5. ⚠️ **Prove that unavailable search produces a structured refusal, not model-memory prose.**
+1. ✅ **Register the three typed tools** — `research_search` · `research_fetch` · `research_capability`.
+   `lib/research/tools.mjs`, with declared input schemas readable **without a backend**, so a contract
+   writer and #81's check can both use them. ⚠️ **The contract layer names no vendor, and a test asserts
+   it** — that is what makes DEC-0004's "the backend is replaceable" a property rather than an intention.
+2. ✅ **Capability signature and a live backend probe.** `GET /usage`: authentication **and** remaining
+   quota, without spending a search credit. Registration *and* health/auth — installed-but-unusable is
+   unavailable (#124). **Zero remaining credits reports `quota-exhausted`, not "available"**, and an
+   unreadable quota shape reports `remaining: null` — **unknown, never assumed fine** (#122).
+3. ⏳ **The first adapter** — Tavily (#128), built at `lib/research/tavily-adapter.mjs`. **Wired and
+   fully tested against constructed backend responses; it has never made a live call.**
+4. ⏳ **Run one real external question end to end** — search → guarded fetch → `evidence(kind: source)`
+   carrying URL, retrieval time, source metadata and a retained citation. **Waits on `TAVILY_API_KEY`.**
+5. ✅ ⚠️ **Unavailable search produces a structured refusal, not model-memory prose.**
    **This is the clause the slice exists to test**; without it the slice has demonstrated nothing that
-   #67's failure did not already pass.
+   #67's failure did not already pass. **Four causes, four distinct reasons** — missing key · rejected
+   key · exhausted quota · unreachable backend — each carrying `mustRecordGap: true` and the explicit
+   instruction *"Do NOT answer from model memory"*, **in the result rather than only in the contract**,
+   because the contract is a document the child may not re-read and the result is data it must handle.
+   A refusal carries **no results field at all**, so nothing can be mistaken for an answer.
 
-⚠️ **One PM input is owed inside 7a, and only inside step 4: `QST-0011` — which search backend is the
-first adapter, and where its credential comes from.** It is deliberately narrow. `research_fetch` is
-plain HTTP and needs no credential; **registration, the capability signature and the live probe are all
-buildable and testable with no backend at all** — and the probe's most important behaviour is what it
-reports when the backend is **absent**, which is that exact state. **So 7a can be built and step 5's
-refusal path proven before this is answered.** What waits on it is the end-to-end run that produces
-real `evidence(kind: source)`.
+✅ **The public-web boundary (#129) came with it**, because "plain HTTP" was the wrong description:
+schemes, URL credentials, loopback/private/link-local/CGNAT/multicast destinations,
+IPv4-mapped IPv6, body size, media type, and **every redirect revalidated**.
+⚠️ **DNS rebinding stays open and is stated in the code**, not quietly assumed away.
+
+✅ **The credential contract is enforced in code, not described in a comment.** The key is asserted
+absent from every result and every error across five failure paths. ⚠️ **And the earlier wording here
+was wrong:** a credential cannot live *"outside anything this project can read"* — **the extension must
+read it.** The enforceable boundary is outside project **files**, planning **content**, and every
+**model-visible** interface (#128).
+
+**16 tests. Six guards mutation-tested; the redirect guard was green for the wrong reason until the
+test asserted on the request rather than the response** (#129).
+
+✅ **`QST-0011` answered 2026-08-22 → `DEC-0006`: Tavily.** What remains is not a decision but a
+**key**: the PM creates the account and puts `TAVILY_API_KEY` in the host environment, and steps 3–4
+finish. ⚠️ **`research_fetch` needs no credential at all and is done** — but *needing no credential is
+exactly what made it dangerous*, which is why it has a boundary rather than a note (#129).
 
 ### 7b. Tier-1 validation slice — second
 

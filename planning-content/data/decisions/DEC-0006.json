@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0006",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Tavily is the first research adapter, with a stated credential and public-web boundary",
+  "statement": "The first adapter behind DEC-0004's typed interface is the Tavily Search API. Basic search is configured with search_depth 'basic', auto_parameters false, include_answer false and include_raw_content false, and returns discovery results only. GET /usage is the capability probe: it validates authentication and reports remaining quota WITHOUT performing a search. CREDENTIAL CONTRACT: the PM creates the account and supplies TAVILY_API_KEY through the host environment; it is injected only into the research child, never into planning or validation children; the specialist has no shell and no generic environment-reading tool; the extension reads the key but never places it in prompts, logs, errors or tool results; and missing key, failed authentication, exhausted quota and an unreachable backend each produce a DISTINCT unavailable reason. PUBLIC-WEB BOUNDARY on research_fetch: reject non-HTTP(S) schemes, URLs carrying credentials, loopback/private/link-local destinations, and oversized or unsupported responses, and revalidate EVERY redirect. Tavily discovers candidate URLs; the project's own guarded fetch reads the authoritative page; neither becomes evidence until the specialist records the fetched source through the typed evidence path.",
+  "rationale": "Tavily fits REQ-0012 better than the alternatives for a specific reason: its free plan grants 1,000 monthly credits with no payment card and STOPS when exhausted, so the authorisation ceiling is enforced by the plan rather than by the PM watching a bill. GET /usage is what makes the capability probe meaningful — DEC-0003 requires a capability the host can DETECT, and a backend that could only be tested by performing a search would charge a credit to answer 'are you there'. Fixing the spend-relevant search parameters in the adapter rather than exposing them keeps cost predictable at one credit per search, which is a REQ-0012 control and not a default. The public-web boundary is the sharper half: a fetch tool with no destination boundary is not a research capability but a request forger inside the host — 169.254.169.254 is cloud metadata and localhost is whatever the PM is running — so DEC-0004's 'public, read-only' scope needed a mechanism rather than a sentence. Revalidating every redirect is what makes the boundary hold, since checking only the URL the caller supplied inspects the doormat and lets the server choose the destination.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0011"
+  ],
+  "alternatives": [
+    {
+      "option": "A billing-backed free allowance (major cloud search APIs)",
+      "whyNot": "A free tier that keeps serving past the allowance and bills for it puts REQ-0012's authorisation ceiling outside the system's control. Stopping at exhaustion is the property that was wanted."
+    },
+    {
+      "option": "Probe by performing a cheap search",
+      "whyNot": "It spends a credit to learn the capability exists, and it cannot distinguish 'auth is fine but quota is gone' from 'auth failed' as cleanly as the usage endpoint does."
+    },
+    {
+      "option": "Let the caller choose search depth and result richness",
+      "whyNot": "Those parameters are what the query costs. A caller that can set them can spend more than the PM authorised, which converts a control into a suggestion."
+    }
+  ],
+  "notes": "⚠️ RESIDUAL RISK, stated rather than closed: DNS rebinding. The guard resolves and checks every address, then fetch resolves the name again itself, so a hostile authority answering differently the second time can still move the destination. Closing it needs a connection to the checked IP with an explicit Host header and SNI, which Node's fetch does not expose. The honest position is that the boundary raises the cost of an attack rather than eliminating it — the same kind of statement DEC-0005 makes about tier 1. ⚠️ The Tavily facts here (free-plan behaviour, the usage endpoint, per-search cost) are DOCUMENTATION READS supplied by the PM, not experiments. Under DEC-0004's own rule they become evidence(kind: source) only when fetched and recorded with retrieval time — which is exactly what 7a step 4 will do, using this adapter, once the credential exists."
+}
