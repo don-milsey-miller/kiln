@@ -4,7 +4,7 @@
   "schemaVersion": 1,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "resolution": "unanswered",
+  "resolution": "answered",
   "title": "How does a specialist obtain internet research capability?",
   "statement": "REQ-0003 requires that implementation questions be answerable from current external sources. Nothing in the shipped package provides that. What gives the research specialist the ability — a Pi extension wrapping a search API, an MCP server, something else — and who holds the credential?",
   "blocks": [
@@ -13,5 +13,9 @@
   "raisedBy": [
     "DEC-0001"
   ],
-  "notes": "BLOCKING under DEC-0002 — see the earlier note. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what counts as research — which questions a specialist may take externally, and which it must refuse; (b) where external access comes from — the host capability, and who holds the credential; (c) how provenance is retained — every claim taken externally must land as evidence(kind: source) with its citations, since REQ-0004 is otherwise unenforceable at the point it matters; (d) how the system behaves when the capability is UNAVAILABLE — an explicit refusal or recorded gap, never a specialist answering from what it already holds, which is the intake's original complaint restored. Only after those four does the mechanism question — extension, MCP, something else — become answerable."
+  "notes": "BLOCKING under DEC-0002 — see the earlier note. BOUNDARIES BEFORE MECHANISM (DEC-0003): (a) what counts as research — which questions a specialist may take externally, and which it must refuse; (b) where external access comes from — the host capability, and who holds the credential; (c) how provenance is retained — every claim taken externally must land as evidence(kind: source) with its citations, since REQ-0004 is otherwise unenforceable at the point it matters; (d) how the system behaves when the capability is UNAVAILABLE — an explicit refusal or recorded gap, never a specialist answering from what it already holds, which is the intake's original complaint restored. Only after those four does the mechanism question — extension, MCP, something else — become answerable.",
+  "answer": "The shipped Pi extension owns typed research tools (research_search, research_fetch, research_capability); the specialist depends on those, not on a vendor. Public read-only research only; credentials stay host-side; every delegation probes registration and backend health; results are discovery observations until promoted to evidence(kind: source); unavailable retrieval produces a structured refusal, never a memory answer. See DEC-0004.",
+  "answeredBy": [
+    "DEC-0004"
+  ]
 }

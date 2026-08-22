@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0005",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Tier 1 first, through a typed validation controller with an honest boundary",
+  "statement": "Build tier 1 first, since #77 already makes it the default. The shipped extension provides a typed validation controller; the specialist NEVER receives unrestricted shell execution. A validation job declares: required tier and capabilities; input files or hashes; commands as an ARGUMENT ARRAY, never an interpolated shell string; a capture plan; timeout and output limits; expected outputs; and any network, credential or cost requirement. The controller owns provision -> execute -> observe -> destroy and refuses a job BEFORE provisioning if it exceeds the project's approved ceiling. Tier 1 is a fresh temporary workspace and Python virtual environment. Its boundary is stated, not implied: a virtual environment isolates Python dependencies; it is NOT an OS security sandbox. Tier 1 therefore does not claim to contain hostile code, deny host-filesystem access or enforce network isolation; it supplies no credentials and uses an allowlisted process environment, and is suitable only for trusted, non-destructive validation that does not need those guarantees. Claims requiring real containment, OS/package fidelity, credentials or external infrastructure require a higher tier. Every run produces an observation record: commands, inputs, outputs, exit status, timing, versions, environment facts, permission failures and cleanup outcome. The capture plan makes omission states DETECTABLE — `not captured` (collection deliberately disabled), `not observable` (no available collector), `unavailable` (collection ran, fact absent), `redacted` (obtained, policy suppressed) — each requiring a reason. Unrequested facts remain simply absent. These describe the OBSERVER only; bearing, applicability, verdict and confidence stay claim-relative (#123). Cleanup failure is a first-class run result: preserve the evidence, report the retained path, and never present destruction as successful.",
+  "rationale": "This answers QST-0006 by settling boundaries before mechanism, as DEC-0003 requires. Four things make it a contract rather than an intention. (1) The honest tier-1 boundary: a venv called a sandbox would let a claim inherit containment it never had, and every claim validated in tier 1 would carry a strength nothing earned. Naming what tier 1 does NOT do is what keeps the rung ceiling truthful. (2) Argument arrays rather than shell strings remove a whole class of interpolation defect at the type level rather than by review. (3) The four omission states are exactly what #122 said the schema needed and #123 said it must not exceed: each is a fact about the observer, none is a judgement about a claim, and each is stated only because a capture plan can actually distinguish it — a state nothing can detect would repeat #121's error one layer down. (4) Cleanup failure as a first-class result closes the gap where a destroy step that silently failed would leave the record saying the environment was gone. Refusal before provisioning is what makes #77's authorisation real: a ceiling checked after spending is a report, not a control.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0006"
+  ],
+  "alternatives": [
+    {
+      "option": "Start at tier 2 (containers) for real isolation",
+      "whyNot": "#77 makes tier 2 conditional on Docker already being present and otherwise a recommendation for the PM to approve. Building it first would make the default path depend on something not guaranteed, and tier 1's honest boundary is sufficient for trusted, non-destructive validation, which is what the current claims need."
+    },
+    {
+      "option": "Give the validation specialist a shell and a working directory",
+      "whyNot": "A shell is not a declarable job. Nothing could be refused before provisioning, no capture plan could be enforced, and the observation record would be whatever the specialist chose to report — which is the record deciding its own completeness."
+    },
+    {
+      "option": "Call the venv a sandbox and move on",
+      "whyNot": "It would silently inflate the confidence rung of every claim validated in it. The cost of the honest boundary is a smaller set of claims tier 1 may settle; the cost of the dishonest one is not knowing which claims those are."
+    }
+  ],
+  "notes": "⚠️ The omission states are now DECIDED as a contract, but the `evidence` schema field that carries them is still unbuilt — #122's deferred consequence lands here. Implementing the extension, the first research adapter and the tier-1 controller is work, not a stage 4 gap (DEC-0002)."
+}

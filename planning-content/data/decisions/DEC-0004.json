@@ -1,0 +1,30 @@
+{
+  "id": "DEC-0004",
+  "type": "decision",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Research capability is a typed extension interface, not a vendor",
+  "statement": "The shipped Pi extension owns a stable, typed research interface — `research_search`, `research_fetch`, `research_capability` — and the research specialist depends on THOSE capabilities, never on a search vendor, model provider or arbitrary MCP tool name. An MCP server may sit behind the extension as an adapter; it must not become the specialist contract. Boundary: public, read-only internet research is permitted when a delegated question depends on a current external fact. Authenticated or private sources, purchases, submissions and other side effects are unavailable unless separately activated later. Credentials live in the PM's host environment, outside the repository and the planning content; the extension consumes them and they are never placed in a child prompt or returned in tool output. Every delegation probes tool registration AND backend health/authentication — installed-but-unusable is unavailable. Search results are discovery observations, not automatically evidence: a fetched source supporting a recorded claim must become evidence(kind: source) carrying URL, retrieval time, source metadata and a retained citation. If search or retrieval is unavailable the specialist returns a structured capability refusal and records the gap, and MUST NOT answer from model memory.",
+  "rationale": "This answers QST-0005 at the level DEC-0003 requires: a capability the host can supply AND detect. Naming three typed tools rather than a backend makes the contract falsifiable — the specialist can be asked whether it has research, and the answer is a probe result rather than an assumption. Pi has no built-in MCP and its extension API registers custom tools, so the adapter layer is where a vendor belongs; a contract written against vendor tool names would change every time the backend did, which is #67's toolless child arriving through the supply chain instead of through trust. The refusal clause is the load-bearing half: the intake's problem 2 was 'educated guessing', and a research specialist that answers from model memory when retrieval is down reproduces exactly that failure while looking like success. Discovery-is-not-evidence keeps #123's boundary intact at the point new observations enter — a search hit is an observation about what exists, not an observation about the claim.",
+  "decidedAt": "2026-08-22",
+  "addresses": [
+    "QST-0005"
+  ],
+  "assumesThat": [],
+  "alternatives": [
+    {
+      "option": "Let the specialist call an MCP server's tools directly",
+      "whyNot": "The contract would name tools the host does not own. Renaming or replacing the backend would silently change what the specialist can promise, and DEC-0003's detectability requirement would have nothing stable to probe."
+    },
+    {
+      "option": "Allow authenticated and private sources from the start",
+      "whyNot": "Side effects and credentials are a different risk class from public reads. Deferring them keeps the first contract honest and leaves activation as a deliberate, separate act (#77's shape)."
+    },
+    {
+      "option": "Let the specialist fall back to model memory when retrieval fails",
+      "whyNot": "That is the exact failure the project exists to fix, and it is indistinguishable from success in the output. A structured refusal is a worse answer and a better record."
+    }
+  ],
+  "notes": "Sources for the Pi facts: packages/coding-agent/docs/usage.md and docs/extensions.md (badlogic/pi-mono). ⚠️ Those are documentation reads, not experiments — if a claim about Pi's extension API becomes load-bearing it needs evidence(kind: source) with retrieval time, per this decision's own rule. The first adapter is implementation work, not a blocking design question, BECAUSE changing it cannot alter the specialist contract — that is what makes the backend replaceable rather than merely intended to be."
+}

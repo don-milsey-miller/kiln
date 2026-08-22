@@ -15,8 +15,8 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **123 decisions as of
-> 2026-08-18**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
+> The framing that produced this list: notes.md is done thinking for now. **126 decisions as of
+> 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
 > ⚠️ **Revised 2026-08-18 from `Visual Project Workflow — Conversation Review and Implementation
@@ -700,6 +700,35 @@ the gate's worklist and is still not next.
 ⚠️ **The gate is a worklist, not a priority queue.** #94 made it report accurately what is absent;
 nothing in it ranks anything. Priority comes from #80 branch 1 — what blocks the next implementation
 *commitment* — which is what produced this ordering in the first place.
+
+---
+
+## 7. The two capabilities #124 and #125 unblocked — **work, not gaps**
+
+_Added 2026-08-22 when the PM decided `QST-0005` and `QST-0006`. **Stage 4's gate flipped to `ready`
+the same day** — the first gate that moved from blocked to ready by a decision rather than by code._
+
+Three pieces are now specified well enough to build, and **none of them is a stage-4 gap any more**
+(DEC-0002: missing implementation is work):
+
+1. **The Pi extension** owning `research_search` · `research_fetch` · `research_capability` (#124).
+   The capability probe — registration **and** backend health/auth — is part of it, not a follow-up:
+   without it the contract promises something the host cannot check (#121).
+2. **The first research adapter** behind that interface. Deliberately unranked as design work,
+   because #124's whole point is that **replacing it cannot alter the contract**.
+3. **The tier-1 validation controller** — `provision → execute → observe → destroy`, declared jobs,
+   argument-array commands, ceiling refusal *before* provisioning (#125).
+
+⚠️ **One schema item rides along:** `evidence` needs the declared place for omission states
+(`not captured` · `not observable` · `unavailable` · `redacted`, each with a reason). #122 deferred its
+shape to `QST-0006`; #125 answered it. **It is owed by the controller, not before it** — the states
+exist to describe what a capture plan could not collect, so the collector is what proves they are
+distinguishable.
+
+⚠️ **This section does not rank itself against step 6.** #76's constraint still binds (no broad
+catalogue expansion before the evidence slice, which passed), and beyond that the ordering is #80
+branch 1's call — what blocks the next implementation *commitment* — which is the PM's, not this
+file's. Listing work is not scheduling it.
 
 ---
 

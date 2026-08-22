@@ -1,8 +1,10 @@
 # Stage 4 — Requirement Gaps
 
-> **Status: AGENT PROPOSAL, awaiting PM decisions.** Stage 4 is `decidedBy: User`
-> (`stages/04-requirement-gaps.json`). The agent surfaces gaps; **the PM decides them.** Nothing below
-> is decided, and the register is deliberately not filled in on the PM's behalf.
+> **Status: PM DECIDED 2026-08-22 — the two blocking gaps are closed and the gate is `ready`.**
+> _(Originally: AGENT PROPOSAL, awaiting PM decisions.)_ Stage 4 is `decidedBy: User`
+> (`stages/04-requirement-gaps.json`). The agent surfaced the gaps; **the PM decided them.** The
+> proposal below was written with the register deliberately NOT filled in on the PM's behalf, and the
+> decisions recorded in it are the PM's own — `DEC-0002`, `DEC-0004`, `DEC-0005`.
 >
 > Derived by walking the fourteen active requirements against what actually exists in the repo — not
 > against the roadmap, and not against what is nearly done.
@@ -38,21 +40,22 @@ started to fix has not begun.
 
 ## Open decisions raised — the register
 
-Five, as `question` artifacts with `blocks` edges to the requirements they hold up. **None is decided.**
+Five, as `question` artifacts with `blocks` edges to the requirements they hold up.
+**Three decided; the two that remain are not blocking under DEC-0002.**
 
-| | Question | Blocks |
-|---|---|---|
-| QST-0005 | How does a specialist obtain internet research capability? | REQ-0003 |
-| QST-0006 | What implements sandboxed execution, and which tier first? | REQ-0005, REQ-0012 |
-| QST-0007 | Does the handoff export exist in v1, and what produces it? | REQ-0010, REQ-0011 |
-| QST-0008 | Is the skeleton's rendering sufficient for REQ-0011's human half? | REQ-0011 |
-| QST-0009 | Which of these gaps **block**, and which are simply not done? | — |
+| | Question | Blocks | State |
+|---|---|---|---|
+| QST-0005 | How does a specialist obtain internet research capability? | REQ-0003 | ✅ **answered → DEC-0004** |
+| QST-0006 | What implements sandboxed execution, and which tier first? | REQ-0005, REQ-0012 | ✅ **answered → DEC-0005** |
+| QST-0007 | Does the handoff export exist in v1, and what produces it? | REQ-0010, REQ-0011 | open, **not blocking** |
+| QST-0008 | Is the skeleton's rendering sufficient for REQ-0011's human half? | REQ-0011 | open, **not blocking** |
+| QST-0009 | Which of these gaps **block**, and which are simply not done? | — | ✅ **answered → DEC-0002** |
 
 ⚠️ **QST-0009 exists because stage 4's exit criterion turns on a word nobody has defined here:** *every
 **blocking** gap has a user decision recorded.* Without a definition the stage cannot be exited honestly
 in either direction — everything could be called blocking, or nothing could. That is a defect in the
 stage definition as much as in this project, and it is the second time #91's *draft made authoritative*
-has shown a seam.
+has shown a seam. ✅ **Answered by DEC-0002**, which is what made the criterion evaluable at all.
 
 ---
 
@@ -79,9 +82,15 @@ REQ-0012 possible. So the answer to *"are the specialist contracts the next crit
 work"* is: **they are the only path to three unmet `must` requirements**, which is a stronger reason
 than their being available.
 
-⚠️ That does **not** decide the order. QST-0005 and QST-0006 have to be answered first — a research
+⚠️ That did **not** decide the order, and QST-0005 and QST-0006 had to be answered first — a research
 specialist with no research capability, or a validation specialist with no sandbox, would be #67's
 toolless child in a different costume: a contract with nothing behind it.
+
+✅ **Both are now answered** (DEC-0004, DEC-0005), which is what makes the contracts writable rather
+than merely wanted. **What each specialist may promise is now bounded by what the host can supply and
+detect** (DEC-0003): public read-only research behind three typed tools, and tier-1 validation that
+explicitly does **not** claim containment. Building the extension, the first adapter and the tier-1
+controller is work, not a gap.
 
 ---
 
@@ -91,6 +100,11 @@ toolless child in a different costume: a contract with nothing behind it.
 
 > **every-blocking-gap-decided** — Every blocking gap has a user decision recorded.
 
-**Cannot be attested until QST-0009 is answered**, because until then "blocking" has no meaning on this
-project. The gate will report `gate/criterion-pending-human` and refuse to be ready (#93), which is the
-correct behaviour and not an obstacle to route around.
+✅ **Attested `satisfied` by the PM 2026-08-22**, and the gate reports `ready: true`.
+
+The path there is worth keeping, because it is what the criterion was for. It was **unevaluable** while
+"blocking" had no definition; DEC-0002 made it evaluable; it was then attested **`not-satisfied`** —
+someone looked and said no, which is a known state, not a stuck one (#93) — and it moved to
+**`satisfied`** only when the two gaps it named were actually decided. ⚠️ **Verified by falsification
+rather than by reading the file**: flipping the attestation back to `not-satisfied` returns
+`ready: false` with `gate/criterion-not-satisfied`, so the gate is genuinely reading it.
