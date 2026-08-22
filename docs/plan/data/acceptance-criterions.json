@@ -168,5 +168,39 @@
     "verifies": [
       "REQ-0010"
     ]
+  },
+  {
+    "evaluates": [
+      "CMP-0002"
+    ],
+    "id": "ACC-0011",
+    "lifecycle": "active",
+    "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The set of assertions stage 6 checks is computed from `restsOn` on active runbook steps (and any other graph use decided at the time), and contains no reference to the `loadBearing` field.",
+    "title": "Stage 6's scope is derived from the graph, not from a flag",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0009"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0002"
+    ],
+    "id": "ACC-0012",
+    "lifecycle": "active",
+    "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Given a runbook step resting on an assertion whose `loadBearing` is absent or false, that assertion appears in stage 6's evaluated set. This is the exact case that passes vacuously today: RBS-0001 rests on AST-0002, which is unflagged.",
+    "title": "An unflagged premise of an active runbook step is in scope",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0009"
+    ]
   }
 ]

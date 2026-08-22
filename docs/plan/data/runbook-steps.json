@@ -8,7 +8,7 @@
     "restsOn": [
       "AST-0002"
     ],
-    "reviewStatus": "draft",
+    "reviewStatus": "approved",
     "schemaVersion": 1,
     "title": "Run specialists in parallel",
     "type": "runbook-step"

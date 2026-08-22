@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { publishHandoff, HandoffRefused, swapIntoPlace, validatePackage } from "../lib/handoff/publish.mjs";
 import { handoffCompleteness, BLOCKED } from "../lib/handoff/completeness.mjs";
-import { canonicalJson, roleSlices, slugify } from "../lib/handoff/render.mjs";
+import { canonicalJson, roleSlices, slugify, taskStatus, renderPlanMarkdown } from "../lib/handoff/render.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
@@ -429,7 +429,13 @@ test("ACC-0010: a slice carries everything its tasks trace to", () => {
   assert.deepEqual([...slices.keys()], ["backend", "frontend"], "roles are COLLECTED from tasks, not from a roster");
 
   const backend = slices.get("backend");
-  assert.deepEqual(backend.tasks.map((t) => t.id), ["TSK-0001", "TSK-0003"]);
+  // ⚠️ ACC-0001 is `pass`, so both backend tasks are ACCEPTED and neither is outstanding work.
+  // The first real package listed finished and unstarted tasks identically, and a recipient
+  // following it would have redone completed work — a defect fixture testing never saw, because
+  // the fixture had no tasks at all.
+  assert.deepEqual(backend.tasks.map((t) => t.id), [], "accepted work is not outstanding work");
+  assert.deepEqual(backend.accepted.map((t) => t.id), ["TSK-0001", "TSK-0003"]);
+  assert.deepEqual(backend.accepted[0].derivedStatus, { status: "accepted", passed: 1, total: 1 });
   // ⚠️ The criterion is "can start without coming back to ask". A slice listing only task IDs would
   // satisfy the filename and not the requirement, so the traced material must travel WITH it.
   assert.deepEqual(backend.requirements.map((r) => r.id), ["REQ-0001"]);
@@ -453,4 +459,90 @@ test("ACC-0010: with no tasks there are no slices, and no empty slice files", ()
 test("slice filenames are stable and filesystem-safe", () => {
   assert.equal(slugify("technical writer"), "technical-writer");
   assert.equal(slugify("Back End / API"), "back-end-api");
+});
+
+test("task status is derived, and a task with no criteria is `unaccountable`", () => {
+  const criteria = new Map([
+    ["ACC-0001", { id: "ACC-0001", outcome: "pass" }],
+    ["ACC-0002", { id: "ACC-0002", outcome: "not-evaluated" }],
+  ]);
+  assert.deepEqual(taskStatus({ acceptedBy: ["ACC-0001"] }, criteria), { status: "accepted", passed: 1, total: 1 });
+  assert.deepEqual(taskStatus({ acceptedBy: ["ACC-0001", "ACC-0002"] }, criteria), { status: "outstanding", passed: 1, total: 2 });
+  // ⚠️ A third state, not a synonym for outstanding: an outstanding task has a finish line nobody
+  // has crossed, and this one has no finish line at all. The publish gate refuses on it.
+  assert.deepEqual(taskStatus({ acceptedBy: [] }, criteria), { status: "unaccountable", passed: 0, total: 0 });
+});
+
+test("the publish gate refuses a task with no acceptance criteria", () => {
+  const f = completeFixture();
+  try {
+    mkdirSync(join(f.contentRoot, "data", "tasks"), { recursive: true });
+    writeFileSync(
+      join(f.contentRoot, "data", "tasks", "TSK-0001.json"),
+      canonicalJson(env("TSK-0001", "task", { statement: "do it", role: "backend", implements: ["CMP-0001"], fulfils: ["REQ-0001"] }))
+    );
+    const ctx = { ...f.ctx, activated: [...f.ctx.activated, "task"] };
+    const c = handoffCompleteness(ctx, { toolRoot: ROOT });
+    assert.equal(c.ready, false);
+    assert.equal(c.blockers[0].reason, BLOCKED.TASK_UNACCOUNTABLE);
+    assert.match(c.blockers[0].detail, /nothing in the\s+package can say when it is done|no acceptance criteria/);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("PLAN.md keeps retired artifacts out of the plan and names them in their own section", () => {
+  const byType = new Map([
+    ["requirement", [
+      env("REQ-0001", "requirement", { statement: "current", priority: "must" }),
+      { ...env("REQ-0002", "requirement", { statement: "withdrawn", priority: "must" }), lifecycle: "retired" },
+    ]],
+  ]);
+  const plan = renderPlanMarkdown(byType, new Map());
+  // ⚠️ The first real package rendered a RETIRED requirement as an ordinary must-have while the JSON
+  // said lifecycle: retired — a human/machine parity break REQ-0011 forbids.
+  const requirementsSection = plan.slice(plan.indexOf("## Requirements"), plan.indexOf("## Retired"));
+  assert.ok(requirementsSection.includes("REQ-0001"));
+  assert.equal(requirementsSection.includes("REQ-0002"), false, "a retired requirement is not part of the current plan");
+  // ...and it is not silently dropped either, which would break parity in the other direction.
+  assert.ok(plan.includes("## Retired and superseded"));
+  assert.match(plan, /REQ-0002.*retired/);
+});
+
+test("DEC-0015: unapproved executable content blocks the publish", () => {
+  const f = completeFixture();
+  try {
+    mkdirSync(join(f.contentRoot, "data", "runbook-steps"), { recursive: true });
+    const step = env("RBS-0001", "runbook-step", { instruction: "run it", expectedOutcome: "it ran", restsOn: ["AST-0001"] });
+    writeFileSync(join(f.contentRoot, "data", "runbook-steps", "RBS-0001.json"), canonicalJson({ ...step, reviewStatus: "draft" }));
+    const ctx = { ...f.ctx, activated: [...f.ctx.activated, "runbook-step"] };
+
+    const blocked = handoffCompleteness(ctx, { toolRoot: ROOT });
+    assert.ok(blocked.blockers.some((b) => b.reason === BLOCKED.UNAPPROVED_EXECUTABLE && b.artifactId === "RBS-0001"));
+
+    // ⚠️ `amended` passes as well as `approved`: #16 makes amended mean "was approved, then changed",
+    // which is a reviewed artifact with a flag on it rather than an unreviewed one.
+    for (const status of ["approved", "amended"]) {
+      writeFileSync(join(f.contentRoot, "data", "runbook-steps", "RBS-0001.json"), canonicalJson({ ...step, reviewStatus: status }));
+      const ok = handoffCompleteness(ctx, { toolRoot: ROOT });
+      assert.deepEqual(ok.blockers.filter((b) => b.reason === BLOCKED.UNAPPROVED_EXECUTABLE), [], status);
+    }
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("the MANIFEST states the approval basis rather than implying it", async () => {
+  const f = completeFixture();
+  try {
+    await publish(f);
+    const manifest = JSON.parse(readFileSync(join(f.outDir, "MANIFEST.json"), "utf-8"));
+    assert.match(manifest.approval.package, /STAGE level/);
+    assert.match(manifest.approval.artifacts, /NOT a publication gate/);
+    assert.deepEqual(manifest.approval.executableContentRequiresApproval, ["runbook-step", "task"]);
+    // The counts are what let a consumer check the claim instead of taking it.
+    assert.ok(Object.values(manifest.approval.reviewStatusCounts).reduce((a, b) => a + b, 0) > 0);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
 });

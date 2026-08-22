@@ -53,20 +53,21 @@ export function makeContext(contentRoot) {
  * progress is the app's to change, `lifecycle` is not, and one `status` field would have made
  * this endpoint able to retire an artifact by accident.
  */
+/**
+ * ⚠️ MOVED 2026-08-22 to lib/tools/review-status.mjs (#145). It used to live here, which meant the
+ * ONLY way to approve an artifact was through a running web server — and DEC-0015 now makes approval
+ * a publish precondition for executable content. Kept as a thin delegation so the skeleton's route
+ * still works and there is exactly one implementation (#47).
+ */
 export async function writeReviewStatus(ctx, id, type, reviewStatus) {
-  const allowed = ctx.schemas.common.$defs.reviewStatus.enum;
-  if (!allowed.includes(reviewStatus))
-    throw new Error(`reviewStatus must be one of ${allowed.join(", ")}, got ${JSON.stringify(reviewStatus)}`);
-
-  return withLock(join(ctx.contentRoot, LOCK_FILE), async () => {
-    const abs = resolveInContentRoot(artifactRelPath(type, id), { contentRoot: ctx.contentRoot });
-    if (!existsSync(abs)) throw new Error(`No such artifact: ${id}`);
-    const doc = JSON.parse(readFileSync(abs, "utf-8")); // fresh, after acquisition
-    const updated = { ...doc, reviewStatus };
-    assertValid(ctx.validators, type, updated, "artifact after status write-back");
-    await atomicWrite(abs, JSON.stringify(updated, null, 2) + "\n");
-    return updated;
+  const { setReviewStatus } = await import("../lib/tools/review-status.mjs");
+  const r = await setReviewStatus(type, id, reviewStatus, {
+    contentRoot: ctx.contentRoot,
+    schemas: ctx.schemas,
+    validators: ctx.validators,
+    reviewedBy: "app",
   });
+  return r.artifact;
 }
 
 /* ------------------------------------------------------------------ rendering */

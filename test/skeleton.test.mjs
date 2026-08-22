@@ -149,7 +149,9 @@ test("5b/6: the status write-back goes through the lock and atomic write, and to
     assert.ok(!readdirSync(dirname(path)).some((f) => f.includes("vpw-tmp")), "no temp file left behind");
 
     await assert.rejects(() => writeReviewStatus(ctx, ids.good, "assertion", "retired"), /reviewStatus must be one of/);
-    await assert.rejects(() => writeReviewStatus(ctx, "AST-9999", "assertion", "approved"), /No such artifact/);
+    // The message now names the TYPE ("No such assertion"), because the implementation moved to
+    // lib/tools/review-status.mjs (#145) and every typed operation there says which type it looked for.
+    await assert.rejects(() => writeReviewStatus(ctx, "AST-9999", "assertion", "approved"), /No such assertion/);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

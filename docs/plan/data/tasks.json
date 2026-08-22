@@ -13,7 +13,7 @@
       "CMP-0011"
     ],
     "lifecycle": "active",
-    "reviewStatus": "draft",
+    "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
@@ -21,7 +21,10 @@
     "type": "task"
   },
   {
-    "acceptedBy": [],
+    "acceptedBy": [
+      "ACC-0011",
+      "ACC-0012"
+    ],
     "dependsOn": [],
     "fulfils": [
       "REQ-0009"
@@ -31,7 +34,7 @@
       "CMP-0002"
     ],
     "lifecycle": "active",
-    "reviewStatus": "draft",
+    "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",

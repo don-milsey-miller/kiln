@@ -16,6 +16,68 @@
       "verifies": [
         "REQ-0010"
       ]
+    },
+    {
+      "evaluates": [
+        "CMP-0002"
+      ],
+      "id": "ACC-0011",
+      "lifecycle": "active",
+      "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The set of assertions stage 6 checks is computed from `restsOn` on active runbook steps (and any other graph use decided at the time), and contains no reference to the `loadBearing` field.",
+      "title": "Stage 6's scope is derived from the graph, not from a flag",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0009"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0002"
+      ],
+      "id": "ACC-0012",
+      "lifecycle": "active",
+      "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Given a runbook step resting on an assertion whose `loadBearing` is absent or false, that assertion appears in stage 6's evaluated set. This is the exact case that passes vacuously today: RBS-0001 rests on AST-0002, which is unflagged.",
+      "title": "An unflagged premise of an active runbook step is in scope",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0009"
+      ]
+    }
+  ],
+  "accepted": [
+    {
+      "acceptedBy": [
+        "ACC-0010"
+      ],
+      "dependsOn": [],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0010",
+        "REQ-0011"
+      ],
+      "id": "TSK-0001",
+      "implements": [
+        "CMP-0011"
+      ],
+      "lifecycle": "active",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
+      "title": "Generate role slices from the task graph",
+      "type": "task"
     }
   ],
   "blockedByOtherRoles": [],
@@ -47,7 +109,7 @@
         "test/handoff.test.mjs"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT — 2026-08-22. This is the first component designed BEFORE it exists rather than recorded after; every other CMP describes a module already on disk. `implementedBy` is absent for exactly that reason, and its absence is the only signal in the artifact that says so. ⚠️ THE HAZARD THIS CREATES IS REAL AND IS RAISED AS QST-0015: the orphan check counts EDGES, so creating this record takes the orphan count to zero while REQ-0010 remains unimplemented. 'All requirements trace to a component' becomes true; 'the handoff exists' does not. A correct rule producing an invisible outcome is the pattern #94, #107 and #122 all describe, and the attestation carries the distinction until something better does. ⚠️ Design decided in DEC-0009: an explicit deterministic command (`npm run handoff`), NEVER a gate side effect. The gate stays read-only. ⚠️ IMPLEMENTED 2026-08-22 — and `implementedBy` now pointing somewhere proves CODE EXISTS, not that the component satisfies its acceptance criteria. QST-0015 stays open for exactly that reason: a path is not a verdict, and nothing here has yet been judged against criteria nobody has written (stage 7's job). ⚠️ The command REFUSES this project today, by design: stage 5's third criterion is attested not-satisfied, so `npm run handoff` reports 11 blockers and writes nothing.",
+      "notes": "⚠️ HISTORY, 2026-08-22 (superseded the same day — see the end of this note). AS OF ITS CREATION it was PLANNED, NOT BUILT: This is the first component designed BEFORE it exists rather than recorded after; every other CMP describes a module already on disk. `implementedBy` is absent for exactly that reason, and its absence is the only signal in the artifact that says so. ⚠️ THE HAZARD THIS CREATES IS REAL AND IS RAISED AS QST-0015: the orphan check counts EDGES, so creating this record takes the orphan count to zero while REQ-0010 remains unimplemented. 'All requirements trace to a component' becomes true; 'the handoff exists' does not. A correct rule producing an invisible outcome is the pattern #94, #107 and #122 all describe, and the attestation carries the distinction until something better does. ⚠️ Design decided in DEC-0009: an explicit deterministic command (`npm run handoff`), NEVER a gate side effect. The gate stays read-only. ✅ CURRENT STATE, 2026-08-22: BUILT AND PUBLISHING. `implementedBy` points at the code and tests; ACC-0001..ACC-0009 all pass; the command published 23 files from the real project with a stable snapshot. The sentences above are kept as dated history because they record why the component was created before it existed — but they are NOT true now, and the first real package exported them as present-tense claims, which is the defect this correction fixes. ⚠️ IMPLEMENTED 2026-08-22 — and `implementedBy` now pointing somewhere proves CODE EXISTS, not that the component satisfies its acceptance criteria. QST-0015 stays open for exactly that reason: a path is not a verdict, and nothing here has yet been judged against criteria nobody has written (stage 7's job). ⚠️ The command REFUSES this project today, by design: stage 5's third criterion is attested not-satisfied, so `npm run handoff` reports 11 blockers and writes nothing.",
       "responsibility": "Produce the frozen handoff package under docs/plan/ from planning-content, on an explicit deterministic command, such that a recipient can begin their part of the work without asking the planner for information the plan should already contain.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -59,7 +121,7 @@
       "type": "component"
     }
   ],
-  "note": "Generated as a query over the task graph, grouped by `task.role` (#19). Nothing here is authored: re-running the handoff recomputes it, so a slice cannot drift from the plan.",
+  "note": "Generated as a query over the task graph, grouped by `task.role` (#19). Nothing here is authored: re-running the handoff recomputes it, so a slice cannot drift from the plan. `tasks` is work REMAINING; `accepted` is work already finished, listed so nobody repeats it. Both statuses are derived from acceptance criteria, never stored.",
   "requirements": [
     {
       "id": "REQ-0009",
@@ -109,28 +171,15 @@
   "tasks": [
     {
       "acceptedBy": [
-        "ACC-0010"
+        "ACC-0011",
+        "ACC-0012"
       ],
       "dependsOn": [],
-      "fulfils": [
-        "REQ-0010",
-        "REQ-0011"
-      ],
-      "id": "TSK-0001",
-      "implements": [
-        "CMP-0011"
-      ],
-      "lifecycle": "active",
-      "reviewStatus": "draft",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
-      "title": "Generate role slices from the task graph",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [],
-      "dependsOn": [],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
       "fulfils": [
         "REQ-0009"
       ],
@@ -139,7 +188,7 @@
         "CMP-0002"
       ],
       "lifecycle": "active",
-      "reviewStatus": "draft",
+      "reviewStatus": "approved",
       "role": "platform",
       "schemaVersion": 2,
       "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",

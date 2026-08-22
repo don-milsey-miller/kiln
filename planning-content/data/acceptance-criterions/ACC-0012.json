@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0012",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An unflagged premise of an active runbook step is in scope",
+  "statement": "Given a runbook step resting on an assertion whose `loadBearing` is absent or false, that assertion appears in stage 6's evaluated set. This is the exact case that passes vacuously today: RBS-0001 rests on AST-0002, which is unflagged.",
+  "evaluates": [
+    "CMP-0002"
+  ],
+  "verifies": [
+    "REQ-0009"
+  ],
+  "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing."
+}

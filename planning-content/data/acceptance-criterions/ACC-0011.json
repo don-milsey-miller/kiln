@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0011",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Stage 6's scope is derived from the graph, not from a flag",
+  "statement": "The set of assertions stage 6 checks is computed from `restsOn` on active runbook steps (and any other graph use decided at the time), and contains no reference to the `loadBearing` field.",
+  "evaluates": [
+    "CMP-0002"
+  ],
+  "verifies": [
+    "REQ-0009"
+  ],
+  "notes": "⚠️ Written BEFORE the work, and `not-evaluated` is the honest state. Added 2026-08-22 because the first real publication shipped TSK-0002 with nothing that could say when it was done — a task a recipient could work on forever without any artifact disagreeing."
+}

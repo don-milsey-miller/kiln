@@ -88,12 +88,6 @@ An unresolved question must exist as a tracked item with a state, not as a sente
 
 *Priority: should*
 
-### REQ-0015 — The system runs locally for a single operator
-
-The system must be usable by one operator on one machine with no hosted service required.
-
-*Priority: must*
-
 ## Components
 
 ### CMP-0001 — Stage definitions and the gate
@@ -259,6 +253,12 @@ An unanswered question is CRITICAL for stage 9's `no-unresolved-critical-questio
 
 **Why:** Stage 9's run found `critical` undefined - the second instance of the defect stage 4 hit with `blocking`. Inventing a fresh category would double the vocabulary and leave two words that both mean 'important' with different unstated tests. DEC-0002 already separates a decision whose absence would make a commitment possibly wrong from work that is simply not done, and the handoff needs exactly that distinction scoped to what it publishes: a question is critical if the package would carry something wrong without its answer, or if a criterion cannot be judged.
 
+### DEC-0015 — Stage attestations approve the PACKAGE; reviewStatus approves the ARTIFACT, and executable content needs both
+
+The two are different approvals of different things and neither substitutes for the other. Stage attestations approve the PACKAGE: a human looked at each exit criterion and said satisfied, not-satisfied or n/a (#93). `reviewStatus` approves the ARTIFACT: someone reviewed that particular statement. For v1: (a) the package's MANIFEST and README state explicitly that the package is approved at STAGE level and carry the per-artifact review counts, so a machine consumer can see the basis rather than infer it; (b) artifact classes that become EXECUTABLE handoff content — `runbook-step` and `task` — must be `approved` or `amended` before they may be published, because those are the artifacts a recipient acts on; (c) every other class ships at whatever review status it holds, visible in the data.
+
+**Why:** The first real package exported 98 artifacts as `draft` while describing itself as approved state, and the ambiguity was visible to machine consumers - which is the strongest kind of defect report, because the package said two things at once. Collapsing the two approvals either way would lose something real: making attestations sufficient would let a recipient act on an instruction nobody reviewed, and requiring per-artifact approval for everything would demand review of exploratory questions and superseded assertions that nobody needs to sign. The line is drawn at EXECUTABILITY because that is where the cost of being wrong changes: a draft question is a note, and a draft runbook step is an instruction someone follows. #57 and #59 already draw the same line for confidence and acknowledgement.
+
 ## Claims
 
 ### AST-0001 — chokidar sees events fs.watch misses on Windows
@@ -308,14 +308,6 @@ With cacheComponents disabled (the default), Next.js in development renders page
 **supported · environment-matched** (derived)
 
 Rests on: EVD-0007 (support), EVD-0010 (support), EVD-0011 (support)
-
-### AST-0007 — With Cache Components, a SYNCHRONOUS fs read freezes into the static shell
-
-With cacheComponents enabled, a Server Component that reads an artifact with fs.readFileSync produces output baked into the static shell, so a later external write to that file does not change what a fresh request returns.
-
-**contested · environment-matched** (derived)
-
-Rests on: EVD-0006 (support), EVD-0012 (refute)
 
 ### AST-0008 — An external write alone produces no request, re-render or browser update
 
@@ -379,6 +371,26 @@ Rests on: EVD-0016 (support)
 
 Is there state a research-finding artifact would hold that is not already held by evidence(kind: source), assertion, or question — and that something downstream must traverse (#41)?
 
+### QST-0016 — The snapshot cannot distinguish two packages built by different tool versions
+
+The package's identity is a content hash of its content files, and `toolVersion` is meant to carry the rest. But this repo's package.json version is `0.0.0` and has never been bumped, so a renderer change produces a DIFFERENT package with the SAME snapshot and the same declared tool version. Observed 2026-08-22: adding the `approval` block to MANIFEST.json left the snapshot at b218b4a525c6176b. What makes the tool's contribution to the package identifiable — version discipline, a hash of the renderer, or something else?
+
+## Tasks
+
+### TSK-0001 — Generate role slices from the task graph
+
+Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0011 · fulfils: REQ-0010, REQ-0011*
+
+### TSK-0002 — Derive stage 6's scope from graph use rather than a flag
+
+Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0002 · fulfils: REQ-0009*
+
 ## Runbook steps
 
 ### RBS-0001 — Run specialists in parallel
@@ -388,3 +400,11 @@ Launch specialist children concurrently; each allocates its own artifact IDs.
 **Expected:** Every child receives distinct IDs and no artifact is overwritten.
 
 *Rests on: AST-0002*
+
+## Retired and superseded
+
+⚠️ **Not part of the current plan.** Listed because removing them silently would make this
+rendering disagree with the machine-readable data, which is the parity REQ-0011 requires.
+
+- **AST-0007** (assertion, superseded) — With Cache Components, a SYNCHRONOUS fs read freezes into the static shell
+- **REQ-0015** (requirement, retired) — The system runs locally for a single operator

@@ -1,0 +1,27 @@
+{
+  "id": "DEC-0015",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage attestations approve the PACKAGE; reviewStatus approves the ARTIFACT, and executable content needs both",
+  "statement": "The two are different approvals of different things and neither substitutes for the other. Stage attestations approve the PACKAGE: a human looked at each exit criterion and said satisfied, not-satisfied or n/a (#93). `reviewStatus` approves the ARTIFACT: someone reviewed that particular statement. For v1: (a) the package's MANIFEST and README state explicitly that the package is approved at STAGE level and carry the per-artifact review counts, so a machine consumer can see the basis rather than infer it; (b) artifact classes that become EXECUTABLE handoff content — `runbook-step` and `task` — must be `approved` or `amended` before they may be published, because those are the artifacts a recipient acts on; (c) every other class ships at whatever review status it holds, visible in the data.",
+  "rationale": "The first real package exported 98 artifacts as `draft` while describing itself as approved state, and the ambiguity was visible to machine consumers - which is the strongest kind of defect report, because the package said two things at once. Collapsing the two approvals either way would lose something real: making attestations sufficient would let a recipient act on an instruction nobody reviewed, and requiring per-artifact approval for everything would demand review of exploratory questions and superseded assertions that nobody needs to sign. The line is drawn at EXECUTABILITY because that is where the cost of being wrong changes: a draft question is a note, and a draft runbook step is an instruction someone follows. #57 and #59 already draw the same line for confidence and acknowledgement.",
+  "decidedAt": "2026-08-22",
+  "addresses": [],
+  "alternatives": [
+    {
+      "option": "Define stage attestations as sufficient package approval",
+      "whyNot": "A recipient could be handed an instruction that no one reviewed, and the attestation would not have been about that instruction. Stage criteria are about the stage, not about each artifact in it."
+    },
+    {
+      "option": "Require `approved` on every artifact before publishing",
+      "whyNot": "It would demand sign-off on exploratory questions and on assertions kept for history, turning approval into a formality - the acknowledgement fatigue the risk register already names."
+    },
+    {
+      "option": "Leave it ambiguous and let consumers infer",
+      "whyNot": "That is the state the first package shipped in, and it is what produced this decision."
+    }
+  ],
+  "notes": "⚠️ CONSEQUENCE, and it will bite immediately: RBS-0001, TSK-0001 and TSK-0002 are all `draft`, so the handoff will REFUSE until they are reviewed. That is the decision working rather than an obstacle - the previous package shipped an instruction and two work items that nobody had signed. ⚠️ Approving requires a typed operation: `reviseArtifact` refuses `reviewStatus` as identity state, and the only writer today is the skeleton's write-back in app/server.mjs. That is the eighth instance of the missing-operation pattern and is being built with this decision rather than after it."
+}

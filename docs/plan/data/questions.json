@@ -294,5 +294,19 @@
     "statement": "CMP-0011 satisfies REQ-0010 and nothing implements it. The stage-9 orphan check counts EDGES, so its creation takes the orphan count to zero while the handoff remains unbuilt — 'all requirements trace to a component' becomes true, and 'the handoff exists' does not. Does `component` need a planned/built axis, or does that distinction belong entirely to attestation and, later, to acceptance criteria?",
     "title": "A component records no distinction between planned and built",
     "type": "question"
+  },
+  {
+    "id": "QST-0016",
+    "lifecycle": "active",
+    "notes": "⚠️ NOT a defect in the hash: README.md and MANIFEST.json both EMBED the snapshot, so neither can be inside it, and that is stated in the MANIFEST rather than left to be discovered. The gap is that `toolVersion` is the only thing covering tool changes and nothing makes it move. ⚠️ NOT BLOCKING under DEC-0002 — no committed work's correctness depends on the answer, and the package is still reproducible from the same tool. But it weakens the reviewability claim: two packages with the same snapshot are supposed to be the same package, and today they can differ. ⚠️ Found by REPUBLISHING and noticing the snapshot had not moved when it should have, which is the same class of check as watching the disk rather than the report.",
+    "raisedBy": [
+      "CMP-0011"
+    ],
+    "resolution": "unanswered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The package's identity is a content hash of its content files, and `toolVersion` is meant to carry the rest. But this repo's package.json version is `0.0.0` and has never been bumped, so a renderer change produces a DIFFERENT package with the SAME snapshot and the same declared tool version. Observed 2026-08-22: adding the `approval` block to MANIFEST.json left the snapshot at b218b4a525c6176b. What makes the tool's contribution to the package identifiable — version discipline, a hash of the renderer, or something else?",
+    "title": "The snapshot cannot distinguish two packages built by different tool versions",
+    "type": "question"
   }
 ]

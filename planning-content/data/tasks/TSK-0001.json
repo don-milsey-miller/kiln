@@ -2,7 +2,7 @@
   "id": "TSK-0001",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
   "title": "Generate role slices from the task graph",
   "statement": "Extend the handoff renderer to emit one slice per role, as a query over tasks grouped by `role`, pulling each task's traced requirements and acceptance criteria with it. No slice is authored or maintained.",
