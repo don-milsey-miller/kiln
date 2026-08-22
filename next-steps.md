@@ -743,6 +743,18 @@ test asserted on the request rather than the response** (#129).
 finish. ⚠️ **`research_fetch` needs no credential at all and is done** — but *needing no credential is
 exactly what made it dangerous*, which is why it has a boundary rather than a note (#129).
 
+`npm run research:probe` answers *"is research usable on this host, right now"* with a **measured**
+result — the live `GET /usage` probe, no search credit spent, and it **never prints the key**.
+
+⚠️ **One clause of DEC-0006 is not enforceable yet, and saying so is the point.** *"Injected only into
+the research child; planning and validation children do not receive it"* needs an **injection point**,
+and the extension binding that would own it does not exist — **so a key set in the user environment
+today is visible to every process the PM runs**, this repo's tools included. **That is a gap in
+enforcement, not in the decision**, and it belongs to the extension binding and 7c. Until then the
+narrowest honest option is a **session-scoped** variable set in the shell that runs the live call, and
+the difference between the two is worth stating rather than papering over: one is a contract the host
+holds, the other is a habit the PM holds.
+
 ### 7b. Tier-1 validation slice — second
 
 1. **Build the controller and the `evidence` omission field together.** ⚠️ **The collector's fixtures
