@@ -17,6 +17,12 @@
  *
  * ⚠️ **It runs in the PM's terminal, not the agent's.** The credential is read from the environment
  * and never printed (DEC-0006).
+ *
+ * ⚠️ **Nothing here calls `process.exit()`, and that is not a style preference.** Measured on this
+ * Node build on Windows: `process.exit()` after ANY `fetch` aborts the process with
+ * `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and returns 127 — so a correct refusal
+ * looked like a crash and reported a crash's exit code. `process.exitCode` plus a natural drain exits
+ * 1 cleanly. **A refusal that cannot be told apart from a failure defeats the clause it implements.**
  */
 
 import { createResearchTools } from "../lib/research/tools.mjs";
@@ -27,33 +33,44 @@ import { quoteIsPresent, flatten, extractTitle } from "../lib/research/quote.mjs
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
+
+/**
+ * Everything after `--name` up to the next `--flag`, joined.
+ *
+ * ⚠️ Not paranoia about npm: argv quoting was MEASURED intact through `npm run --` in both
+ * PowerShell and bash. It joins because the failure mode if a shell ever does drop quotes is the
+ * worst kind — `--claim "a b c"` would silently record the claim as `a`, a truncated sentence that
+ * still validates and still reads like a claim. Joining cannot produce a worse value than taking
+ * the first token, so it costs nothing to be safe here.
+ */
 const flag = (name) => {
   const i = argv.indexOf(`--${name}`);
-  return i === -1 ? undefined : argv[i + 1];
+  if (i === -1) return undefined;
+  const parts = [];
+  for (let j = i + 1; j < argv.length && !argv[j].startsWith("--"); j++) parts.push(argv[j]);
+  return parts.length ? parts.join(" ") : undefined;
 };
 
 const tools = createResearchTools(createTavilyAdapter());
 
-/** Every path that cannot proceed exits through here, so a refusal always looks like a refusal. */
+/** Every path that cannot proceed reports through here, so a refusal always looks like a refusal. */
 function refuse(result) {
   console.error(`REFUSED     ${result.reason}`);
   console.error(`detail      ${result.detail}`);
   if (result.mustRecordGap)
-    console.error(
-      "\nThis is a capability refusal. Record the gap; do NOT answer from model memory (DEC-0004)."
-    );
-  process.exit(1);
+    console.error("\nThis is a capability refusal. Record the gap; do NOT answer from model memory (DEC-0004).");
+  return 1;
 }
 
-if (cmd === "search") {
+async function search() {
   const query = argv.slice(1).filter((a) => !a.startsWith("--")).join(" ");
   if (!query) {
     console.error('Usage: npm run research:search -- "your question"');
-    process.exit(2);
+    return 2;
   }
   console.error("(one search credit)");
   const out = await tools.research_search({ query, maxResults: Number(flag("max") ?? 5) });
-  if (out.ok === false) refuse(out);
+  if (out.ok === false) return refuse(out);
 
   console.log(`discovery for: ${out.query}\n`);
   out.results.forEach((r, i) => {
@@ -65,32 +82,45 @@ if (cmd === "search") {
   });
   console.log(out.note);
   console.log(`\nTo record one as evidence:\n  npm run research:record -- <url> --claim "..." --quote "exact sentence from the page"`);
-  process.exit(0);
+  return 0;
 }
 
-if (cmd === "record") {
+async function record() {
   const url = argv[1];
   const claim = flag("claim");
   const quote = flag("quote");
   if (!url || url.startsWith("--") || !claim || !quote) {
     console.error('Usage: npm run research:record -- <url> --claim "what it supports" --quote "exact sentence from the page"');
     console.error("\n--quote is not optional: it is checked against the retrieved text before anything is written.");
-    process.exit(2);
+    return 2;
+  }
+
+  // ⚠️ Resolve the content root BEFORE fetching anything. The first version fetched the page and
+  // THEN discovered it had nowhere to write, which is #125's "refuse before provisioning" ignored in
+  // miniature: a precondition checked after the irreversible part is a report, not a check. Here the
+  // waste is one HTTP request; the habit is what matters.
+  let contentRoot;
+  try {
+    contentRoot = resolveContentRoot();
+  } catch (e) {
+    console.error(e.message);
+    console.error("\nThis repo is its own consumer, so the default rule does not apply to it. Set:");
+    console.error('  $env:PLANNING_CONTENT_DIR = "D:\\visual-project-workflow\\planning-content"');
+    return 2;
   }
 
   const got = await tools.research_fetch({ url });
-  if (got.ok === false) refuse(got);
+  if (got.ok === false) return refuse(got);
 
   if (!quoteIsPresent(got.body, quote)) {
     console.error("REFUSED     quote-not-found");
     console.error(`detail      That sentence is not in the retrieved document (${got.url}).`);
     console.error("\nNothing was recorded. A citation for text that is not on the page is worse than no");
     console.error("citation: it is a claim that has borrowed someone else's authority.");
-    process.exit(1);
+    return 1;
   }
 
   const title = flag("title") ?? extractTitle(got.body) ?? got.url;
-  const contentRoot = resolveContentRoot();
   const evidence = await createEvidence(
     {
       title: `Source: ${title}`.slice(0, 200),
@@ -116,10 +146,14 @@ if (cmd === "record") {
     console.log(`linked      ${assertion} <- ${evidence.id} (${polarity})`);
   } else {
     console.log("\nNot linked to any assertion. Bearing is a separate judgement (#123): link it with");
-    console.log(`  --assertion AST-#### --polarity support|refute`);
+    console.log("  --assertion AST-#### --polarity support|refute");
   }
-  process.exit(0);
+  return 0;
 }
 
-console.error("Usage:\n  npm run research:search -- \"a question\"\n  npm run research:record -- <url> --claim \"...\" --quote \"...\"");
-process.exit(2);
+if (cmd === "search") process.exitCode = await search();
+else if (cmd === "record") process.exitCode = await record();
+else {
+  console.error('Usage:\n  npm run research:search -- "a question"\n  npm run research:record -- <url> --claim "..." --quote "..."');
+  process.exitCode = 2;
+}

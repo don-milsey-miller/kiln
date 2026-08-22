@@ -29,8 +29,8 @@ if (out.available) {
   console.log(`available   backend=${out.backend}  probed live, no search credit spent`);
   console.log(`quota       ${quota}`);
   console.log(`tools       ${Object.keys(out.signatures).join(", ")}`);
-  process.exit(0);
-}
+  process.exitCode = 0;
+} else {
 
 console.log(`UNAVAILABLE backend=${out.backend}`);
 console.log(`reason      ${out.reason}`);
@@ -43,4 +43,5 @@ console.log(
     : `This is a structured capability refusal, not a failure to report. A specialist seeing this must\n` +
         `record the gap and must NOT answer from model memory (DEC-0004).`
 );
-process.exit(1);
+  process.exitCode = 1;
+}

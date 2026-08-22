@@ -226,3 +226,19 @@ test("a successful fetch records what promotion to evidence needs", async () => 
   assert.deepEqual(out.redirectChain, ["https://example.com/page"]);
   assert.equal(mustRecordGap(out), false);
 });
+
+test("the CLIs never call process.exit, because it crashes after fetch on this platform", async () => {
+  // ⚠️ Measured 2026-08-22 on Node 24 / Windows: `process.exit()` after ANY `fetch` aborts with
+  // `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and returns 127 — so a correct refusal
+  // printed a crash and reported a crash's exit code. `process.exitCode` plus a natural drain exits
+  // cleanly. A name check, like #123's: it catches the obvious regression, not a clever equivalent.
+  const { readFileSync } = await import("node:fs");
+  for (const f of ["../bin/research.mjs", "../bin/research-probe.mjs"]) {
+    // Comments are stripped first: both files EXPLAIN why the call is forbidden, and a check that
+    // cannot tell an explanation from a call would forbid documenting its own rule.
+    const code = readFileSync(new URL(f, import.meta.url), "utf-8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    assert.equal(/process\.exit\s*\(/.test(code), false, `${f} must set process.exitCode instead of calling process.exit()`);
+  }
+});
