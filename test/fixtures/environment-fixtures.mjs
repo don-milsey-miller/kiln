@@ -55,13 +55,21 @@ export const HOST_RUN = {
 /**
  * FIXTURE B — controller-managed tier-1 execution.
  *
- * ⚠️ **Provisional until the controller actually emits it.** #127 says the collector's fixtures must
- * justify every schema state, and a state a collector cannot produce must not be in the schema. This
- * fixture is a claim about what the tier-1 controller will emit; the controller's own tests are what
- * turn it into a fact. It is written first so the schema is shaped by both cases at once.
+ * ✅ **AUTHORITATIVE as of 2026-08-22: rewritten FROM a real controller run**, per the PM's condition
+ * that it becomes authoritative only when the real path emits it. It was provisional before that, and
+ * reality corrected it in two places — which is the argument for the condition:
  *
- * It carries the three omission states the host run cannot produce, which is why two fixtures were
- * needed rather than one.
+ *   1. The redacted fact is `env:TAVILY_API_KEY`, not `TAVILY_API_KEY`. The `env:` prefix is how the
+ *      capture plan asks for an environment variable, and the fixture had invented a name.
+ *   2. There is a FOURTH omission the draft did not have: `timing`, `not-captured`. Writing the
+ *      fixture from imagination produced three states from three causes and quietly missed the one
+ *      that comes from the capture plan itself.
+ *
+ * ⚠️ Neither correction was large, and that is the point: a fixture written from a design is
+ * plausible everywhere and wrong in the details, and the details are what a schema is made of.
+ *
+ * Values here are shape, not measurements — `test/controller.test.mjs` compares KEYS and
+ * (fact, state) pairs against a live run, never the machine-specific values.
  */
 export const CONTROLLER_RUN = {
   execution: "controller",
@@ -73,10 +81,10 @@ export const CONTROLLER_RUN = {
     doesNotClaim: ["containment-of-hostile-code", "host-filesystem-denial", "network-isolation"],
   },
   facts: {
-    os: "Windows",
-    "python-version": "3.12.4",
+    os: "Windows_NT 10.0.26200",
+    "python-version": "Python 3.12.10",
     workspace: "fresh temporary directory",
-    "venv": "created per run",
+    venv: "created per run",
   },
   omissions: [
     {
@@ -87,12 +95,17 @@ export const CONTROLLER_RUN = {
     {
       fact: "cpu-model",
       state: "not-observable",
-      reason: "No collector for CPU model exists on this platform in tier 1.",
+      reason: 'No collector for "cpu-model" exists on this platform at this tier.',
     },
     {
-      fact: "TAVILY_API_KEY",
+      fact: "env:TAVILY_API_KEY",
       state: "redacted",
-      reason: "Present in the allowlisted process environment and deliberately suppressed: a credential must never reach an evidence record (DEC-0006).",
+      reason: "Obtained from the host environment and suppressed by policy: a credential must never reach an evidence record (DEC-0006).",
+    },
+    {
+      fact: "timing",
+      state: "not-captured",
+      reason: "The capture plan explicitly disabled this fact for this run.",
     },
   ],
 };
