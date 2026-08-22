@@ -87,29 +87,129 @@
     },
     "environment": {
       "type": "object",
-      "description": "What the experiment ran in. REQ-0006 requires this in enough detail to judge whether it resembles the target, and #96's applicability filter is what does that judging. Free-form keys on purpose: the dimensions that matter differ per claim, and a fixed list would be wrong for most of them.",
+      "description": "What the experiment ran in. REQ-0006 requires this in enough detail to judge whether it resembles the target, and #96's applicability filter is what does that judging. ⚠️ RESHAPED 2026-08-22 (#131) after two fixtures pressured it: `tier` used to be required alongside `facts`, which made a run executed directly on the host UNRECORDABLE — there was no honest value for it. The fix is two axes rather than a 'tier 0': every experiment declares an environment, and only a controller-managed run declares a sandboxTier.",
       "properties": {
-        "tier": {
+        "execution": {
+          "enum": [
+            "host",
+            "controller"
+          ],
+          "description": "WHO ran it. `host`: executed directly, with whatever the machine had. `controller`: the validation controller provisioned an environment and ran it there. This is the discriminator that makes an absent sandboxTier meaningful rather than merely missing.",
+          "x-materiality": "structural"
+        },
+        "sandboxTier": {
           "enum": [
             1,
             2,
             3
           ],
-          "description": "#56's sandbox tier. Caps the reachable rung (see 'Which tier can reach which rung')."
+          "description": "#56's sandbox tier. Caps the reachable rung. ⚠️ Present ONLY when a controller supplied the isolation. A host run has no tier — not the lowest tier, NO tier: a rung implies a comparison, and 'isolation is not a thing this run has an answer to' is not the bottom of a ladder.",
+          "x-materiality": "structural"
+        },
+        "isolationBoundary": {
+          "type": "object",
+          "description": "What the tier did and did not claim, travelling WITH the record (DEC-0005). A reader of this evidence must be able to see that tier 1 is not containment without going to find the decision that said so.",
+          "properties": {
+            "isolates": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/nonEmptyString"
+              },
+              "uniqueItems": true
+            },
+            "doesNotClaim": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/nonEmptyString"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "isolates",
+            "doesNotClaim"
+          ],
+          "additionalProperties": false,
+          "x-materiality": "semantic"
         },
         "facts": {
           "type": "object",
-          "description": "Observed environment facts — os, kernel, interpreter, image, instance type, whatever the claim turns on. Compared against the assertion's targetEnvironment to decide applicability and environment match.",
+          "description": "Observed environment facts — os, kernel, interpreter, image, instance type, whatever the claim turns on. Compared against the assertion's targetEnvironment to decide applicability and environment match. Free-form keys on purpose: the dimensions that matter differ per claim, and a fixed list would be wrong for most of them.",
           "additionalProperties": {
             "$ref": "common.schema.json#/$defs/nonEmptyString"
-          }
+          },
+          "x-materiality": "semantic"
+        },
+        "omissions": {
+          "type": "array",
+          "description": "Facts the observer does NOT have, each with why (#122, DEC-0005). ⚠️ These describe the OBSERVER, never relevance: whether a missing fact matters to a claim is decided per claim by the applicability layer (#123, #105). ⚠️ Unrequested facts stay simply absent — this array is for facts that were wanted and are not here, which is what makes an omission DETECTABLE rather than silent.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fact": {
+                "$ref": "common.schema.json#/$defs/nonEmptyString",
+                "description": "The key this would have been, had it been collected."
+              },
+              "state": {
+                "enum": [
+                  "not-captured",
+                  "not-observable",
+                  "unavailable",
+                  "redacted"
+                ],
+                "description": "not-captured: collection was deliberately disabled, or no collector was running. not-observable: the requested fact has no available collector. unavailable: collection RAN and the fact was absent. redacted: collection obtained the value and policy suppressed it. ⚠️ Each state is here because a fixture produces it; a state nothing can distinguish must not be declared (#121, #127)."
+              },
+              "reason": {
+                "$ref": "common.schema.json#/$defs/nonEmptyString",
+                "description": "Required on every state. 'We did not observe this' and 'this was not observable' license different conclusions, and the state alone does not carry which one happened here."
+              }
+            },
+            "required": [
+              "fact",
+              "state",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "uniqueItems": true,
+          "x-materiality": "semantic"
         }
       },
       "required": [
-        "tier",
+        "execution",
         "facts"
       ],
-      "additionalProperties": false,
+      "allOf": [
+        {
+          "$comment": "A controller-managed run must name its tier and its boundary. Nested inside allOf per #82.",
+          "if": {
+            "properties": {
+              "execution": {
+                "const": "controller"
+              }
+            },
+            "required": [
+              "execution"
+            ]
+          },
+          "then": {
+            "required": [
+              "sandboxTier",
+              "isolationBoundary"
+            ],
+            "$comment": "The controller knows both, so a record it produced without them is a collector defect rather than an unknown."
+          },
+          "else": {
+            "not": {
+              "required": [
+                "sandboxTier"
+              ]
+            },
+            "$comment": "⚠️ A host run may NOT carry a sandboxTier. This is the load-bearing constraint of the whole reshape: it makes 'no isolation claim' structural rather than a convention someone remembers. Recording a tier here would grant containment the run never had, and #42's rungs would report a strength nothing earned."
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
       "x-materiality": "semantic"
     },
     "outcome": {

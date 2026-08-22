@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **130 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **133 decisions as of
 > 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -779,10 +779,15 @@ holds, the other is a habit the PM holds.
 
 ### 7b. Tier-1 validation slice — second
 
-1. **Build the controller and the `evidence` omission field together.** ⚠️ **The collector's fixtures
-   must justify every schema state** — a state no fixture can produce does not go in the schema.
-   That inverts the usual order deliberately, and it is what fixes #122's original defect at source:
-   a state written before its collector exists is one nobody has shown is distinguishable (#121).
+1. ✅ **The environment model, settled by two fixtures written before the schema changed** (#131):
+   `execution` (host | controller) + `facts` always; **`sandboxTier` only when a controller supplied
+   isolation, and forbidden on a host run**; `isolationBoundary` travels with a controller record;
+   `omissions[]` carries the four states, each with a reason. **No tier 0** — a rung implies a
+   comparison, and a host run has no answer to isolation rather than the weakest one.
+   ⚠️ **The controller fixture is provisional until the controller emits it.**
+   ✅ **Migration 2 applied** to the 12 records the reshape broke (#132), and **`AST-0013` is finally
+   recorded from its ORIGINAL output** — not re-run — closing 7a's asymmetry (#133).
+   ⏳ **Still to build: the collector itself**, which is what turns fixture B from a claim into a fact.
 2. **Exercise `provision → execute → observe → destroy`.**
 3. **Cover the hard cases, not the happy path:** timeout · unavailable fact · redaction · **cleanup
    failure** · and the explicit **"a venv is not containment"** boundary.

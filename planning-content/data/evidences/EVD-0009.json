@@ -1,14 +1,14 @@
 {
   "id": "EVD-0009",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Next.js probe — matrix SUMMARY (not attachable to a single-cell claim)",
   "kind": "experiment",
   "summary": "Minimal Next.js 16.3.1 app reading data/artifact.json in a Server Component. Matrix: read API {fs.readFileSync, await readFile} x cacheComponents {disabled, enabled}. Protocol per cell: render A; write B from a separate process touching no application code; wait 10s; read module-scope server counters via a route handler so browser behaviour cannot be mistaken for server caching; then make a fresh request. RESULT — ALL FOUR CELLS IDENTICAL: nothing happened during the quiet window (0 page requests, 0 file reads); the fresh request returned B; counters confirmed the server re-read the file and re-rendered. Step 6: an app-supplied SSE route watching the data directory delivered a change event to a connected client within the window in both cacheComponents modes, and a reload then showed B.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "framework": "Next.js 16.3.1",
       "react": "19.2.8",
@@ -21,5 +21,5 @@
   },
   "observedAt": "2026-08-18",
   "outcome": "success",
-  "notes": "Kept as the summary of the whole run and deliberately UNATTACHED. Its environment says cacheComponents:'both' and readApi:'both', which environment-MISMATCHES every claim about one configuration — the applicability filter excluded it from all four, correctly, and that is how the modelling error was caught. A matrix run is N experiments and must be recorded as N. The per-cell records carry the bearing; this one carries the protocol."
+  "notes": "Kept as the summary of the whole run and deliberately UNATTACHED. Its environment says cacheComponents:'both' and readApi:'both', which environment-MISMATCHES every claim about one configuration — the applicability filter excluded it from all four, correctly, and that is how the modelling error was caught. A matrix run is N experiments and must be recorded as N. The per-cell records carry the bearing; this one carries the protocol. ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }

@@ -1,14 +1,14 @@
 {
   "id": "EVD-0012",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Probe cell — fs.readFileSync, cacheComponents enabled",
   "kind": "experiment",
   "summary": "Rendered A; wrote B from a separate process touching no application code; waited 10s. Nothing happened during the quiet window (0 page requests, 0 file reads). A fresh request returned B, and module-scope server counters confirmed the server re-read the file and re-rendered — so a SYNCHRONOUS read did NOT freeze into a static shell in dev.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "framework": "Next.js 16.3.1",
       "react": "19.2.8",
@@ -20,5 +20,6 @@
     }
   },
   "observedAt": "2026-08-18",
-  "outcome": "success"
+  "outcome": "success",
+  "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }

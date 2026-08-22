@@ -30,17 +30,17 @@ async function seeded() {
   const good = await createAssertion(
     { title: "Sound", statement: "This one holds.", targetEnvironment: { facts: HERE } }, o);
   const goodEv = await createEvidence(
-    { title: "It worked", kind: "experiment", summary: "Ran it.", environment: { tier: 1, facts: HERE }, observedAt: "2026-08-18", outcome: "success" }, o);
+    { title: "It worked", kind: "experiment", summary: "Ran it.", environment: { execution: "host", facts: HERE }, observedAt: "2026-08-18", outcome: "success" }, o);
   await linkEvidence(good.id, goodEv.id, "support", o);
 
   const contested = await createAssertion(
     { title: "Disputed", statement: "This one is disputed.", targetEnvironment: { facts: HERE } }, o);
   const forIt = await createEvidence(
-    { title: "For", kind: "experiment", summary: "Worked.", environment: { tier: 1, facts: HERE }, observedAt: "2026-08-18", outcome: "success" }, o);
+    { title: "For", kind: "experiment", summary: "Worked.", environment: { execution: "host", facts: HERE }, observedAt: "2026-08-18", outcome: "success" }, o);
   const against = await createEvidence(
-    { title: "Against", kind: "experiment", summary: "Failed.", environment: { tier: 1, facts: HERE }, observedAt: "2026-08-18", outcome: "failure" }, o);
+    { title: "Against", kind: "experiment", summary: "Failed.", environment: { execution: "host", facts: HERE }, observedAt: "2026-08-18", outcome: "failure" }, o);
   const stale = await createEvidence(
-    { title: "Stale", kind: "experiment", summary: "Old run.", environment: { tier: 1, facts: { os: "Ubuntu 24" } }, observedAt: "2026-01-01", outcome: "failure" }, o);
+    { title: "Stale", kind: "experiment", summary: "Old run.", environment: { execution: "host", facts: { os: "Ubuntu 24" } }, observedAt: "2026-01-01", outcome: "failure" }, o);
   await linkEvidence(contested.id, forIt.id, "support", o);
   await linkEvidence(contested.id, against.id, "refute", o);
   await linkEvidence(contested.id, stale.id, "refute", o);

@@ -31,7 +31,7 @@ const TARGET = { facts: { os: "RHEL 10", postgres: "17" } };
 const AST_IN = { title: "Replication works", statement: "PG 17 logical replication satisfies REQ-0012.", targetEnvironment: TARGET };
 const EXPERIMENT = (facts, outcome = "success") => ({
   title: "Ran it", kind: "experiment", summary: "Executed the procedure.",
-  environment: { tier: 2, facts }, observedAt: "2026-08-18", outcome,
+  environment: { execution: "controller", sandboxTier: 2, isolationBoundary: { isolates: ["filesystem", "process", "network-namespace"], doesNotClaim: ["kernel-isolation"] }, facts }, observedAt: "2026-08-18", outcome,
 });
 
 /* ------------------------------------------------- #96 enforced at the input boundary */

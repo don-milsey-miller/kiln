@@ -1,14 +1,14 @@
 {
   "id": "EVD-0004",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Recurrence reproduced and classified — lock acquisition returned EPERM",
   "kind": "experiment",
   "summary": "Instrumented the concurrency test so each child reports a structured outcome, then ran the isolated test file repeatedly. Run 19 of a declared 40 failed. Classification: one child of six, `lock-acquisition-timeout` class, message `Could not acquire ....planning.lock: EPERM`, elapsed 507ms. No duplicate IDs; the other five children allocated distinct IDs. openSync(path,'wx') returned EPERM rather than EEXIST, and the retry loop treated anything but EEXIST as fatal.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "os": "Windows 11",
       "node": "v24.18.0",
@@ -17,5 +17,5 @@
   },
   "observedAt": "2026-08-18",
   "outcome": "failure",
-  "notes": "Instrumentation validated before use: forcing maxWaitMs=1 produced five children classified lock-acquisition-timeout and the assertion 'NOT a serialisation result', confirming the classifier distinguishes causes rather than reporting the first assertion to trip."
+  "notes": "Instrumentation validated before use: forcing maxWaitMs=1 produced five children classified lock-acquisition-timeout and the assertion 'NOT a serialisation result', confirming the classifier distinguishes causes rather than reporting the first assertion to trip. ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }

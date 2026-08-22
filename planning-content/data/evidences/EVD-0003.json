@@ -1,19 +1,20 @@
 {
   "id": "EVD-0003",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "One unexplained failure in a full parallel run",
   "kind": "experiment",
   "summary": "The same test failed once during a full 92-test parallel run and did not reproduce in three subsequent runs. The failure output was not captured, so the cause is unconfirmed; maxWaitMs was raised as a mitigation on an unproven diagnosis.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "os": "Windows 11",
       "node": "v24.18.0"
     }
   },
   "observedAt": "2026-08-18",
-  "outcome": "failure"
+  "outcome": "failure",
+  "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }

@@ -31,7 +31,7 @@ const EXPERIMENT = (id, facts, extra = {}) =>
   env(id, "evidence", {
     kind: "experiment",
     summary: "Ran it.",
-    environment: { tier: 2, facts },
+    environment: { execution: "controller", sandboxTier: 2, isolationBoundary: { isolates: ["filesystem", "process", "network-namespace"], doesNotClaim: ["kernel-isolation"] }, facts },
     observedAt: "2026-08-18",
     outcome: "success",
     ...extra,

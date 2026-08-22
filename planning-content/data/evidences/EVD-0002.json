@@ -1,19 +1,20 @@
 {
   "id": "EVD-0002",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Six concurrent processes, distinct IDs",
   "kind": "experiment",
   "summary": "Six node processes creating requirements concurrently received six distinct IDs. Falsified by removing the lock: eight unlocked processes produced 4 distinct IDs of 8.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "os": "Windows 11",
       "node": "v24.18.0"
     }
   },
   "observedAt": "2026-08-18",
-  "outcome": "success"
+  "outcome": "success",
+  "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }

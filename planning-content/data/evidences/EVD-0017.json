@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0017",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "npm run research:probe, PM's host, 2026-08-22",
+  "kind": "experiment",
+  "summary": "`npm run research:probe` printed: available, backend=tavily, probed live, no search credit spent; quota 1500 of 1500 credits remaining (0 used); tools research_capability, research_search, research_fetch.",
+  "outcome": "success",
+  "observedAt": "2026-08-22",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "os": "Windows",
+      "backend": "tavily",
+      "credential-source": "host environment variable",
+      "quota-limit": "1500",
+      "quota-used": "0"
+    },
+    "omissions": [
+      {
+        "fact": "node-version",
+        "state": "not-captured",
+        "reason": "No capture plan existed: this run predates the validation controller. It was not collected then, and it must not be filled in now from a re-run."
+      },
+      {
+        "fact": "os-build",
+        "state": "not-captured",
+        "reason": "Nothing collected it at the time."
+      },
+      {
+        "fact": "tavily-plan-name",
+        "state": "not-captured",
+        "reason": "The /usage response body was not retained; only the figures the probe printed survive."
+      },
+      {
+        "fact": "timing",
+        "state": "not-captured",
+        "reason": "The probe does not time itself, and no external timing was recorded."
+      }
+    ]
+  },
+  "notes": "⚠️ PROVENANCE: executed by the PM in their own terminal and the OUTPUT WAS PASTED. Not collected by an instrumented run, so what survives is the eight lines it printed and nothing more. ⚠️ RECORDED 2026-08-22 FROM THAT ORIGINAL OUTPUT, four days of decisions later, and deliberately NOT re-run. A fresh probe would observe a fresh moment — by now at least one search credit has been spent — and presenting it as evidence of the 1500/1500, 0-used event would be a later observation wearing an earlier date. ⚠️ `execution: host` with NO sandboxTier: this ran directly on the machine, so it makes no isolation claim (#131). The facts above are exactly those the output carried; everything else is listed as an omission with its reason."
+}

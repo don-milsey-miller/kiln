@@ -1,14 +1,14 @@
 {
   "id": "EVD-0014",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Write-back cell — cacheComponents disabled",
   "kind": "experiment",
   "summary": "A Next.js route handler called the repo's REAL writeReviewStatus (lock -> fresh read inside the lock -> validate -> atomic write) via runtime dynamic import; nothing was reimplemented. Results: the write landed and reviewStatus changed; every other field byte-identical, so the reviewStatus-only boundary held; lock released; no temp file left. A request asking for reviewStatus 'retired' was refused 400 and the artifact was unchanged. With the lock held by an EXTERNAL process, the Next.js write did not proceed (artifact unchanged after 1.2s), then completed once the lock was released — total wait ~1.3s. React's state model did not interfere with the lock in either mode.",
   "environment": {
-    "tier": 1,
+    "execution": "host",
     "facts": {
       "framework": "Next.js 16.3.1",
       "react": "19.2.8",
@@ -20,5 +20,6 @@
     }
   },
   "observedAt": "2026-08-18",
-  "outcome": "success"
+  "outcome": "success",
+  "notes": " ⚠️ MIGRATED 2026-08-22 (#131): this record previously carried `environment.tier: 1`. It was not an observation — the old schema REQUIRED a sandbox tier, and tier 1 was the only value that fit a run with no controller. No validation controller existed when this was recorded, so the run executed directly on the host and is now recorded as `execution: \"host\"` with no tier. The value is dropped rather than kept because keeping it would claim isolation the run never had."
 }
