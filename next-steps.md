@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **126 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **127 decisions as of
 > 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -686,10 +686,70 @@ confidence rung → runbook step → lint → render`. Immediately after 5b, not
 
 ---
 
-## 6. Broaden the catalogue — **only after 5c passes**
+## 7. The two capabilities — **runs before step 6** (#127)
 
-_#76 constraint, unchanged by the reorder: broad catalogue expansion does not begin until the evidence
-slice passes. What changed is only that the slice now happens around the skeleton rather than after it._
+_Added 2026-08-22 when the PM decided `QST-0005` and `QST-0006`; **placed ahead of step 6 the same day.**
+**Stage 4's gate flipped to `ready`** — the first gate that moved from blocked to ready by a decision
+rather than by code._
+
+⚠️ **The numbers are identities, not positions.** The running order is **5a → 5b → 5c → 7 → 6**.
+Renumbering would silently rewrite what #38, #72, #74, #75 and #85 point at, so the list is out of
+order on purpose (#76's fourth amendment).
+
+**Why it precedes step 6 (#80 branch 1):** the specialist contracts cannot truthfully promise research
+or validation **until the host capabilities exist and can be detected** (DEC-0003) — writing them first
+produces exactly the contract #121 forbids. **Step 6 blocks nothing currently known**, and under #106
+still lacks authentic stage demand: stage 4 found demand for `task`/`role-assignment` only
+conditionally, none for `acceptance-criterion`, and **none at all for `risk`**.
+
+### 7a. Research vertical slice — first
+
+1. **Register the three typed tools** — `research_search` · `research_fetch` · `research_capability`.
+2. **Implement the capability signature and a live backend probe.** Registration *and* health/auth:
+   installed-but-unusable is unavailable (#124).
+3. **Add the first adapter.**
+4. **Run one real external question end to end** — search → fetch → `evidence(kind: source)` carrying
+   URL, retrieval time, source metadata and a retained citation.
+5. ⚠️ **Prove that unavailable search produces a structured refusal, not model-memory prose.**
+   **This is the clause the slice exists to test**; without it the slice has demonstrated nothing that
+   #67's failure did not already pass.
+
+⚠️ **One PM input is owed inside 7a, and only inside step 4: `QST-0011` — which search backend is the
+first adapter, and where its credential comes from.** It is deliberately narrow. `research_fetch` is
+plain HTTP and needs no credential; **registration, the capability signature and the live probe are all
+buildable and testable with no backend at all** — and the probe's most important behaviour is what it
+reports when the backend is **absent**, which is that exact state. **So 7a can be built and step 5's
+refusal path proven before this is answered.** What waits on it is the end-to-end run that produces
+real `evidence(kind: source)`.
+
+### 7b. Tier-1 validation slice — second
+
+1. **Build the controller and the `evidence` omission field together.** ⚠️ **The collector's fixtures
+   must justify every schema state** — a state no fixture can produce does not go in the schema.
+   That inverts the usual order deliberately, and it is what fixes #122's original defect at source:
+   a state written before its collector exists is one nobody has shown is distinguishable (#121).
+2. **Exercise `provision → execute → observe → destroy`.**
+3. **Cover the hard cases, not the happy path:** timeout · unavailable fact · redaction · **cleanup
+   failure** · and the explicit **"a venv is not containment"** boundary.
+
+### 7c. Specialist contracts — only after their capabilities pass
+
+Contracts describe the **measured** tool signatures and limitations, never the planned ones, and
+**#81 rejects any child that cannot prove those signatures.** A contract written against a planned
+signature promises what the host *might* supply; #81 has something real to compare against only in the
+measured case. This is DEC-0003 executed rather than restated.
+
+⚠️ **`QST-0010` remains legitimate work and does not jump the queue.** The transition audit is a
+**worklist, not a priority queue** — the same distinction #94 drew for the capability gate, worth
+restating because a freshly-written worklist reads like a plan.
+
+---
+
+## 6. Broaden the catalogue — **last, and only on real demand**
+
+_#76 constraint, unchanged by either reorder: broad catalogue expansion does not begin until the
+evidence slice passes. **Moved behind step 7 on 2026-08-22** — it blocks nothing currently known, and
+under #106 it still lacks authentic stage demand. Driven by real stage 5–8 work when it does run._
 
 ⚠️ **`schema` and `api-spec` typed tools live here, not earlier** (#95). They are implemented and
 **not activated on this project** — this intake never asked for a data model or an API. They are still
@@ -700,35 +760,6 @@ the gate's worklist and is still not next.
 ⚠️ **The gate is a worklist, not a priority queue.** #94 made it report accurately what is absent;
 nothing in it ranks anything. Priority comes from #80 branch 1 — what blocks the next implementation
 *commitment* — which is what produced this ordering in the first place.
-
----
-
-## 7. The two capabilities #124 and #125 unblocked — **work, not gaps**
-
-_Added 2026-08-22 when the PM decided `QST-0005` and `QST-0006`. **Stage 4's gate flipped to `ready`
-the same day** — the first gate that moved from blocked to ready by a decision rather than by code._
-
-Three pieces are now specified well enough to build, and **none of them is a stage-4 gap any more**
-(DEC-0002: missing implementation is work):
-
-1. **The Pi extension** owning `research_search` · `research_fetch` · `research_capability` (#124).
-   The capability probe — registration **and** backend health/auth — is part of it, not a follow-up:
-   without it the contract promises something the host cannot check (#121).
-2. **The first research adapter** behind that interface. Deliberately unranked as design work,
-   because #124's whole point is that **replacing it cannot alter the contract**.
-3. **The tier-1 validation controller** — `provision → execute → observe → destroy`, declared jobs,
-   argument-array commands, ceiling refusal *before* provisioning (#125).
-
-⚠️ **One schema item rides along:** `evidence` needs the declared place for omission states
-(`not captured` · `not observable` · `unavailable` · `redacted`, each with a reason). #122 deferred its
-shape to `QST-0006`; #125 answered it. **It is owed by the controller, not before it** — the states
-exist to describe what a capture plan could not collect, so the collector is what proves they are
-distinguishable.
-
-⚠️ **This section does not rank itself against step 6.** #76's constraint still binds (no broad
-catalogue expansion before the evidence slice, which passed), and beyond that the ordering is #80
-branch 1's call — what blocks the next implementation *commitment* — which is the PM's, not this
-file's. Listing work is not scheduling it.
 
 ---
 
