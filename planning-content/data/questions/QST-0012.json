@@ -1,0 +1,17 @@
+{
+  "id": "QST-0012",
+  "type": "question",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "An experiment run under no sandbox tier cannot be recorded at all",
+  "statement": "`evidence` requires `environment` whenever `kind` is `experiment`, and `environment` requires a sandbox `tier` of 1, 2 or 3. A run executed directly on the host sits under NO tier, so the typed path refuses the record outright — there is no honest value for `tier`, and omitting `environment` fails validation. Is a direct host run a tier (a 'tier 0' with no isolation), or must `environment` be restructured so observed facts can be recorded without asserting an isolation level that did not exist?",
+  "raisedBy": [
+    "DEC-0005"
+  ],
+  "blocks": [
+    "AST-0013"
+  ],
+  "notes": "⚠️ FOUND BY BEING BLOCKED, not by review: creating the evidence record for `npm run research:probe` failed validation with `must have required property 'environment'`. The first real observation the research capability produced could not be recorded. ⚠️ The two available workarounds are both dishonest and both were refused: recording `tier: 1` claims an isolation that did not exist, and recording `kind: source` calls an execution a document. ⚠️ NOT BLOCKING under DEC-0002 — no committed work's correctness depends on the answer and no stage criterion is unevaluable without it — but it does block THIS record, which is a smaller and more concrete thing worth stating separately. ⚠️ It belongs with 7b and must NOT be fixed by guessing now: 7b builds the controller and the omission field together precisely so that what an environment record carries is decided against a real collector rather than ahead of one (#127). Changing the schema today to unblock one record would be that error in miniature. ⚠️ Note also that the schema is not simply wrong. REQ-0006 says a tested claim records its environment, and the conditional enforces it; what is missing is a way to say 'observed here, under no isolation' — an absence the tier enum cannot express."
+}

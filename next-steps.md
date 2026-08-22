@@ -712,10 +712,13 @@ conditionally, none for `acceptance-criterion`, and **none at all for `risk`**.
    quota, without spending a search credit. Registration *and* health/auth — installed-but-unusable is
    unavailable (#124). **Zero remaining credits reports `quota-exhausted`, not "available"**, and an
    unreadable quota shape reports `remaining: null` — **unknown, never assumed fine** (#122).
-3. ⏳ **The first adapter** — Tavily (#128), built at `lib/research/tavily-adapter.mjs`. **Wired and
-   fully tested against constructed backend responses; it has never made a live call.**
-4. ⏳ **Run one real external question end to end** — search → guarded fetch → `evidence(kind: source)`
-   carrying URL, retrieval time, source metadata and a retained citation. **Waits on `TAVILY_API_KEY`.**
+3. ✅ **The first adapter** — Tavily (#128), `lib/research/tavily-adapter.mjs`. **Proven live
+   2026-08-22**: `npm run research:probe` returned available, 1500 of 1500 credits, **0 used** — and the
+   zero is what shows the probe spent no search credit. ⚠️ **Measured 1500, documented 1,000** (#128).
+4. ⏳ **Run one real external question end to end** — `npm run research:search` then
+   `npm run research:record`. **Two commands on purpose:** a single one would make the first hit into
+   evidence, which is the model's judgement wearing a citation. **Run by the PM, in the PM's terminal**,
+   so the credential never reaches the agent's process.
 5. ✅ ⚠️ **Unavailable search produces a structured refusal, not model-memory prose.**
    **This is the clause the slice exists to test**; without it the slice has demonstrated nothing that
    #67's failure did not already pass. **Four causes, four distinct reasons** — missing key · rejected
@@ -735,8 +738,19 @@ was wrong:** a credential cannot live *"outside anything this project can read"*
 read it.** The enforceable boundary is outside project **files**, planning **content**, and every
 **model-visible** interface (#128).
 
-**16 tests. Six guards mutation-tested; the redirect guard was green for the wrong reason until the
-test asserted on the request rather than the response** (#129).
+⚠️ **`--quote` is not optional on `research:record`, and it is checked against the retrieved text
+before anything is written.** A citation for a sentence that is not on the page is **worse than no
+citation** — it is #67's plausible prose with a URL attached, and the URL makes it *more* convincing.
+Everything else in 7a protects the process; **this protects the content.** Script and style text do not
+count as page text, and an empty quote is refused rather than trivially satisfied.
+
+⚠️ **`AST-0013` records the live probe result and has NO evidence attached** — not because none exists,
+but because the typed path **refused** it: an experiment must carry an environment, an environment must
+name a sandbox tier, and this ran under none (`QST-0012`). **Left visible rather than filled in**, since
+a tier that did not apply would turn a recording defect into a false confidence rung.
+
+**23 tests. Eight guards mutation-tested**; the redirect guard was green for the wrong reason until the
+test asserted on the request rather than the response (#129).
 
 ✅ **`QST-0011` answered 2026-08-22 → `DEC-0006`: Tavily.** What remains is not a decision but a
 **key**: the PM creates the account and puts `TAVILY_API_KEY` in the host environment, and steps 3–4
