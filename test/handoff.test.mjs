@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { publishHandoff, HandoffRefused, swapIntoPlace, validatePackage } from "../lib/handoff/publish.mjs";
 import { handoffCompleteness, BLOCKED } from "../lib/handoff/completeness.mjs";
-import { canonicalJson, roleSlices, slugify, taskStatus, renderPlanMarkdown } from "../lib/handoff/render.mjs";
+import { canonicalJson, roleSlices, slugify, taskStatus, renderPlanMarkdown, renderPackage, verifySnapshot, hashFiles, SNAPSHOT_PLACEHOLDER } from "../lib/handoff/render.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
@@ -545,4 +545,55 @@ test("the MANIFEST states the approval basis rather than implying it", async () 
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------- QST-0016: normalized whole-package hashing (#146) */
+
+test("the snapshot covers MANIFEST.json and README.md, not only the content files", async () => {
+  // ⚠️ THE TEST THE OLD SCHEME COULD NOT PASS. It hashed everything EXCEPT those two, so adding the
+  // `approval` block to MANIFEST.json changed the package and left the snapshot at
+  // b218b4a525c6176b — two different packages under one identity. Found by republishing and
+  // noticing the hash had not moved, which is the same class of check as watching the disk rather
+  // than the report.
+  const f = completeFixture();
+  try {
+    const before = await publish(f);
+    const manifest = JSON.parse(readFileSync(join(f.outDir, "MANIFEST.json"), "utf-8"));
+
+    // Every file, including the two self-referential ones, is inside the hash.
+    const files = new Map(listFiles(f.outDir).map((p) => [p, readFileSync(join(f.outDir, p), "utf-8")]));
+    assert.ok(files.has("MANIFEST.json") && files.has("README.md"));
+    const check = verifySnapshot(files);
+    assert.equal(check.ok, true, `recorded ${check.recorded} but recomputed ${check.recomputed}`);
+    assert.equal(check.recorded, before.snapshot);
+
+    // ⚠️ Verification MUST normalize first. Hashing the package as-published — without putting the
+    // placeholder back — hashes bytes the renderer never hashed, and can never agree.
+    const naive = hashFiles(files);
+    assert.notEqual(naive, check.recorded, "an unnormalized recompute must not accidentally match");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("a change confined to the MANIFEST moves the snapshot", () => {
+  // Rendered twice from identical content, with one difference the OLD scheme would have hidden
+  // entirely: a different tool version, which appears only in MANIFEST.json and README.md.
+  const records = [{ doc: { id: "REQ-0001", type: "requirement", statement: "s", lifecycle: "active", reviewStatus: "draft", title: "t" } }];
+  const a = renderPackage({ records, activated: ["requirement"], toolVersion: "1.0.0", stageDocs: new Map() });
+  const b = renderPackage({ records, activated: ["requirement"], toolVersion: "2.0.0", stageDocs: new Map() });
+  assert.deepEqual(a.get("data/requirements.json"), b.get("data/requirements.json"), "the content files are identical");
+  assert.notEqual(
+    JSON.parse(a.get("MANIFEST.json")).snapshot,
+    JSON.parse(b.get("MANIFEST.json")).snapshot,
+    "a package that differs only in its manifest must not share an identity"
+  );
+});
+
+test("identical input still produces an identical snapshot", () => {
+  const records = [{ doc: { id: "REQ-0001", type: "requirement", statement: "s", lifecycle: "active", reviewStatus: "draft", title: "t" } }];
+  const mk = () => renderPackage({ records, activated: ["requirement"], toolVersion: "1.0.0", stageDocs: new Map() });
+  assert.equal(JSON.parse(mk().get("MANIFEST.json")).snapshot, JSON.parse(mk().get("MANIFEST.json")).snapshot);
+  // ...and the placeholder never survives into the published package.
+  for (const [path, text] of mk()) assert.equal(text.includes(SNAPSHOT_PLACEHOLDER), false, `${path} still holds the placeholder`);
 });

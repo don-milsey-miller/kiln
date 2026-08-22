@@ -7,9 +7,9 @@
       "reason": "Re-evaluated 2026-08-22 after `task` and `acceptance-criterion` were approved and built. Two tasks exist, both `platform`, and the renderer now emits `slices/platform.json` as a QUERY over the task graph - pulling each task's traced requirements, acceptance criteria and components into the slice so it stands alone, plus `blockedByOtherRoles` for dependencies assigned elsewhere. ⚠️ HONEST LIMITS, both recorded rather than rounded away: (1) there is exactly ONE role on this project, so the slicing is exercised but the CROSS-ROLE case - the one the criterion is really about - is covered by a constructed test rather than by real content; (2) ACC-0010, the criterion for the slice itself, was written BEFORE the code and is now `pass`, evaluated by test rather than by a recipient actually starting work. The criterion asks whether a recipient could start without coming back, and the strongest evidence available is that everything a task traces to travels with it."
     },
     "runbook-steps-above-threshold": {
-      "result": "satisfied",
+      "result": "n/a",
       "decidedBy": "pm",
-      "reason": "One step. RBS-0001 rests on AST-0002, derived supported / environment-matched - rung 4, above every threshold in project.yaml, and the step is non-destructive so its floor is lower still. ⚠️ One step is a CHECK rather than an exercise of the rule; the enforcement that matters is `mayBecomeInstruction`, tested against constructed refuted and contested claims."
+      "reason": "Re-evaluated 2026-08-22 after RBS-0001 was retired: there are NO active runbook steps, so there is nothing for the threshold to apply to. ⚠️ Recorded n/a rather than satisfied, and the difference matters - `satisfied` would claim every step cleared its bar, which is vacuously true of an empty set and reads as an assurance nobody earned. RBS-0001 was `Launch specialist children concurrently`: no orchestration path exists, it named no command and no remediation, and real concurrent orchestration would reopen #79. It served as the evidence-slice fixture that proved runbook-step -> assertion -> evidence end to end, and it is retired rather than deleted."
     },
     "no-unresolved-critical-questions": {
       "result": "satisfied",

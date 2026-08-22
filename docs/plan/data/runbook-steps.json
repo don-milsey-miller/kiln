@@ -3,13 +3,15 @@
     "expectedOutcome": "Every child receives distinct IDs and no artifact is overwritten.",
     "id": "RBS-0001",
     "instruction": "Launch specialist children concurrently; each allocates its own artifact IDs.",
-    "lifecycle": "active",
+    "lifecycle": "retired",
+    "notes": "⚠️ RETIRED 2026-08-22, approval REVOKED first. `Launch specialist children concurrently` is not an actionable instruction: no orchestration path exists, it names no concrete command and no remediation, and real concurrent orchestration would REOPEN #79's reasoning-freshness trigger. It was useful as the evidence-slice fixture that proved RBS -> assertion -> evidence end to end (5c), and it is kept as history rather than deleted — but it must not ship as something a recipient acts on. ⚠️ It stays the worked example in ACC-0012 and in stage 6's vacuity finding, where it is cited as a PAST case rather than a live one.",
     "partOf": [],
     "restsOn": [
       "AST-0002"
     ],
-    "reviewStatus": "approved",
+    "reviewStatus": "draft",
     "schemaVersion": 1,
+    "supersededBy": [],
     "title": "Run specialists in parallel",
     "type": "runbook-step"
   }

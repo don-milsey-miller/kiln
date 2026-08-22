@@ -259,6 +259,12 @@ The two are different approvals of different things and neither substitutes for 
 
 **Why:** The first real package exported 98 artifacts as `draft` while describing itself as approved state, and the ambiguity was visible to machine consumers - which is the strongest kind of defect report, because the package said two things at once. Collapsing the two approvals either way would lose something real: making attestations sufficient would let a recipient act on an instruction nobody reviewed, and requiring per-artifact approval for everything would demand review of exploratory questions and superseded assertions that nobody needs to sign. The line is drawn at EXECUTABILITY because that is where the cost of being wrong changes: a draft question is a note, and a draft runbook step is an instruction someone follows. #57 and #59 already draw the same line for confidence and acknowledgement.
 
+### DEC-0016 — The package snapshot is a normalized whole-package hash
+
+Every file is rendered with a fixed placeholder where the snapshot goes; the entire tree - including MANIFEST.json and README.md - is hashed over canonical path names plus bytes; the placeholders are then replaced with the resulting hash. Verification performs the same normalization before recomputing. `toolVersion` is provenance metadata and carries no part of package identity. A separate generator fingerprint is optional and is not required.
+
+**Why:** The previous scheme hashed every file EXCEPT the two that embed the snapshot, which excluded material content to avoid a self-reference. Republishing exposed the cost: adding the `approval` block to MANIFEST.json produced a materially different package under the same identity, b218b4a525c6176b. Normalizing removes the self-reference without excluding anything - a renderer change that alters any output now changes the snapshot, and one producing identical output correctly retains it, which is exactly the property that makes a package reviewable in a diff. It also relieves `toolVersion` of a job it was silently failing at: this repo's version is 0.0.0 and has never been bumped.
+
 ## Claims
 
 ### AST-0001 — chokidar sees events fs.watch misses on Windows
@@ -371,10 +377,6 @@ Rests on: EVD-0016 (support)
 
 Is there state a research-finding artifact would hold that is not already held by evidence(kind: source), assertion, or question — and that something downstream must traverse (#41)?
 
-### QST-0016 — The snapshot cannot distinguish two packages built by different tool versions
-
-The package's identity is a content hash of its content files, and `toolVersion` is meant to carry the rest. But this repo's package.json version is `0.0.0` and has never been bumped, so a renderer change produces a DIFFERENT package with the SAME snapshot and the same declared tool version. Observed 2026-08-22: adding the `approval` block to MANIFEST.json left the snapshot at b218b4a525c6176b. What makes the tool's contribution to the package identifiable — version discipline, a hash of the renderer, or something else?
-
 ## Tasks
 
 ### TSK-0001 — Generate role slices from the task graph
@@ -391,20 +393,11 @@ Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearin
 **outstanding** (0/2 criteria passed) · role: platform
 *Implements: CMP-0002 · fulfils: REQ-0009*
 
-## Runbook steps
-
-### RBS-0001 — Run specialists in parallel
-
-Launch specialist children concurrently; each allocates its own artifact IDs.
-
-**Expected:** Every child receives distinct IDs and no artifact is overwritten.
-
-*Rests on: AST-0002*
-
 ## Retired and superseded
 
 ⚠️ **Not part of the current plan.** Listed because removing them silently would make this
 rendering disagree with the machine-readable data, which is the parity REQ-0011 requires.
 
 - **AST-0007** (assertion, superseded) — With Cache Components, a SYNCHRONOUS fs read freezes into the static shell
+- **RBS-0001** (runbook-step, retired) — Run specialists in parallel
 - **REQ-0015** (requirement, retired) — The system runs locally for a single operator
