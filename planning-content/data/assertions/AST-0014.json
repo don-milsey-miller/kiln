@@ -13,5 +13,8 @@
       "source": "vendor documentation"
     }
   },
-  "notes": "⚠️ Deliberately narrow, and split from the measured figure rather than merged with it (the #102 lesson). This claim is about WHAT THE DOCUMENTATION SAYS and a documentation fetch can settle it. It is NOT a claim about what any particular account receives — AST-0013 records that this account's live probe reported a plan limit of 1500 — and the two are not in conflict until something shows they are about the same quantity. A single assertion holding both would be unfalsifiable by either observation."
+  "notes": "⚠️ Deliberately narrow, and split from the measured figure rather than merged with it (the #102 lesson). This claim is about WHAT THE DOCUMENTATION SAYS and a documentation fetch can settle it. It is NOT a claim about what any particular account receives — AST-0013 records that this account's live probe reported a plan limit of 1500 — and the two are not in conflict until something shows they are about the same quantity. A single assertion holding both would be unfalsifiable by either observation.",
+  "supportedBy": [
+    "EVD-0016"
+  ]
 }

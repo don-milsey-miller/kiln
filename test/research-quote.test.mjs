@@ -54,5 +54,7 @@ test("markup between words does not break a real quote", () => {
 test("visibleText and extractTitle do the small jobs they claim", () => {
   assert.equal(flatten(visibleText("<p>a</p>\n<p>b</p>")), "a b");
   assert.equal(extractTitle(PAGE), "Pricing and limits");
+  // Entities decoded: the first real record stored "Credits &amp; Pricing" in its citation.
+  assert.equal(extractTitle("<title>Credits &amp; Pricing</title>"), "Credits & Pricing");
   assert.equal(extractTitle("<html><body>no title</body></html>"), null);
 });

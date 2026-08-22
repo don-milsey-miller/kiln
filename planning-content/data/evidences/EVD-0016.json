@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0016",
+  "type": "evidence",
+  "schemaVersion": 1,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: Credits & Pricing - Tavily Docs",
+  "kind": "source",
+  "summary": "Tavily's published documentation states the free plan provides 1,000 credits per month",
+  "sources": [
+    {
+      "title": "Credits & Pricing - Tavily Docs",
+      "locator": "https://docs.tavily.com/documentation/api-credits",
+      "retrievedAt": "2026-08-22"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"1,000 credits/month\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

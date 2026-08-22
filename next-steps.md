@@ -15,7 +15,7 @@
 > repo's manifest and the sandbox leaning → Open questions, **and closed the same day as #77**. **What
 > remains here is scheduling and scratch: check tables, run records, and what is owed next.**
 >
-> The framing that produced this list: notes.md is done thinking for now. **129 decisions as of
+> The framing that produced this list: notes.md is done thinking for now. **130 decisions as of
 > 2026-08-22**, and the only open question left in it is a cosmetic one — try-it panels in API specs.
 > **The next few answers have to come from code rather than from the document.**
 >
@@ -715,10 +715,12 @@ conditionally, none for `acceptance-criterion`, and **none at all for `risk`**.
 3. ✅ **The first adapter** — Tavily (#128), `lib/research/tavily-adapter.mjs`. **Proven live
    2026-08-22**: `npm run research:probe` returned available, 1500 of 1500 credits, **0 used** — and the
    zero is what shows the probe spent no search credit. ⚠️ **Measured 1500, documented 1,000** (#128).
-4. ⏳ **Run one real external question end to end** — `npm run research:search` then
-   `npm run research:record`. **Two commands on purpose:** a single one would make the first hit into
-   evidence, which is the model's judgement wearing a citation. **Run by the PM, in the PM's terminal**,
-   so the credential never reaches the agent's process.
+4. ✅ **One real external question, end to end, 2026-08-22.** `research:search` returned five
+   candidates — **two of them third-party blogs** — the PM chose the authoritative docs page, the quote
+   was verified present in the retrieved text, and `EVD-0016` was written through the typed path and
+   linked to `AST-0014`, which now derives **`supported` / `source-supported`**. **Run by the PM, in
+   the PM's terminal**, so the credential never reached the agent's process. ✅ **A flagged risk did not
+   materialise:** the docs page was not client-rendered, and the quote check found the sentence.
 5. ✅ ⚠️ **Unavailable search produces a structured refusal, not model-memory prose.**
    **This is the clause the slice exists to test**; without it the slice has demonstrated nothing that
    #67's failure did not already pass. **Four causes, four distinct reasons** — missing key · rejected
@@ -743,6 +745,12 @@ before anything is written.** A citation for a sentence that is not on the page 
 citation** — it is #67's plausible prose with a URL attached, and the URL makes it *more* convincing.
 Everything else in 7a protects the process; **this protects the content.** Script and style text do not
 count as page text, and an empty quote is refused rather than trivially satisfied.
+
+⚠️ **The asymmetry 7a exposed, and the reason `QST-0012` belongs inside 7b rather than after it:**
+**`AST-0014` — what the docs SAY — is `source-supported`. `AST-0013` — what this account MEASURED —
+is still `unresolved`/`unverified`.** Not because the measurement is weaker, but because it cannot be
+recorded at all. **A documented figure is currently better evidenced than a measured one, purely
+because of a recording gap.**
 
 ⚠️ **`AST-0013` records the live probe result and has NO evidence attached** — not because none exists,
 but because the typed path **refused** it: an experiment must carry an environment, an environment must
