@@ -185,13 +185,30 @@ removes the only working reference at exactly the moment a second implementation
 | Step | Stage | What settles it |
 |---|---|---|
 | 1. UI intake and scope boundaries | **1–2** | This section. Confirmation is the PM's. |
-| 2. Targeted Next.js/MDX research; deployment-mode decision | **3** | `QST-0017`, `QST-0018`, `QST-0020`, `QST-0021` answered from sources, each claim recorded as an `assertion` with its `evidence` (REQ-0003, REQ-0004) |
+| 2. Targeted Next.js/MDX research; deployment-mode decision | **3** | The five questions, **in the order below**. Each claim recorded as an `assertion` with its `evidence` (REQ-0003, REQ-0004) |
 | 3a. Component design | **5** | `component` artifacts; `requirements-traced-to-components` re-attested |
 | 3b. Risk and feasibility | **6** | ⚠️ **Not skippable, and the reason is concrete:** if step 2 answers `QST-0017` as production mode, `AST-0010` reopens here and needs real validation before anything rests on it |
 | 3c. Acceptance criteria | **7** | External refresh · write-back safety · malformed content · stage-status accuracy |
 | 4. One end-to-end vertical slice | **8** | `task` artifacts. ⚠️ **Deliberately not authored yet:** the handoff gate refuses a task with no acceptance criteria, so tasks cannot honestly precede step 3c |
 | 5. Navigation, authoring, review, full tracker | later cycles | Real demand, per #106 |
 | 6. Package the local application for consumers | later | Depends on the `QST-0017` answer |
+
+## Research order for step 2 — PM-set 2026-08-24
+
+Not arbitrary: each question removes options from the ones after it, so answering them out of order
+means designing against constraints nobody has established yet and rediscovering them later.
+
+| # | Question | Why here |
+|---|---|---|
+| 1 | `QST-0017` deployment mode | ⚠️ **First because it is the only one that creates owed work.** It decides whether `AST-0010` becomes immediately owed (#137), and stage 6 must know that before it can judge feasibility |
+| 2 | `QST-0018` MDX compilation and component bound | The safety boundary on agent-authored content. Everything rendered later goes through whatever this settles |
+| 3 | `QST-0020` server/client module boundary | `lib/` is Node-only — filesystem, locks, subprocesses. What may cross to the client constrains every view |
+| 4 | `QST-0021` runtime lifecycle | Install, watcher lifetime, SSE recovery, and **visible** failure behaviour. Depends on 1 and 3 |
+| 5 | `QST-0019` information architecture | ⚠️ **Answered last, and NOT by research.** Principally a product decision — no source settles which views a planning tool opens with. Decided under the constraints the first four establish |
+
+**The first four need targeted technical research, and bounded probes where documentation is
+insufficient** — REQ-0003 and REQ-0005 doing exactly what they were written for, and what the research
+and tier-1 validation capabilities were built to serve.
 
 ## Re-attestation — ✅ done 2026-08-24, and the handoff now refuses
 

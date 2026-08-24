@@ -969,10 +969,46 @@ around it.** `docs/plan/` therefore stays at snapshot `6c86330767dcbbfa`, descri
 stood before this decomposition, which is the honest thing for it to describe until the plan is
 finished again.
 
-⚠️ **The gates reported READY for the whole window between authoring and re-attesting**, because every
-criterion here is `mechanised: false`. Nothing detected that four attestations described a smaller plan
-than the one on disk. **Nothing was republished while that was true** — that discipline is currently a
-habit rather than a guard, and it is the sharpest open case for #79 acquiring one.
+### Research order for step 2 — PM-set 2026-08-24
+
+Each question removes options from the ones after it, so the order is load-bearing rather than
+administrative. Answering out of order means designing against constraints nobody has established.
+
+1. **`QST-0017`** deployment mode — ⚠️ **first because it is the only one that creates owed work**: it
+   decides whether `AST-0010` becomes immediately owed (#137), and stage 6 must know before it can
+   judge feasibility.
+2. **`QST-0018`** MDX compilation and the component bound — the safety boundary on agent-authored
+   content; everything rendered later goes through it.
+3. **`QST-0020`** server/client module boundary — `lib/` is Node-only, so what may cross constrains
+   every view.
+4. **`QST-0021`** runtime lifecycle — install, watcher lifetime, SSE recovery, **visible** failure.
+5. **`QST-0019`** information architecture — ⚠️ **answered last and NOT by research.** A product
+   decision; no source settles which views a planning tool opens with. It is recorded as such on the
+   artifact itself, so whoever picks it up does not go looking for sources that cannot exist.
+
+The first four need targeted technical research and **bounded probes where documentation is
+insufficient** — REQ-0003 and REQ-0005 doing what they were written for.
+
+⚠️ **`TAVILY_API_KEY` is not set in this environment**, so `research:search` currently reports
+`no-credential` and refuses rather than guessing (DEC-0006, DEC-0003). Step 2 needs it host-side before
+it can start.
+
+### #79 — the concrete incident, recorded and deliberately NOT acted on
+
+⚠️ **The gates reported READY for the whole window between authoring `REQ-0016…REQ-0020` and
+re-attesting**, because every criterion here is `mechanised: false`. Nothing detected that four
+attestations described a smaller plan than the one on disk. **Nothing was republished while that was
+true — but that was discipline, not a guard.**
+
+This is #79 with a reproducible instance attached rather than as an abstraction, and it is **preserved
+here rather than fixed now**. A mechanism is cheap and obvious (an attestation records a hash of the
+artifact set it was evaluated over; a mismatch makes it stale rather than satisfied), which is exactly
+why it should not be slipped into the application work — a guard added because it is easy, rather than
+because something depends on it, is the catalogue justifying itself one level down (#106).
+
+**Trigger:** the first commitment that depends on preventing recurrence — a consumer relying on a
+published package's approval basis, an automated republish, or a second operator who cannot be assumed
+to have watched the window. Until one of those exists, the discipline holds it.
 
 ---
 
