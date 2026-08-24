@@ -22,7 +22,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { runJob, destroyWorkspace, allowlistedEnv } from "../lib/validation/controller.mjs";
+import { runJob, destroyWorkspace, allowlistedEnv, resolveWithin, observeExpectedOutputs } from "../lib/validation/controller.mjs";
 import { CONTROLLER_RUN } from "./fixtures/environment-fixtures.mjs";
 import { createValidators, assertValid } from "../lib/validate.mjs";
 import { dirname } from "node:path";
@@ -202,4 +202,149 @@ test("the child environment is allowlisted, not inherited", () => {
   const env = allowlistedEnv({ PATH: "/bin", TAVILY_API_KEY: "tvly-secret", AWS_SECRET_ACCESS_KEY: "x", TEMP: "/tmp" });
   assert.deepEqual(Object.keys(env).sort(), ["PATH", "TEMP"]);
   assert.equal(JSON.stringify(env).includes("tvly-secret"), false);
+});
+
+
+/* ------------------------------------------------ containment: the workspace is the whole territory */
+
+test("resolveWithin refuses every path that leaves the workspace, and allows the ones that do not", () => {
+  const B = String.fromCharCode(92);
+  const ws = mkdtempSync(join(tmpdir(), "vpw-within-"));
+  try {
+    assert.equal(resolveWithin(ws, "a.txt"), join(ws, "a.txt"));
+    assert.equal(resolveWithin(ws, "sub/dir/a.txt"), join(ws, "sub", "dir", "a.txt"));
+
+    for (const bad of ["../escaped.txt", "../../escaped.txt", "a/../../escaped.txt", "/etc/passwd", "C:/Windows/x", B + "x"])
+      assert.throws(() => resolveWithin(ws, bad), /must stay inside the workspace|outside the workspace/, bad);
+  } finally {
+    rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("a job declaring an escaping input is refused, and the escape target is never created", async () => {
+  // ⚠️ The assertion that matters is the SECOND one. Checking only the refusal record would pass
+  // against an implementation that refused and wrote the file anyway, which is precisely the class of
+  // false report the destroy path is built around.
+  const base = mkdtempSync(join(tmpdir(), "vpw-escape-"));
+  const target = join(base, "escaped.txt");
+  try {
+    const r = await runJob(JOB({ inputs: { "../escaped.txt": "pwned" } }), { baseDir: base });
+    assert.equal(r.ok, false);
+    assert.equal(r.phase, "refused");
+    assert.equal(r.reason, "path-escapes-workspace");
+    assert.equal(r.destroy.outcome, "nothing-to-destroy");
+    assert.equal(existsSync(target), false, "the file outside the workspace must not exist");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a declared input lands inside the workspace, including in a subdirectory", async () => {
+  const r = await runJob(
+    JOB({
+      inputs: { "data/in.txt": "forty-two" },
+      commands: [["{python}", "-c", "print(open('data/in.txt').read())"]],
+    })
+  );
+  assert.equal(r.ok, true);
+  assert.match(r.executions[0].stdout, /forty-two/);
+});
+
+/* --------------------------------------------- expected outputs: the declaration is finally checked */
+
+test("a produced expected output is observed, and satisfies the declaration", async () => {
+  const r = await runJob(
+    JOB({
+      commands: [["{python}", "-c", "open('result.json','w').write('{}')"]],
+      expectedOutputs: ["result.json"],
+    })
+  );
+  assert.equal(r.ok, true);
+  assert.equal(r.outputsSatisfied, true);
+  assert.deepEqual(r.expectedOutputs, [{ path: "result.json", observed: true, present: true, bytes: 2, satisfied: true }]);
+});
+
+test("a job that produces NOTHING no longer reports a clean completed run", async () => {
+  // ⚠️ This is the defect in one assertion. `expectedOutputs` was a required declaration that nothing
+  // read, so this job — which declares a result and produces none — was recorded exactly like one that
+  // succeeded. `ok` still describes the LIFECYCLE, which did complete; `outputsSatisfied` describes
+  // the RESULT, and the two are separate on purpose.
+  const r = await runJob(JOB({ commands: [["{python}", "-c", "print('did nothing')"]], expectedOutputs: ["result.json"] }));
+  assert.equal(r.ok, true, "the controller's own lifecycle completed");
+  assert.equal(r.outputsSatisfied, false, "and the job did not produce what it declared");
+  assert.equal(r.expectedOutputs[0].present, false);
+  assert.equal(r.expectedOutputs[0].observed, true, "we LOOKED and it was absent");
+  assert.match(r.expectedOutputs[0].reason, /did not produce its declared result/);
+});
+
+test("an output that exists but is emptier than declared is present and NOT satisfied", async () => {
+  const r = await runJob(
+    JOB({
+      commands: [["{python}", "-c", "open('result.json','w').write('')"]],
+      expectedOutputs: [{ path: "result.json", minBytes: 1 }],
+    })
+  );
+  assert.equal(r.expectedOutputs[0].present, true);
+  assert.equal(r.expectedOutputs[0].satisfied, false);
+  assert.match(r.expectedOutputs[0].reason, /below the declared minimum/);
+  assert.equal(r.outputsSatisfied, false);
+});
+
+test("a run that never reached observation reports outputs as UNOBSERVED, not as absent", async () => {
+  const r = await runJob(JOB({ expectedOutputs: ["result.json"] }), { python: "definitely-not-a-real-interpreter" });
+  assert.equal(r.phase, "provision");
+  assert.equal(r.expectedOutputs[0].observed, false, "nothing looked for it");
+  assert.equal(r.expectedOutputs[0].satisfied, false);
+  assert.match(r.expectedOutputs[0].reason, /never looked for/);
+});
+
+test("a job declaring no outputs is vacuously satisfied, because it promised nothing", async () => {
+  const r = await runJob(JOB());
+  assert.deepEqual(r.expectedOutputs, []);
+  assert.equal(r.outputsSatisfied, true);
+});
+
+test("observeExpectedOutputs refuses to look outside the workspace even when handed a bad spec", () => {
+  const ws = mkdtempSync(join(tmpdir(), "vpw-obs-"));
+  try {
+    const [o] = observeExpectedOutputs(ws, { expectedOutputs: ["../../etc/passwd"] });
+    assert.equal(o.satisfied, false);
+    assert.match(o.reason, /must stay inside the workspace/);
+  } finally {
+    rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------- the ceiling bounds the JOB, not each command in it */
+
+test("the approved timeout bounds the whole execution phase, not every command separately", async () => {
+  // ⚠️ Four sleeps of 900ms under a 2000ms ceiling. Per-command timeouts would let all four run —
+  // 3.6s against an approved 2s — and every one of them would be "within the timeout". One shared
+  // deadline stops the run at the figure that was actually authorised.
+  const job = JOB({
+    timeoutMs: 2_000,
+    commands: Array.from({ length: 4 }, () => ["{python}", "-c", "import time; time.sleep(0.9)"]),
+  });
+  const r = await runJob(job);
+
+  const spent = r.executions.reduce((a, e) => a + e.durationMs, 0);
+  assert.ok(spent <= job.timeoutMs + 600, `execution spent ${spent}ms against a ${job.timeoutMs}ms ceiling`);
+  assert.ok(
+    r.executions.some((e) => e.killed || e.timedOut) || r.executions.length < 4,
+    `the shared deadline must stop the run: ${JSON.stringify(r.executions.map((e) => [e.durationMs, e.exitStatus, e.killed]))}`
+  );
+  // The record says what bounded it, rather than leaving a reader to infer it from the declaration.
+  assert.equal(r.limits.executionDeadlineMs, 2_000);
+
+  // ⚠️ NOT asserted as `destroyed`. Killing a command leaves the workspace momentarily locked on
+  // Windows, and the controller reports `retained` rather than pretending otherwise — condition 4,
+  // arriving here as a side effect of the subject under test. The deadline is what this test is
+  // about, so it insists only that the destroy attempt was recorded and observed.
+  assert.ok(["destroyed", "retained"].includes(r.destroy.outcome), r.destroy.outcome);
+  if (r.destroy.retainedPath) {
+    // Best effort, and only tidying up after the test: the killed interpreter may still hold the
+    // directory for a moment. Whether it comes back is not what this test is asserting.
+    await sleep(600);
+    try { rmSync(r.destroy.retainedPath, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+  }
 });

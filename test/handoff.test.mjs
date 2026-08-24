@@ -23,6 +23,8 @@ import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
 import { loadStageDefinitions } from "../lib/stages.mjs";
+import { evaluateStageGate } from "../lib/lint.mjs";
+import { loadStageAttestations } from "../lib/attestations.mjs";
 import { withLock } from "../lib/lock.mjs";
 import { LOCK_FILE } from "../lib/tools/create-artifact.mjs";
 
@@ -38,8 +40,13 @@ function completeFixture() {
   const contentRoot = join(base, "planning-content");
   mkdirSync(join(contentRoot, "data", "requirements"), { recursive: true });
   mkdirSync(join(contentRoot, "data", "components"), { recursive: true });
+  mkdirSync(join(contentRoot, "data", "evidences"), { recursive: true });
   mkdirSync(join(contentRoot, "stages"), { recursive: true });
-  writeFileSync(join(contentRoot, "project.yaml"), "capabilities:\n  artifactTypes:\n    activated: [requirement, component]\n");
+  // ⚠️ `evidence` is activated and NO stage produces it. That combination is load-bearing here: it is
+  // the only way to reach "an activated type with zero artifacts" now that the handoff composes every
+  // stage gate — for a type a stage DOES produce, zero artifacts is a gate failure rather than a
+  // rendering case. See the stale-file test below.
+  writeFileSync(join(contentRoot, "project.yaml"), "capabilities:\n  artifactTypes:\n    activated: [requirement, component, evidence]\n");
 
   writeFileSync(
     join(contentRoot, "data", "requirements", "REQ-0001.json"),
@@ -48,6 +55,13 @@ function completeFixture() {
   writeFileSync(
     join(contentRoot, "data", "components", "CMP-0001.json"),
     canonicalJson(env("CMP-0001", "component", { responsibility: "Makes the thing work.", satisfies: ["REQ-0001"], implementedBy: ["lib/thing.mjs"] }))
+  );
+  writeFileSync(
+    join(contentRoot, "data", "evidences", "EVD-0001.json"),
+    canonicalJson(env("EVD-0001", "evidence", {
+      kind: "experiment", summary: "It worked.", outcome: "success", observedAt: "2026-01-01",
+      environment: { execution: "host", facts: { os: "fixture" } },
+    }))
   );
   // ⚠️ An artifact of a type this project has NOT activated. Without it, removing the renderer's
   // exclusion guard changed nothing and the deactivated-types test was vacuous — which falsification
@@ -84,24 +98,40 @@ const publish = (f, extra = {}) => publishHandoff(f.ctx, { outDir: f.outDir, too
 
 /* ------------------------------------------------ the decisive negative control: the real project */
 
-test("the REAL project is now publishable, and not vacuously", () => {
-  // ⚠️ THIS TEST USED TO ASSERT A REFUSAL, and the history is the point rather than trivia. It
-  // refused while eleven criteria were unattested, then while stage 5's traceability was
-  // not-satisfied, then while stage 9 had no role slices. Each blocker named something real, and each
-  // was cleared by building the thing rather than by relaxing the predicate.
+test("the REAL project refuses again, on a blocker the old predicate could not see", () => {
+  // ⚠️ THE HISTORY IS THE POINT rather than trivia. This test asserted a refusal while eleven criteria
+  // were unattested, then while stage 5's traceability was not-satisfied, then while stage 9 had no
+  // role slices; each was cleared by building the thing. It then asserted a PUBLISH — and that
+  // reading was wrong, not because anything regressed but because the predicate was partial: it read
+  // attestations and re-derived nothing else, so `gate/type-not-implemented` never reached it.
+  // Composing the stage gates (#46: two boundaries, one engine) makes the project's real state
+  // visible again — `research-finding` is activated with no schema and no typed tool, so stage 3
+  // cannot be exited and a package claiming stage 9 is complete would be claiming it falsely.
   const contentRoot = join(ROOT, "planning-content");
   const ctx = { contentRoot, schemas, validators, activated: readActivatedTypes(contentRoot) };
   const c = handoffCompleteness(ctx, { toolRoot: ROOT });
 
-  assert.equal(c.ready, true, `expected publishable; blocked by ${JSON.stringify(c.blockers.map((b) => b.detail))}`);
+  assert.equal(c.ready, false);
+  assert.deepEqual(
+    c.blockers.map((b) => `${b.stageId ?? "-"}:${b.ruleId ?? b.reason}`),
+    ["03-discovery:gate/type-not-implemented"],
+    `the ONLY blocker should be the discovery capability gap; got ${JSON.stringify(c.blockers, null, 2)}`
+  );
+  assert.match(c.blockers[0].detail, /capability gap, not unfinished planning/);
 
-  // ⚠️ Ready is only meaningful if it was EARNED. A predicate that passed because nobody had looked
-  // would report exactly the same boolean, so the test checks the reason as well as the verdict:
-  // every declared criterion is attested, and none is merely pending.
+  // ⚠️ The refusal must be EARNED too. A predicate that blocked because nobody had looked would
+  // report the same boolean, so: every declared criterion is still attested, and none is pending.
   const defs = loadStageDefinitions(ROOT);
   const declared = Object.values(defs).flatMap((d) => (d.exitCriteria ?? []).map((x) => `${d.id}:${x.id}`));
   assert.ok(declared.length >= 12, "the stage set should still declare the criteria this is checking");
-  assert.deepEqual(c.blockers, [], "no blockers of any kind");
+  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.PENDING), [], "no criterion is merely unattested");
+  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.NOT_SATISFIED), [], "no criterion is attested not-satisfied");
+
+  // ⚠️ And it must be a gate defect the STAGE boundary already reported, not a new opinion the
+  // handoff invented. If these two ever disagree, the composition has been re-derived again.
+  const stage = evaluateStageGate(ctx, "03-discovery", { attestations: loadStageAttestations(contentRoot, "03-discovery") });
+  assert.equal(stage.ready, false);
+  assert.deepEqual(stage.gateFindings.map((f) => f.ruleId), ["gate/type-not-implemented"]);
 });
 
 /* ------------------------------------------------------------------- the fixture path: publishing */
@@ -115,7 +145,7 @@ test("a complete project publishes, with only the approved surfaces", async () =
 
     assert.deepEqual(files, [
       "MANIFEST.json", "PLAN.md", "README.md",
-      "data/components.json", "data/requirements.json", "docs/01-intake.md",
+      "data/components.json", "data/evidences.json", "data/requirements.json", "docs/01-intake.md",
     ]);
     // ⚠️ DEC-0010 and DEC-0011, checked rather than assumed: no site, no aggregate runbook, no slices.
     assert.equal(files.some((f) => f.startsWith("site/")), false, "DEC-0010: no site");
@@ -176,17 +206,37 @@ test("removed source material does not survive as a stale file", async () => {
   const f = completeFixture();
   try {
     await publish(f);
-    assert.ok(readFileSync(join(f.outDir, "data", "components.json"), "utf-8").includes("CMP-0001"));
+    assert.ok(readFileSync(join(f.outDir, "data", "evidences.json"), "utf-8").includes("EVD-0001"));
 
-    rmSync(join(f.contentRoot, "data", "components", "CMP-0001.json"));
-    // The component is gone, so the requirement it satisfied is now an orphan — but the fixture's
-    // criteria are all n/a, so completeness still passes and the package must simply lose the file.
+    rmSync(join(f.contentRoot, "data", "evidences", "EVD-0001.json"));
+    // ⚠️ The subject is `evidence` rather than `component` BECAUSE no stage produces evidence. This
+    // test used to delete the fixture's only component and passed only because the handoff gate did
+    // not compose stage 5. Deleting that component now leaves stage 05-solution-design producing an
+    // activated type with no artifacts, which is a refusal and not a rendering question.
     await publish(f);
-    const components = readFileSync(join(f.outDir, "data", "components.json"), "utf-8");
-    assert.equal(components.includes("CMP-0001"), false, "a deleted artifact must not survive in the package");
+    const evidences = readFileSync(join(f.outDir, "data", "evidences.json"), "utf-8");
+    assert.equal(evidences.includes("EVD-0001"), false, "a deleted artifact must not survive in the package");
     // ⚠️ The file is PRESENT and empty, not absent. An activated type with no artifacts is a
     // different fact from a type that does not apply here, and the package must not collapse them.
-    assert.deepEqual(JSON.parse(components), []);
+    assert.deepEqual(JSON.parse(evidences), []);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("deleting the last artifact of a type a STAGE produces is a refusal, not an empty file", () => {
+  // ⚠️ The other half of the test above, and the reason it had to change. #46's handoff boundary now
+  // composes every stage gate, so an activated, stage-produced type with nothing in it blocks the
+  // publish rather than rendering as `[]`.
+  const f = completeFixture();
+  try {
+    rmSync(join(f.contentRoot, "data", "components", "CMP-0001.json"));
+    const c = handoffCompleteness(f.ctx, { toolRoot: ROOT });
+    assert.equal(c.ready, false);
+    const b = c.blockers.find((x) => x.ruleId === "gate/no-artifacts-for-stage-type");
+    assert.ok(b, `expected a stage-gate blocker; got ${JSON.stringify(c.blockers)}`);
+    assert.equal(b.stageId, "05-solution-design");
+    assert.equal(b.reason, BLOCKED.STAGE_GATE);
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
@@ -292,7 +342,7 @@ test("`n/a` passes and an unattested criterion blocks", () => {
     const c = handoffCompleteness(f.ctx, { toolRoot: ROOT });
     assert.equal(c.ready, false);
     assert.ok(c.blockers.every((b) => b.reason === BLOCKED.PENDING));
-    assert.match(c.blockers[0].detail, /Nobody has looked/);
+    assert.match(c.blockers[0].detail, /has not been evaluated/);
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }

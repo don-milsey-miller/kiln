@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { checkJob, JOB_REFUSED, DEFAULT_CEILING, TIER_1_BOUNDARY } from "../lib/validation/job.mjs";
+import { checkJob, unsafeWorkspacePath, expectedOutputSpecs, JOB_REFUSED, DEFAULT_CEILING, TIER_1_BOUNDARY } from "../lib/validation/job.mjs";
 
 const JOB = (over = {}) => ({
   tier: 1,
@@ -89,4 +89,52 @@ test("tier 1's boundary is data, so it can reach an evidence record", () => {
   ]);
   assert.equal(TIER_1_BOUNDARY.supplies.credentials, false);
   assert.match(TIER_1_BOUNDARY.statement, /not an OS security sandbox/);
+});
+
+
+/* ------------------------------------------------------- containment: nothing leaves the workspace */
+
+test("an input whose name leaves the workspace is refused BEFORE anything is provisioned", () => {
+  // ⚠️ The point of testing this here rather than only in the controller: a path check that needs a
+  // workspace cannot run before the workspace exists, and "refuse before provisioning" would quietly
+  // become "write outside the workspace, then clean up the part of it we still own".
+  const out = checkJob(JOB({ inputs: { "../../escaped.txt": "pwned" } }));
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, JOB_REFUSED.UNSAFE_PATH);
+  assert.match(out.detail, /nothing will clean up/);
+});
+
+test("absolute paths, drive letters and separators are all refused, in both slash directions", () => {
+  const B = String.fromCharCode(92);
+  for (const bad of ["/etc/passwd", B + "Windows" + B + "System32", "C:/Users/x", "a" + B + ".." + B + "b", "a/../b", "./a", "a//b", "a/"])
+    assert.equal(checkJob(JOB({ inputs: { [bad]: "x" } })).reason, JOB_REFUSED.UNSAFE_PATH, bad);
+
+  // ...and an ordinary nested path is NOT refused, so the rule is containment rather than a ban on
+  // subdirectories. A check that refused everything would pass the tests above and be useless.
+  assert.equal(checkJob(JOB({ inputs: { "sub/dir/input.txt": "x" } })).ok, true);
+  assert.equal(unsafeWorkspacePath("sub/dir/input.txt"), null);
+});
+
+test("input contents must be strings, so a job cannot smuggle a shape past the writer", () => {
+  assert.equal(checkJob(JOB({ inputs: { "a.txt": { toString: "nope" } } })).reason, JOB_REFUSED.MALFORMED);
+  assert.equal(checkJob(JOB({ inputs: ["a.txt"] })).reason, JOB_REFUSED.MALFORMED);
+});
+
+/* --------------------------------------------------- expected outputs: declared AND then checkable */
+
+test("expected outputs are validated as paths, not merely counted", () => {
+  assert.equal(checkJob(JOB({ expectedOutputs: ["result.json"] })).ok, true);
+  assert.equal(checkJob(JOB({ expectedOutputs: [{ path: "out/result.json", minBytes: 2 }] })).ok, true);
+
+  assert.equal(checkJob(JOB({ expectedOutputs: ["../result.json"] })).reason, JOB_REFUSED.UNSAFE_PATH);
+  assert.equal(checkJob(JOB({ expectedOutputs: [{}] })).reason, JOB_REFUSED.MALFORMED);
+  assert.equal(checkJob(JOB({ expectedOutputs: [42] })).reason, JOB_REFUSED.MALFORMED);
+  assert.equal(checkJob(JOB({ expectedOutputs: [{ path: "a", minBytes: -1 }] })).reason, JOB_REFUSED.MALFORMED);
+});
+
+test("expectedOutputSpecs normalises both declaration forms to one shape", () => {
+  assert.deepEqual(expectedOutputSpecs({ expectedOutputs: ["a.json", { path: "b.json", minBytes: 10 }] }), [
+    { path: "a.json", minBytes: null },
+    { path: "b.json", minBytes: 10 },
+  ]);
 });
