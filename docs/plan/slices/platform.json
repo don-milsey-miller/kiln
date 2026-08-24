@@ -156,7 +156,7 @@
       "priority": "must",
       "rationale": "Intake: 'the runbook should represent the output of discovery, not the beginning of discovery.'",
       "reviewStatus": "draft",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "statement": "No instruction in the final output may rest on a claim whose basis is below the level required for that instruction.",
       "tags": [
         "handoff",
@@ -171,7 +171,7 @@
       "priority": "must",
       "rationale": "Intake objective, stated in the PM's own terms.",
       "reviewStatus": "draft",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "statement": "A recipient of the output must be able to begin their part of the work without asking the planner for information the plan should have contained.",
       "tags": [
         "handoff"
@@ -185,7 +185,7 @@
       "priority": "must",
       "rationale": "Intake stakeholders: the material explicitly declines to assume which the implementer is. This is testable by comparing both consumers against the same required-information inventory.",
       "reviewStatus": "draft",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "statement": "For every required item in the handoff, both a human reader and an automated consumer must be able to recover the same information without depending on the other representation.",
       "tags": [
         "handoff"

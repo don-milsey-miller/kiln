@@ -107,7 +107,7 @@
     "kind": "source",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "sources": [
       {
         "locator": "https://nextjs.org/docs/app/getting-started/caching",
@@ -124,7 +124,7 @@
     "kind": "source",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "sources": [
       {
         "locator": "https://nextjs.org/docs/app/guides/caching-without-cache-components",
@@ -141,7 +141,7 @@
     "kind": "source",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "sources": [
       {
         "locator": "https://nextjs.org/docs/app/api-reference/functions/revalidatePath",
@@ -339,7 +339,7 @@
     "lifecycle": "active",
     "notes": "Quoted from the page, verified present at retrieval time: \"1,000 credits/month\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "sources": [
       {
         "locator": "https://docs.tavily.com/documentation/api-credits",

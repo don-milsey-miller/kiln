@@ -5,7 +5,7 @@
     "priority": "must",
     "rationale": "Intake: 'session quality is inconsistent' — the process is currently negotiated per session.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "The system must define the sequence of planning activities and their completion conditions, such that two planning sessions on comparable projects follow the same sequence.",
     "tags": [
       "process"
@@ -19,7 +19,7 @@
     "priority": "must",
     "rationale": "Intake: the PM cannot currently tell how far a planning session has got.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "At any point the system must be able to report which stage the project is in and what that stage still requires.",
     "tags": [
       "process"
@@ -33,7 +33,7 @@
     "priority": "must",
     "rationale": "Intake problem 2: 'educated guessing' on vendor docs, OS procedures, versions and known issues.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "When a planning question depends on external fact, the system must be able to consult a current external source rather than reason from what it already holds.",
     "tags": [
       "research"
@@ -47,7 +47,7 @@
     "priority": "must",
     "rationale": "Without this the distinction between a documented claim and a guess is lost the moment it is written down.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Any claim the plan rests on that came from an external source must record a reference to that source.",
     "tags": [
       "research",
@@ -62,7 +62,7 @@
     "priority": "must",
     "rationale": "Intake problem 3: no sandbox, so testable assumptions are inferred instead.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "The system must be able to execute a procedure in a real environment and capture the commands run, the output produced, and whether it succeeded.",
     "tags": [
       "validation"
@@ -76,7 +76,7 @@
     "priority": "must",
     "rationale": "A procedure that worked somewhere unlike the target has not been validated for the target.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Any claim validated by execution must record the environment it ran in, in enough detail to judge whether that environment resembles the target.",
     "tags": [
       "validation",
@@ -91,7 +91,7 @@
     "priority": "must",
     "rationale": "Intake's central constraint: a guess, a documented claim and a demonstrated one must remain distinguishable to the end.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Every claim the plan depends on must carry a recorded basis — unverified, source-supported, or demonstrated by execution — as structured data rather than prose.",
     "tags": [
       "evidence"
@@ -105,7 +105,7 @@
     "priority": "must",
     "rationale": "If telling them apart requires careful reading, it will not survive contact with a long document.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "A reader or a consuming agent must be able to tell the basis of any claim by inspecting structure, without interpreting narrative text.",
     "tags": [
       "evidence",
@@ -120,7 +120,7 @@
     "priority": "must",
     "rationale": "Intake: 'the runbook should represent the output of discovery, not the beginning of discovery.'",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "No instruction in the final output may rest on a claim whose basis is below the level required for that instruction.",
     "tags": [
       "handoff",
@@ -135,7 +135,7 @@
     "priority": "must",
     "rationale": "Intake objective, stated in the PM's own terms.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "A recipient of the output must be able to begin their part of the work without asking the planner for information the plan should have contained.",
     "tags": [
       "handoff"
@@ -149,7 +149,7 @@
     "priority": "must",
     "rationale": "Intake stakeholders: the material explicitly declines to assume which the implementer is. This is testable by comparing both consumers against the same required-information inventory.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "For every required item in the handoff, both a human reader and an automated consumer must be able to recover the same information without depending on the other representation.",
     "tags": [
       "handoff"
@@ -163,7 +163,7 @@
     "priority": "must",
     "rationale": "Intake constraint: validation cannot assume a free, local, consequence-free environment.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "The system must not perform a validation that incurs cost or uses credentials unless the operator has explicitly authorised that class of validation.",
     "tags": [
       "validation",
@@ -178,7 +178,7 @@
     "priority": "should",
     "rationale": "Intake: 'continuously capture decisions and evolving requirements.' A decision without alternatives cannot be reopened intelligently.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Every decision that shapes the plan must be recorded together with the options considered and why the chosen one won.",
     "tags": [
       "decisions"
@@ -192,7 +192,7 @@
     "priority": "should",
     "rationale": "Intake open questions 1-4 are themselves examples: they need to survive being read once.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "An unresolved question must exist as a tracked item with a state, not as a sentence inside a document.",
     "tags": [
       "decisions"
@@ -206,7 +206,7 @@
     "priority": "must",
     "rationale": "Retired during PM review: local single-operator operation is a later architecture decision, not a constraint stated by the frozen intake. Keeping it here would back-project the chosen solution into the solution-free ask.",
     "reviewStatus": "amended",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "The system must be usable by one operator on one machine with no hosted service required.",
     "tags": [
       "environment"

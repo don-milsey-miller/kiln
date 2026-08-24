@@ -18,18 +18,19 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "What caused the single observed failure of the separate-process concurrency test during a full parallel run on 2026-08-18, and is serialisation implicated at all?",
     "title": "Why did the concurrency test fail once under full-suite parallel load?",
     "type": "question"
   },
   {
+    "answeredBy": [],
     "id": "QST-0002",
     "lifecycle": "active",
-    "notes": "SECOND PARTIAL RESULT, 2026-08-18 — a READING-based stage 3 was run (QST-0004, the Next.js debt), which is the case the first result said was missing. It still needed no research-finding. Source inventory: three evidence(kind: source) records, each carrying its citations in evidence.sources. Claims: three assertions, each scoped by targetEnvironment to the mode it is about. ⚠️ CONTRADICTORY SOURCES WERE ENCOUNTERED — the case this type's strongest argument rests on. Two pages of the SAME official documentation give the same operation opposite treatment: the previous-model guide says pages in development are never cached, while the Cache Components page says a synchronous fs read is a predictable value prerendered into the static shell. ⚠️ AND THE CONTRADICTION DISSOLVED RATHER THAN NEEDING A HOME. The two sources do not disagree; they describe two different modes. Scoping each assertion's targetEnvironment by cacheComponents enabled/disabled resolved it completely — which is what targetEnvironment is for, and it is the same move that fixed AST-0003. So 'contradictory sources resolved or surfaced' was satisfied by SCOPING THE CLAIMS, not by a narrative artifact. Still not conclusive: this contradiction was RESOLVABLE. A genuine unresolved disagreement between authorities — two sources making incompatible claims about the SAME configuration — has not yet been met, and that remains the one case research-finding might own. Remains unanswered, with the evidence against it now covering both the experimental and the documentary half of stage 3.",
-    "resolution": "unanswered",
+    "notes": "SECOND PARTIAL RESULT, 2026-08-18 — a READING-based stage 3 was run (QST-0004, the Next.js debt), which is the case the first result said was missing. It still needed no research-finding. Source inventory: three evidence(kind: source) records, each carrying its citations in evidence.sources. Claims: three assertions, each scoped by targetEnvironment to the mode it is about. ⚠️ CONTRADICTORY SOURCES WERE ENCOUNTERED — the case this type's strongest argument rests on. Two pages of the SAME official documentation give the same operation opposite treatment: the previous-model guide says pages in development are never cached, while the Cache Components page says a synchronous fs read is a predictable value prerendered into the static shell. ⚠️ AND THE CONTRADICTION DISSOLVED RATHER THAN NEEDING A HOME. The two sources do not disagree; they describe two different modes. Scoping each assertion's targetEnvironment by cacheComponents enabled/disabled resolved it completely — which is what targetEnvironment is for, and it is the same move that fixed AST-0003. So 'contradictory sources resolved or surfaced' was satisfied by SCOPING THE CLAIMS, not by a narrative artifact. Still not conclusive: this contradiction was RESOLVABLE. A genuine unresolved disagreement between authorities — two sources making incompatible claims about the SAME configuration — has not yet been met, and that remains the one case research-finding might own. Remains unanswered, with the evidence against it now covering both the experimental and the documentary half of stage 3. ⚠️ DEFERRED 2026-08-24 by pm — NOT ANSWERED, and the distinction is the whole point. `research-finding` is deactivated for this project on demonstrated absence of demand, which records \"no project demand today\" rather than \"the type has no value\". The evidence still FAVOURS projection and does not establish it: what has never been met is a genuinely IRRECONCILABLE disagreement — two authorities making incompatible claims about the SAME configuration — and the one contradiction this project did encounter dissolved under `targetEnvironment` scoping rather than needing a home. ⚠️ REOPENING CONDITIONS, either of which reactivates the type and returns this question to open work: (a) an irreconcilable same-configuration conflict between authorities; (b) a downstream consumer requiring state not carried by `assertion`, `evidence` or `question`. ⚠️ `monitored` was deliberately NOT added to `resolution` (pm, 2026-08-24): monitoring is workflow policy, not a resolution outcome. If triggers later need structured representation they get their own `revisitWhen` field rather than a fourth enum value mixing two axes into one — the same split-first rule that keeps `resolution` off the envelope (#107).",
+    "resolution": "deferred",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Is there state a research-finding artifact would hold that is not already held by evidence(kind: source), assertion, or question — and that something downstream must traverse (#41)?",
     "title": "Does `research-finding` own anything irreducible, or is it a projection?",
     "type": "question"
@@ -44,7 +45,7 @@
     "notes": "#87 says an aggregate belongs at handoff as a projection, not as an authored artifact, so membership and ordering do not justify the type: partOf gives membership by reverse index (#84), and ordinal plus dependsOn give ordering. The strongest candidate is sequence-level state no single step owns: a precondition for the whole run, abort criteria, and a rollback strategy spanning steps. #58's floor is per-step; a runbook-level abort is not. Role slice is NOT a candidate: #19 slices the handoff per role and #18 discovers roles from stage-8 assignments, so role-assignment owns that. Resolve by naming those fields concretely, or accept that stage 9 produces runbook-step artifacts and the runbook is assembled at handoff.",
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Is there runbook-level state — preconditions, abort criteria, rollback strategy, role slice — that no runbook-step holds and that cannot be derived by reverse traversal of runbook-step.partOf?",
     "title": "Does `runbook` own state not derivable from its steps?",
     "type": "question"
@@ -68,7 +69,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Can a Next.js development app reliably reflect artifact files written by an EXTERNAL process, and perform lock-protected status write-backs, without relying on HMR, stale server state, or framework-owned caching?",
     "title": "Can a Next.js dev app reflect externally written files and do lock-protected write-backs?",
     "type": "question"
@@ -89,7 +90,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "REQ-0003 requires that implementation questions be answerable from current external sources. Nothing in the shipped package provides that. What gives the research specialist the ability — a Pi extension wrapping a search API, an MCP server, something else — and who holds the credential?",
     "title": "How does a specialist obtain internet research capability?",
     "type": "question"
@@ -111,7 +112,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "REQ-0005 requires claims to be testable by execution in a real environment. #56 decides three tiers and #77 decides how they activate, but no controller exists for any of them. Which tier is built first, and what provisions, executes, observes and destroys?",
     "title": "What implements sandboxed execution, and which tier first?",
     "type": "question"
@@ -133,7 +134,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "REQ-0010 requires a handoff actionable without returning to the planner, and #19 specifies docs/plan/ with data, docs, site and PLAN.md. Nothing produces any of it. Is the export in v1, and is it a command, a gate action, or a stage-9 agent task?",
     "title": "Does the handoff export exist in v1, and what produces it?",
     "type": "question"
@@ -154,7 +155,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "REQ-0011 requires the output to serve a human reader and an automated consumer without either being a lossy rendering of the other. Artifacts are JSON, so the machine half exists. What satisfies the human half — the skeleton's HTML, #19's site/ build, or #8's interactive components?",
     "title": "Is the skeleton's rendering sufficient for the human half of REQ-0011?",
     "type": "question"
@@ -173,7 +174,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Stage 4's exit criterion is that every BLOCKING gap has a user decision recorded — not every gap. Which of the four questions above block progress, and which are known future work that does not?",
     "title": "Which of these gaps BLOCK, and which are simply not done?",
     "type": "question"
@@ -191,7 +192,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "#39 authorises a state transition — the PM approves an activation list at stage 2, recorded in project.yaml — and nothing can perform it. readActivatedTypes reads it; no typed operation writes it. Should there be one, and what must it validate?",
     "title": "Approving artifact type activation has no typed operation",
     "type": "question"
@@ -212,7 +213,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "DEC-0004 makes the backend replaceable and puts credentials in the PM's host environment, outside the repository. Step 7a still has to pick ONE first adapter and have a working key for it to run a real external question end to end. Which provider, and how is its credential supplied to the extension on this machine?",
     "title": "Which search backend is the first adapter, and where do its credentials come from?",
     "type": "question"
@@ -231,7 +232,7 @@
     ],
     "resolution": "answered",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "`evidence` requires `environment` whenever `kind` is `experiment`, and `environment` requires a sandbox `tier` of 1, 2 or 3. A run executed directly on the host sits under NO tier, so the typed path refuses the record outright — there is no honest value for `tier`, and omitting `environment` fails validation. Is a direct host run a tier (a 'tier 0' with no isolation), or must `environment` be restructured so observed facts can be recorded without asserting an isolation level that did not exist?",
     "title": "An experiment run under no sandbox tier cannot be recorded at all",
     "type": "question"

@@ -151,7 +151,9 @@ capabilities:
     # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
     # Activated `task` — approved by pm: stage 8 demand; closes the trace chain and is what role slices query (#144)
     # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
-    activated: [acceptance-criterion, assertion, component, decision, evidence, question, requirement, research-finding, runbook-step, task]
+    # Deactivated `research-finding` — approved by pm: no demonstrated project demand — QST-0002 is DEFERRED, not answered, so the type may still own irreducible state; stage 03-discovery is therefore ATTESTATION-ONLY BY APPROVED ACTIVATION DECISION, and its empty activated-output intersection is deliberate rather than silent; reactivate on an irreconcilable same-configuration conflict between authorities, or a downstream consumer requiring state not carried by assertion/evidence/question
+    # Written by lib/tools/activate-type.mjs (QST-0010). Do not hand-edit this list.
+    activated: [acceptance-criterion, assertion, component, decision, evidence, question, requirement, runbook-step, task]
   # A permission boundary, not a preference (#56). The PM declares which
   # tiers are available; the validation agent enforces the ceiling and may
   # not exceed it. This is the one place the agent spends money and holds

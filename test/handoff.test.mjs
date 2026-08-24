@@ -98,40 +98,52 @@ const publish = (f, extra = {}) => publishHandoff(f.ctx, { outDir: f.outDir, too
 
 /* ------------------------------------------------ the decisive negative control: the real project */
 
-test("the REAL project refuses again, on a blocker the old predicate could not see", () => {
-  // ⚠️ THE HISTORY IS THE POINT rather than trivia. This test asserted a refusal while eleven criteria
-  // were unattested, then while stage 5's traceability was not-satisfied, then while stage 9 had no
-  // role slices; each was cleared by building the thing. It then asserted a PUBLISH — and that
-  // reading was wrong, not because anything regressed but because the predicate was partial: it read
-  // attestations and re-derived nothing else, so `gate/type-not-implemented` never reached it.
-  // Composing the stage gates (#46: two boundaries, one engine) makes the project's real state
-  // visible again — `research-finding` is activated with no schema and no typed tool, so stage 3
-  // cannot be exited and a package claiming stage 9 is complete would be claiming it falsely.
+test("the REAL project publishes, and the verdict is the CONJUNCTION rather than a coincidence", () => {
+  // ⚠️ THIS TEST HAS CHANGED POLARITY THREE TIMES, and the history is the point rather than trivia.
+  // It asserted a refusal while eleven criteria were unattested, then while stage 5's traceability was
+  // not-satisfied, then while stage 9 had no role slices — each cleared by building the thing. It then
+  // asserted a publish, and THAT reading was wrong: the predicate was partial, so stage 3's capability
+  // gap never reached it. Composing the stage gates made it refuse again on `research-finding`, and the
+  // PM cleared that on 2026-08-24 by DEACTIVATING the type with a recorded reopening condition — a
+  // decision, not a relaxed predicate. QST-0002 is deferred rather than answered, and project.yaml
+  // says so where the activation is written.
+  //
+  // ⚠️ So `ready: true` is back, and on its own it means exactly what it meant before the review: very
+  // little. The second assertion below checks the CONJUNCTION — that no stage disagrees — which is
+  // what the original defect violated. It cannot catch a future unwiring on its own, because nothing
+  // in this project is currently failing for it to disagree WITH; the fixtures are the live guard, and
+  // falsification confirms it: unwiring the composition fails four of them, including the
+  // stage-produced-type refusal below.
   const contentRoot = join(ROOT, "planning-content");
   const ctx = { contentRoot, schemas, validators, activated: readActivatedTypes(contentRoot) };
   const c = handoffCompleteness(ctx, { toolRoot: ROOT });
 
-  assert.equal(c.ready, false);
-  assert.deepEqual(
-    c.blockers.map((b) => `${b.stageId ?? "-"}:${b.ruleId ?? b.reason}`),
-    ["03-discovery:gate/type-not-implemented"],
-    `the ONLY blocker should be the discovery capability gap; got ${JSON.stringify(c.blockers, null, 2)}`
-  );
-  assert.match(c.blockers[0].detail, /capability gap, not unfinished planning/);
+  assert.equal(c.ready, true, `expected publishable; blocked by ${JSON.stringify(c.blockers, null, 2)}`);
+  assert.deepEqual(c.blockers, [], "no blockers of any kind");
 
-  // ⚠️ The refusal must be EARNED too. A predicate that blocked because nobody had looked would
-  // report the same boolean, so: every declared criterion is still attested, and none is pending.
+  // ⚠️ The conjunction, checked rather than assumed. Every stage the definition set declares must be
+  // independently ready — the handoff is not allowed to be more permissive than the transitions it is
+  // downstream of, and this is the assertion the original defect would have failed.
   const defs = loadStageDefinitions(ROOT);
+  const notReady = Object.values(defs)
+    .map((d) => evaluateStageGate(ctx, d.id, { attestations: loadStageAttestations(contentRoot, d.id) }))
+    .filter((g) => !g.ready)
+    .map((g) => `${g.stageId}: ${g.gateFindings.map((f) => f.ruleId).join(", ")}`);
+  assert.deepEqual(notReady, [], "a publishable project cannot contain a stage that is not ready");
+
+  // ⚠️ And ready must be EARNED. A predicate that passed because nobody had looked would report the
+  // same boolean, so: every declared criterion is attested, and none is merely pending.
   const declared = Object.values(defs).flatMap((d) => (d.exitCriteria ?? []).map((x) => `${d.id}:${x.id}`));
   assert.ok(declared.length >= 12, "the stage set should still declare the criteria this is checking");
-  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.PENDING), [], "no criterion is merely unattested");
-  assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.NOT_SATISFIED), [], "no criterion is attested not-satisfied");
 
-  // ⚠️ And it must be a gate defect the STAGE boundary already reported, not a new opinion the
-  // handoff invented. If these two ever disagree, the composition has been re-derived again.
-  const stage = evaluateStageGate(ctx, "03-discovery", { attestations: loadStageAttestations(contentRoot, "03-discovery") });
-  assert.equal(stage.ready, false);
-  assert.deepEqual(stage.gateFindings.map((f) => f.ruleId), ["gate/type-not-implemented"]);
+  // ⚠️ `research-finding` is DEACTIVATED, not implemented. Stage 3 therefore produces nothing this
+  // project has activated, and its gate rests entirely on two human attestations — deliberate, and
+  // recorded as such in project.yaml. Asserting it here stops the empty intersection going silent.
+  assert.equal(ctx.activated.includes("research-finding"), false);
+  assert.deepEqual(loadStageDefinitions(ROOT)["03-discovery"].produces, ["research-finding"]);
+  const attested = loadStageAttestations(contentRoot, "03-discovery");
+  assert.deepEqual(Object.keys(attested).sort(), ["sources-reconciled", "unknowns-resolved"]);
+  for (const a of Object.values(attested)) assert.equal(a.result, "satisfied");
 });
 
 /* ------------------------------------------------------------------- the fixture path: publishing */

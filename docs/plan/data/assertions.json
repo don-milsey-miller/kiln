@@ -19,7 +19,7 @@
     "id": "AST-0001",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "On Windows, chokidar reports every file creation in a watched tree where Node's fs.watch({recursive:true}) does not.",
     "supportedBy": [
       "EVD-0001"
@@ -55,7 +55,7 @@
     "notes": "Contested on purpose: this is the unresolved concurrency flake, not a contrived example.",
     "refutedBy": [],
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Concurrent createArtifact calls in separate processes never receive the same allocated ID.",
     "supportedBy": [
       "EVD-0002"
@@ -93,7 +93,7 @@
       "EVD-0003"
     ],
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "On Windows 11 with Node v24.18.0, with lock acquisition retrying EEXIST only, running `node --test` over the full suite, the separate-process concurrency test passes on every completed run. One failing completed run falsifies this.",
     "targetEnvironment": {
       "facts": {
@@ -125,7 +125,7 @@
     "id": "AST-0004",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "On Windows, openSync(lockPath,'wx') can return EPERM while another process holds or is releasing the lock, so a retry loop keyed only on EEXIST treats transient contention as a fatal error.",
     "supportedBy": [
       "EVD-0004"
@@ -159,7 +159,7 @@
     "id": "AST-0005",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "On Windows 11 / Node v24.18.0, with lock acquisition retrying EEXIST, EPERM, EBUSY and EACCES, the separate-process concurrency test completes without error across the declared 80-run matrix.",
     "supportedBy": [
       "EVD-0005"
@@ -204,7 +204,7 @@
     "id": "AST-0006",
     "lifecycle": "active",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "With cacheComponents disabled (the default), Next.js in development renders pages on demand and never caches them, so a Server Component re-reads artifact files on each request.",
     "supportedBy": [
       "EVD-0007",
@@ -250,7 +250,7 @@
       "EVD-0012"
     ],
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "With cacheComponents enabled, a Server Component that reads an artifact with fs.readFileSync produces output baked into the static shell, so a later external write to that file does not change what a fresh request returns.",
     "supersededBy": [
       "AST-0010",
@@ -294,7 +294,7 @@
     "lifecycle": "active",
     "notes": "Rewritten 2026-08-18 before validation. It previously claimed 'no mechanism exists', which no experiment can establish — a universal negative is unfalsifiable and would have sat at whatever rung its evidence happened to reach while meaning something no evidence could support. The observable form is bounded in time, scoped to versions and mode, and one counter-observation refutes it.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Under Next.js 16.3.1 in `next dev` on Windows 11 / Node v24.18.0, writing an artifact file from a process outside the application causes no new server request, no server re-render, and no browser update within 10 seconds, in either cacheComponents mode.",
     "supportedBy": [
       "EVD-0008",
@@ -338,7 +338,7 @@
     "lifecycle": "active",
     "notes": "Split from AST-0007 on 2026-08-18 before validation.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "With cacheComponents enabled, a Server Component that reads an artifact with `await readFile()` is treated as uncached data — it must sit within `use cache` or behind a Suspense boundary, and a fresh request after an external write returns the new value.",
     "supportedBy": [
       "EVD-0006",
@@ -375,7 +375,7 @@
     "lifecycle": "active",
     "notes": "Carved out of AST-0007 after the dev refutation. This is what the documentation actually describes, and it is untested. ⚠️ It may never matter: #2 and #22 make the app local-only, so `next dev` may be the only mode this product ever runs in — which is itself a decision nobody has taken. ⚠️ REGISTERED VALIDATION TASK, DEFERRED 2026-08-22 under #80 branch 3 — not an outstanding debt. DEC-0001 makes this blocking only when a production build enters scope, and the product is local and runs `next dev`. Validating it now would test an UNDECLARED deployment mode: demand-driven sequencing means the experiment arrives with the commitment that needs it. REOPENING CONDITION: execute before adopting `next build` / `next start`, or when upgrading beyond the currently tested Next.js version (16.3.1 / React 19.2.8 / Node v24.18.0). ⚠️ The condition fires when the risk becomes POSSIBLE, not when it is observed — #80's stated preference, because the second means shipping the failure once to learn it was real.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "With cacheComponents enabled, under `next build` followed by `next start`, a Server Component reading an artifact with fs.readFileSync produces output baked into the static shell, so a later external write does not change what a fresh request returns.",
     "supportedBy": [
       "EVD-0006"
@@ -415,7 +415,7 @@
     "lifecycle": "active",
     "notes": "The properly-scoped positive half of AST-0007's contested pair. AST-0010 carries the build-mode half.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "With cacheComponents enabled under `next dev`, a Server Component reading an artifact with fs.readFileSync re-reads the file on a fresh request, so an external write is reflected.",
     "supportedBy": [
       "EVD-0012"
@@ -460,7 +460,7 @@
     "lifecycle": "active",
     "notes": "#100 named React's state model against #78's lock as the interaction most likely to bite. Measured in both cacheComponents modes; it did not.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Under Next.js 16.3.1 in `next dev` on Windows 11 / Node v24.18.0, a route handler calling writeReviewStatus writes only reviewStatus, refuses any other lifecycle value, releases the lock, leaves no temp file, and waits rather than proceeding while an external process holds the lock.",
     "supportedBy": [
       "EVD-0014",
@@ -498,7 +498,7 @@
     "loadBearing": true,
     "notes": "⚠️ Scoped to what was actually observed, per the AST-0003 and AST-0007 lesson. It says the probe WORKED ON THAT HOST ON THAT DAY. It does not claim the probe works when the key is absent or rejected — those paths are covered by constructed fixtures in test/research.test.mjs, not by this run — and it does not claim anything about search, which has still never been called live. ⚠️ THIS ASSERTION HAS NO EVIDENCE, and the reason is not that none exists. The run happened and its output is known; the typed path REFUSED the evidence record because an experiment must carry an environment and an environment must name a sandbox tier, and this ran under none (QST-0012). It therefore sits at rung 1 — unverified — while the observation that would settle it is sitting in a terminal. That state is left visible on purpose: filling it in with a tier that did not apply would convert a recording defect into a false confidence rung, which is the exact failure #42's ladder exists to prevent.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "On the PM's Windows host on 2026-08-22, `research_capability` returned available:true after a live GET /usage against api.tavily.com, reporting 1500 of 1500 credits remaining and 0 used. The zero-used figure is what shows the probe did not perform a search.",
     "supportedBy": [
       "EVD-0017"
@@ -532,7 +532,7 @@
     "loadBearing": false,
     "notes": "⚠️ Deliberately narrow, and split from the measured figure rather than merged with it (the #102 lesson). This claim is about WHAT THE DOCUMENTATION SAYS and a documentation fetch can settle it. It is NOT a claim about what any particular account receives — AST-0013 records that this account's live probe reported a plan limit of 1500 — and the two are not in conflict until something shows they are about the same quantity. A single assertion holding both would be unfalsifiable by either observation.",
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "statement": "Tavily's own documentation at docs.tavily.com states that the free plan provides 1,000 API credits per month.",
     "supportedBy": [
       "EVD-0016"

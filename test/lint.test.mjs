@@ -559,10 +559,10 @@ test("#39: one reader for the approved activation set, shared by the CLI and the
   const activated = readActivatedTypes(join(ROOT, "planning-content"));
   assert.deepEqual(
     [...activated].sort(),
-    ["acceptance-criterion", "assertion", "component", "decision", "evidence", "question", "requirement", "research-finding", "runbook-step", "task"],
+    ["acceptance-criterion", "assertion", "component", "decision", "evidence", "question", "requirement", "runbook-step", "task"],
     "should match what the PM has approved in project.yaml — stage 2's set, plus `component` (DEC-0008), " +
-      "activated through setTypeActivation rather than by hand: plus `component` (DEC-0008), " +
-      "`acceptance-criterion` and `task` (#144), minus `runbook` (DEC-0011)"
+      "`acceptance-criterion` and `task` (#144), minus `runbook` (DEC-0011) and `research-finding` " +
+      "(2026-08-24, QST-0002 deferred) — every one written through setTypeActivation rather than by hand"
   );
   assert.ok(!activated.includes("schema") && !activated.includes("api-spec"), "stage 2 deliberately did not activate these");
   assert.deepEqual(readActivatedTypes(tmpdir()), [], "absent manifest yields no activation, never a guess");

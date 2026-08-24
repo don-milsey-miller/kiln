@@ -10,7 +10,7 @@
       "AST-0002"
     ],
     "reviewStatus": "draft",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "supersededBy": [],
     "title": "Run specialists in parallel",
     "type": "runbook-step"

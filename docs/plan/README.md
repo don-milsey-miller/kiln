@@ -3,7 +3,7 @@
 **Generated. Nothing here was written by hand**, and editing it edits a rendering — the next
 `npm run handoff` overwrites you. Change `planning-content/` instead.
 
-- snapshot: `5979e738b81e0e1b`
+- snapshot: `6c86330767dcbbfa`
 - tool version: `0.0.0`
 
 ## What is in it
@@ -15,7 +15,6 @@
 - 17 evidences
 - 16 questions
 - 15 requirements
-- 0 research-findings
 - 1 runbook-step
 - 2 tasks
 

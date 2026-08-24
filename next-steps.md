@@ -65,15 +65,13 @@
 > schemas shipped. A running order that stops running is worse than no running order: everything below
 > it was current and the one line people read first was not.
 >
-> **Checkpoint 2026-08-23.** ✅ **Review hardening complete — 272 tests pass** (see 7d).
-> ⚠️ **The handoff is BLOCKED, and deliberately**: `research-finding` is activated and unimplemented,
-> and stage 3's gate now reaches the publish predicate instead of being routed around it. That is
-> product state, not a regression.
-> **Next: resolve `QST-0002` — does `research-finding` own anything irreducible, or is it a
-> projection? — then build it or deactivate it, with PM approval either way (#39).** Two partial
-> results are already recorded against the type, including the contradictory-sources case its
-> strongest argument rests on; neither is conclusive, and the gate will keep refusing until the
-> question is answered one way or the other.
+> **Checkpoint 2026-08-24.** ✅ **Review hardening complete — 272 tests pass** (see 7d).
+> ✅ **The handoff publishes again**, and by a DECISION rather than a relaxed predicate:
+> `research-finding` is **deactivated** for this project with PM approval and a recorded reopening
+> condition (see 7e). ⚠️ **`QST-0002` is `deferred`, NOT answered** — the evidence favours projection
+> and does not establish it, and the type keeps its place in #38's catalogue.
+> **Next: nothing is owed.** The queue is driven by real stage 5–8 demand (step 6) and by the two
+> reopening triggers, which are watches rather than work.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
@@ -848,9 +846,9 @@ lint is clean; `npm audit` reports nothing.**
   while `handoffCompleteness` returned `ready: true` with zero blockers. #46 has two boundaries and
   **one engine**; a partial copy is worse than a second implementation, because it agrees often enough
   to look authoritative.
-- ⚠️ **So the handoff is blocked again, on the one real thing the partial predicate was hiding.**
-  `research-finding` is activated with no schema and no typed tool. **Intentional product state.**
-  The queue is above: `QST-0002` first, then build or deactivate with PM approval.
+- ⚠️ **So the handoff blocked again, on the one real thing the partial predicate was hiding** —
+  `research-finding`, activated with no schema and no typed tool. **Cleared by decision on
+  2026-08-24, not by relaxing anything: see 7e.**
 - ✅ **The tier-1 controller cannot write outside its workspace.** Input and expected-output paths were
   joined onto the workspace unchecked, so `../../escaped.txt` wrote outside the only directory
   `destroy` disposes of. Refused before provisioning by a pure check, and re-checked at write time
@@ -885,6 +883,43 @@ or a reaper:** more than one `vpw-tier1-*` directory surviving a completed run, 
 outcome from a run that did NOT kill a command. Either means retention has stopped being a momentary
 artefact of a kill and started accumulating, and the answer then is a sweep at startup plus a delayed
 second attempt — not a quieter report.
+
+---
+
+### 7e. `research-finding` deactivated — ✅ 2026-08-24 (pm), `QST-0002` deferred
+
+**`QST-0002` is `deferred`, not answered**, and the type stays in #38's catalogue. This records **"no
+demonstrated project demand today"**, never "the type has no value" — the difference the `runbook`
+precedent (DEC-0011) established and this reuses.
+
+- ✅ **Written through `setTypeActivation`, never by hand** (QST-0010), so the approver and the reason
+  are stamped above the `activated:` line where anyone reading the manifest meets them.
+- ✅ **`resolveQuestion(QST-0002, "deferred")`**, with the reopening conditions appended to its notes.
+  `deferred` truthfully says *someone chose how to handle this now*; leaving it `unanswered` would have
+  said *nobody has settled it*, which stopped being true the moment the decision was taken. Same
+  distinction #93 drew between an attested `n/a` and a pending criterion, one axis over.
+- ⚠️ **`monitored` was deliberately NOT added to `resolution`.** Monitoring is workflow policy, not a
+  resolution outcome. If triggers ever need structured representation they get their own `revisitWhen`
+  field rather than a fourth enum value mixing two axes into one — the split-first rule that already
+  keeps `resolution` off the envelope (#107).
+- ⚠️ **Stage `03-discovery` is now ATTESTATION-ONLY, by approved activation decision.** It produces
+  only `research-finding`, so with that deactivated its gate has an **empty activated-output
+  intersection** and rests entirely on authored prose plus two substantively reasoned human
+  attestations, both `satisfied`. **This is the reduction in mechanical checking, accepted explicitly
+  and stated in the manifest reason** so it is deliberate rather than silent — which is the failure
+  mode #107 exists to prevent. A test asserts the intersection is empty, so it cannot become silent by
+  drift either.
+
+**Reopening — either one reactivates the type and returns `QST-0002` to open work:**
+
+1. an **irreconcilable same-configuration** conflict between authorities — two of them making
+   incompatible claims about the *same* configuration, which is the one case never yet encountered
+   (the Next.js contradiction dissolved under `targetEnvironment` scoping rather than needing a home);
+2. a **downstream consumer** requiring state not carried by `assertion`, `evidence` or `question`.
+
+⚠️ **The handoff-test polarity has now flipped three times, and `ready: true` is still worth very
+little on its own.** What makes it mean something is the conjunction — every stage gate independently
+agreeing — plus the fixtures: unwiring the composition fails four of them. Falsified, not assumed.
 
 ---
 
