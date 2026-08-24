@@ -1,7 +1,7 @@
 {
   "id": "DEC-0002",
   "type": "decision",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "What makes a requirement gap BLOCKING",

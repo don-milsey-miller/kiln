@@ -1,7 +1,7 @@
 {
   "id": "REQ-0005",
   "type": "requirement",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Claims can be tested by execution in a real environment",

@@ -1,7 +1,7 @@
 {
   "id": "QST-0004",
   "type": "question",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "resolution": "answered",

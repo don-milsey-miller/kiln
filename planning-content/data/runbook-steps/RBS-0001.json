@@ -1,7 +1,7 @@
 {
   "id": "RBS-0001",
   "type": "runbook-step",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "retired",
   "title": "Run specialists in parallel",

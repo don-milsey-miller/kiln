@@ -1,7 +1,7 @@
 {
   "id": "AST-0007",
   "type": "assertion",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "superseded",
   "title": "With Cache Components, a SYNCHRONOUS fs read freezes into the static shell",

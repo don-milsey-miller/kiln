@@ -1,7 +1,7 @@
 {
   "id": "REQ-0012",
   "type": "requirement",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Validation that costs money or needs credentials requires explicit authorisation",

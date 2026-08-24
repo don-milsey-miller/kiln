@@ -1,7 +1,7 @@
 {
   "id": "DEC-0005",
   "type": "decision",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Tier 1 first, through a typed validation controller with an honest boundary",

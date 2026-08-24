@@ -1,7 +1,7 @@
 {
   "id": "AST-0009",
   "type": "assertion",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "With Cache Components, an AWAITED fs read is treated as uncached data",

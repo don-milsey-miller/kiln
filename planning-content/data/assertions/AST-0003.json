@@ -1,7 +1,7 @@
 {
   "id": "AST-0003",
   "type": "assertion",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "The concurrency test passes on every completed full-suite run",

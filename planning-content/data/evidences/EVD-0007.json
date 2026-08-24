@@ -1,7 +1,7 @@
 {
   "id": "EVD-0007",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Next.js docs — Caching and Revalidating (Previous Model)",

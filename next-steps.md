@@ -61,7 +61,19 @@
 > Three defences, three different silent failures, all three observed rather than imagined. It doesn't
 > block step 3; it lands with the delegation extension.
 >
-> **Next: step 3 — the four schemas.** Both verification spikes are answered; nothing is owed before it.
+> ⚠️ **This line said "Next: step 3 — the four schemas" until 2026-08-23**, seven steps after the
+> schemas shipped. A running order that stops running is worse than no running order: everything below
+> it was current and the one line people read first was not.
+>
+> **Checkpoint 2026-08-23.** ✅ **Review hardening complete — 272 tests pass** (see 7d).
+> ⚠️ **The handoff is BLOCKED, and deliberately**: `research-finding` is activated and unimplemented,
+> and stage 3's gate now reaches the publish predicate instead of being routed around it. That is
+> product state, not a regression.
+> **Next: resolve `QST-0002` — does `research-finding` own anything irreducible, or is it a
+> projection? — then build it or deactivate it, with PM approval either way (#39).** Two partial
+> results are already recorded against the type, including the contradictory-sources case its
+> strongest argument rests on; neither is conclusive, and the gate will keep refusing until the
+> question is answered one way or the other.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
@@ -822,6 +834,57 @@ restated.
 ⚠️ **`QST-0010` remains legitimate work and does not jump the queue.** The transition audit is a
 **worklist, not a priority queue** — the same distinction #94 drew for the capability gate, worth
 restating because a freshly-written worklist reads like a plan.
+
+---
+
+### 7d. Review hardening — ✅ 2026-08-23, and the handoff refuses again
+
+An external review of the core found five defects. All five are closed. **272 tests pass; the planning
+lint is clean; `npm audit` reports nothing.**
+
+- ✅ **The handoff gate COMPOSES every stage gate** instead of re-deriving a subset of it. It read
+  attestations and nothing else, so `gate/type-not-implemented` and `gate/no-artifacts-for-stage-type`
+  never reached it — and **this project was the defect report**: stage `03-discovery` was NOT READY
+  while `handoffCompleteness` returned `ready: true` with zero blockers. #46 has two boundaries and
+  **one engine**; a partial copy is worse than a second implementation, because it agrees often enough
+  to look authoritative.
+- ⚠️ **So the handoff is blocked again, on the one real thing the partial predicate was hiding.**
+  `research-finding` is activated with no schema and no typed tool. **Intentional product state.**
+  The queue is above: `QST-0002` first, then build or deactivate with PM approval.
+- ✅ **The tier-1 controller cannot write outside its workspace.** Input and expected-output paths were
+  joined onto the workspace unchecked, so `../../escaped.txt` wrote outside the only directory
+  `destroy` disposes of. Refused before provisioning by a pure check, and re-checked at write time
+  against the resolved path — refused rather than sanitised, for the same reason a shell-string command
+  is.
+- ✅ **`expectedOutputs` is finally READ.** It was a required declaration nothing consumed, so a job
+  could declare a result, produce none, and be recorded as a completed run. `ok` still describes the
+  **lifecycle**; `outputsSatisfied` describes the **result**; and a run that never reached observation
+  reports `observed: false`, which is not the same fact as `present: false`.
+- ✅ **The approved timeout bounds the JOB, not each command in it.** Every command used to receive the
+  full `job.timeoutMs`, so an authorisation grew with the thing it authorised. One shared deadline for
+  the execution phase, provisioning capped separately at the ceiling, and both figures recorded on the
+  run.
+- ✅ **`schemaVersion` is project-wide, advanced and enforced** (#50). `project.yaml` said 1 while the
+  authoring tool stamped 2 and 104 records sat evenly split, because **nothing read the manifest's
+  number** — a version nobody checks is a comment. Three lint rules now read it, 52 records and the
+  manifest were migrated under one lock, and `npm run migrate:content` runs an ordered chain rather
+  than one hard-coded migration.
+
+#### Owed, non-blocking
+
+⚠️ **A killed command can leave the workspace briefly retained on Windows.** When the execution
+deadline stops a command, the interpreter may still hold its directory for a moment, so `destroy`
+observes the path is present and honestly reports `retained` rather than `destroyed`. **Nothing is
+wrong with the record** — that is condition 4 working, and the retained path is named in the run — but
+the directory is real and nobody comes back for it.
+
+**Deliberately not fixed now**, because the honest report is the load-bearing behaviour and a retry
+loop bolted onto `destroy` would blur "we could not remove it" into "we removed it eventually",
+which is the distinction the whole destroy path exists to keep. **Trigger for building delayed cleanup
+or a reaper:** more than one `vpw-tier1-*` directory surviving a completed run, or any `retained`
+outcome from a run that did NOT kill a command. Either means retention has stopped being a momentary
+artefact of a kill and started accumulating, and the answer then is a sweep at startup plus a delayed
+second attempt — not a quieter report.
 
 ---
 

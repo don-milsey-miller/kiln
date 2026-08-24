@@ -14,7 +14,8 @@
     "research:probe": "node bin/research-probe.mjs",
     "research:search": "node bin/research.mjs search",
     "research:record": "node bin/research.mjs record",
-    "handoff": "node bin/handoff.mjs"
+    "handoff": "node bin/handoff.mjs",
+    "migrate:content": "node bin/migrate-content.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

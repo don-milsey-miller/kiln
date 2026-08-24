@@ -1,7 +1,7 @@
 {
   "id": "EVD-0016",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Source: Credits & Pricing - Tavily Docs",

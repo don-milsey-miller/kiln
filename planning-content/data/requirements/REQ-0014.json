@@ -1,7 +1,7 @@
 {
   "id": "REQ-0014",
   "type": "requirement",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Open questions are tracked objects, not prose",

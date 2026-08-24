@@ -1,7 +1,7 @@
 {
   "id": "AST-0011",
   "type": "assertion",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "In `next dev` with Cache Components, a synchronous fs read does NOT freeze",

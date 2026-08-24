@@ -1,7 +1,7 @@
 {
   "id": "REQ-0015",
   "type": "requirement",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "amended",
   "lifecycle": "retired",
   "title": "The system runs locally for a single operator",

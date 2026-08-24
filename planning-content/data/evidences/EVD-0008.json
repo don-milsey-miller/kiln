@@ -1,7 +1,7 @@
 {
   "id": "EVD-0008",
   "type": "evidence",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Next.js docs and issue tracker — revalidatePath is server-triggered only",

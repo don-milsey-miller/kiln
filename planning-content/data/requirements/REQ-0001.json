@@ -1,7 +1,7 @@
 {
   "id": "REQ-0001",
   "type": "requirement",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "The planning process is defined by the system, not by the session",

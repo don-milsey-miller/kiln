@@ -19,13 +19,25 @@ description: >-
   planning-content/.
 
 # The version of the CONTENT schema that this file and everything under
-# planning-content/ is written against (#50). The tool reads it to detect
-# content written by an older version and migrate it forward.
+# planning-content/ is written against (#50). ONE version for all content:
+# every artifact carries this same number in its envelope, and the lint
+# reports any record that disagrees with it.
 #
 # Bump this on a breaking change to the shape of content — never on a tool
 # release. `git pull` inside .planning/ updates the tool; this number is what
 # makes that update safe for content the tool didn't write.
-schemaVersion: 1
+#
+# ⚠️ Do not hand-edit it. `npm run migrate:content -- --apply` advances the
+# records and this line together, under one lock — advancing either alone is
+# how the two came to disagree.
+#
+# ⚠️ ADVANCED 1 -> 2 on 2026-08-23 (PM decision). It had said 1 since setup
+# while the authoring tool stamped 2 on everything it wrote, and nothing read
+# this line, so 52 records sat at each version with no way to tell whether a
+# `1` meant "not migrated" or "authored before #131". The lint reads it now:
+# behind the tool, ahead of the tool, and any artifact out of step with it are
+# each a blocking finding.
+schemaVersion: 2
 
 # --- Pipeline shape (#4, #14) ---------------------------------------------
 #

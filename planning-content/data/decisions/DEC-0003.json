@@ -1,7 +1,7 @@
 {
   "id": "DEC-0003",
   "type": "decision",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "A specialist contract may only describe capabilities the host can supply AND detect",
