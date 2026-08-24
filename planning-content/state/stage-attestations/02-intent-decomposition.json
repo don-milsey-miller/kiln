@@ -4,17 +4,17 @@
     "every-requirement-testable": {
       "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "All 14 active requirements have observable conditions; REQ-0011 was sharpened to compare human and automated consumers against the same required-information inventory, and unsupported REQ-0015 was retired."
+      "reason": "RE-EVALUATED 2026-08-24 after the second decomposition, and the re-evaluation is the point: the previous attestation was true of a 14-requirement plan and this one is not that plan. All 14 original active requirements still state observable conditions. The five application-shell requirements REQ-0016..REQ-0020 are each testable as written: current-stage display is checkable against the derived stage, MDX rendering and its component bound are checkable by rendering a document that references a component outside the permitted set, external refresh is checkable by writing a file from outside the application, the typed write path is checkable by asserting no other write path exists, and installability is checkable on a clean machine. ⚠️ Testable is not the same as SPECIFIED: four of the five depend on an open question (QST-0017..QST-0021), and this criterion asks whether a requirement can be tested, not whether the answer it will be tested against has been chosen yet."
     },
     "scope-boundary-drawn": {
       "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "The corrected intake explicitly separates the current through-handoff product boundary from execution, production feedback, and organisational-learning ambitions in the frozen source."
+      "reason": "RE-EVALUATED 2026-08-24. The original through-handoff boundary is unchanged. The application-shell boundary proposed in 02-intent-decomposition.md is CONFIRMED BY THE PM as written: in scope are current-stage display, one MDX stage document, external-change refresh via the existing watcher/SSE contract, review-status write-back through the existing typed path, and a stated deployment mode; out of scope are authoring UI, cross-stage navigation, the full artifact tracker, any second write path into content, and consumer packaging. The first slice is deliberately narrow and the agent's proposal is accepted without amendment."
     },
     "type-activation-approved": {
       "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "Approved: requirement, decision, assertion, evidence, research-finding, question, runbook, and runbook-step. The weak acceptance-criterion inference and deferred types remain inactive; schema and api-spec remain implementation testbeds rather than project requirements."
+      "reason": "RE-EVALUATED 2026-08-24, because the previous reason described a set that no longer exists: it named `runbook` and `research-finding`, both since deactivated by approved decision (DEC-0011; QST-0002 deferred 2026-08-24). The CURRENT approved set is acceptance-criterion, assertion, component, decision, evidence, question, requirement, runbook-step and task, as recorded in project.yaml with each activation's approver and reason. ⚠️ The application-shell scope requires NO NEW artifact types: its five requirements decompose into components, acceptance criteria and tasks, all already activated. A UI need is not by itself a reason to add a type (#106), and no new type is proposed here."
     }
   }
 }

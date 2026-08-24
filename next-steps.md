@@ -66,12 +66,15 @@
 > it was current and the one line people read first was not.
 >
 > **Checkpoint 2026-08-24.** ✅ **Review hardening complete — 272 tests pass** (see 7d).
-> ✅ **The handoff publishes again**, and by a DECISION rather than a relaxed predicate:
-> `research-finding` is **deactivated** for this project with PM approval and a recorded reopening
-> condition (see 7e). ⚠️ **`QST-0002` is `deferred`, NOT answered** — the evidence favours projection
-> and does not establish it, and the type keeps its place in #38's catalogue.
-> **Next: nothing is owed.** The queue is driven by real stage 5–8 demand (step 6) and by the two
-> reopening triggers, which are watches rather than work.
+> ✅ **`research-finding` deactivated** by decision, with `QST-0002` `deferred` and two reopening
+> triggers recorded (see 7e).
+> ✅ **A second planning cycle is open: the application shell** (see 8a, and
+> `planning-content/stages/02-intent-decomposition.md` for the brief). Five requirements, five
+> questions and one scope decision, PM-confirmed.
+> ⚠️ **The handoff REFUSES, on stage 5's traceability**, because `REQ-0016…REQ-0020` trace to no
+> component yet. Deliberate and attested as such; `docs/plan/` stays at `6c86330767dcbbfa`.
+> **Next: roadmap step 2 — targeted Next.js/MDX research, answering `QST-0017…QST-0021`**, with the
+> deployment-mode answer decided first because it is what reopens `AST-0010`.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
@@ -920,6 +923,56 @@ precedent (DEC-0011) established and this reuses.
 ⚠️ **The handoff-test polarity has now flipped three times, and `ready: true` is still worth very
 little on its own.** What makes it mean something is the conjunction — every stage gate independently
 agreeing — plus the fixtures: unwiring the composition fails four of them. Falsified, not assumed.
+
+---
+
+## 8a. The application shell — planning cycle opened 2026-08-24
+
+**#5's Next.js + MDX has never been exercised.** `app/server.mjs` is the 5b walking skeleton and says so
+in its own header: it proves the watcher, the derivation and the status write-back, and deliberately
+not the rendering framework (#100). This cycle plans the application; it does not build it.
+
+**The brief and the scope boundary live in `planning-content/stages/02-intent-decomposition.md`** as a
+second decomposition — PM-confirmed 2026-08-24, without amendment. Not a revision of the first: the
+original 15 requirements came from the frozen intake and stand unchanged. It is stage 2 rather than
+stage 1 because `01-intake.md`'s whole constraint is that the ask carries no solution, and a brief
+naming Next.js, MDX and SSE would break the one thing that document is testing.
+
+**The slice:** a local application that displays the current stage and one MDX stage document,
+reflects external file changes through the existing watcher/SSE contract, and writes review status
+through the existing typed path.
+
+- `REQ-0016`…`REQ-0020`, each linked by `openQuestions` to what gates it.
+- `QST-0017`…`QST-0021` — deployment mode · MDX compilation and its component bound · information
+  architecture · how the shell imports `lib/` without duplicating it · runtime lifecycle.
+- **`DEC-0017`** — the shell reuses the substrate and **the skeleton is not migrated**.
+  `app/server.mjs` stays as the *verified reference* until parity with its seven proven properties;
+  migrating it would remove the only working reference exactly when a second implementation appears.
+
+⚠️ **`QST-0017` is a TRIGGER, not only a choice.** `AST-0010` is deferred (#137) *because* the
+deployment mode is undeclared. Answering "`next build` / `next start`" reopens that validation on the
+spot, and stage 6 is where it gets judged — which is why the roadmap does not skip stage 6.
+
+⚠️ **No `task` artifacts yet, and the reason is mechanical rather than stylistic:** the handoff gate
+refuses a task with no acceptance criteria, so tasks cannot honestly precede stage 7.
+
+### The handoff refuses, and that is the correct state
+
+Authoring these requirements made **four** attestations semantically stale — #79, named and
+deliberately unsolved, so the PM re-evaluated rather than the tool detecting it. Three returned
+`satisfied` (including `type-activation-approved`, whose text still named `runbook` and
+`research-finding`); stage 5's `requirements-traced-to-components` is now **`not-satisfied`**, because
+the five requirements trace to no component and stage 5 has not run for the shell.
+
+⚠️ **It clears when stage 5 produces and approves the application components — not by re-attesting
+around it.** `docs/plan/` therefore stays at snapshot `6c86330767dcbbfa`, describing the plan as it
+stood before this decomposition, which is the honest thing for it to describe until the plan is
+finished again.
+
+⚠️ **The gates reported READY for the whole window between authoring and re-attesting**, because every
+criterion here is `mechanised: false`. Nothing detected that four attestations described a smaller plan
+than the one on disk. **Nothing was republished while that was true** — that discipline is currently a
+habit rather than a guard, and it is the sharpest open case for #79 acquiring one.
 
 ---
 

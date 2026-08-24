@@ -1,0 +1,11 @@
+{
+  "id": "QST-0021",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "What are the shell's installation, startup, watcher-lifetime, SSE-reconnect and error-handling behaviours?",
+  "statement": "The application is installed and run locally by the operator. Its lifecycle must be specified: how it is installed, how it starts, how long the file watcher lives relative to the server process, what a client does when the SSE stream drops, and what the operator sees when content is malformed or unreadable.",
+  "notes": "⚠️ Each of these already has a partial answer in the skeleton and none of them is written down as a contract. #73 records that `fs.watch` is unusable on Windows and chokidar is not, so the watcher choice is settled; its LIFETIME is not. The SSE reconnect behaviour matters more than it looks: a dropped stream that silently never reconnects leaves the operator reading stale state while the page looks live, which is the same class of defect as a retained workspace reported as destroyed."
+}

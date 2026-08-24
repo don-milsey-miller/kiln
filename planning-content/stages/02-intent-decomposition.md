@@ -116,3 +116,109 @@ reason** — an evaluation, not an acknowledgement.
 **The approved set is recorded in `project.yaml`.** This approval deliberately does not activate
 `schema` or `api-spec`: their implementation remains useful shared-infrastructure work, but this
 project's intake does not call for those artifact types.
+
+---
+
+# Second decomposition — the application shell (2026-08-24)
+
+> **Status: PM-CONFIRMED 2026-08-24.** Stage 2 is `decidedBy: agent-proposes-user-confirms` (#34, #39).
+> The agent proposed the scope below and **the PM confirmed it as written, without amendment** — the
+> five requirements judged testable, the first-slice boundary judged appropriately narrow, and the
+> deferral of tasks until acceptance criteria exist judged correct. It decomposes a **new ask** — the
+> Next.js/MDX application — into requirements and open questions, and draws the scope boundary. It
+> does not design the application; that is stage 5, and stage 5 has not run for it.
+>
+> ⚠️ **This is a second decomposition, not a revision of the first.** The 15 requirements above came
+> from the frozen intake and still stand unchanged; these five come from a later ask, and mixing them
+> would lose which requirements this project was founded on. #14 honours a determined stage set — it
+> does not say a stage runs once.
+
+## The ask
+
+A local Next.js application that **displays the current project stage and an MDX stage document,
+reflects external file changes through the existing watcher/SSE contract, and performs review-status
+updates through the existing typed write path.** One vertical slice, end to end.
+
+⚠️ **The system is ready to PLAN this and is not ready to build it broadly.** Product-facing
+requirements, acceptance criteria and tasks do not exist for the application, and #5's Next.js/MDX
+choice has never been exercised — `app/server.mjs` is the walking skeleton (5b) and says so in its own
+header. What follows is intake and scope, not implementation.
+
+## Scope boundary
+
+| In scope for the first slice | Out of scope, and why |
+|---|---|
+| Current stage display, derived (#16) | Authoring UI — no requirement asks for it yet, and #43 makes templates generated |
+| One MDX stage document rendered | Navigation across all nine stages — an IA question (`QST-0019`) precedes it |
+| External-change refresh via watcher + SSE | Full artifact tracker and assertion/evidence views — `app/server.mjs` already renders the second |
+| Review-status write through the typed path | Any second write path into content (#88) |
+| A stated, documented deployment mode | Consumer packaging — step 6, and it depends on the mode answer |
+
+## Five open questions, authored as artifacts (REQ-0014)
+
+| ID | Question | Why it gates the slice |
+|---|---|---|
+| `QST-0017` | `next dev` only, or `next build` / `next start`? | ⚠️ **A trigger, not only a choice.** `AST-0010` is deferred (#137) *because* the deployment mode is undeclared. Answering "production" reopens that validation the moment it is answered. |
+| `QST-0018` | How is MDX compiled, and what may a document execute? | Stage documents are agent-authored. MDX compiles to JavaScript, so a permissive default makes content into arbitrary application code — the inverse of #88. |
+| `QST-0019` | What is the initial information architecture? | Decides what the slice renders and what it defers. |
+| `QST-0020` | How does the shell import `lib/` without duplicating it? | #47 has one implementation and several callers. The hard part is that these modules are Node-only — the server/client boundary is the real question. |
+| `QST-0021` | Install, startup, watcher lifetime, SSE reconnect, errors? | Each has a partial answer in the skeleton and none is a written contract. A silently dead stream renders stale content that looks live. |
+
+## Five requirements, and the decision that bounds them
+
+| ID | Requirement | Open on |
+|---|---|---|
+| `REQ-0016` | The application displays the project's current stage | `QST-0019` |
+| `REQ-0017` | The application renders a stage document authored in MDX | `QST-0018` |
+| `REQ-0018` | The application reflects external content changes without a manual reload | `QST-0021` |
+| `REQ-0019` | The application performs review-status updates through the existing typed write path | `QST-0020` |
+| `REQ-0020` | The application is installable and runnable locally from a documented command | `QST-0017`, `QST-0021` |
+
+**`DEC-0017` — the Next.js shell reuses the substrate; the skeleton is not migrated.** `app/server.mjs`
+stays as the **verified substrate reference** until the new shell reaches behavioural parity with its
+seven proven properties, and the shell imports `lib/` rather than reimplementing any of it. Three
+alternatives are recorded with why each lost, including the tempting one: migrating the skeleton
+removes the only working reference at exactly the moment a second implementation appears.
+
+## Roadmap, mapped to the stages that own each step
+
+| Step | Stage | What settles it |
+|---|---|---|
+| 1. UI intake and scope boundaries | **1–2** | This section. Confirmation is the PM's. |
+| 2. Targeted Next.js/MDX research; deployment-mode decision | **3** | `QST-0017`, `QST-0018`, `QST-0020`, `QST-0021` answered from sources, each claim recorded as an `assertion` with its `evidence` (REQ-0003, REQ-0004) |
+| 3a. Component design | **5** | `component` artifacts; `requirements-traced-to-components` re-attested |
+| 3b. Risk and feasibility | **6** | ⚠️ **Not skippable, and the reason is concrete:** if step 2 answers `QST-0017` as production mode, `AST-0010` reopens here and needs real validation before anything rests on it |
+| 3c. Acceptance criteria | **7** | External refresh · write-back safety · malformed content · stage-status accuracy |
+| 4. One end-to-end vertical slice | **8** | `task` artifacts. ⚠️ **Deliberately not authored yet:** the handoff gate refuses a task with no acceptance criteria, so tasks cannot honestly precede step 3c |
+| 5. Navigation, authoring, review, full tracker | later cycles | Real demand, per #106 |
+| 6. Package the local application for consumers | later | Depends on the `QST-0017` answer |
+
+## Re-attestation — ✅ done 2026-08-24, and the handoff now refuses
+
+Authoring `REQ-0016…REQ-0020` made **four** `satisfied` attestations semantically stale: they were
+evaluated on 2026-08-22 against a plan that did not contain these requirements. This is #79 exactly —
+staleness that is named and deliberately not solved mechanically, which makes it the PM's to
+re-evaluate rather than the tool's to detect.
+
+⚠️ **The gates reported READY throughout that window, and that was the finding rather than a
+reassurance.** Every criterion here is `mechanised: false`, so nothing detected that four attestations
+described a smaller plan than the one on disk. **Nothing was republished while that was true.**
+
+| Stage | Criterion | Re-attested | On what basis |
+|---|---|---|---|
+| 2 | `every-requirement-testable` | `satisfied` | Each of the five states an observable condition. ⚠️ Testable ≠ specified: four depend on an open question, and this criterion asks whether a requirement *can* be tested |
+| 2 | `scope-boundary-drawn` | `satisfied` | PM confirmation of the in/out table above, without amendment |
+| 2 | `type-activation-approved` | `satisfied` | ⚠️ **The fourth, and it was stale for a different reason** — its previous text still named `runbook` and `research-finding`, both since deactivated. Re-stated against the current set, and **the shell needs no new type**: its requirements decompose into `component`, `acceptance-criterion` and `task`, all already activated (#106) |
+| 5 | `requirements-traced-to-components` | **`not-satisfied`** | The five trace to no component, because stage 5 has not run for the shell |
+
+### The handoff refuses, and the refusal is the correct state
+
+`npm run handoff` now blocks on one criterion: stage 5's traceability. **That is not a regression and
+not something to route around.** A package whose MANIFEST claims stage-level approval while five
+requirements trace to nothing would be claiming an approval nobody gave — the same false success the
+composed gate was built to surface.
+
+⚠️ **It clears when stage 5 produces and approves the application components** — roadmap step 3a, after
+step 2 answers `QST-0017…QST-0021`. Not before, and **not by re-attesting around it**. `docs/plan/`
+therefore stays at snapshot `6c86330767dcbbfa`, describing the plan as it stood before this
+decomposition, which is the honest thing for it to describe until the plan is finished again.

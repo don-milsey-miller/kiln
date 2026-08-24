@@ -1,0 +1,11 @@
+{
+  "id": "QST-0017",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Does the shipped application run only under `next dev`, or must it support `next build` / `next start`?",
+  "statement": "The application shell must declare ONE deployment mode as its supported configuration. Choosing production mode reactivates AST-0010, which was deferred (#137) on the grounds that validating a production build would test an undeclared deployment mode.",
+  "notes": "⚠️ This question is a TRIGGER, not only a choice. AST-0010's deferral is conditioned on the deployment mode staying undeclared; declaring `next build` / `next start` is exactly the reopening condition it records, and the validation becomes owed the moment the answer is production. Answering `next dev` only is therefore cheaper AND narrower, and the cost of that narrowness — no evidence that the shipped configuration is the validated one — belongs in the answer rather than being discovered later."
+}

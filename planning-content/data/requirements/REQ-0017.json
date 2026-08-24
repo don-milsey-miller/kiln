@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0017",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The application renders a stage document authored in MDX",
+  "statement": "The application renders the MDX stage document for a selected stage, and a document referencing a component outside the permitted set does not execute arbitrary code.",
+  "rationale": "Stage documents are the narrative half of the plan and are agent-authored. Rendering them is the point of choosing MDX; bounding what they may execute is what keeps content from becoming application code.",
+  "priority": "must",
+  "openQuestions": [
+    "QST-0018"
+  ]
+}

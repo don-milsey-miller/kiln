@@ -1,0 +1,11 @@
+{
+  "id": "QST-0018",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "How is MDX compiled, and which components may a stage document execute?",
+  "statement": "Stage documents under `planning-content/stages/` are agent-authored content. MDX compiles to executable JavaScript, so the compilation strategy must state which components a document may reference and what happens to a reference outside that set.",
+  "notes": "⚠️ The load-bearing property is that agent-authored content must NOT implicitly become arbitrary application code. This project's whole discipline is that content is data the tool reads (#88 forbids authoring artifacts by hand precisely so the writer is a typed operation) — a document format whose default is 'anything in scope is callable' inverts that. The answer needs three parts: where compilation happens, the allowlist of components a document may use, and the behaviour on an unknown reference (refuse, or render inert). Refusing is consistent with how `checkJob` treats a shell-string command: refused rather than sanitised, because sanitising means guessing what the author meant."
+}

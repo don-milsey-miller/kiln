@@ -1,0 +1,26 @@
+{
+  "id": "DEC-0017",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The Next.js shell reuses the substrate; the skeleton is not migrated",
+  "statement": "The Next.js/MDX application is built as a NEW shell that imports the existing lib/ modules — lint, derivation, locking and the typed operations — as the single implementation. `app/server.mjs` remains in place as the verified substrate reference until the Next.js slice reaches behavioural parity with it, and is not migrated, ported or edited to become the application.",
+  "rationale": "The skeleton exists to prove the risky surface — the watcher, the derivation and the status write-back — and it has a test suite asserting exactly those properties. Migrating it would spend that proof on a rendering framework it was deliberately built to avoid, and would leave nothing to compare the new shell against. Keeping it as a reference makes parity CHECKABLE rather than asserted: two callers of the same modules should agree, and a disagreement is a finding about the new shell.",
+  "alternatives": [
+    {
+      "option": "Migrate app/server.mjs into the Next.js application and delete it",
+      "whyNot": "It removes the only working reference at exactly the moment a second implementation appears, so the first divergence would have nothing to be measured against. The skeleton's value is that it is verified; a migration converts it into unverified application code."
+    },
+    {
+      "option": "Reimplement the lint, derivation and locking inside the Next.js app",
+      "whyNot": "#47 has one implementation and three callers by design. A second copy inside the app becomes a second enforcement model within a month — the failure that row exists to prevent — and the lock in particular cannot be duplicated safely: two implementations of #78 are two lock protocols."
+    },
+    {
+      "option": "Defer the shell and extend app/server.mjs instead",
+      "whyNot": "#5 names Next.js and MDX and is untested by the skeleton (#100). Extending the skeleton indefinitely would keep deferring the only part of #5 that has never been exercised, while accumulating UI in a substrate that was explicitly not built to carry it."
+    }
+  ],
+  "decidedAt": "2026-08-24",
+  "notes": "⚠️ Parity is the retirement condition, and it is deliberately not a date. `app/server.mjs` is retired when the Next.js slice demonstrably does what the skeleton's seven proven properties say it does — reads canonical files, derives at render time, persists nothing derived, refreshes on external change, writes through the lock, and surfaces lint findings without re-judging them. Until then two callers exist on purpose."
+}

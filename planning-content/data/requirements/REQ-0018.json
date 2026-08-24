@@ -1,0 +1,14 @@
+{
+  "id": "REQ-0018",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The application reflects external content changes without a manual reload",
+  "statement": "When a file under the content root is changed by something other than the application, the application's view updates without the operator reloading the page, and a dropped update stream is visibly distinguishable from an idle one.",
+  "rationale": "The agent and the operator write the same files (#15), so a view that only refreshes on reload shows state that has already moved. The second clause is the harder half: a silently dead stream renders stale content that looks live.",
+  "priority": "must",
+  "openQuestions": [
+    "QST-0021"
+  ]
+}
