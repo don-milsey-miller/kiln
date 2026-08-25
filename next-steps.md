@@ -1000,6 +1000,48 @@ around it.** `docs/plan/` therefore stays at snapshot `6c86330767dcbbfa`, descri
 stood before this decomposition, which is the honest thing for it to describe until the plan is
 finished again.
 
+### ✅ `AST-0010` validated 2026-08-25 — the claim holds, its explanation does not
+
+Owed the moment `DEC-0018` landed, and executed rather than deferred again. **Two full production
+builds** (`next build` + `next start`, next@16.3.2, React 19.2.8, Node v24.18.0, loopback only), one
+with Cache Components enabled and one disabled, each in its own disposable workspace.
+
+| Configuration | Route built as | First request | After external write | +6s |
+|---|---|---|---|---|
+| `cacheComponents: true` | `○ /` static | build value | **build value** | **build value** |
+| `cacheComponents: false` | `○ /` static | build value | **build value** | **build value** |
+
+✅ **`AST-0010`'s outcome holds** — rung 3, `experimentally-validated`. ⚠️ **Its conditional framing
+does not.** The disabled configuration behaved identically, so the freeze is **not caused by Cache
+Components** — recorded as **`AST-0019`**, which derives at **rung 4, `environment-matched`**, the
+MVP's ceiling, because its target environment matches the evidence key-for-key.
+
+⚠️ **This is why both configurations were run.** Testing only the named case would have confirmed
+`AST-0010` and left a wrong mitigation on the table: a reader of that assertion alone would conclude
+the risk is avoidable by turning a flag off. It is not.
+
+⚠️ **`AST-0010` was re-scoped 16.3.1 → 16.3.2, and that is the reopening condition being EXECUTED, not
+the target fitted to a result.** The condition's second clause was "when upgrading beyond the tested
+version". Every other dimension was *measured* unchanged — React, Node, OS, mode, read API — so
+exactly one fact moved, and it is the one the condition named.
+
+**`QST-0023` was created by the evidence**, not by planning: how does the application make
+artifact-reading routes reflect external writes in production mode? It blocks `REQ-0016`, `REQ-0017`
+and `REQ-0018` — all three read content written externally, and all three would silently serve
+build-time state under the configuration just adopted. It is a **stage 5 design question**, not a
+research one.
+
+⚠️ **`DEC-0018` is not reopened by this.** Production mode was chosen because the shipped artifact must
+be the validated one, and this finding argues *for* that decision: the freeze is exactly the class of
+behaviour that never appears under `next dev`. Had the shell shipped on the development server, this
+would have been discovered by a user.
+
+⚠️ **Stage 6 is NOT re-attested by the agent.** `high-severity-risks-mitigated` said it returns to
+satisfied when `AST-0010` is validated across both configurations *or* a mitigation is chosen. The
+validation is done — and it **confirmed** the risk while showing the obvious mitigation does not work.
+Whether that is now a mitigated risk, an accepted one, or still open pending `QST-0023` is a PM verdict
+(#93).
+
 ### Research order for step 2 — PM-set 2026-08-24
 
 Each question removes options from the ones after it, so the order is load-bearing rather than

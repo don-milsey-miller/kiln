@@ -1,0 +1,25 @@
+{
+  "id": "AST-0019",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The production-build freeze is NOT conditional on Cache Components",
+  "statement": "Under `next build` + `next start` with Next.js 16.3.2, a Server Component reading an artifact with fs.readFileSync is prerendered as a static route and serves its build-time value regardless of whether cacheComponents is enabled or disabled; a later external write does not change what a fresh request returns in either configuration.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS NARROWS AST-0010 BY WIDENING THE BEHAVIOUR. AST-0010 attributes the freeze to Cache Components, and measurement says the attribution is wrong: the disabled configuration built the same static route and served the same stale value. The claim's OUTCOME held; its CONDITIONAL FRAMING did not. That distinction matters because a reader of AST-0010 alone would conclude the risk is avoidable by turning a flag off, and it is not. ⚠️ Found only because both configurations were run. Testing the named case alone would have confirmed AST-0010 and left the wrong mitigation on the table.",
+  "supportedBy": [
+    "EVD-0022"
+  ]
+}

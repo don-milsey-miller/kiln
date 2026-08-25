@@ -9,6 +9,7 @@
   "rationale": "Stage documents are the narrative half of the plan and are agent-authored. Rendering them is the point of choosing MDX; bounding what they may execute is what keeps content from becoming application code.",
   "priority": "must",
   "openQuestions": [
-    "QST-0018"
+    "QST-0018",
+    "QST-0023"
   ]
 }

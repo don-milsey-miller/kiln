@@ -1,0 +1,53 @@
+{
+  "id": "EVD-0022",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: production-build artifact read, Cache Components enabled and disabled",
+  "kind": "experiment",
+  "summary": "Two full builds. With cacheComponents ENABLED the route built as \"┌ ○ /\" and served \"VALUE_AT_BUILD_TIME\" on the first request; after an external write of a different value it still served \"VALUE_AT_BUILD_TIME\", and \"VALUE_AT_BUILD_TIME\" six seconds later. With cacheComponents DISABLED the result was identical: route \"┌ ○ /\", and the same build-time value on all three requests. In both configurations a later external write did not change what a fresh request returned.",
+  "outcome": "success",
+  "observedAt": "2026-08-25",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync",
+      "node-version": "v24.18.0",
+      "workspace": "two dedicated temporary directories, removal verified",
+      "network": "loopback only for `next start`; npm install reached the public registry"
+    },
+    "omissions": [
+      {
+        "fact": "revalidation-beyond-ten-seconds",
+        "state": "not-captured",
+        "reason": "Requests were made immediately after the external write and again six seconds later. A revalidation window longer than that would not have been seen, so this shows the value is frozen across ten seconds, not that it is frozen forever."
+      },
+      {
+        "fact": "dynamic-route-configurations",
+        "state": "not-captured",
+        "reason": "Only the default static outcome was exercised. Whether an explicitly dynamic route, or a read through a dynamic API, reflects external writes was not tested — and that is precisely what the application needs to know next."
+      },
+      {
+        "fact": "other-operating-systems",
+        "state": "not-observable",
+        "reason": "One host was available; this is scoped to Windows and cannot be generalised from here."
+      }
+    ]
+  },
+  "notes": "⚠️ BOTH CONFIGURATIONS WERE RUN ON PURPOSE. The claim names the cacheComponents-enabled case, and testing only that case would have left the undecided configuration as a third deferral — which is the outcome #80's condition exists to prevent. Running both is what produced the second finding. ⚠️ Host execution: the tier-1 controller could not run this (network for `npm install`, and no long-lived service form — QST-0022). Two disposable workspaces, removal observed rather than trusted, whole process tree terminated between configurations."
+}

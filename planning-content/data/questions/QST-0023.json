@@ -1,0 +1,11 @@
+{
+  "id": "QST-0023",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "How does the application make artifact-reading routes reflect external writes in production mode?",
+  "statement": "Under `next build` + `next start`, a Server Component that reads an artifact synchronously is prerendered as a static route and serves its build-time value indefinitely. The application shell must therefore choose an explicit mechanism — a dynamic route, a read through a dynamic API, a revalidation strategy, or client-side fetching — for every view that must reflect external content changes.",
+  "notes": "⚠️ CREATED BY EVIDENCE, not by planning: this question did not exist until the AST-0010 validation produced AST-0019. It blocks REQ-0016 (current stage display), REQ-0017 (MDX stage document) and REQ-0018 (external-change refresh) — all three read content that the agent and the PM write externally, and all three would silently serve build-time state under the configuration DEC-0018 just adopted. ⚠️ It is a STAGE 5 question, not a research one. The mechanisms are documented; which one this application uses is a design choice, and it belongs with the components at roadmap step 3a. ⚠️ Note what it does NOT reopen: DEC-0018 stands. Production mode was chosen because the shipped artifact must be the validated one, and this finding argues for that decision rather than against it — the freeze is exactly the class of behaviour that never appears under `next dev`."
+}

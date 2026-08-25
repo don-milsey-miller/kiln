@@ -9,6 +9,7 @@
   "rationale": "The agent and the operator write the same files (#15), so a view that only refreshes on reload shows state that has already moved. The second clause is the harder half: a silently dead stream renders stale content that looks live.",
   "priority": "must",
   "openQuestions": [
-    "QST-0021"
+    "QST-0021",
+    "QST-0023"
   ]
 }
