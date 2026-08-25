@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0019",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/api-reference/cli/next",
+  "kind": "source",
+  "summary": "next start runs production mode and requires a prior next build",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/api-reference/cli/next",
+      "locator": "https://nextjs.org/docs/app/api-reference/cli/next",
+      "retrievedAt": "2026-08-24"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"`next start` starts the application in production mode. The application should be compiled with\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0020",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/getting-started/deploying",
+  "kind": "source",
+  "summary": "Node.js self-hosted deployment is supported and supports all Next.js features",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/getting-started/deploying",
+      "locator": "https://nextjs.org/docs/app/getting-started/deploying",
+      "retrievedAt": "2026-08-24"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Node.js deployments support all Next.js features.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

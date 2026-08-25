@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0018",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/api-reference/cli/next",
+  "kind": "source",
+  "summary": "Next.js 16.3.2 development builds output to .next/dev instead of .next, so dev and production are different build artifacts",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/api-reference/cli/next",
+      "locator": "https://nextjs.org/docs/app/api-reference/cli/next",
+      "retrievedAt": "2026-08-24"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Development builds output to `.next/dev` instead of `.next`. This allows you to run `next dev` and `next build` concurrently without conflicts.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

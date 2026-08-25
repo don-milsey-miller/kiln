@@ -1,0 +1,25 @@
+{
+  "id": "AST-0015",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Development and production are different builds, with different output locations",
+  "statement": "In Next.js 16.3.2, `next dev` and `next build` produce different builds: development output goes to `.next/dev` and production output to `.next`, and the two can run concurrently without conflicting.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "next",
+      "nextVersion": "16.3.2",
+      "router": "app",
+      "docsRetrieved": "2026-08-24"
+    }
+  },
+  "openQuestions": [
+    "QST-0017"
+  ],
+  "notes": "⚠️ THIS IS THE CLAIM THAT MAKES AST-0010 MATERIAL rather than cautious. If dev and production were the same artifact, validating under `next dev` would validate what ships. They are not, so a validation run against the development server says nothing about the production build — which is exactly why #137 deferred AST-0010 while the deployment mode is undeclared, and why declaring production mode makes it owed rather than optional.",
+  "supportedBy": [
+    "EVD-0018"
+  ]
+}

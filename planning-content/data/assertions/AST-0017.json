@@ -1,0 +1,25 @@
+{
+  "id": "AST-0017",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A self-hosted Node.js deployment supports all Next.js features",
+  "statement": "In Next.js 16.3.2, deploying as a Node.js server is a supported option and Node.js deployments support all Next.js features, without requiring a hosting platform or adapter.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "next",
+      "nextVersion": "16.3.2",
+      "router": "app",
+      "docsRetrieved": "2026-08-24"
+    }
+  },
+  "openQuestions": [
+    "QST-0017"
+  ],
+  "notes": "Bears on whether production mode is available to this product AT ALL. The tool is local-first and clonable (#1, #20, #32) — a deployment story that required a platform would make production mode unreachable regardless of what the PM preferred. It does not.",
+  "supportedBy": [
+    "EVD-0020"
+  ]
+}

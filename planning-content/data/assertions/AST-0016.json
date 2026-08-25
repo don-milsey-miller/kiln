@@ -1,0 +1,25 @@
+{
+  "id": "AST-0016",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Production mode requires a prior build step",
+  "statement": "In Next.js 16.3.2, `next start` starts the application in production mode and requires the application to have been compiled with `next build` beforehand.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "next",
+      "nextVersion": "16.3.2",
+      "router": "app",
+      "docsRetrieved": "2026-08-24"
+    }
+  },
+  "openQuestions": [
+    "QST-0017"
+  ],
+  "notes": "Bears on QST-0021 as well as QST-0017: choosing production mode adds a build step between installation and startup, which the runtime lifecycle has to specify. It also means the operator can be in a state where the app is installed and cannot start — a failure mode `next dev` does not have.",
+  "supportedBy": [
+    "EVD-0019"
+  ]
+}
