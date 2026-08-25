@@ -132,14 +132,26 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       `${stageId} is not ready and the handoff does not name it: ${JSON.stringify(c.blockers)}`
     );
 
-  // ---- today's state, deliberately one assertion so a legitimate movement edits one line.
-  assert.deepEqual(notReady, ["05-solution-design"], "the application requirements trace to no component yet");
+  // ---- today's state. Deliberately compact, so a legitimate movement of the plan edits these lines
+  // and nothing else. It has moved twice already: stage 5 regressed when the application requirements
+  // were authored, and stage 6 followed when DEC-0018 adopted production mode and reopened AST-0010.
+  assert.deepEqual(
+    notReady,
+    ["05-solution-design", "06-risk-feasibility"],
+    "requirements trace to no component yet; AST-0010 is an owed production-build risk"
+  );
   assert.deepEqual(
     c.blockers.map((b) => `${b.stageId}:${b.ruleId}`),
-    ["05-solution-design:gate/criterion-not-satisfied"],
+    ["05-solution-design:gate/criterion-not-satisfied", "06-risk-feasibility:gate/criterion-not-satisfied"],
     JSON.stringify(c.blockers, null, 2)
   );
-  assert.match(c.blockers[0].detail, /REGRESSED DELIBERATELY/, "the refusal must carry the PM's reason, not just a rule id");
+
+  // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying
+  // why teaches people to route around it, which is how a gate stops being a gate.
+  for (const b of c.blockers)
+    assert.ok((b.detail ?? "").length > 120, `${b.stageId} blocks without a substantive reason: ${b.detail}`);
+  assert.match(c.blockers[0].detail, /REGRESSED DELIBERATELY/);
+  assert.match(c.blockers[1].detail, /neither experimental validation nor a mitigation/);
 
   // ---- and the refusal must be EARNED. A gate blocked because nobody had looked reports the same
   // boolean as one blocked by a recorded verdict, so: nothing here is merely unattested.

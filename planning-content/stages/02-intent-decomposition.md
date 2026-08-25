@@ -210,21 +210,25 @@ means designing against constraints nobody has established yet and rediscovering
 insufficient** — REQ-0003 and REQ-0005 doing exactly what they were written for, and what the research
 and tier-1 validation capabilities were built to serve.
 
-## ⚠️ Stage 6 is now stale too — a PM re-evaluation is owed
+## Stage 6 — ✅ re-attested 2026-08-25, and it now blocks too
 
 `DEC-0018` reopened `AST-0010`, and **stage 6 is where an owed validation gets judged.** Its
 attestations were recorded on 2026-08-22, against a plan with no application shell in it and with
 `AST-0010` deferred rather than owed.
 
-| Criterion | Recorded | Whether it still holds |
+| Criterion | Re-attested | On what basis |
 |---|---|---|
-| `high-severity-risks-mitigated` | `satisfied` | ⚠️ **Needs re-evaluation.** It was judged against notes.md's 19-row register, which predates the shell and cannot have considered an owed production-build validation |
-| `load-bearing-assertions-at-rung` | `n/a` | Probably still holds **on its own stated basis** — the scope is derived from *instructions resting on* assertions, not from the `loadBearing` flag, and no active instruction rests on `AST-0015`…`AST-0018`. The PM should confirm rather than assume |
+| `high-severity-risks-mitigated` | **`not-satisfied`** | The former basis predates the shell. `AST-0010` is a live production-build risk with **neither** experimental validation **nor** a mitigation — disabling Cache Components has not been chosen either. ⚠️ Not an accepted risk: #80's condition fired so the validation would arrive *with* the commitment needing it, and signing it off unvalidated would be that deferral wearing a different word |
+| `load-bearing-assertions-at-rung` | `n/a` | Measured again, not carried forward: the scope is derived from *instructions resting on* assertions, and it is still **empty** — `RBS-0001` is retired and rests on `AST-0002`, so no active instruction rests on anything. ⚠️ `AST-0010` is deliberately **not** captured here; stretching a criterion to cover a risk it does not describe makes both harder to read |
 
-⚠️ **Not re-attested by the agent.** #93 makes these PM verdicts, and an agent attesting its own
-authoring is the failure the three-verdict design exists to prevent. The gate currently reports stage
-6 READY, which is the same #79 window as before: nothing mechanical detects that an attestation now
-describes a smaller plan than the one on disk.
+⚠️ **Verified by re-running the gate, not assumed: stage 6 reports NOT READY**, and the handoff now
+refuses on **two** blockers rather than one. Both are PM verdicts (#93) — the agent authored the
+inputs and did not attest them.
+
+**`high-severity-risks-mitigated` returns to satisfied** when `AST-0010` is validated under 16.3.2 in
+production mode across **both** Cache Components enabled *and* disabled — both, so the undecided
+configuration does not quietly become a third deferral — or when a mitigation is chosen and recorded
+as a decision.
 
 ## Re-attestation — ✅ done 2026-08-24, and the handoff now refuses
 
