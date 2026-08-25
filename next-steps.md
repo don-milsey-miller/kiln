@@ -73,8 +73,11 @@
 > questions and one scope decision, PM-confirmed.
 > ⚠️ **The handoff REFUSES, on stage 5's traceability**, because `REQ-0016…REQ-0020` trace to no
 > component yet. Deliberate and attested as such; `docs/plan/` stays at `6c86330767dcbbfa`.
-> **Next: roadmap step 2 — targeted Next.js/MDX research, answering `QST-0017…QST-0021`**, with the
-> deployment-mode answer decided first because it is what reopens `AST-0010`.
+> ✅ **`QST-0017` is ANSWERED (`DEC-0018`, 2026-08-25): the application ships in production mode**,
+> `next build` + `next start`; `next dev` is a contributor workflow only. ⚠️ **`AST-0010` is therefore
+> OWED** — both clauses of its reopening condition fired at once.
+> **Next: roadmap step 2 continues at `QST-0018`** (MDX compilation and the component bound), then
+> `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
@@ -826,9 +829,11 @@ restated.
 - ✅ **#79 does NOT reopen.** Checked, not assumed: 7c defines contracts and spawns nothing
   concurrently. **The trigger is the first time two specialists run concurrently over overlapping
   dependency sets** — #79's own condition, still unbuilt.
-- ⚠️ **`AST-0010` is deferred, not owed** (#137): validating a production build now would test an
-  **undeclared deployment mode**. Reopens on adopting `next build` / `next start`, or on upgrading
-  past the tested Next.js version.
+- ⚠️ **`AST-0010` was deferred, not owed** (#137): validating a production build then would have
+  tested an **undeclared deployment mode**. Reopening on adopting `next build` / `next start`, or on
+  upgrading past the tested Next.js version. ✅ **BOTH CLAUSES FIRED 2026-08-25** — `DEC-0018` adopts
+  production mode, and the version in play is 16.3.2 against a claim tested at 16.3.1. **It is now
+  owed**, at roadmap step 3b. See 8a.
 
 **199 tests. Ten guards mutation-tested, all caught.**
 
@@ -949,9 +954,35 @@ through the existing typed path.
   `app/server.mjs` stays as the *verified reference* until parity with its seven proven properties;
   migrating it would remove the only working reference exactly when a second implementation appears.
 
-⚠️ **`QST-0017` is a TRIGGER, not only a choice.** `AST-0010` is deferred (#137) *because* the
-deployment mode is undeclared. Answering "`next build` / `next start`" reopens that validation on the
-spot, and stage 6 is where it gets judged — which is why the roadmap does not skip stage 6.
+### ✅ `QST-0017` answered 2026-08-25 — production mode, by decision rather than by more research
+
+**`DEC-0018`: the shipped configuration is `next build` + `next start`. `next dev` is a contributor
+workflow only** — nothing a consumer runs, and nothing this project validates against.
+
+Sourced first, then decided. `AST-0015` (rung 2) established that dev and production are **different
+artifacts**; `AST-0017` (rung 2) that self-hosted Node.js production needs no platform or adapter;
+`AST-0018` (rung 3, measured) that a concurrent `next dev` does **not** interfere with the chokidar
+watcher (#73).
+
+⚠️ **The probe removed an objection; `AST-0015` made the decision.** A shipped configuration should be
+validated in the mode users receive — and shipping `next dev` would mean shipping something this
+project can *never* validate as production, so every experiment would measure the wrong artifact
+forever. That principle does not depend on how well a development server behaves, which is why
+further discovery was not bought: **the Tavily credential is preserved for `QST-0018` and `QST-0020`**,
+where external failure reports can genuinely change the answer.
+
+⚠️ **`AST-0010` IS NOW OWED, knowingly.** Its condition was "execute before adopting `next build` /
+`next start`, **or** when upgrading past the tested version" — and **both** fired: this decision adopts
+production mode, and the version in play is 16.3.2 against a claim tested at 16.3.1. Accepted rather
+than discovered, per #80: the condition fires when the risk becomes *possible*, not when it is
+observed, because the second means shipping the failure once to learn it was real. It lands at
+**roadmap step 3b (stage 6)** — where the roadmap put it before this answer existed. ⚠️ One thing stays
+open inside it: the claim is conditional on `cacheComponents` being enabled, and whether the
+application enables it is undecided. That scopes the validation; it does not defer it again.
+
+⚠️ **`REQ-0020` no longer lists `QST-0017` as an open question.** The field means *questions blocking
+this requirement*, and an answered one left there claims a block that no longer exists. The trace
+survives: `QST-0017` carries `answeredBy: [DEC-0018]`, and `DEC-0018` addresses both it and `REQ-0020`.
 
 ⚠️ **No `task` artifacts yet, and the reason is mechanical rather than stylistic:** the handoff gate
 refuses a task with no acceptance criteria, so tasks cannot honestly precede stage 7.
@@ -974,9 +1005,8 @@ finished again.
 Each question removes options from the ones after it, so the order is load-bearing rather than
 administrative. Answering out of order means designing against constraints nobody has established.
 
-1. **`QST-0017`** deployment mode — ⚠️ **first because it is the only one that creates owed work**: it
-   decides whether `AST-0010` becomes immediately owed (#137), and stage 6 must know before it can
-   judge feasibility.
+1. ✅ **`QST-0017`** deployment mode — **answered 2026-08-25, `DEC-0018`: production mode.** It was
+   first because it is the only one that creates owed work, and it did: `AST-0010` is now owed.
 2. **`QST-0018`** MDX compilation and the component bound — the safety boundary on agent-authored
    content; everything rendered later goes through it.
 3. **`QST-0020`** server/client module boundary — `lib/` is Node-only, so what may cross constrains

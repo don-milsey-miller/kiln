@@ -9,7 +9,6 @@
   "rationale": "The product is a local-first tool a consumer clones (#1, #20, #32). An application whose supported mode is undeclared cannot be validated against the configuration it actually ships in — which is why AST-0010 is deferred rather than answered.",
   "priority": "must",
   "openQuestions": [
-    "QST-0017",
     "QST-0021"
   ]
 }

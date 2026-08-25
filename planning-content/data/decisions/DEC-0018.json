@@ -1,0 +1,35 @@
+{
+  "id": "DEC-0018",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The application ships in production mode; `next dev` is a contributor workflow only",
+  "statement": "The application shell's supported configuration is `next build` followed by `next start`. `next dev` remains available to contributors working on the application and is not a shipped configuration: nothing a consumer runs, and nothing the project validates against, is the development server.",
+  "rationale": "AST-0015 is decisive on its own: `next dev` and `next build` produce different artifacts, so shipping the development server means shipping a configuration this project can NEVER validate as production — every validation would be measuring something other than what users receive. A shipped configuration should be validated in the mode users receive, and that principle does not depend on how well the development server behaves. AST-0017 establishes the option is actually available: a self-hosted Node.js deployment supports all Next.js features with no platform or adapter, so production mode is reachable for a local-first clonable tool. AST-0018 removed the project-specific objection — a concurrent `next dev` did not measurably interfere with the chokidar watcher — but that argument was never the reason to prefer production, only a reason someone might have preferred dev.",
+  "alternatives": [
+    {
+      "option": "Ship `next dev` as the supported configuration",
+      "whyNot": "It is cheaper today and permanently unvalidatable. AST-0015 shows the dev and production artifacts differ, so no experiment run against `next dev` says anything about what a consumer receives — the evidence loop this entire product is built around would be measuring the wrong thing forever. It also keeps AST-0010 deferred by keeping the deployment mode undeclared, which is deferral by avoiding the question rather than by judgement."
+    },
+    {
+      "option": "Support both modes as shipped configurations",
+      "whyNot": "Two supported configurations are two things to validate, and #96's applicability filter would need every claim scoped by mode — doubling the evidence work to serve a second configuration nobody asked for. A contributor workflow is not a shipped configuration, and naming it one would make it owed."
+    },
+    {
+      "option": "Defer pending discovery on long-running development servers",
+      "whyNot": "The question that discovery answers — is a long-lived `next dev` sound — is the wrong question. Even a perfectly stable development server would still be shipping an artifact that differs from the production one. More reading could not move the principle, so spending the search credential here would buy nothing; it is preserved for QST-0018 and QST-0020, where external failure reports can genuinely change the decision."
+    }
+  ],
+  "decidedAt": "2026-08-25",
+  "addresses": [
+    "QST-0017",
+    "REQ-0020"
+  ],
+  "evidencedBy": [
+    "AST-0015",
+    "AST-0017",
+    "AST-0018"
+  ],
+  "notes": "⚠️ THIS MAKES AST-0010 OWED, IMMEDIATELY AND KNOWINGLY. Its reopening condition (#137, #80 branch 3) is 'execute before adopting `next build` / `next start`, or when upgrading beyond the tested version' — and BOTH clauses have now fired: this decision adopts production mode, and the version sourced and probed on 2026-08-24/25 is Next.js 16.3.2 against a claim tested at 16.3.1. The cost is accepted rather than discovered: #80's condition fires when the risk becomes POSSIBLE, not when it is observed, because the second means shipping the failure once to learn it was real. ⚠️ It lands at roadmap step 3b (stage 6, risk and feasibility), which is exactly where the roadmap said it would land when it was written — the ordering was not retrofitted to this answer."
+}

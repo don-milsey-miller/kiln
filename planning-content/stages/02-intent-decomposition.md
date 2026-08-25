@@ -172,7 +172,7 @@ header. What follows is intake and scope, not implementation.
 | `REQ-0017` | The application renders a stage document authored in MDX | `QST-0018` |
 | `REQ-0018` | The application reflects external content changes without a manual reload | `QST-0021` |
 | `REQ-0019` | The application performs review-status updates through the existing typed write path | `QST-0020` |
-| `REQ-0020` | The application is installable and runnable locally from a documented command | `QST-0017`, `QST-0021` |
+| `REQ-0020` | The application is installable and runnable locally from a documented command | ~~`QST-0017`~~ answered, `QST-0021` |
 
 **`DEC-0017` — the Next.js shell reuses the substrate; the skeleton is not migrated.** `app/server.mjs`
 stays as the **verified substrate reference** until the new shell reaches behavioural parity with its
@@ -187,7 +187,7 @@ removes the only working reference at exactly the moment a second implementation
 | 1. UI intake and scope boundaries | **1–2** | This section. Confirmation is the PM's. |
 | 2. Targeted Next.js/MDX research; deployment-mode decision | **3** | The five questions, **in the order below**. Each claim recorded as an `assertion` with its `evidence` (REQ-0003, REQ-0004) |
 | 3a. Component design | **5** | `component` artifacts; `requirements-traced-to-components` re-attested |
-| 3b. Risk and feasibility | **6** | ⚠️ **Not skippable, and the reason is concrete:** if step 2 answers `QST-0017` as production mode, `AST-0010` reopens here and needs real validation before anything rests on it |
+| 3b. Risk and feasibility | **6** | ⚠️ **Not skippable, and no longer conditional:** `QST-0017` answered production mode, so `AST-0010` HAS reopened and needs real validation here before anything rests on it |
 | 3c. Acceptance criteria | **7** | External refresh · write-back safety · malformed content · stage-status accuracy |
 | 4. One end-to-end vertical slice | **8** | `task` artifacts. ⚠️ **Deliberately not authored yet:** the handoff gate refuses a task with no acceptance criteria, so tasks cannot honestly precede step 3c |
 | 5. Navigation, authoring, review, full tracker | later cycles | Real demand, per #106 |
@@ -200,7 +200,7 @@ means designing against constraints nobody has established yet and rediscovering
 
 | # | Question | Why here |
 |---|---|---|
-| 1 | `QST-0017` deployment mode | ⚠️ **First because it is the only one that creates owed work.** It decides whether `AST-0010` becomes immediately owed (#137), and stage 6 must know that before it can judge feasibility |
+| 1 | ✅ `QST-0017` deployment mode | **Answered 2026-08-25 — `DEC-0018`: production mode (`next build` + `next start`); `next dev` is a contributor workflow only.** It was first because it is the only one that creates owed work, and it did: `AST-0010`'s reopening condition fired on BOTH clauses — production mode adopted, and 16.3.2 in play against a claim tested at 16.3.1 — so the validation is now **owed at step 3b** |
 | 2 | `QST-0018` MDX compilation and component bound | The safety boundary on agent-authored content. Everything rendered later goes through whatever this settles |
 | 3 | `QST-0020` server/client module boundary | `lib/` is Node-only — filesystem, locks, subprocesses. What may cross to the client constrains every view |
 | 4 | `QST-0021` runtime lifecycle | Install, watcher lifetime, SSE recovery, and **visible** failure behaviour. Depends on 1 and 3 |
@@ -209,6 +209,22 @@ means designing against constraints nobody has established yet and rediscovering
 **The first four need targeted technical research, and bounded probes where documentation is
 insufficient** — REQ-0003 and REQ-0005 doing exactly what they were written for, and what the research
 and tier-1 validation capabilities were built to serve.
+
+## ⚠️ Stage 6 is now stale too — a PM re-evaluation is owed
+
+`DEC-0018` reopened `AST-0010`, and **stage 6 is where an owed validation gets judged.** Its
+attestations were recorded on 2026-08-22, against a plan with no application shell in it and with
+`AST-0010` deferred rather than owed.
+
+| Criterion | Recorded | Whether it still holds |
+|---|---|---|
+| `high-severity-risks-mitigated` | `satisfied` | ⚠️ **Needs re-evaluation.** It was judged against notes.md's 19-row register, which predates the shell and cannot have considered an owed production-build validation |
+| `load-bearing-assertions-at-rung` | `n/a` | Probably still holds **on its own stated basis** — the scope is derived from *instructions resting on* assertions, not from the `loadBearing` flag, and no active instruction rests on `AST-0015`…`AST-0018`. The PM should confirm rather than assume |
+
+⚠️ **Not re-attested by the agent.** #93 makes these PM verdicts, and an agent attesting its own
+authoring is the failure the three-verdict design exists to prevent. The gate currently reports stage
+6 READY, which is the same #79 window as before: nothing mechanical detects that an attestation now
+describes a smaller plan than the one on disk.
 
 ## Re-attestation — ✅ done 2026-08-24, and the handoff now refuses
 
