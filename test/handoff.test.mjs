@@ -151,7 +151,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   for (const b of c.blockers)
     assert.ok((b.detail ?? "").length > 120, `${b.stageId} blocks without a substantive reason: ${b.detail}`);
   assert.match(c.blockers[0].detail, /REGRESSED DELIBERATELY/);
-  assert.match(c.blockers[1].detail, /neither experimental validation nor a mitigation/);
+  assert.match(c.blockers[1].detail, /confirmed the risk; it did not mitigate it/i);
 
   // ---- and the refusal must be EARNED. A gate blocked because nobody had looked reports the same
   // boolean as one blocked by a recorded verdict, so: nothing here is merely unattested.

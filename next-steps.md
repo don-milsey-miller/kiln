@@ -1036,11 +1036,28 @@ be the validated one, and this finding argues *for* that decision: the freeze is
 behaviour that never appears under `next dev`. Had the shell shipped on the development server, this
 would have been discovered by a user.
 
-⚠️ **Stage 6 is NOT re-attested by the agent.** `high-severity-risks-mitigated` said it returns to
-satisfied when `AST-0010` is validated across both configurations *or* a mitigation is chosen. The
-validation is done — and it **confirmed** the risk while showing the obvious mitigation does not work.
-Whether that is now a mitigated risk, an accepted one, or still open pending `QST-0023` is a PM verdict
-(#93).
+⚠️ **Stage 6 stays NOT READY, and its exit condition was itself wrong.** The attestation said it
+returned to satisfied on validation *or* an accepted-risk signoff. **Both halves were wrong, and the
+validation is what showed it** (PM, 2026-08-25):
+
+- **Validation confirmed the risk; it did not mitigate it.** Measuring a hazard precisely is not
+  having a mitigation for it — and this measurement *removed* the mitigation anyone would have reached
+  for first, because disabling Cache Components does not help.
+- **An accepted-risk signoff is not available**, and that is a fact about the requirements rather than
+  about appetite. `REQ-0016`–`REQ-0018` require current stage state, a rendered stage document, and
+  reflection of external changes without a manual reload. Silently serving build-time content does not
+  make those requirements *riskier* — it **violates** them. A risk you can accept is one where the plan
+  still holds if it lands; here it does not.
+
+**Returns to satisfied** when `QST-0023` produces a production-safe design **and that design is
+validated** — an artifact-reading route measured to reflect an external write under `next build` +
+`next start`. Not on the design being chosen, and not on the hazard being understood: a mitigation that
+has not been run is a plan for one.
+
+⚠️ **`AST-0019` is the operative claim**; `AST-0010` stays as the narrower, historically-motivated one
+at rung 3. Two claims — one superseding the other's *explanation* while both keep their provenance — is
+more honest than editing the first until it agrees, and deleting the too-narrow claim would delete the
+reason anyone thought to test both configurations.
 
 ### Research order for step 2 — PM-set 2026-08-24
 

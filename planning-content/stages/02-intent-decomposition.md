@@ -225,10 +225,16 @@ attestations were recorded on 2026-08-22, against a plan with no application she
 refuses on **two** blockers rather than one. Both are PM verdicts (#93) — the agent authored the
 inputs and did not attest them.
 
-**`high-severity-risks-mitigated` returns to satisfied** when `AST-0010` is validated under 16.3.2 in
-production mode across **both** Cache Components enabled *and* disabled — both, so the undecided
-configuration does not quietly become a third deferral — or when a mitigation is chosen and recorded
-as a decision.
+⚠️ **AMENDED 2026-08-25 — that exit condition was wrong, and the validation is what showed it.** It
+said satisfied returned on validation *or* an accepted-risk signoff. The validation happened
+(`EVD-0022`) and **confirmed** the risk in both configurations, while removing the mitigation anyone
+would have reached for first. And an accepted-risk signoff is not available: silently serving
+build-time content does not make `REQ-0016`–`REQ-0018` riskier, it **violates** them — a risk you can
+accept is one where the plan still holds if it lands.
+
+**`high-severity-risks-mitigated` now returns to satisfied** when `QST-0023` produces a production-safe
+design **and that design is validated**: an artifact-reading route measured to reflect an external
+write under `next build` + `next start`. A mitigation that has not been run is a plan for one.
 
 ## Re-attestation — ✅ done 2026-08-24, and the handoff now refuses
 
