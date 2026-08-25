@@ -1,0 +1,56 @@
+{
+  "id": "EVD-0021",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: chokidar detection with and without a concurrent `next dev`",
+  "kind": "experiment",
+  "summary": "Three runs of the same measurement in one disposable workspace. control: 20/20 observed, median lag 3ms, max 6ms; treatment: 20/20 observed, median lag 3ms, max 10ms with `next dev` serving on 127.0.0.1:3987; control2: 20/20 observed, median lag 3ms, max 7ms after the dev server was killed. No file was missed in any run, and `next dev` did not recompile during the content writes.",
+  "outcome": "success",
+  "observedAt": "2026-08-25",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation",
+        "freedom-from-concurrent-host-activity"
+      ]
+    },
+    "facts": {
+      "os": "win32 x64",
+      "node-version": "v24.18.0",
+      "nextVersion": "16.3.2",
+      "workspace": "dedicated temporary directory, removal verified",
+      "network": "loopback only for the dev server; npm install reached the public registry",
+      "install": "local to the temporary directory; no global install, no repository change"
+    },
+    "omissions": [
+      {
+        "fact": "sustained-runtime-behaviour",
+        "state": "not-captured",
+        "reason": "The dev server ran for well under a minute. Handle count, memory growth and watcher stability over hours were not measured, and that is the actual concern behind QST-0017 rather than the burst behaviour this did measure."
+      },
+      {
+        "fact": "content-root-outside-app-root",
+        "state": "not-captured",
+        "reason": "The watched directory sat inside the Next.js project root. An application watching a content root OUTSIDE the app root is a different arrangement and was not exercised."
+      },
+      {
+        "fact": "other-operating-systems",
+        "state": "not-observable",
+        "reason": "One host was available. #73 already records that file-watching behaviour differs by platform, so this result is scoped to Windows and cannot be generalised from here."
+      },
+      {
+        "fact": "concurrent-host-activity",
+        "state": "unavailable",
+        "reason": "Execution was on the host with no containment, so whatever else the machine was doing during the runs is unknown. The two controls bound this rather than remove it: an unrelated disturbance would have had to affect the treatment alone."
+      }
+    ]
+  },
+  "notes": "⚠️ HOST EXECUTION, stated rather than implied. The tier-1 controller could not run this at all: the job declares `requires: { network: true }` for `npm install` and the approved ceiling refuses it before provisioning (#77), and — separately and more fundamentally — the job model has no form for a long-lived service alongside commands, so the probe is not expressible under it regardless of the ceiling. See the capability gap recorded as its own question. ⚠️ Controls before AND after the treatment, so 'no interference' is a comparison rather than an assertion: a second control isolates interference from any second-run effect. ⚠️ The workspace was removed and its ABSENCE checked rather than the removal call trusted — the same discipline the controller uses, applied by hand because no controller ran. ⚠️ METHODOLOGY HISTORY — AN INVALIDATED FIRST RUN, EXPLICITLY EXCLUDED FROM THE FINDING ABOVE. An earlier execution of this probe reported treatment 0/20 with the controls at 20/20, which read as total interference from `next dev`. It was a FIXTURE DEFECT, not an observation: both runs wrote the same filenames into the same directory, so the control created the files and the treatment only modified them, while the watcher listened for `add`. A second defect in the same version measured latency as elapsed-time-since-watcher-start, which reports the write schedule (20 files x 120ms) rather than detection lag and would have read as ~2.4s of latency on a completely idle watcher. ⚠️ NONE OF THAT RUN'S NUMBERS CONTRIBUTE ANYTHING HERE. They are void rather than weak, and the summary, outcome and omissions above describe only the corrected execution: a fresh directory per run, per-file observed-minus-written latency, and a control taken after the treatment as well as before. Both defects were in the fixture; neither touched the code under observation. ⚠️ It is preserved because the correction is WHY this result can be trusted rather than a detail about how it was obtained. The control is what exposed it — a result that dramatic, from a change that small, is a bug before it is a finding — and a probe whose only reported run is the one that worked has not demonstrated that it could have failed."
+}

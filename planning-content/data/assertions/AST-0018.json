@@ -1,0 +1,27 @@
+{
+  "id": "AST-0018",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A concurrent `next dev` does not measurably interfere with a chokidar watcher on the same tree",
+  "statement": "On Windows with Next.js 16.3.2 and chokidar 5, a chokidar watcher observed all 20 externally-created files in a directory inside the Next.js project root while `next dev` was serving on loopback, at a detection latency indistinguishable from the same measurement taken with no dev server running; and `next dev` did not recompile in response to those writes.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "os": "win32 x64",
+      "nextVersion": "16.3.2",
+      "nodeVersion": "v24.18.0",
+      "watcher": "chokidar",
+      "scenario": "content directory inside the Next.js project root, imported by nothing"
+    }
+  },
+  "openQuestions": [
+    "QST-0017",
+    "QST-0021"
+  ],
+  "notes": "⚠️ SCOPE, because a negative result is the easiest kind to over-read. This says the two watchers did not collide in ONE scenario on ONE machine over SECONDS. It does not say a long-lived `next dev` is sound as a shipped configuration — the server ran for under a minute, and nothing here measures handle or memory growth over hours, which is the actual worry behind QST-0017. It also tests the content directory INSIDE the project root; the real application may watch a content root outside it entirely, which is a different scenario and not covered. ⚠️ The first run of this probe reported 0/20 under `next dev` and looked exactly like total interference. It was a fixture bug: both runs wrote the same filenames into the same directory, so the treatment produced `change` events while the watcher listened for `add`. The control is what made it visible — a result that dramatic from a change that small is a bug before it is a finding.",
+  "supportedBy": [
+    "EVD-0021"
+  ]
+}

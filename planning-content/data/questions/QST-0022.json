@@ -1,0 +1,11 @@
+{
+  "id": "QST-0022",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Should the tier-1 job model support long-lived services, or are host probes the answer for concurrent-process validation?",
+  "statement": "The validation controller runs declared commands sequentially to completion and has no form for a service that must stay running while something else is observed. Any claim about two processes interacting is therefore unvalidatable under the controller, whatever the approved ceiling permits.",
+  "notes": "⚠️ FOUND BY NEEDING IT, not by auditing — the fourth time this project has hit that pattern (#83's missing lifecycle setter, #126's missing question resolver, #132's missing migration, QST-0010's missing activation operation). The watcher-interaction probe for QST-0021 could not be expressed: `commands` is an array of argument arrays run one after another with `shell: false`, so 'start a server, measure something else, stop the server' has no representation. A literal '&' would be passed as an argument, which is the argument-array design working correctly. ⚠️ TWO separate blockers, and only one is an authorisation question. The ceiling refused the job first, on `requires: { network: true }` — that is #77 working, and the PM can raise it. The missing service form is not an authorisation question at all and no ceiling change reaches it. ⚠️ The alternative is not obviously worse: a host probe recorded honestly as `execution: \"host\"` with its omissions is what #131's reshape made recordable, and it is what actually answered the question. A `services: []` form would add real containment and disposal to this class of validation — but it is controller work, and it should earn its own commitment rather than being built inside an application question (#106). ⚠️ TRIGGER for building it: the first claim where host execution is not good enough — anything needing containment, a clean environment, or a result someone outside this machine must trust."
+}
