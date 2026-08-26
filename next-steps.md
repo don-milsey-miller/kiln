@@ -76,8 +76,25 @@
 > ✅ **`QST-0017` is ANSWERED (`DEC-0018`, 2026-08-25): the application ships in production mode**,
 > `next build` + `next start`; `next dev` is a contributor workflow only. ⚠️ **`AST-0010` is therefore
 > OWED** — both clauses of its reopening condition fired at once.
-> **Next: roadmap step 2 continues at `QST-0018`** (MDX compilation and the component bound), then
-> `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision.
+>
+> **Checkpoint 2026-08-26.** ✅ **`QST-0023` is ANSWERED (`DEC-0019`): planning-content reads go
+> through `connection()` inside a `<Suspense>` boundary**, per read. Chosen for independence from the
+> Cache Components setting rather than for freshness — three measured mechanisms are fresh, and only
+> this one is fresh with that flag both on and off. Its prefetch cost is an **accepted design cost**,
+> recorded in the decision rather than left open as a hazard.
+> ✅ **Validated with a negative control in the same build** (`EVD-0024`, `AST-0021` at rung 4), so
+> the result is not a build that happened to be dynamic.
+> ✅ **Stage 6 is READY again.** `high-severity-risks-mitigated` returns to `satisfied` by the exit
+> condition its own not-satisfied attestation wrote — design produced *and* validated.
+> ⚠️ **`AST-0022` hands stage 7 a constraint worth reading before criteria are written:** a
+> non-compliant read is served **fresh** while a compliant read shares its route, so a violation
+> passes every behavioural freshness check until the sibling moves. **Enforcement has to be static.**
+> ⚠️ **The handoff still REFUSES, now on stage 5 alone** — `REQ-0016…REQ-0020` trace to no component.
+> ✅ **7d's retained-workspace trigger fired and is closed** — 155MB over 33 directories, removed, and
+> a reaper added so retention a test provokes on purpose no longer accumulates.
+> **Next: roadmap step 2 resumes at `QST-0018`** (MDX compilation and the component bound), then
+> `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision. ⚠️ `QST-0023` deliberately did
+> **not** decide the MDX component boundary or the Cache Components setting; both are still open.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
@@ -891,6 +908,28 @@ or a reaper:** more than one `vpw-tier1-*` directory surviving a completed run, 
 outcome from a run that did NOT kill a command. Either means retention has stopped being a momentary
 artefact of a kill and started accumulating, and the answer then is a sweep at startup plus a delayed
 second attempt — not a quieter report.
+
+✅ **The trigger FIRED and is closed — 2026-08-26.** 155MB across **33** directories (15
+`vpw-tier1-*`, 18 `vpw-skel-*`), four days old. Removed, and only those: seven other `vpw-*`
+directories from other tests were left alone as out of the authorised scope.
+
+⚠️ **The fix went where the trigger pointed, and NOT into `destroy`.** The controller's report was
+never the problem — thirteen `runJob` call sites in the tests, exactly one of which cleaned up after
+the retention it provoked. `test/helpers/reap.mjs` registers what a result retained and sweeps once
+the file's tests are done; `destroy` is untouched and still says only what it observed.
+
+⚠️ **Three properties are written into the helper beside the code that would otherwise undo them.**
+It runs *after* the assertions, so it can never make a test pass — cleanup placed before the check is
+how a cleanup step starts hiding the defect it was added beside. It removes **only** registered
+paths, never a `vpw-*` glob over the system temp, which could delete a concurrently running test
+file's live workspace. And it never throws, because residue turning a green run red gets the
+registration deleted rather than the residue.
+
+⚠️ **Falsified, and the falsification is the interesting part:** "no residue after the run" is also
+exactly what a controller that destroyed everything cleanly looks like — and that is what happened on
+the runs here, so the *integration* path did not fire. `test/reap.test.mjs` therefore exercises the
+mechanism directly, including the negative case that matters most: registering a path must **not**
+remove it, or a retention test starts racing the cleanup added to help it.
 
 ---
 
