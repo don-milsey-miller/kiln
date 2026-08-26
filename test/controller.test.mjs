@@ -23,6 +23,17 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { runJob, destroyWorkspace, allowlistedEnv, resolveWithin, observeExpectedOutputs } from "../lib/validation/controller.mjs";
+import { reapLater, reapWorkspace, installReaper } from "./helpers/reap.mjs";
+
+installReaper();
+
+// ⚠️ Every job in this file goes through `run`, not `runJob` directly. A retained workspace is a
+// legitimate outcome the controller reports honestly, and on Windows it is a common one after a
+// command is killed — but a test that provokes retention and then walks away leaves the directory
+// on disk forever. Thirteen call sites, one of which tidied up, produced 155MB of `vpw-tier1-*`
+// residue. `reapWorkspace` returns the result unchanged and registers only what was retained, so
+// no assertion below moves and nothing is swept before it has been checked.
+const run = (...args) => runJob(...args).then(reapWorkspace);
 import { CONTROLLER_RUN } from "./fixtures/environment-fixtures.mjs";
 import { createValidators, assertValid } from "../lib/validate.mjs";
 import { dirname } from "node:path";
@@ -49,7 +60,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ------------------------------------------------- 2, 3, 4: destroy reports what was observed */
 
 test("FORCED cleanup failure: a locked workspace is retained, never reported destroyed", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "vpw-forced-"));
+  const ws = reapLater(mkdtempSync(join(tmpdir(), "vpw-forced-")));
   // Windows will not delete a directory that is a live process's current directory. This is a real
   // refusal by the filesystem, not a stubbed error.
   const holder = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { cwd: ws, stdio: "ignore" });
@@ -69,7 +80,7 @@ test("FORCED cleanup failure: a locked workspace is retained, never reported des
 });
 
 test("...and the same workspace destroys cleanly once the holder releases it", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "vpw-forced2-"));
+  const ws = reapLater(mkdtempSync(join(tmpdir(), "vpw-forced2-")));
   const holder = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { cwd: ws, stdio: "ignore" });
   await sleep(400);
   assert.equal(destroyWorkspace(ws).outcome, "retained");
@@ -101,7 +112,7 @@ test("a removal that throws while the directory IS gone is destroyed, and says s
 /* ---------------------------------------------- 1: every path reaches a recorded destroy attempt */
 
 test("a job refused before provisioning still records a destroy outcome", async () => {
-  const r = await runJob(JOB({ tier: 3 }));
+  const r = await run(JOB({ tier: 3 }));
   assert.equal(r.ok, false);
   assert.equal(r.phase, "refused");
   assert.equal(r.destroy.outcome, "nothing-to-destroy");
@@ -109,7 +120,7 @@ test("a job refused before provisioning still records a destroy outcome", async 
 });
 
 test("a provisioning failure records the phase, destroys, and captures nothing dishonestly", async () => {
-  const r = await runJob(JOB(), { python: "definitely-not-a-real-interpreter" });
+  const r = await run(JOB(), { python: "definitely-not-a-real-interpreter" });
   assert.equal(r.ok, false);
   assert.equal(r.phase, "provision");
   assert.ok(r.destroy, "a failed provision must still reach destroy");
@@ -121,7 +132,7 @@ test("a provisioning failure records the phase, destroys, and captures nothing d
 });
 
 test("an execution failure is recorded with its exit status, and still destroys", async () => {
-  const r = await runJob(JOB({ commands: [["{python}", "-c", "import sys; sys.exit(3)"]] }));
+  const r = await run(JOB({ commands: [["{python}", "-c", "import sys; sys.exit(3)"]] }));
   assert.equal(r.executions[0].exitStatus, 3);
   assert.equal(r.destroy.outcome, "destroyed");
   assert.equal(r.ok, true, "the run completed; the COMMAND failed, and those are different facts");
@@ -134,7 +145,7 @@ test("the reported destroy is checked against the DISK, not against the report",
   // the filesystem is the only assertion a false report cannot satisfy.
   const base = mkdtempSync(join(tmpdir(), "vpw-base-"));
   try {
-    const r = await runJob(JOB({ commands: [["{python}", "-c", "print(1)"]] }), { baseDir: base });
+    const r = await run(JOB({ commands: [["{python}", "-c", "print(1)"]] }), { baseDir: base });
     assert.equal(r.destroy.outcome, "destroyed");
     const { readdirSync } = await import("node:fs");
     assert.deepEqual(readdirSync(base), [], "the workspace must really be gone, not merely reported gone");
@@ -146,7 +157,7 @@ test("the reported destroy is checked against the DISK, not against the report",
 /* -------------------------------- 5, 6, 7: the real path, and fixture B becoming authoritative */
 
 test("the real controller emits all four omission states, with reasons", async () => {
-  const r = await runJob(JOB(), { hostEnv: { ...process.env, TAVILY_API_KEY: "tvly-not-a-real-key" } });
+  const r = await run(JOB(), { hostEnv: { ...process.env, TAVILY_API_KEY: "tvly-not-a-real-key" } });
 
   assert.equal(r.ok, true);
   assert.equal(r.phase, "complete");
@@ -228,7 +239,7 @@ test("a job declaring an escaping input is refused, and the escape target is nev
   const base = mkdtempSync(join(tmpdir(), "vpw-escape-"));
   const target = join(base, "escaped.txt");
   try {
-    const r = await runJob(JOB({ inputs: { "../escaped.txt": "pwned" } }), { baseDir: base });
+    const r = await run(JOB({ inputs: { "../escaped.txt": "pwned" } }), { baseDir: base });
     assert.equal(r.ok, false);
     assert.equal(r.phase, "refused");
     assert.equal(r.reason, "path-escapes-workspace");
@@ -240,7 +251,7 @@ test("a job declaring an escaping input is refused, and the escape target is nev
 });
 
 test("a declared input lands inside the workspace, including in a subdirectory", async () => {
-  const r = await runJob(
+  const r = await run(
     JOB({
       inputs: { "data/in.txt": "forty-two" },
       commands: [["{python}", "-c", "print(open('data/in.txt').read())"]],
@@ -253,7 +264,7 @@ test("a declared input lands inside the workspace, including in a subdirectory",
 /* --------------------------------------------- expected outputs: the declaration is finally checked */
 
 test("a produced expected output is observed, and satisfies the declaration", async () => {
-  const r = await runJob(
+  const r = await run(
     JOB({
       commands: [["{python}", "-c", "open('result.json','w').write('{}')"]],
       expectedOutputs: ["result.json"],
@@ -269,7 +280,7 @@ test("a job that produces NOTHING no longer reports a clean completed run", asyn
   // read, so this job — which declares a result and produces none — was recorded exactly like one that
   // succeeded. `ok` still describes the LIFECYCLE, which did complete; `outputsSatisfied` describes
   // the RESULT, and the two are separate on purpose.
-  const r = await runJob(JOB({ commands: [["{python}", "-c", "print('did nothing')"]], expectedOutputs: ["result.json"] }));
+  const r = await run(JOB({ commands: [["{python}", "-c", "print('did nothing')"]], expectedOutputs: ["result.json"] }));
   assert.equal(r.ok, true, "the controller's own lifecycle completed");
   assert.equal(r.outputsSatisfied, false, "and the job did not produce what it declared");
   assert.equal(r.expectedOutputs[0].present, false);
@@ -278,7 +289,7 @@ test("a job that produces NOTHING no longer reports a clean completed run", asyn
 });
 
 test("an output that exists but is emptier than declared is present and NOT satisfied", async () => {
-  const r = await runJob(
+  const r = await run(
     JOB({
       commands: [["{python}", "-c", "open('result.json','w').write('')"]],
       expectedOutputs: [{ path: "result.json", minBytes: 1 }],
@@ -291,7 +302,7 @@ test("an output that exists but is emptier than declared is present and NOT sati
 });
 
 test("a run that never reached observation reports outputs as UNOBSERVED, not as absent", async () => {
-  const r = await runJob(JOB({ expectedOutputs: ["result.json"] }), { python: "definitely-not-a-real-interpreter" });
+  const r = await run(JOB({ expectedOutputs: ["result.json"] }), { python: "definitely-not-a-real-interpreter" });
   assert.equal(r.phase, "provision");
   assert.equal(r.expectedOutputs[0].observed, false, "nothing looked for it");
   assert.equal(r.expectedOutputs[0].satisfied, false);
@@ -299,7 +310,7 @@ test("a run that never reached observation reports outputs as UNOBSERVED, not as
 });
 
 test("a job declaring no outputs is vacuously satisfied, because it promised nothing", async () => {
-  const r = await runJob(JOB());
+  const r = await run(JOB());
   assert.deepEqual(r.expectedOutputs, []);
   assert.equal(r.outputsSatisfied, true);
 });
@@ -325,7 +336,7 @@ test("the approved timeout bounds the whole execution phase, not every command s
     timeoutMs: 2_000,
     commands: Array.from({ length: 4 }, () => ["{python}", "-c", "import time; time.sleep(0.9)"]),
   });
-  const r = await runJob(job);
+  const r = await run(job);
 
   const spent = r.executions.reduce((a, e) => a + e.durationMs, 0);
   assert.ok(spent <= job.timeoutMs + 600, `execution spent ${spent}ms against a ${job.timeoutMs}ms ceiling`);
@@ -341,10 +352,7 @@ test("the approved timeout bounds the whole execution phase, not every command s
   // arriving here as a side effect of the subject under test. The deadline is what this test is
   // about, so it insists only that the destroy attempt was recorded and observed.
   assert.ok(["destroyed", "retained"].includes(r.destroy.outcome), r.destroy.outcome);
-  if (r.destroy.retainedPath) {
-    // Best effort, and only tidying up after the test: the killed interpreter may still hold the
-    // directory for a moment. Whether it comes back is not what this test is asserting.
-    await sleep(600);
-    try { rmSync(r.destroy.retainedPath, { recursive: true, force: true, maxRetries: 5 }); } catch {}
-  }
+  // Whether the directory comes back is not what this test asserts, and the tidying up is no longer
+  // written here: `run` registered any retained path with the reaper, which sweeps after every
+  // assertion in the file has been evaluated.
 });
