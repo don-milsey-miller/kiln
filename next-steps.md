@@ -108,8 +108,26 @@
 > and more reading cannot settle it. **Held open for `TAVILY_API_KEY`**: failure reports and
 > operational constraints could still change the component boundary, and direct retrieval cannot find
 > them.
+> ✅ **`QST-0018` ANSWERED (`DEC-0020`, 2026-08-26): stage documents are restricted MDX, and
+> REJECTION is the contract.** A remark plugin fails the compile — with file and line:column — on every
+> import/export, expression, JSX attribute expression, spread attribute and unmapped component.
+> Forbidden JavaScript is never silently removed; stripping stays underneath as defence in depth only.
+> Same trade `checkJob` already makes: refused rather than sanitised, because sanitising means guessing
+> what the author meant. 6/6 at build time and 6/6 at runtime, `AST-0029`/`AST-0031` at rung 4.
+> ⚠️ **`AST-0030` changed the design and nobody asked for it.** A file-routed `.mdx` page is compiled
+> **into the build** — rewriting it while `next start` served it changed nothing, and `connection()`
+> cannot recover that because there is no request-time read left. `REQ-0018` therefore **forces runtime
+> compilation**, which is what `next-mdx-remote` does and where CVE-2026-0969 lived. The restricted
+> compile is not belt-and-braces here; it is what makes the only viable design defensible.
+> ✅ **`AST-0028` closed in code**: the publisher now covers `.md` and `.mdx`, **refuses** anything else
+> in `stages/` instead of skipping it, and checks source-to-package **set equality** rather than a
+> count. Both halves falsified — and the first refusal test was found to be vacuous by exactly that
+> falsification, passing with the refusal deleted.
 > **Then `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision.** ⚠️ Neither `QST-0023`
-> nor this pass settles the **Cache Components** setting; it stays open, deliberately.
+> nor `DEC-0020` settles the **Cache Components** setting; it stays open, deliberately.
+> ⚠️ **Owed before the shell is built:** composing the runtime compile with `DEC-0019`'s `connection()`
+> boundary, and the per-request compilation cost — unmeasured, and the fallback if it is unaffordable is
+> plain markdown for stage documents (recorded as `DEC-0020`'s second alternative).
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
