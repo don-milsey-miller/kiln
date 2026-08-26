@@ -1,0 +1,24 @@
+{
+  "id": "AST-0031",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The rejection contract holds identically under runtime compilation",
+  "statement": "The same remark plugin, run through `@mdx-js/mdx`'s `compile` with `outputFormat: \"function-body\"` and executed with `run`, produces the same six outcomes as the bundler path: a permitted document compiles and renders its mapped component, and each of the five forbidden constructs is refused with the source path and a line:column position.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "@mdx-js/mdx",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "outputFormat": "function-body"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ The contract is a property of the PLUGIN, not of the bundler integration — which is what makes the design portable between the two compilation modes, and what lets the freshness requirement be met without giving up the restriction. ⚠️ Not measured: composing this with a Server Component behind DEC-0019's boundary, and the per-request compilation cost. Both are recorded as omissions.",
+  "supportedBy": [
+    "EVD-0044"
+  ]
+}

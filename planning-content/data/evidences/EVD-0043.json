@@ -1,0 +1,43 @@
+{
+  "id": "EVD-0043",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: a file-routed MDX document is compiled into the build and does not reflect an edit",
+  "kind": "experiment",
+  "summary": "An `app/doc/page.mdx` containing a mapped component built as a static route under `next build`. With `next start` serving it, the file was rewritten with a different marker and re-requested: the served page continued to show the build-time marker.",
+  "outcome": "success",
+  "observedAt": "2026-08-26",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "integration": "@next/mdx",
+      "builder": "Turbopack (16.3.2 default)",
+      "node-version": "v24.18.0",
+      "route": "app/doc/page.mdx",
+      "workspace": "disposable, removal verified"
+    },
+    "omissions": [
+      {
+        "fact": "connection-contract-applied",
+        "state": "not-captured",
+        "reason": "DEC-0019's contract was deliberately NOT applied here, because it could not help: the document becomes JavaScript at build time, so there is no request-time read for `connection()` to make dynamic. Measuring it would have confirmed the same value for a different reason and invited the wrong conclusion."
+      }
+    ]
+  },
+  "notes": "⚠️ FOUND BY LOOKING AT THE ROUTE SYMBOL, not by asking the question. The accepted case built as `○ /doc` — static — which is the symbol AST-0019 is about, and the freshness matrix had already made it worth chasing."
+}

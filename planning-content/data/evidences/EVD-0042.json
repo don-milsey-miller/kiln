@@ -1,0 +1,49 @@
+{
+  "id": "EVD-0042",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: restricted MDX rejects forbidden JavaScript at build time, with positions",
+  "kind": "experiment",
+  "summary": "One `@next/mdx` application, a remark plugin that calls `file.fail` on forbidden nodes, and six documents built through `next build`. accept: built ✓; reject-import: refused @ 1:1 ✓; reject-expression: refused @ 3:8 ✓; reject-attr-expression: refused @ 3:10 ✓; reject-spread: refused @ 3:10 ✓; reject-unmapped: refused @ 3:1 ✓. The accepted document built as a route, rendered its markdown, and rendered the mapped component. Each of the five refusals failed the build and named the file with a line:column position and a reason.",
+  "outcome": "success",
+  "observedAt": "2026-08-26",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "integration": "@next/mdx",
+      "builder": "Turbopack (16.3.2 default)",
+      "node-version": "v24.18.0",
+      "permittedComponents": "Callout",
+      "workspace": "one disposable workspace, rebuilt per case, removal verified",
+      "network": "npm install reached the public registry"
+    },
+    "omissions": [
+      {
+        "fact": "rejection-completeness",
+        "state": "not-captured",
+        "reason": "Five forbidden constructs were exercised: import/export, flow and text expressions, JSX attribute expressions, spread attributes, and unmapped components. That the plugin catches EVERY way to reach JavaScript in MDX was not established and cannot be by example — it needs an argument over the mdast node types, which is why stripping is retained as defence in depth."
+      },
+      {
+        "fact": "rehype-and-recma-stages",
+        "state": "not-captured",
+        "reason": "The plugin runs at the remark (mdast) stage only. Whether a later rehype or recma plugin could reintroduce JavaScript was not tested."
+      }
+    ]
+  },
+  "notes": "⚠️ TWO CONFIGURATION CONSTRAINTS WERE MEASURED, and both first presented as the contract failing. (1) Next.js 16.3.2 builds with TURBOPACK by default, which serialises the config — so a remark plugin must be given as a module path, not a function reference. (2) That path must be ABSOLUTE: `@next/mdx` resolves a relative path with `require.resolve(p, {paths:[projectRoot]})` from its own package directory, so `./lib/plugin.mjs` fails with `Cannot find module` and a require stack rooted in `node_modules/@next/mdx`. That message reads like a broken plugin rather than a configuration rule, and it cost a build to tell apart. ⚠️ REJECT, NOT STRIP, is what makes the diagnostics possible at all. `file.fail` carries the node's position; a stripping plugin has nothing to report because by construction nothing is wrong afterwards."
+}

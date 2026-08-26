@@ -1,0 +1,43 @@
+{
+  "id": "DEC-0020",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage documents are restricted MDX: forbidden JavaScript is a build-time error",
+  "statement": "Stage documents are authored in MDX and compiled with a remark plugin that REJECTS, with a file path and a line:column position, every ESM import or export, every JavaScript expression, every JSX attribute expression, every JSX spread attribute, and every JSX element whose name is not in the permitted component set. Rejection is the user-visible contract: forbidden JavaScript fails the compile and is never silently removed. The permitted set is the component mapping, which is the only route by which a component can reach a document once imports are refused. Stripping may be retained beneath this as defence in depth, but it may never be the observable behaviour.",
+  "rationale": "AST-0023 established that MDX supplies no allowlist and that its own security model is trusting the author; AST-0026 recorded what that cost someone else, as CVE-2026-0969. AST-0027 showed the ecosystem's answer was to remove the capability rather than filter it. The amendment that shapes this decision is that removal must be LOUD: silent stripping reproduces exactly the failure AST-0028 found in the publisher, where content is absent while the output still looks valid, and this project already refuses that trade in `checkJob` — a shell-string command is refused rather than sanitised, because sanitising means guessing what the author meant. A document is a plan someone will act on; a line that vanished is worse than a build that stopped. Rejection also happens to be the only version that can produce a diagnostic at all: `file.fail` carries the node's position, while a stripping plugin has nothing to report because by construction nothing is wrong afterwards.",
+  "alternatives": [
+    {
+      "option": "Strip forbidden JavaScript silently, as `next-mdx-remote`'s `blockJS` does",
+      "whyNot": "It is the ecosystem default and it is safe in the security sense, which is why it was the original proposal. It fails on a different axis: the author gets no signal, and a stage document that quietly lost a paragraph still renders, still validates, and still ships in the handoff package. That is AST-0028's failure shape arriving through the content pipeline instead of the publisher. Retained UNDER the rejection as defence in depth, never as the contract."
+    },
+    {
+      "option": "Plain markdown for stage documents; MDX only for a fixed set of authored pages",
+      "whyNot": "Genuinely viable and materially simpler — no plugin, no compile-time contract, and the CVE class disappears rather than being managed. It loses the component vocabulary in stage documents, which is the reason MDX was proposed: the narrative half of the plan is where a callout, a status chip or a criterion table earns its place. Recorded as the fallback if the per-request compilation cost measured later proves unacceptable."
+    },
+    {
+      "option": "Unrestricted MDX, trusting the agent as the author",
+      "whyNot": "It is what MDX's documentation permits — trust your authors — and it is inconsistent with this project's own posture. #88 forbids hand-authoring artifacts precisely because the writer should be a typed operation with a schema behind it; treating the same agent as trusted to write executable documents contradicts that. AST-0028 makes it concrete rather than philosophical: the handoff package ships stage documents verbatim to other people, so unrestricted MDX exports execution to recipients."
+    },
+    {
+      "option": "Keep file-routed `app/**/page.mdx` and accept build-time compilation",
+      "whyNot": "Measured and rejected: AST-0030 shows a file-routed document is compiled into the build and does not reflect an edit, which REQ-0018 forbids. `connection()` cannot recover it because there is no request-time read left to make dynamic."
+    }
+  ],
+  "decidedAt": "2026-08-26",
+  "addresses": [
+    "QST-0018",
+    "REQ-0017"
+  ],
+  "evidencedBy": [
+    "AST-0029",
+    "AST-0030",
+    "AST-0031",
+    "AST-0023",
+    "AST-0026",
+    "AST-0027",
+    "AST-0028"
+  ],
+  "notes": "⚠️ RUNTIME COMPILATION IS FORCED, AND IT IS THE UNCOMFORTABLE PART. AST-0030 rules out file-routed MDX, so a fresh stage document must be compiled per request — which is what `next-mdx-remote` does and where CVE-2026-0969 lived. AST-0031 is what makes that acceptable: the rejection is a property of the plugin, so it holds identically in the runtime path. The restriction is not belt-and-braces here; it is what makes the only viable design defensible. ⚠️ REQ-0021 COVERS THE MAPPED COMPONENTS, and the two contracts help each other. The component implementations reachable from the mapping are ordinary application source, so REQ-0021's static confinement of planning-content reads applies to them exactly as to any other module — a mapped component performing a direct read is the violation REQ-0021 exists to catch. And because imports are refused inside documents, the mapping IS the complete set of components a document can reach, so the confinement check's scope is enumerable rather than open-ended. ⚠️ WHAT IS NOT ESTABLISHED. That the five rejected constructs are every way to reach JavaScript in MDX — six examples cannot show that, and it is the reason stripping stays underneath. That a later rehype or recma stage cannot reintroduce JavaScript. That per-request compilation is affordable at the sizes this project produces. And composing the compile with DEC-0019's `connection()` boundary, which has not been run. ⚠️ CONFIGURATION IS PART OF THE CONTRACT, not incidental: Turbopack is the default builder at 16.3.2 and serialises the config, so the plugin is referenced by ABSOLUTE module path. Both constraints were measured, and both first looked like the contract failing. ⚠️ DOES NOT SETTLE CACHE COMPONENTS. Nothing here touches that flag, and DEC-0019 was chosen so it does not have to be settled."
+}

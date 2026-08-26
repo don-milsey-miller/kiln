@@ -1,0 +1,25 @@
+{
+  "id": "AST-0029",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A remark plugin that fails on forbidden nodes rejects at build time with file and position",
+  "statement": "With `@next/mdx` on Next.js 16.3.2, a remark plugin calling `file.fail` on `mdxjsEsm`, `mdxFlowExpression`, `mdxTextExpression`, `mdxJsxExpressionAttribute`, object-valued `mdxJsxAttribute`, and JSX element names outside a permitted set causes `next build` to FAIL for each of those constructs, reporting the document path and a line:column position. A document using only markdown and a permitted component builds, renders its markdown, and renders the mapped component. The plugin must be configured as an ABSOLUTE module path, because Turbopack is the default builder and `@next/mdx` resolves a relative plugin path from its own package directory.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "integration": "@next/mdx",
+      "builder": "Turbopack (16.3.2 default)"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ WHAT THIS DOES NOT CLAIM: that the five rejected constructs are ALL the ways to reach JavaScript in MDX. Six examples cannot establish completeness, and that is recorded as an omission rather than glossed. It is the reason stripping stays as defence in depth even though rejection is the user-visible contract.",
+  "supportedBy": [
+    "EVD-0042"
+  ]
+}

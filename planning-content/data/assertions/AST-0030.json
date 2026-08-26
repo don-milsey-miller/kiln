@@ -1,0 +1,25 @@
+{
+  "id": "AST-0030",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "File-routed MDX is compiled into the build, so a stage document cannot be fresh",
+  "statement": "An `@next/mdx` document routed as a page is compiled to JavaScript at build time. Under `next build` + `next start`, rewriting the document while the server runs does not change what the route serves. DEC-0019's `connection()` contract cannot recover this, because the document is no longer read at request time — it has become part of the bundle.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "integration": "@next/mdx",
+      "builder": "Turbopack (16.3.2 default)"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS IS A REQUIREMENTS CONFLICT, NOT A PERFORMANCE NOTE. REQ-0017 renders a stage document and REQ-0018 requires external changes to be reflected without a manual reload. File-routed MDX satisfies the first and cannot satisfy the second, and the agent rewrites stage documents while the operator is looking at them — that is the normal case here, not an edge one. ⚠️ ITS CONSEQUENCE IS UNCOMFORTABLE AND SHOULD BE STATED PLAINLY: freshness forces compiling the document per request, which is what `next-mdx-remote` does, which is where CVE-2026-0969 was. The restricted compile is not belt-and-braces for this design; it is the thing that makes the only viable design defensible.",
+  "supportedBy": [
+    "EVD-0043"
+  ]
+}

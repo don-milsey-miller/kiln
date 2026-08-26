@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0044",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the same rejection contract holds under runtime MDX compilation",
+  "kind": "experiment",
+  "summary": "The identical remark plugin was run through `@mdx-js/mdx`'s `compile` + `run` in a Node process rather than a bundler, against the same six documents, rendering with `renderToStaticMarkup`. accept: compiled; reject-import: refused @ 1:1; reject-expression: refused @ 3:8; reject-attr-expression: refused @ 3:10; reject-spread: refused @ 3:10; reject-unmapped: refused @ 3:1. All six matched the build-time outcomes, and every refusal carried a position and the source path.",
+  "outcome": "success",
+  "observedAt": "2026-08-26",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "@mdx-js/mdx",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "outputFormat": "function-body",
+      "permittedComponents": "Callout"
+    },
+    "omissions": [
+      {
+        "fact": "server-component-integration",
+        "state": "not-captured",
+        "reason": "Compilation and rendering were exercised directly, not inside a Next.js Server Component behind DEC-0019's `connection()` boundary. Composing the two is the next step and has not been run."
+      },
+      {
+        "fact": "compilation-cost-per-request",
+        "state": "not-captured",
+        "reason": "Timing was not collected. Whether compiling a stage document per request is acceptable at the sizes this project produces is unmeasured."
+      }
+    ]
+  },
+  "notes": "⚠️ THIS BECAME LOAD-BEARING ONLY BECAUSE OF THE FRESHNESS FINDING. If file-routed MDX had reflected edits, runtime compilation would never have been needed and this would be a curiosity. As it stands the requirements force runtime compilation, runtime compilation of author-controlled MDX is the exact shape of CVE-2026-0969, and this is the measurement that says the plugin still refuses there."
+}
