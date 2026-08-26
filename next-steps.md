@@ -92,9 +92,24 @@
 > ⚠️ **The handoff still REFUSES, now on stage 5 alone** — `REQ-0016…REQ-0020` trace to no component.
 > ✅ **7d's retained-workspace trigger fired and is closed** — 155MB over 33 directories, removed, and
 > a reaper added so retention a test provokes on purpose no longer accumulates.
-> **Next: roadmap step 2 resumes at `QST-0018`** (MDX compilation and the component bound), then
-> `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision. ⚠️ `QST-0023` deliberately did
-> **not** decide the MDX component boundary or the Cache Components setting; both are still open.
+> ⚠️ **`REQ-0021` added 2026-08-26 — from measurement, not decomposition.** `AST-0022` carried into
+> stage 7 as an architectural requirement: planning-content reads must be confined to the approved
+> abstraction and the confinement **checked statically**, because the obvious behavioural criterion is
+> objective, mechanical, and blind. **Acceptance for `REQ-0016`–`REQ-0018` may not rest on freshness
+> behaviour alone.** Mechanism deliberately unspecified — stage 5's to choose.
+>
+> **`QST-0018` — primary-source pass done 2026-08-26, still `unanswered`.** Nine quote-verified
+> records; `AST-0023`, `AST-0024`, `AST-0025` at rung 2. ⚠️ **The question's premise is wrong: there is
+> no allowlist to configure.** An MDX document may contain whole JavaScript programs and import any
+> ESM the bundler resolves; the component mapping substitutes rather than restricts; and the
+> missing-component error fires at runtime for references that resolve to *nothing*, which is the
+> mistaken author's case and not the capable one's. **MDX's own security model is trusting the
+> author.** What is left is a product judgement — are agent-authored stage documents trusted code? —
+> and more reading cannot settle it. **Held open for `TAVILY_API_KEY`**: failure reports and
+> operational constraints could still change the component boundary, and direct retrieval cannot find
+> them.
+> **Then `QST-0020`, `QST-0021`, and `QST-0019` last as a product decision.** ⚠️ Neither `QST-0023`
+> nor this pass settles the **Cache Components** setting; it stays open, deliberately.
 >
 > ✅ **All spike directories deleted 2026-08-18**, children before parents: `D:\spikes\trust-verify`
 > (2a), `D:\spikes\override-verify` (2b), `D:\spike-watcher` (an earlier watcher attempt carrying
