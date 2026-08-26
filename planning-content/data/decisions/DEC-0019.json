@@ -1,0 +1,45 @@
+{
+  "id": "DEC-0019",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Planning-content reads go through `connection()` inside a Suspense boundary",
+  "statement": "Every server-side read of planning content must await `connection()` from `next/server` before the filesystem read, and that read must sit inside a `<Suspense>` boundary whose fallback is a real loading state for the content being read. This is the artifact-reading contract for REQ-0016, REQ-0017 and REQ-0018. A boundary added only to satisfy the build — one wrapping the whole page, or one whose fallback renders nothing — does not satisfy it: the boundary exists so the static shell can ship while the fresh read streams, and a page-level wrapper makes the whole page the fallback and buys nothing.",
+  "rationale": "The deciding property is independence from the Cache Components setting, not freshness. EVD-0023 measured three mechanisms that serve fresh reads, and only this one does so in both caching models: `export const dynamic` does not exist when Cache Components is enabled, `connection()` without a boundary fails the build there, and `io()` behind a boundary is fresh only when the flag is on. AST-0019 established that the freeze itself is unconditional, so the contract that fixes it must be unconditional too. A freshness contract that depends on an unrelated configuration flag is a contract that breaks silently when someone changes the flag — the same failure shape as the build-time freeze it replaces, and harder to see. Choosing `connection()` also keeps this decision inside the freshness contract: the caching model stays undecided, which is where it belongs until the component boundary work reaches it.",
+  "alternatives": [
+    {
+      "option": "`io()` from `next/cache` behind a Suspense boundary",
+      "whyNot": "It is the documented Cache Components primitive and it is the better-behaved mechanism where it applies — it does not block prefetching. But EVD-0023 measured it FROZEN with cacheComponents disabled, because the documentation is explicit that it resolves immediately in routes without Cache Components. A route built on `io()` would silently serve build-time content if that flag were ever turned off, and nothing in the build output or the served page would say so. Adopting it would also decide the caching model as a side effect of a freshness question, which is precisely the coupling this question was scoped to avoid."
+    },
+    {
+      "option": "`export const dynamic = 'force-dynamic'`",
+      "whyNot": "Measured fresh, and the simplest thing that works today. It was REMOVED in Next.js 16.0.0 when Cache Components is enabled, so it is not a contract — it is a mechanism with a known expiry date that the project would have to migrate off the first time anyone enables the flag."
+    },
+    {
+      "option": "`connection()` without a Suspense boundary",
+      "whyNot": "Measured fresh with Cache Components disabled, and it FAILS THE BUILD with Cache Components enabled (`blocking-prerender-dynamic`). Loud rather than silent, which is the better failure — but it still makes the contract conditional on a flag."
+    },
+    {
+      "option": "Read planning content from the client instead of the server",
+      "whyNot": "It sidesteps the prerender entirely and would work. It also moves every planning-content read out of the Server Component model, which pushes a component-boundary decision this question was explicitly scoped not to make (QST-0018), and it would need a fetch endpoint that does not exist. Available later if the prefetch cost turns out to matter; nothing here forecloses it."
+    },
+    {
+      "option": "Accept the staleness and document it",
+      "whyNot": "Not compatible with REQ-0016, REQ-0017 and REQ-0018 as written. Silently serving build-time content violates those requirements rather than raising the risk of violating them, so an accepted-risk signoff would be recording a requirement failure as a tolerance."
+    }
+  ],
+  "decidedAt": "2026-08-26",
+  "addresses": [
+    "QST-0023",
+    "REQ-0016",
+    "REQ-0017",
+    "REQ-0018"
+  ],
+  "evidencedBy": [
+    "AST-0020",
+    "AST-0019",
+    "EVD-0023"
+  ],
+  "notes": "⚠️ THE PREFETCH LIMITATION IS AN ACCEPTED DESIGN COST, NOT AN OPEN HAZARD, and it is recorded here rather than as a question on purpose. The Next.js documentation states that `connection()` stays suspended until a full user navigation reaches the server, so it also blocks prefetches; `io()` does not. For a local-first tool served over loopback to one operator, correctness of what is on screen outranks the latency a prefetch would have saved. No artifact tracks this as unresolved, because it is not unresolved — it was weighed and paid. If prefetch latency ever becomes a measured problem, that is a new observation that would reopen this decision through supersession, not a deferral sitting open in the backlog today. ⚠️ WHAT THIS DELIBERATELY DOES NOT DECIDE. The Cache Components setting stays undecided — the whole point of the chosen mechanism is that the contract holds either way, so deciding it here would spend the property that was just bought. The MDX component boundary (QST-0018) is untouched: this constrains WHEN a planning-content read may happen, not which component performs it or how the document is rendered. ⚠️ VALIDATION IS OWED AND NOT YET DONE. EVD-0023 measured the mechanism; it has not yet measured the contract as stated above, with `connection()` before each read and a fallback that is a real loading state. Stage 6's `high-severity-risks-mitigated` stays `not-satisfied` until that validation passes — a decision to mitigate is not a mitigation, which is the correction the stage already carries from the AST-0010 round."
+}
