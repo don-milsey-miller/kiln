@@ -191,6 +191,28 @@ test("a complete project publishes, with only the approved surfaces", async () =
   }
 });
 
+test("a renderer that drops a stage document is REFUSED, and the check is wired in", async () => {
+  // ⚠️ The set-equality check has its own unit tests; this is the one that proves it is actually
+  // CALLED. Deleting the `stageDocSetProblems(...)` call in publishHandoff passes every test in
+  // stage-docs-in-package.test.mjs, because those exercise the function directly.
+  const f = completeFixture();
+  try {
+    const dropStageDocs = (input) => {
+      const files = renderPackage(input);
+      for (const k of [...files.keys()]) if (k.startsWith("docs/")) files.delete(k);
+      return files;
+    };
+    await assert.rejects(() => publish(f, { render: dropStageDocs }), (e) => {
+      assert.ok(e instanceof HandoffRefused, `expected a refusal, got ${e}`);
+      assert.match(e.message, /01-intake\.md/, "the refusal names the document that went missing");
+      return true;
+    });
+    assert.equal(existsSync(f.outDir), false, "and nothing was published");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
 test("a deactivated type is ABSENT, not an empty file", async () => {
   const f = completeFixture();
   try {
