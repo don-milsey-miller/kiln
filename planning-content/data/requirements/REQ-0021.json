@@ -1,0 +1,21 @@
+{
+  "id": "REQ-0021",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Planning-content reads are confined to the approved abstraction, and the confinement is checked statically",
+  "statement": "Every read of planning content in the application goes through a single reading abstraction that applies the DEC-0019 contract. A direct filesystem read of the content root anywhere else in the application fails a check that does not depend on running the application or observing what it serves, and the same check verifies that each read site is enclosed by a `<Suspense>` boundary. Acceptance for REQ-0016, REQ-0017 and REQ-0018 may not rest on freshness behaviour alone.",
+  "rationale": "AST-0022 measured that a read violating the contract is served FRESH whenever a compliant read shares its route — the compliant read makes the route dynamic and the violation rides along. So a behavioural check cannot see the violation: every freshness test passes on a codebase that breaks the contract, right up until the compliant sibling is moved, cached or deleted, at which point every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked.",
+  "priority": "must",
+  "derivedFrom": [
+    "REQ-0016",
+    "REQ-0017",
+    "REQ-0018"
+  ],
+  "evidencedBy": [
+    "AST-0022",
+    "AST-0021"
+  ],
+  "notes": "⚠️ THIS IS AN ARCHITECTURAL REQUIREMENT, NOT A TESTING PREFERENCE, and the distinction is what AST-0022 establishes. 'Verify it behaves correctly' is unavailable here as a matter of measured fact rather than of rigour — the observable behaviour of a compliant and a non-compliant read is IDENTICAL on a route that has at least one compliant read. The property has to be enforced where it is visible, which is in the source. ⚠️ TWO OBLIGATIONS, and the second is the one that gets forgotten: confine the read, AND check the boundary. DEC-0019 requires both `connection()` before the read and a `<Suspense>` boundary around it, and an abstraction can supply the first while a caller omits the second. A check that only looks for stray `readFileSync` calls would pass an application whose every read is correctly routed and unboundaried — which builds fine without Cache Components and FAILS THE BUILD with it, so the omission surfaces as a configuration change breaking the build rather than as the contract violation it is. ⚠️ THE MECHANISM IS DELIBERATELY UNSPECIFIED. A lint rule, a module-boundary constraint, a generated single accessor, or a build step that greps for content-root paths would each satisfy this; choosing among them is stage 5 design work that belongs with the components, and naming one here would decide it before the components exist. What is fixed is the PROPERTY: checkable without executing the application. ⚠️ IT INTERACTS WITH QST-0018 AND DOES NOT PRE-EMPT IT. If a stage document may reference components, then the permitted-component set is also a surface through which a direct read could enter, and static confinement has to cover it. That is a constraint QST-0018's answer must satisfy, not a decision about what that answer is. ⚠️ IT DOES NOT SETTLE CACHE COMPONENTS. DEC-0019 was chosen precisely so the contract holds with that flag either way, and a static check on source has nothing to say about it. Any enforcement design that only works under one setting would spend the property DEC-0019 bought."
+}

@@ -77,8 +77,52 @@ made when the trace stopped being prose.
 
 ---
 
+## 4. ⚠️ Carried forward for the application shell — `REQ-0021`, and a criterion that cannot be behavioural
+
+**Not a run of this stage.** Stage 7 has run once, against `CMP-0011`. The application shell has no
+components yet, so it cannot run here — this section exists so the constraint arrives *before* the
+criteria are written rather than as a correction afterwards.
+
+**`AST-0022` removes an option this stage would otherwise reach for first.** The natural acceptance
+criterion for `DEC-0019` is *"change a file, request the page, see the new value"* — objective,
+pass/fail, exactly the shape §1 rewards. **It is also a criterion that passes on a codebase that
+breaks the contract.** A read that omits `connection()` is served fresh whenever a compliant read
+shares its route; the two are observationally identical until the compliant sibling is moved, cached
+or deleted, and then every read on that route silently reverts to build-time content.
+
+⚠️ **This is the AC-9 problem inverted, and the inversion is the point.** AC-9 was a criterion whose
+*objectivity* was partly a judgment call, and §1 handled it by naming strong proxies and saying they
+were proxies. Here the criterion is **perfectly objective and measures the wrong thing.** Being
+pass/fail is not the same as being evidence, and a stage whose exit criterion asks only for the first
+will happily certify the second. **Objective, mechanical, and blind is the worst of the three
+combinations**, because nothing in the attestation looks wrong.
+
+**So `REQ-0021` requires static enforcement**, and acceptance for `REQ-0016`–`REQ-0018` may not rest
+on freshness behaviour alone. Two obligations, and the second is the one that gets dropped:
+
+| | What must be checked | Why behaviour cannot check it |
+|---|---|---|
+| 1 | No planning-content read outside the approved `connection()`-backed abstraction | A stray read is fresh by proximity; the page looks correct |
+| 2 | Every read site is enclosed by a `<Suspense>` boundary | An abstraction supplies `connection()`; a caller can still omit the boundary. That builds fine **without** Cache Components and **fails the build with it** — so the omission surfaces as a config change breaking the build, not as the contract violation it is |
+
+⚠️ **The mechanism is stage 5's to choose**, not this stage's: a lint rule, a module-boundary
+constraint, a generated single accessor, or a build step that greps for content-root paths would each
+satisfy it. What is fixed is the property — **checkable without executing the application**. ⚠️ And it
+must not settle Cache Components: `DEC-0019` was chosen so the contract holds with that flag either
+way, and an enforcement design that only works under one setting would spend that property.
+
+⚠️ **It also constrains `QST-0018`.** If a stage document may reference components, the permitted-component
+set is another surface a direct read could enter through, and static confinement has to cover it.
+That is a condition `QST-0018`'s answer must satisfy — **not a decision about what that answer is.**
+
+---
+
 ## Exit criteria
 
 | Criterion | Attestation |
 |---|---|
 | **criteria-objective** | ✅ `satisfied` — eight of nine are pass/fail outright; AC-9's testable half is objective and its judgment half is named rather than hidden. ⚠️ Basis is prose: the criteria are a table here, not artifacts, pending the PM's decision on `acceptance-criterion`. |
+
+⚠️ **This attestation covers the 2026-08-22 run against `CMP-0011` and nothing else.** §4 is a
+constraint recorded ahead of a run that has not happened; the application shell reaches this stage
+only after stage 5 produces its components. **Nothing in §4 is attested.**

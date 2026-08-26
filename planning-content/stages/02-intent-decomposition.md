@@ -174,6 +174,23 @@ header. What follows is intake and scope, not implementation.
 | `REQ-0019` | The application performs review-status updates through the existing typed write path | `QST-0020` |
 | `REQ-0020` | The application is installable and runnable locally from a documented command | ~~`QST-0017`~~ answered, `QST-0021` |
 
+⚠️ **A sixth was added on 2026-08-26, after the PM confirmed the five above.** It is listed separately
+rather than folded into the confirmed table, because a table that grows silently stops recording what
+was actually approved and when.
+
+| ID | Requirement | Open on | Origin |
+|---|---|---|---|
+| `REQ-0021` | Planning-content reads are confined to the approved abstraction, and the confinement is checked **statically** | — | **Measurement, not decomposition** — `AST-0022` |
+
+**It exists because a test cannot see the violation.** `AST-0022` measured that a read breaking the
+`DEC-0019` contract is served **fresh** whenever a compliant read shares its route, so every
+behavioural freshness check passes on a codebase that breaks the contract — until the compliant
+sibling moves, and every read on that route silently reverts to build-time content. **A test that
+passes on broken code is worse than no test, because it is also a claim that the code was checked.**
+So the property has to be enforced where it is visible: in the source. ⚠️ The *mechanism* is
+deliberately unspecified — that is stage 5 design work, and naming one here would decide it before the
+components exist.
+
 **`DEC-0017` — the Next.js shell reuses the substrate; the skeleton is not migrated.** `app/server.mjs`
 stays as the **verified substrate reference** until the new shell reaches behavioural parity with its
 seven proven properties, and the shell imports `lib/` rather than reimplementing any of it. Three
