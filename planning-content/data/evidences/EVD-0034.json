@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0034",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+  "kind": "source",
+  "summary": "Server-side rendering of untrusted MDX produced a real, GitHub-reviewed high-severity code-execution vulnerability.",
+  "sources": [
+    {
+      "title": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+      "locator": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"The serialize function used to compile MDX in next-mdx-remote is vulnerable to arbitrary code execution due to insufficient sanitization of MDX content.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

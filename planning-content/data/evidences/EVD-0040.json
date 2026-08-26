@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0040",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md",
+  "kind": "source",
+  "summary": "Stripping ESM import/export from MDX at compile time is an established published practice, not a bespoke idea.",
+  "sources": [
+    {
+      "title": "https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md",
+      "locator": "https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"plugin **to remove import and/or export statements (`mdxjsEsm`) in MDX documents.**\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

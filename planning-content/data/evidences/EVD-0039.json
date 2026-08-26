@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0039",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+  "kind": "source",
+  "summary": "Fully unrestricted MDX is documented as safe only for content the operator completely trusts.",
+  "sources": [
+    {
+      "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Only set `blockDangerousJS: false` if you completely trust the MDX content source. This removes critical security protections and could allow RCE attacks.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "AST-0028",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Making stage documents executable would export execution to package recipients — or silently drop them",
+  "statement": "The handoff publisher copies `planning-content/stages/*.md` verbatim into the published package, which currently carries nine stage documents. Because the filter matches only `.md`, converting stage documents to `.mdx` produces one of exactly two outcomes: with the filter unchanged, every stage document silently disappears from the package; with the filter widened, agent-authored documents that compile to JavaScript are shipped to whoever receives the package.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "repository": "visual-project-workflow",
+      "publisher": "lib/handoff/publish.mjs readStageDocs()"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ BOTH BRANCHES ARE BAD, AND THE QUIET ONE IS WORSE. A package missing the narrative half of the plan is still a package: it validates, it renders, its MANIFEST reports counts that were never about stage documents, and nothing in it says nine files are absent. That is the well-formed false success this project keeps naming, arriving through a two-character change to a filename. ⚠️ THE OTHER BRANCH IS WHERE CVE-2026-0969 STOPS BEING SOMEONE ELSE'S INCIDENT. The package is the artefact this whole system exists to produce and hand to other people. Shipping executable author-controlled documents in it means the recipient's machine runs what the sending project's agent wrote — the same shape as the CVE, with the compile moved to their side of the handoff. ⚠️ It is a genuine argument for the restricted compile rather than against MDX. A document compiled with expressions and ESM removed is inert text plus a component vocabulary, and ships safely. The choice is not MDX-or-markdown; it is which MDX.",
+  "supportedBy": [
+    "EVD-0034",
+    "EVD-0041"
+  ]
+}

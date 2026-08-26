@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0038",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+  "kind": "source",
+  "summary": "Even with JS enabled, the protective mode is described by its own maintainers as best effort rather than a boundary.",
+  "sources": [
+    {
+      "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"which will provide a best effort option to blocks dangerous operations like `eval`, `Function`, `process`, `require`, and other globals that could lead to remote code execution (RCE)\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

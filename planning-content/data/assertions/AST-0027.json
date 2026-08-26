@@ -1,0 +1,26 @@
+{
+  "id": "AST-0027",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The ecosystem's remedy is to remove the capability at compile time, and its protective mode is best-effort",
+  "statement": "`next-mdx-remote` 6.0.0 introduced `blockJS` and `blockDangerousJS`, both defaulting to true for security reasons, so JavaScript expressions in MDX are disabled by default from that release. With JS re-enabled, the remaining protection is described by its own maintainers as a best-effort option to block dangerous operations such as `eval`, `Function`, `process` and `require`; disabling it further is documented as safe only for content the operator completely trusts. Separately, removing `import` and `export` statements from MDX at compile time is available as a published remark plugin.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "toolchain": "MDX (mdxjs.com), standard compiler"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ THE REMEDY WAS SUBTRACTION, NOT FILTERING, and that is the most decision-relevant fact in this pass. The maintainers did not write a sanitiser that makes MDX safe; they removed the ability to run JavaScript and made removal the default. The one place they did attempt filtering, they labelled BEST EFFORT in their own documentation — a maintainer declining to call their own protection a boundary is worth more than any assurance they could have offered. ⚠️ IT ALSO ANSWERS THE SECOND THING THIS QUESTION WAS HELD OPEN FOR: whether restricting the compiler is something projects do or something that breaks in practice. It is now the DEFAULT behaviour of a mainstream library, and ESM removal ships as an off-the-shelf plugin. The restricted compile is the well-travelled path, not the bespoke one. ⚠️ Nothing here is measured against `@next/mdx`. Whether the same subtraction composes with a build-time bundler integration is a compile away and has not been run.",
+  "supportedBy": [
+    "EVD-0036",
+    "EVD-0037",
+    "EVD-0038",
+    "EVD-0039",
+    "EVD-0040"
+  ]
+}

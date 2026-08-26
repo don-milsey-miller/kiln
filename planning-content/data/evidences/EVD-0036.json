@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0036",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0",
+  "kind": "source",
+  "summary": "The maintainers' remedy was to BLOCK JavaScript in MDX by default rather than to sanitise it.",
+  "sources": [
+    {
+      "title": "https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0",
+      "locator": "https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Introduced the parameters `blockJS` and `blockDangerousJS` that controls how JS in interpreted during compiling MDX. Both default to true for security reasons.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

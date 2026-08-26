@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0035",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+  "kind": "source",
+  "summary": "CVE-2026-0969 is classified as code injection at CVSS 8.8, affecting next-mdx-remote up to 6.0.0.",
+  "sources": [
+    {
+      "title": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+      "locator": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"\"vulnerable_version_range\":\">= 4.3.0, < 6.0.0\",\"first_patched_version\":\"6.0.0\"\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

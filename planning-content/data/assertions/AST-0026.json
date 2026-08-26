@@ -1,0 +1,23 @@
+{
+  "id": "AST-0026",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Server-side rendering of untrusted MDX is a demonstrated code-execution class, not a theoretical one",
+  "statement": "CVE-2026-0969 (GHSA-g4xw-jxrg-5f6m, GitHub-reviewed, high severity) records arbitrary code execution during React server-side rendering of untrusted MDX: the `serialize` function used to compile MDX in `next-mdx-remote` was vulnerable due to insufficient sanitisation of MDX content. Versions from 4.3.0 up to 6.0.0 are affected and 6.0.0 is the first patched release.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "toolchain": "MDX (mdxjs.com), standard compiler"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ THE VULNERABLE LIBRARY IS NOT THE ONE THIS PROJECT WOULD USE, and saying so is the difference between evidence and alarm. `next-mdx-remote` compiles MDX at RUNTIME from a supplied string; `@next/mdx` compiles at BUILD time from files in the repository. The exposure is not the same and this CVE does not transfer directly. ⚠️ WHAT DOES TRANSFER IS THE MECHANISM. The vulnerability was not a bug in a parser — it is what AST-0023 already established, arriving as an incident: MDX expressions and ESM are code, so compiling a document IS executing its author's intent. `next-mdx-remote` was only the place that property met an untrusted author first. ⚠️ It answers the question this was held open for: whether anyone had run semi-trusted MDX and what went wrong. Someone did, and it was CWE-94.",
+  "supportedBy": [
+    "EVD-0034",
+    "EVD-0035"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0037",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+  "kind": "source",
+  "summary": "From 6.0.0 onward JavaScript expressions in MDX are disabled by default for security.",
+  "sources": [
+    {
+      "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"By default, JavaScript expressions (like `{variable}` or `{func()}`) are **disabled for security** for versions 6.0.0 and above.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

@@ -1,0 +1,43 @@
+{
+  "id": "EVD-0041",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Observation: the handoff package ships every stage document verbatim, and filters on `.md`",
+  "kind": "experiment",
+  "summary": "`lib/handoff/publish.mjs` reads `planning-content/stages/`, filters `readdirSync(dir).filter((f) => f.endsWith(\".md\"))`, and copies each file's text unchanged into the package — the code comments it as \"Stage narratives ship as-is: they are authored planning content, not generated output.\" The published package at `docs/plan/` contains nine such documents under `docs/`, one per stage, at snapshot 6c86330767dcbbfa.",
+  "outcome": "success",
+  "observedAt": "2026-08-26",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "repository": "visual-project-workflow",
+      "publisher": "lib/handoff/publish.mjs readStageDocs()",
+      "packageRoot": "docs/plan/",
+      "snapshot": "6c86330767dcbbfa"
+    },
+    "omissions": [
+      {
+        "fact": "recipient-rendering-behaviour",
+        "state": "not-observable",
+        "reason": "What a recipient DOES with a package is outside this repository. The package ships document text; whether anyone compiles it, and with which toolchain, cannot be observed from here — which is exactly why the property matters rather than why it does not."
+      },
+      {
+        "fact": "mdx-extension-behaviour",
+        "state": "not-captured",
+        "reason": "No `.mdx` file exists under `planning-content/stages/`, so the filter's behaviour on one was read from the source rather than exercised. Running it would need a stage document that does not yet exist."
+      }
+    ]
+  },
+  "notes": "⚠️ Recorded as an observation of THIS repository because the consequence below is not derivable from any external source, and it is the point at which an ecosystem CVE becomes a fact about this project rather than an interesting story about someone else's."
+}
