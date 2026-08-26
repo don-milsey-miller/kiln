@@ -1,0 +1,25 @@
+{
+  "id": "AST-0021",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The DEC-0019 read contract serves current planning content in both caching models",
+  "statement": "Under `next build` + `next start` with Next.js 16.3.2, a route whose planning-content reads each await `connection()` from `next/server` inside a `<Suspense>` boundary serves the current file contents on every request, with cacheComponents both enabled and disabled, including after an external write made while the server is running. The boundary's fallback is present in the initial HTML in both configurations, so the loading state the contract requires is observable and not merely declared. A route making the same reads without `connection()` and without a boundary builds static and serves build-time content in both configurations.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS IS THE CLAIM STAGE 6 NEEDS, and it is deliberately narrower than 'the freshness risk is handled'. It says the contract behaves as written in the mode DEC-0018 ships. It does NOT say the application shell implements the contract — no shell exists yet — so this discharges the DESIGN half of the risk and leaves the IMPLEMENTATION half to acceptance criteria at stage 7. ⚠️ The negative control is what makes this a validation rather than a demonstration: the same reads without the contract were stale in both configurations, on the same build, in the same run.",
+  "supportedBy": [
+    "EVD-0024"
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "id": "EVD-0024",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the DEC-0019 read contract, with a non-compliant control on the same build",
+  "kind": "experiment",
+  "summary": "One application, three routes, built and served twice under `next build` + `next start`. The contract route makes two planning-content reads, each awaiting `connection()` inside its own Suspense boundary with a named loading fallback. The control route makes the same read with neither. A third route mixes one of each. Copies of real planning artifacts were read through `JSON.parse(readFileSync(...))` and a markdown read, then rewritten externally with the server live. With cacheComponents DISABLED the routes built as \"┌ ƒ /\", \"└ ƒ /mixed\" and \"├ ○ /bare\"; with it ENABLED, \"┌ ◐ /\", \"└ ◐ /mixed\" and \"├ ○ /bare\". In BOTH configurations the contract route served the externally written values on every request after the write, its Suspense fallback was present in the initial HTML, and the control route served its build-time values on every request including five seconds later. The mixed route served BOTH slots fresh — including the non-compliant one.",
+  "outcome": "success",
+  "observedAt": "2026-08-26",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync",
+      "node-version": "v24.18.0",
+      "workspace": "one disposable workspace, installed once, rebuilt per configuration; removal verified",
+      "network": "loopback only for `next start`; npm install reached the public registry"
+    },
+    "omissions": [
+      {
+        "fact": "prefetch-latency",
+        "state": "not-captured",
+        "reason": "The cost DEC-0019 accepts — that `connection()` blocks prefetching — was NOT measured here. It is taken from the Next.js documentation, so the accepted cost sits at source-supported while the benefit sits at environment-matched. Measuring it needs client-side navigation between routes, which this probe does not perform."
+      },
+      {
+        "fact": "revalidation-beyond-five-seconds",
+        "state": "not-captured",
+        "reason": "Routes were re-requested about two and five seconds after the external write. This shows the control route is frozen across five seconds, not that it is frozen forever — the same bound EVD-0023 carries."
+      },
+      {
+        "fact": "integration-with-the-project-content-loaders",
+        "state": "not-observable",
+        "reason": "The application shell does not exist yet, so reads went through `fs.readFileSync` and `JSON.parse` on copies of real artifacts. That matches the READ SHAPE the requirements need but not the project's own loader modules, which the shell is required to reuse rather than rewrite."
+      },
+      {
+        "fact": "concurrent-request-load",
+        "state": "not-captured",
+        "reason": "One request at a time. Whether a dynamic route holds up under concurrent reads of the same artifacts bears on runtime lifecycle, not on freshness."
+      },
+      {
+        "fact": "other-operating-systems",
+        "state": "not-observable",
+        "reason": "One host was available; scoped to Windows."
+      }
+    ]
+  },
+  "notes": "⚠️ THIS IS NOT A RE-RUN OF EVD-0023, and the difference is the point. EVD-0023 compared MECHANISMS, one read per build, to choose one. This measures the CONTRACT AS WRITTEN — `connection()` before EACH read, a fallback that is a real loading state — and it carries a NEGATIVE CONTROL inside the same build. Without the control, a fresh result would not distinguish the contract doing the work from something incidental about the build. The control was stale in both configurations, so the contract is load-bearing rather than decorative. ⚠️ THE CONTROL INDEPENDENTLY REPRODUCES AST-0019 a third time, in a third instrument: `○ /bare` built static and served build-time content with cacheComponents both enabled and disabled. ⚠️ THE MIXED ROUTE IS THE FINDING NOBODY ASKED FOR. Its non-compliant read came back FRESH in both configurations, because a compliant sibling had already made the route dynamic. See AST-0022 — it is the reason the 'each read' clause is not redundant."
+}

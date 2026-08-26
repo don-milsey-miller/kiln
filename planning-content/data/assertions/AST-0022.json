@@ -1,0 +1,25 @@
+{
+  "id": "AST-0022",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A non-compliant read is silently fresh while a compliant read shares its route",
+  "statement": "Under `next build` + `next start` with Next.js 16.3.2, a planning-content read that does not follow the DEC-0019 contract is nevertheless served fresh when another read on the same route does follow it, with cacheComponents both enabled and disabled — the compliant read makes the whole route dynamic and the non-compliant sibling rides along. The non-compliant read's freshness therefore depends on the continued presence of a compliant sibling on that route, and neither the build output nor the served page distinguishes a read that is fresh because it follows the contract from one that is fresh by proximity.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS IS WHY 'BEFORE EACH READ' IS NOT REDUNDANT. Read as a per-route rule, the contract would be satisfied by one `connection()` anywhere on the route — and every other read on it would be fresh, so nothing would look wrong. Then someone removes the compliant read, or moves it to a child route, or wraps it in a cached component, and every sibling silently reverts to build-time content. That is the exact failure mode DEC-0019 rejected `io()` for: correct until an unrelated change makes it quietly wrong. The per-read clause makes each read carry its own reason to be fresh, so the invariant survives refactoring. ⚠️ It also means TESTING CANNOT CATCH A VIOLATION on a compliant route — a non-compliant read passes every freshness check as long as a sibling is compliant. The enforcement has to be static (a rule about the code) rather than behavioural (a rule about the output), which is a real constraint on how the acceptance criteria at stage 7 can be written. ⚠️ Found only because the control was placed inside the same build rather than in a separate one.",
+  "supportedBy": [
+    "EVD-0024"
+  ]
+}

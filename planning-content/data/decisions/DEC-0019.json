@@ -37,8 +37,10 @@
     "REQ-0018"
   ],
   "evidencedBy": [
-    "AST-0020",
     "AST-0019",
+    "AST-0020",
+    "AST-0021",
+    "AST-0022",
     "EVD-0023"
   ],
   "notes": "⚠️ THE PREFETCH LIMITATION IS AN ACCEPTED DESIGN COST, NOT AN OPEN HAZARD, and it is recorded here rather than as a question on purpose. The Next.js documentation states that `connection()` stays suspended until a full user navigation reaches the server, so it also blocks prefetches; `io()` does not. For a local-first tool served over loopback to one operator, correctness of what is on screen outranks the latency a prefetch would have saved. No artifact tracks this as unresolved, because it is not unresolved — it was weighed and paid. If prefetch latency ever becomes a measured problem, that is a new observation that would reopen this decision through supersession, not a deferral sitting open in the backlog today. ⚠️ WHAT THIS DELIBERATELY DOES NOT DECIDE. The Cache Components setting stays undecided — the whole point of the chosen mechanism is that the contract holds either way, so deciding it here would spend the property that was just bought. The MDX component boundary (QST-0018) is untouched: this constrains WHEN a planning-content read may happen, not which component performs it or how the document is rendered. ⚠️ VALIDATION IS OWED AND NOT YET DONE. EVD-0023 measured the mechanism; it has not yet measured the contract as stated above, with `connection()` before each read and a fallback that is a real loading state. Stage 6's `high-severity-risks-mitigated` stays `not-satisfied` until that validation passes — a decision to mitigate is not a mitigation, which is the correction the stage already carries from the AST-0010 round."
