@@ -1,0 +1,26 @@
+{
+  "id": "AST-0025",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "In `@next/mdx` the component mapping is mandatory, global, and additive",
+  "statement": "Using `@next/mdx` with the App Router requires an `mdx-components` file at the project root; the documentation states the integration will not work without it. The mapping it exports applies to all MDX files in the application rather than per document. Components passed to an individually imported MDX component merge with and override the global mapping.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "integration": "@next/mdx",
+      "router": "App Router"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ THE THREE PROPERTIES ARE QUOTED; THE CONSEQUENCE BELOW IS AN INFERENCE FROM THEM, and it is flagged as one rather than presented as a fourth finding. If a per-page map MERGES WITH AND OVERRIDES the global map, then a page can add a component or replace one, and cannot take one away. So the mapping composes in the permissive direction only: there is no documented way to give one document a SMALLER set than another. Confirming that needs a compile, not another page. ⚠️ WHAT IT MEANS FOR THE COMPONENT BOUNDARY. A single global mapping is a reasonable place to state what stage documents may render, but it bounds only what is SUBSTITUTED — it is not consulted for a component the document imports itself (AST-0023). Treating it as the allowlist would be a boundary that is trivially bypassed by the one line an author is most likely to write.",
+  "supportedBy": [
+    "EVD-0031",
+    "EVD-0032",
+    "EVD-0033"
+  ]
+}

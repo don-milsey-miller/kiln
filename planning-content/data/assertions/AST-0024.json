@@ -1,0 +1,23 @@
+{
+  "id": "AST-0024",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "MDX's missing-component error is a diagnostic, not a boundary",
+  "statement": "MDX requires a referenced component to be defined and fails at RUNTIME when it is not, with the message `Expected component X to be defined: you likely forgot to import, pass, or provide it`. The failure occurs when a reference resolves to nothing; a document that imports a component, defines one locally, or is passed one never reaches it. The check therefore reports an authoring mistake and does not constrain what a document may reference or execute.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "toolchain": "MDX (mdxjs.com), standard compiler"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ THIS IS THE CANDIDATE ANSWER TO QST-0018'S THIRD PART, AND IT DOES NOT SURVIVE. The question asked what happens to a reference outside the permitted set — refuse, or render inert. MDX refuses, which sounds like the answer the question wanted. It is not: it refuses references to components that were never supplied, which is the case a mistaken author hits and not the case a capable one does. A document that reaches for something it should not have can simply import it, and then it IS defined. ⚠️ AND THE REFUSAL IS AT RUNTIME. Even used as a diagnostic, it surfaces when a page is rendered rather than when the document is written or the project is built — so a stage document with a bad reference is a page that throws for the operator, not a build that refuses. ⚠️ Same shape as AST-0022, one layer up: a mechanism that looks like enforcement because it produces an error, while the case it catches is not the case that matters.",
+  "supportedBy": [
+    "EVD-0029",
+    "EVD-0030"
+  ]
+}

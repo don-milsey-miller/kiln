@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0030",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: What is MDX? | MDX",
+  "kind": "source",
+  "summary": "MDX requires components to be defined, and names exactly three ways a document may obtain one.",
+  "sources": [
+    {
+      "title": "What is MDX? | MDX",
+      "locator": "https://mdxjs.com/docs/what-is-mdx/",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Note that components must be defined. You can import them, define them locally, or pass them in later\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

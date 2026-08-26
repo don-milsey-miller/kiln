@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0025",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: What is MDX? | MDX",
+  "kind": "source",
+  "summary": "An MDX document may contain whole JavaScript programs, so compiling one is executing author-supplied code.",
+  "sources": [
+    {
+      "title": "What is MDX? | MDX",
+      "locator": "https://mdxjs.com/docs/what-is-mdx/",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Expressions can contain whole JavaScript programs as long as they’re (wrapped in) an expression that evaluates to something that can be rendered.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

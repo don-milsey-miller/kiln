@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0031",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/guides/mdx",
+  "kind": "source",
+  "summary": "With @next/mdx and the App Router, the global component-mapping file is mandatory.",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/guides/mdx",
+      "locator": "https://nextjs.org/docs/app/guides/mdx",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"`mdx-components.tsx` is **required** to use `@next/mdx` with App Router and will not work without it.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

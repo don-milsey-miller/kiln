@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0028",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: Getting started | MDX",
+  "kind": "source",
+  "summary": "The MDX project advises against letting untrusted parties author MDX and offers no in-language sandbox.",
+  "sources": [
+    {
+      "title": "Getting started | MDX",
+      "locator": "https://mdxjs.com/docs/getting-started/",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Do not let random people from the internet write MDX.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

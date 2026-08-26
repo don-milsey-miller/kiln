@@ -1,0 +1,25 @@
+{
+  "id": "AST-0023",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "An MDX stage document is a program, and MDX supplies no allowlist",
+  "statement": "Under the standard MDX toolchain a `.mdx` document compiles to a JavaScript module. It may contain arbitrary JavaScript expressions — the documentation states that expressions can contain whole JavaScript programs wrapped so they evaluate to something renderable — and it may use ESM `import` and `export` to reach any module the bundler can resolve. MDX provides no mechanism that restricts which components or modules a document may reference. Its documented security position is that MDX is a programming language whose safety rests on trusting the author, and that untrusted parties should not be permitted to author MDX.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "toolchain": "MDX (mdxjs.com), standard compiler"
+    }
+  },
+  "openQuestions": [
+    "QST-0018"
+  ],
+  "notes": "⚠️ THIS REFRAMES QST-0018 RATHER THAN ANSWERING IT. The question was posed as 'which components may a stage document execute', which presumes a permitted set exists to be configured. It does not. The component mapping is a substitution table for markdown elements and named components; it is not a gate, and nothing consults it before a document's own `import` runs. ⚠️ THE REAL QUESTION IS WHETHER THE AGENT IS A TRUSTED AUTHOR, and it is a product judgement rather than a research finding. MDX's own answer — trust the author or do not use MDX — puts the decision squarely on this project. #88 forbids hand-authoring artifacts precisely so the writer is a typed operation with a schema behind it; stage documents are the one agent-authored surface with no such check, and MDX would make them executable. That tension is the substance of this question and it is not resolved by more reading. ⚠️ SOURCE-SUPPORTED, NOT MEASURED. Every clause here is quoted from primary documentation. Nothing has been compiled or run, so this says what MDX is documented to do, not what this project's configuration was observed to do.",
+  "supportedBy": [
+    "EVD-0025",
+    "EVD-0026",
+    "EVD-0027",
+    "EVD-0028"
+  ]
+}

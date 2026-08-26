@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0033",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/guides/mdx",
+  "kind": "source",
+  "summary": "Per-page components merge with and override the global mapping rather than replacing it.",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/guides/mdx",
+      "locator": "https://nextjs.org/docs/app/guides/mdx",
+      "retrievedAt": "2026-08-26"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"These will merge with and override\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}
