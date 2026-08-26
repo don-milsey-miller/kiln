@@ -1,0 +1,53 @@
+{
+  "id": "EVD-0023",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: which freshness mechanisms survive a production build",
+  "kind": "experiment",
+  "summary": "Seven distinct mechanism/caching-model combinations built and served under `next build` + `next start`, each measured by writing a different value to the artifact after the server was live and re-requesting. Results: baseline/cacheComponents:false -> ┌ ○ / frozen; baseline/cacheComponents:true -> ┌ ○ / frozen; connection/cacheComponents:false -> ┌ ƒ / FRESH; connection/cacheComponents:true -> BUILD FAILED; force-dynamic/cacheComponents:false -> ┌ ƒ / FRESH; baseline/cacheComponents:false -> ┌ ○ / frozen; baseline/cacheComponents:true -> ┌ ○ / frozen; connection-suspense/cacheComponents:false -> ┌ ƒ / FRESH; connection-suspense/cacheComponents:true -> ┌ ◐ / FRESH; io-suspense/cacheComponents:false -> ┌ ○ / frozen; io-suspense/cacheComponents:true -> ┌ ◐ / FRESH. Only `connection()` behind a Suspense boundary reflected the external write in BOTH caching models.",
+  "outcome": "success",
+  "observedAt": "2026-08-25",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync",
+      "node-version": "v24.18.0",
+      "workspace": "one disposable workspace per pass, removal verified",
+      "network": "loopback only for `next start`; npm install reached the public registry"
+    },
+    "omissions": [
+      {
+        "fact": "revalidation-beyond-five-seconds",
+        "state": "not-captured",
+        "reason": "Each variant was re-requested about two and five seconds after the external write. A longer revalidation window would not have been seen."
+      },
+      {
+        "fact": "concurrent-request-load",
+        "state": "not-captured",
+        "reason": "One request at a time. Whether a dynamic route holds up under concurrent requests reading the same artifacts was not exercised, and bears on the runtime lifecycle question rather than on freshness."
+      },
+      {
+        "fact": "other-operating-systems",
+        "state": "not-observable",
+        "reason": "One host was available; scoped to Windows."
+      }
+    ]
+  },
+  "notes": "⚠️ TWO INSTRUMENT DEFECTS were found and corrected before these numbers were trusted, and both would have read as findings. (1) The marker extractor sliced between two sentinels in the HTML; under Cache Components the Suspense fallback ships in the static shell and the value STREAMS, so the first match landed inside escaped RSC flight data and both Cache Components runs scored 'inconclusive' while plainly serving the right value. Replaced with sentinel presence, which is immune to escaping because only one sentinel is on disk at a time. (2) The route-symbol matcher did not know `◐` (partially prerendered), so it fell through and reported `○ /_not-found` as the route under test. Both defects were in the instrument, not in Next.js. ⚠️ The baseline was re-run in the same pass as the corrected variants rather than carried over from the earlier pass, so every row here was measured by ONE instrument."
+}

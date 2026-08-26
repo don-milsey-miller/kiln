@@ -1,0 +1,27 @@
+{
+  "id": "AST-0020",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "`connection()` behind a Suspense boundary is the only measured mechanism fresh in both caching models",
+  "statement": "Under `next build` + `next start` with Next.js 16.3.2, a Server Component that awaits `connection()` inside a Suspense boundary before reading an artifact serves the current file contents on every request with cacheComponents both enabled and disabled. `connection()` without a Suspense boundary fails the build when cacheComponents is enabled; `io()` behind a Suspense boundary is fresh only when cacheComponents is enabled and is silently frozen when it is disabled; `export const dynamic` is unavailable when cacheComponents is enabled.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "readApi": "fs.readFileSync"
+    }
+  },
+  "openQuestions": [
+    "QST-0023"
+  ],
+  "notes": "⚠️ THE PROPERTY THAT MATTERS IS MODEL-INDEPENDENCE, not freshness alone. Three mechanisms produce fresh reads; only this one does so without the caching model being decided first. `io()` is the Cache Components primitive and the documentation prefers it — but it resolves immediately when Cache Components is off, so a route built on it would go SILENTLY STALE if that flag were ever turned off. A freshness contract that breaks quietly when an unrelated configuration changes is the same shape of defect as the build-time freeze it is meant to fix. ⚠️ `connection()` has a real cost, stated rather than buried: the documentation says it stays suspended until a full user navigation reaches the server, so it also blocks prefetches. `io()` does not. That is a genuine trade against model-independence and belongs in the decision.",
+  "supportedBy": [
+    "EVD-0023"
+  ]
+}
