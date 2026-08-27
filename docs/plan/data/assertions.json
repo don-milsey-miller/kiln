@@ -364,26 +364,32 @@
           "match": "unknown",
           "polarity": "support",
           "ref": "EVD-0006"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0022"
         }
       ],
-      "confidence": "source-supported",
+      "confidence": "experimentally-validated",
       "excluded": [],
       "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
       "verdict": "supported"
     },
     "id": "AST-0010",
     "lifecycle": "active",
-    "notes": "Carved out of AST-0007 after the dev refutation. This is what the documentation actually describes, and it is untested. ⚠️ It may never matter: #2 and #22 make the app local-only, so `next dev` may be the only mode this product ever runs in — which is itself a decision nobody has taken. ⚠️ REGISTERED VALIDATION TASK, DEFERRED 2026-08-22 under #80 branch 3 — not an outstanding debt. DEC-0001 makes this blocking only when a production build enters scope, and the product is local and runs `next dev`. Validating it now would test an UNDECLARED deployment mode: demand-driven sequencing means the experiment arrives with the commitment that needs it. REOPENING CONDITION: execute before adopting `next build` / `next start`, or when upgrading beyond the currently tested Next.js version (16.3.1 / React 19.2.8 / Node v24.18.0). ⚠️ The condition fires when the risk becomes POSSIBLE, not when it is observed — #80's stated preference, because the second means shipping the failure once to learn it was real.",
+    "notes": "Carved out of AST-0007 after the dev refutation. This is what the documentation actually describes, and it is untested. ⚠️ It may never matter: #2 and #22 make the app local-only, so `next dev` may be the only mode this product ever runs in — which is itself a decision nobody has taken. ⚠️ REGISTERED VALIDATION TASK, DEFERRED 2026-08-22 under #80 branch 3 — not an outstanding debt. DEC-0001 makes this blocking only when a production build enters scope, and the product is local and runs `next dev`. Validating it now would test an UNDECLARED deployment mode: demand-driven sequencing means the experiment arrives with the commitment that needs it. REOPENING CONDITION: execute before adopting `next build` / `next start`, or when upgrading beyond the currently tested Next.js version (16.3.1 / React 19.2.8 / Node v24.18.0). ⚠️ The condition fires when the risk becomes POSSIBLE, not when it is observed — #80's stated preference, because the second means shipping the failure once to learn it was real. ⚠️ REOPENED 2026-08-25 — THE CONDITION FIRED, AND ON BOTH CLAUSES. DEC-0018 adopts `next build` + `next start` as the shipped configuration, which is the first clause verbatim; and the version now in play is Next.js 16.3.2 (sourced 2026-08-24, installed by the watcher probe 2026-08-25) against a claim whose targetEnvironment names 16.3.1, which is the second. This is no longer a registered-and-deferred validation task: it is OWED, and it is owed before anything in the application shell rests on how a Server Component's artifact read behaves in production. ⚠️ It is owed at roadmap step 3b — stage 6, risk and feasibility — where the roadmap placed it when it was written, before this answer existed. ⚠️ Note what is still open inside it: the claim is conditional on `cacheComponents` being enabled, and whether the application enables it has not been decided. That is a scope question for the validation, not a reason to defer it again. ⚠️ RE-SCOPED 16.3.1 -> 16.3.2 ON 2026-08-25, and this is the reopening condition being EXECUTED rather than the target being fitted to a result. The condition's second clause was 'when upgrading beyond the currently tested Next.js version', so re-validating at the new version is the whole point of having written it; leaving the claim scoped to 16.3.1 would have made the fresh evidence inapplicable to it by construction. Every other dimension was MEASURED to be unchanged — React 19.2.8, Node v24.18.0, Windows, `next build` + `next start`, `fs.readFileSync` — so exactly one fact moved, and it is the one the condition named. ⚠️ VALIDATED 2026-08-25 (EVD-0022) — AND ITS CONDITIONAL FRAMING IS WRONG. The outcome holds: with cacheComponents enabled the value was baked into the build and three requests after an external write all served the stale value. But the disabled configuration behaved IDENTICALLY, so the freeze is not caused by Cache Components. See AST-0019. Anyone reading this assertion alone would conclude the risk can be mitigated by disabling the flag; it cannot. ⚠️ NOT OPERATIVE for design work (pm, 2026-08-25). AST-0019 is the claim to rest on. This one is retained as the narrower historically-motivated claim at rung 3: it is where the concern started, it is what the documentation described, and it is the record of a conditional framing that measurement corrected. Kept rather than retired, because deleting the claim that turned out to be too narrow would delete the reason anyone thought to test both configurations.",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With cacheComponents enabled, under `next build` followed by `next start`, a Server Component reading an artifact with fs.readFileSync produces output baked into the static shell, so a later external write does not change what a fresh request returns.",
     "supportedBy": [
-      "EVD-0006"
+      "EVD-0006",
+      "EVD-0022"
     ],
     "targetEnvironment": {
       "facts": {
         "cacheComponents": "enabled",
-        "framework": "Next.js 16.3.1",
+        "framework": "Next.js 16.3.2",
         "mode": "next build + next start",
         "node": "v24.18.0",
         "os": "Windows 11",
@@ -544,6 +550,935 @@
       }
     },
     "title": "Tavily's published docs state the free plan provides 1,000 credits per month",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0018"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0015",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS THE CLAIM THAT MAKES AST-0010 MATERIAL rather than cautious. If dev and production were the same artifact, validating under `next dev` would validate what ships. They are not, so a validation run against the development server says nothing about the production build — which is exactly why #137 deferred AST-0010 while the deployment mode is undeclared, and why declaring production mode makes it owed rather than optional.",
+    "openQuestions": [
+      "QST-0017"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "In Next.js 16.3.2, `next dev` and `next build` produce different builds: development output goes to `.next/dev` and production output to `.next`, and the two can run concurrently without conflicting.",
+    "supportedBy": [
+      "EVD-0018"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "docsRetrieved": "2026-08-24",
+        "framework": "next",
+        "nextVersion": "16.3.2",
+        "router": "app"
+      }
+    },
+    "title": "Development and production are different builds, with different output locations",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0019"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0016",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "Bears on QST-0021 as well as QST-0017: choosing production mode adds a build step between installation and startup, which the runtime lifecycle has to specify. It also means the operator can be in a state where the app is installed and cannot start — a failure mode `next dev` does not have.",
+    "openQuestions": [
+      "QST-0017"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "In Next.js 16.3.2, `next start` starts the application in production mode and requires the application to have been compiled with `next build` beforehand.",
+    "supportedBy": [
+      "EVD-0019"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "docsRetrieved": "2026-08-24",
+        "framework": "next",
+        "nextVersion": "16.3.2",
+        "router": "app"
+      }
+    },
+    "title": "Production mode requires a prior build step",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0020"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0017",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "Bears on whether production mode is available to this product AT ALL. The tool is local-first and clonable (#1, #20, #32) — a deployment story that required a platform would make production mode unreachable regardless of what the PM preferred. It does not.",
+    "openQuestions": [
+      "QST-0017"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "In Next.js 16.3.2, deploying as a Node.js server is a supported option and Node.js deployments support all Next.js features, without requiring a hosting platform or adapter.",
+    "supportedBy": [
+      "EVD-0020"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "docsRetrieved": "2026-08-24",
+        "framework": "next",
+        "nextVersion": "16.3.2",
+        "router": "app"
+      }
+    },
+    "title": "A self-hosted Node.js deployment supports all Next.js features",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0021"
+        }
+      ],
+      "confidence": "experimentally-validated",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0018",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ SCOPE, because a negative result is the easiest kind to over-read. This says the two watchers did not collide in ONE scenario on ONE machine over SECONDS. It does not say a long-lived `next dev` is sound as a shipped configuration — the server ran for under a minute, and nothing here measures handle or memory growth over hours, which is the actual worry behind QST-0017. It also tests the content directory INSIDE the project root; the real application may watch a content root outside it entirely, which is a different scenario and not covered. ⚠️ The first run of this probe reported 0/20 under `next dev` and looked exactly like total interference. It was a fixture bug: both runs wrote the same filenames into the same directory, so the treatment produced `change` events while the watcher listened for `add`. The control is what made it visible — a result that dramatic from a change that small is a bug before it is a finding.",
+    "openQuestions": [
+      "QST-0017",
+      "QST-0021"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On Windows with Next.js 16.3.2 and chokidar 5, a chokidar watcher observed all 20 externally-created files in a directory inside the Next.js project root while `next dev` was serving on loopback, at a detection latency indistinguishable from the same measurement taken with no dev server running; and `next dev` did not recompile in response to those writes.",
+    "supportedBy": [
+      "EVD-0021"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "nextVersion": "16.3.2",
+        "nodeVersion": "v24.18.0",
+        "os": "win32 x64",
+        "scenario": "content directory inside the Next.js project root, imported by nothing",
+        "watcher": "chokidar"
+      }
+    },
+    "title": "A concurrent `next dev` does not measurably interfere with a chokidar watcher on the same tree",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0022"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0019",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS NARROWS AST-0010 BY WIDENING THE BEHAVIOUR. AST-0010 attributes the freeze to Cache Components, and measurement says the attribution is wrong: the disabled configuration built the same static route and served the same stale value. The claim's OUTCOME held; its CONDITIONAL FRAMING did not. That distinction matters because a reader of AST-0010 alone would conclude the risk is avoidable by turning a flag off, and it is not. ⚠️ Found only because both configurations were run. Testing the named case alone would have confirmed AST-0010 and left the wrong mitigation on the table. ⚠️ OPERATIVE CLAIM (pm, 2026-08-25). This is the one downstream design rests on: it is environment-matched at rung 4 and it states the behaviour unconditionally, which is what a component design actually needs. AST-0010 stays as the narrower, historically-motivated claim at rung 3 — it records what the documentation described and what was first suspected, and its scope is deliberately not widened to match this one. Two claims, one superseding the other's EXPLANATION while both keep their own provenance, is more honest than editing the first until it agrees.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under `next build` + `next start` with Next.js 16.3.2, a Server Component reading an artifact with fs.readFileSync is prerendered as a static route and serves its build-time value regardless of whether cacheComponents is enabled or disabled; a later external write does not change what a fresh request returns in either configuration.",
+    "supportedBy": [
+      "EVD-0022"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "title": "The production-build freeze is NOT conditional on Cache Components",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0023"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0020",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE PROPERTY THAT MATTERS IS MODEL-INDEPENDENCE, not freshness alone. Three mechanisms produce fresh reads; only this one does so without the caching model being decided first. `io()` is the Cache Components primitive and the documentation prefers it — but it resolves immediately when Cache Components is off, so a route built on it would go SILENTLY STALE if that flag were ever turned off. A freshness contract that breaks quietly when an unrelated configuration changes is the same shape of defect as the build-time freeze it is meant to fix. ⚠️ `connection()` has a real cost, stated rather than buried: the documentation says it stays suspended until a full user navigation reaches the server, so it also blocks prefetches. `io()` does not. That is a genuine trade against model-independence and belongs in the decision.",
+    "openQuestions": [
+      "QST-0023"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under `next build` + `next start` with Next.js 16.3.2, a Server Component that awaits `connection()` inside a Suspense boundary before reading an artifact serves the current file contents on every request with cacheComponents both enabled and disabled. `connection()` without a Suspense boundary fails the build when cacheComponents is enabled; `io()` behind a Suspense boundary is fresh only when cacheComponents is enabled and is silently frozen when it is disabled; `export const dynamic` is unavailable when cacheComponents is enabled.",
+    "supportedBy": [
+      "EVD-0023"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "title": "`connection()` behind a Suspense boundary is the only measured mechanism fresh in both caching models",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0024"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0021",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS THE CLAIM STAGE 6 NEEDS, and it is deliberately narrower than 'the freshness risk is handled'. It says the contract behaves as written in the mode DEC-0018 ships. It does NOT say the application shell implements the contract — no shell exists yet — so this discharges the DESIGN half of the risk and leaves the IMPLEMENTATION half to acceptance criteria at stage 7. ⚠️ The negative control is what makes this a validation rather than a demonstration: the same reads without the contract were stale in both configurations, on the same build, in the same run.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under `next build` + `next start` with Next.js 16.3.2, a route whose planning-content reads each await `connection()` from `next/server` inside a `<Suspense>` boundary serves the current file contents on every request, with cacheComponents both enabled and disabled, including after an external write made while the server is running. The boundary's fallback is present in the initial HTML in both configurations, so the loading state the contract requires is observable and not merely declared. A route making the same reads without `connection()` and without a boundary builds static and serves build-time content in both configurations.",
+    "supportedBy": [
+      "EVD-0024"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "title": "The DEC-0019 read contract serves current planning content in both caching models",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0024"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0022",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS WHY 'BEFORE EACH READ' IS NOT REDUNDANT. Read as a per-route rule, the contract would be satisfied by one `connection()` anywhere on the route — and every other read on it would be fresh, so nothing would look wrong. Then someone removes the compliant read, or moves it to a child route, or wraps it in a cached component, and every sibling silently reverts to build-time content. That is the exact failure mode DEC-0019 rejected `io()` for: correct until an unrelated change makes it quietly wrong. The per-read clause makes each read carry its own reason to be fresh, so the invariant survives refactoring. ⚠️ It also means TESTING CANNOT CATCH A VIOLATION on a compliant route — a non-compliant read passes every freshness check as long as a sibling is compliant. The enforcement has to be static (a rule about the code) rather than behavioural (a rule about the output), which is a real constraint on how the acceptance criteria at stage 7 can be written. ⚠️ Found only because the control was placed inside the same build rather than in a separate one.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under `next build` + `next start` with Next.js 16.3.2, a planning-content read that does not follow the DEC-0019 contract is nevertheless served fresh when another read on the same route does follow it, with cacheComponents both enabled and disabled — the compliant read makes the whole route dynamic and the non-compliant sibling rides along. The non-compliant read's freshness therefore depends on the continued presence of a compliant sibling on that route, and neither the build output nor the served page distinguishes a read that is fresh because it follows the contract from one that is fresh by proximity.",
+    "supportedBy": [
+      "EVD-0024"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync"
+      }
+    },
+    "title": "A non-compliant read is silently fresh while a compliant read shares its route",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0025"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0026"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0027"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0028"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0023",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS REFRAMES QST-0018 RATHER THAN ANSWERING IT. The question was posed as 'which components may a stage document execute', which presumes a permitted set exists to be configured. It does not. The component mapping is a substitution table for markdown elements and named components; it is not a gate, and nothing consults it before a document's own `import` runs. ⚠️ THE REAL QUESTION IS WHETHER THE AGENT IS A TRUSTED AUTHOR, and it is a product judgement rather than a research finding. MDX's own answer — trust the author or do not use MDX — puts the decision squarely on this project. #88 forbids hand-authoring artifacts precisely so the writer is a typed operation with a schema behind it; stage documents are the one agent-authored surface with no such check, and MDX would make them executable. That tension is the substance of this question and it is not resolved by more reading. ⚠️ SOURCE-SUPPORTED, NOT MEASURED. Every clause here is quoted from primary documentation. Nothing has been compiled or run, so this says what MDX is documented to do, not what this project's configuration was observed to do.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under the standard MDX toolchain a `.mdx` document compiles to a JavaScript module. It may contain arbitrary JavaScript expressions — the documentation states that expressions can contain whole JavaScript programs wrapped so they evaluate to something renderable — and it may use ESM `import` and `export` to reach any module the bundler can resolve. MDX provides no mechanism that restricts which components or modules a document may reference. Its documented security position is that MDX is a programming language whose safety rests on trusting the author, and that untrusted parties should not be permitted to author MDX.",
+    "supportedBy": [
+      "EVD-0025",
+      "EVD-0026",
+      "EVD-0027",
+      "EVD-0028"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "toolchain": "MDX (mdxjs.com), standard compiler"
+      }
+    },
+    "title": "An MDX stage document is a program, and MDX supplies no allowlist",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0029"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0030"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0024",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS THE CANDIDATE ANSWER TO QST-0018'S THIRD PART, AND IT DOES NOT SURVIVE. The question asked what happens to a reference outside the permitted set — refuse, or render inert. MDX refuses, which sounds like the answer the question wanted. It is not: it refuses references to components that were never supplied, which is the case a mistaken author hits and not the case a capable one does. A document that reaches for something it should not have can simply import it, and then it IS defined. ⚠️ AND THE REFUSAL IS AT RUNTIME. Even used as a diagnostic, it surfaces when a page is rendered rather than when the document is written or the project is built — so a stage document with a bad reference is a page that throws for the operator, not a build that refuses. ⚠️ Same shape as AST-0022, one layer up: a mechanism that looks like enforcement because it produces an error, while the case it catches is not the case that matters.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "MDX requires a referenced component to be defined and fails at RUNTIME when it is not, with the message `Expected component X to be defined: you likely forgot to import, pass, or provide it`. The failure occurs when a reference resolves to nothing; a document that imports a component, defines one locally, or is passed one never reaches it. The check therefore reports an authoring mistake and does not constrain what a document may reference or execute.",
+    "supportedBy": [
+      "EVD-0029",
+      "EVD-0030"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "toolchain": "MDX (mdxjs.com), standard compiler"
+      }
+    },
+    "title": "MDX's missing-component error is a diagnostic, not a boundary",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0031"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0032"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0033"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0025",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE THREE PROPERTIES ARE QUOTED; THE CONSEQUENCE BELOW IS AN INFERENCE FROM THEM, and it is flagged as one rather than presented as a fourth finding. If a per-page map MERGES WITH AND OVERRIDES the global map, then a page can add a component or replace one, and cannot take one away. So the mapping composes in the permissive direction only: there is no documented way to give one document a SMALLER set than another. Confirming that needs a compile, not another page. ⚠️ WHAT IT MEANS FOR THE COMPONENT BOUNDARY. A single global mapping is a reasonable place to state what stage documents may render, but it bounds only what is SUBSTITUTED — it is not consulted for a component the document imports itself (AST-0023). Treating it as the allowlist would be a boundary that is trivially bypassed by the one line an author is most likely to write.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Using `@next/mdx` with the App Router requires an `mdx-components` file at the project root; the documentation states the integration will not work without it. The mapping it exports applies to all MDX files in the application rather than per document. Components passed to an individually imported MDX component merge with and override the global mapping.",
+    "supportedBy": [
+      "EVD-0031",
+      "EVD-0032",
+      "EVD-0033"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "integration": "@next/mdx",
+        "router": "App Router"
+      }
+    },
+    "title": "In `@next/mdx` the component mapping is mandatory, global, and additive",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0034"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0035"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0026",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE VULNERABLE LIBRARY IS NOT THE ONE THIS PROJECT WOULD USE, and saying so is the difference between evidence and alarm. `next-mdx-remote` compiles MDX at RUNTIME from a supplied string; `@next/mdx` compiles at BUILD time from files in the repository. The exposure is not the same and this CVE does not transfer directly. ⚠️ WHAT DOES TRANSFER IS THE MECHANISM. The vulnerability was not a bug in a parser — it is what AST-0023 already established, arriving as an incident: MDX expressions and ESM are code, so compiling a document IS executing its author's intent. `next-mdx-remote` was only the place that property met an untrusted author first. ⚠️ It answers the question this was held open for: whether anyone had run semi-trusted MDX and what went wrong. Someone did, and it was CWE-94.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "CVE-2026-0969 (GHSA-g4xw-jxrg-5f6m, GitHub-reviewed, high severity) records arbitrary code execution during React server-side rendering of untrusted MDX: the `serialize` function used to compile MDX in `next-mdx-remote` was vulnerable due to insufficient sanitisation of MDX content. Versions from 4.3.0 up to 6.0.0 are affected and 6.0.0 is the first patched release.",
+    "supportedBy": [
+      "EVD-0034",
+      "EVD-0035"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "toolchain": "MDX (mdxjs.com), standard compiler"
+      }
+    },
+    "title": "Server-side rendering of untrusted MDX is a demonstrated code-execution class, not a theoretical one",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0036"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0037"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0038"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0039"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0040"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0027",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE REMEDY WAS SUBTRACTION, NOT FILTERING, and that is the most decision-relevant fact in this pass. The maintainers did not write a sanitiser that makes MDX safe; they removed the ability to run JavaScript and made removal the default. The one place they did attempt filtering, they labelled BEST EFFORT in their own documentation — a maintainer declining to call their own protection a boundary is worth more than any assurance they could have offered. ⚠️ IT ALSO ANSWERS THE SECOND THING THIS QUESTION WAS HELD OPEN FOR: whether restricting the compiler is something projects do or something that breaks in practice. It is now the DEFAULT behaviour of a mainstream library, and ESM removal ships as an off-the-shelf plugin. The restricted compile is the well-travelled path, not the bespoke one. ⚠️ Nothing here is measured against `@next/mdx`. Whether the same subtraction composes with a build-time bundler integration is a compile away and has not been run.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`next-mdx-remote` 6.0.0 introduced `blockJS` and `blockDangerousJS`, both defaulting to true for security reasons, so JavaScript expressions in MDX are disabled by default from that release. With JS re-enabled, the remaining protection is described by its own maintainers as a best-effort option to block dangerous operations such as `eval`, `Function`, `process` and `require`; disabling it further is documented as safe only for content the operator completely trusts. Separately, removing `import` and `export` statements from MDX at compile time is available as a published remark plugin.",
+    "supportedBy": [
+      "EVD-0036",
+      "EVD-0037",
+      "EVD-0038",
+      "EVD-0039",
+      "EVD-0040"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "toolchain": "MDX (mdxjs.com), standard compiler"
+      }
+    },
+    "title": "The ecosystem's remedy is to remove the capability at compile time, and its protective mode is best-effort",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0034"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0041"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0028",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ BOTH BRANCHES ARE BAD, AND THE QUIET ONE IS WORSE. A package missing the narrative half of the plan is still a package: it validates, it renders, its MANIFEST reports counts that were never about stage documents, and nothing in it says nine files are absent. That is the well-formed false success this project keeps naming, arriving through a two-character change to a filename. ⚠️ THE OTHER BRANCH IS WHERE CVE-2026-0969 STOPS BEING SOMEONE ELSE'S INCIDENT. The package is the artefact this whole system exists to produce and hand to other people. Shipping executable author-controlled documents in it means the recipient's machine runs what the sending project's agent wrote — the same shape as the CVE, with the compile moved to their side of the handoff. ⚠️ It is a genuine argument for the restricted compile rather than against MDX. A document compiled with expressions and ESM removed is inert text plus a component vocabulary, and ships safely. The choice is not MDX-or-markdown; it is which MDX.",
+    "openQuestions": [
+      "QST-0018"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The handoff publisher copies `planning-content/stages/*.md` verbatim into the published package, which currently carries nine stage documents. Because the filter matches only `.md`, converting stage documents to `.mdx` produces one of exactly two outcomes: with the filter unchanged, every stage document silently disappears from the package; with the filter widened, agent-authored documents that compile to JavaScript are shipped to whoever receives the package.",
+    "supportedBy": [
+      "EVD-0034",
+      "EVD-0041"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "publisher": "lib/handoff/publish.mjs readStageDocs()",
+        "repository": "visual-project-workflow"
+      }
+    },
+    "title": "Making stage documents executable would export execution to package recipients — or silently drop them",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0042"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0029",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ WHAT THIS DOES NOT CLAIM: that the five rejected constructs are ALL the ways to reach JavaScript in MDX. Six examples cannot establish completeness, and that is recorded as an omission rather than glossed. It is the reason stripping stays as defence in depth even though rejection is the user-visible contract.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With `@next/mdx` on Next.js 16.3.2, a remark plugin calling `file.fail` on `mdxjsEsm`, `mdxFlowExpression`, `mdxTextExpression`, `mdxJsxExpressionAttribute`, object-valued `mdxJsxAttribute`, and JSX element names outside a permitted set causes `next build` to FAIL for each of those constructs, reporting the document path and a line:column position. A document using only markdown and a permitted component builds, renders its markdown, and renders the mapped component. The plugin must be configured as an ABSOLUTE module path, because Turbopack is the default builder and `@next/mdx` resolves a relative plugin path from its own package directory.",
+    "supportedBy": [
+      "EVD-0042"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "integration": "@next/mdx",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      }
+    },
+    "title": "A remark plugin that fails on forbidden nodes rejects at build time with file and position",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0043"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0030",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS A REQUIREMENTS CONFLICT, NOT A PERFORMANCE NOTE. REQ-0017 renders a stage document and REQ-0018 requires external changes to be reflected without a manual reload. File-routed MDX satisfies the first and cannot satisfy the second, and the agent rewrites stage documents while the operator is looking at them — that is the normal case here, not an edge one. ⚠️ ITS CONSEQUENCE IS UNCOMFORTABLE AND SHOULD BE STATED PLAINLY: freshness forces compiling the document per request, which is what `next-mdx-remote` does, which is where CVE-2026-0969 was. The restricted compile is not belt-and-braces for this design; it is the thing that makes the only viable design defensible.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "An `@next/mdx` document routed as a page is compiled to JavaScript at build time. Under `next build` + `next start`, rewriting the document while the server runs does not change what the route serves. DEC-0019's `connection()` contract cannot recover this, because the document is no longer read at request time — it has become part of the bundle.",
+    "supportedBy": [
+      "EVD-0043"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "integration": "@next/mdx",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      }
+    },
+    "title": "File-routed MDX is compiled into the build, so a stage document cannot be fresh",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0044"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0031",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ The contract is a property of the PLUGIN, not of the bundler integration — which is what makes the design portable between the two compilation modes, and what lets the freshness requirement be met without giving up the restriction. ⚠️ Not measured: composing this with a Server Component behind DEC-0019's boundary, and the per-request compilation cost. Both are recorded as omissions.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The same remark plugin, run through `@mdx-js/mdx`'s `compile` with `outputFormat: \"function-body\"` and executed with `run`, produces the same six outcomes as the bundler path: a permitted document compiles and renders its mapped component, and each of the five forbidden constructs is refused with the source path and a line:column position.",
+    "supportedBy": [
+      "EVD-0044"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "framework": "@mdx-js/mdx",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "outputFormat": "function-body",
+        "react": "19.2.8"
+      }
+    },
+    "title": "The rejection contract holds identically under runtime compilation",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0049"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0032",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE DOCUMENTATION CALLS THE MARKER OPTIONAL, AND FOR THIS PROJECT IT IS NOT. `server-only` changes no runtime behaviour and prevents nothing that was not already prevented — both client imports fail. What it changes is whether the failure is diagnosable, and an unlocatable build error in a tool whose whole premise is legible refusals is the wrong kind of correct. ⚠️ It is the same shape as DEC-0020 and the publisher refusal, arriving a third time: the question is never only whether the wrong thing is stopped, but whether the stop says where.",
+    "openQuestions": [
+      "QST-0020"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under Next.js 16.3.2 with Turbopack, a Server Component imports a Node-only module from a sibling `lib/` directory by plain relative path — no alias, no `transpilePackages`, no bundler configuration — and the value it computes renders in the page. When the same module is reached from a `'use client'` component the build fails either way, but only the `server-only` marker makes the failure locatable: without it Turbopack reports an internal error naming no file and no position; with it the build fails at the marked file's line 1 with the source line and an explanation.",
+    "supportedBy": [
+      "EVD-0049"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "layout": "lib/ as a sibling of app/, plain relative import",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      }
+    },
+    "title": "A Server Component imports sibling `lib/` directly, and the client-bundle failure is unreadable without a guard",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0046"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0050"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0033",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ FOUND BY CHECKING THE OBVIOUS DESIGN BEFORE PROPOSING IT. 'Put `import \"server-only\"` at the top of each Node-only lib module' is what the documentation's example does, it is what anyone would write first, and here it breaks `npm test` and every `bin/` command. The package's conditional export is what makes the app-facing guard and the tool-facing import mutually exclusive in one file. ⚠️ THE ADAPTER IS A CONVENTION UNTIL REQ-0021 MAKES IT A RULE. Nothing measured here stops a component importing `../../lib/x.mjs` directly and going around the guard — and that is exactly the class of violation REQ-0021's static confinement exists to catch, so the two want the same check rather than two.",
+    "openQuestions": [
+      "QST-0020"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The `server-only` package maps the `react-server` export condition to an empty module and everything else to a module that throws on import. `lib/` is imported by the CLIs in `bin/` and by the test suite under plain Node, where that condition does not apply, so marking `lib/` would make those throw. Placing the marker on a thin adapter inside the application that re-exports from `lib/` preserves both: `lib/` stays importable by plain Node, a Server Component importing the adapter builds and renders, and a `'use client'` component importing the adapter fails the build at the adapter's own line 1 with the correct App Router message. The marker therefore propagates through a re-export.",
+    "supportedBy": [
+      "EVD-0046",
+      "EVD-0050"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "guardLocation": "app-side adapter, not lib/",
+        "layout": "lib/ as a sibling of app/, plain relative import",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      }
+    },
+    "title": "The `server-only` guard cannot live in `lib/`, and works on an app-side adapter",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0051"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0053"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0054"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0055"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0034",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS REFUTES REQ-0018's SECOND CLAUSE FOR THE SUBSTRATE, by construction rather than by accident. The requirement asks that *a dropped update stream is visibly distinguishable from an idle one*. Byte-identical is the strongest possible form of indistinguishable — no client-side cleverness can recover a difference that was never transmitted. ⚠️ AND THE TWO GAPS COMPOUND. Per the WHATWG specification a client usually reconnects on its own (EVD-0054), which sounds like it makes the missed change harmless — it does not, because reconnection delivers nothing and the page only reloads on a message. So the page is stale, correctly connected, and silent, until some unrelated later change happens to arrive. ⚠️ Spec-side caveat carried explicitly: a FAILED connection is terminal and never retried (EVD-0051), and a non-200 or wrong Content-Type causes exactly that (EVD-0053). That path was not exercised here and is the one where the stream is genuinely gone for good. ⚠️ The server half is measured; browser reconnect behaviour is source-supported only.",
+    "openQuestions": [
+      "QST-0021"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The walking skeleton's `/events` stream sends `retry: 500` once and then nothing until a change occurs: an idle stream emitted zero bytes over six seconds. It sends no `id:` field, so a reconnecting client has no `Last-Event-ID` to present and the server has no position to resume from; a change made while disconnected was not delivered after reconnection. A client therefore cannot distinguish an idle stream from a dead one, and cannot learn that it missed anything.",
+    "supportedBy": [
+      "EVD-0051",
+      "EVD-0053",
+      "EVD-0054",
+      "EVD-0055"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "substrate": "app/server.mjs walking skeleton",
+        "transport": "text/event-stream over http",
+        "watcher": "chokidar"
+      }
+    },
+    "title": "The skeleton's idle stream and its dead stream are byte-identical, and a gap is never recovered",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0056"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0035",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ IT IS THE COUNT, NOT THE OMISSION, that turns this from incomplete into misleading. An operator reading `178 artifacts` has been told the thing they cannot see is there. ⚠️ Same family as everything else this question found: absence presented as validity. The handoff publisher dropped stage documents silently (AST-0028), a non-compliant read is fresh by proximity (AST-0022), and a stripped MDX expression leaves a document that still renders — this is the read path's version of it.",
+    "openQuestions": [
+      "QST-0021"
+    ],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When one artifact file under the content root contains invalid JSON, the walking skeleton returns HTTP 200 with a normally-formed page, omits that artifact entirely, shows no additional lint finding, and continues to report the same artifact total as before the corruption. The rendered page therefore claims a count it did not render.",
+    "supportedBy": [
+      "EVD-0056"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "substrate": "app/server.mjs walking skeleton",
+        "transport": "text/event-stream over http",
+        "watcher": "chokidar"
+      }
+    },
+    "title": "A malformed artifact vanishes from the view while the header count still counts it",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0057"
+        },
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0058"
+        }
+      ],
+      "confidence": "source-supported",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0036",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS CORRECTS A PROPOSAL I MADE, and the way it was wrong is worth keeping. QST-0021's measurement showed idle and dead streams are byte-identical, and the fix I offered was a periodic comment frame — which fixes the BYTES and not the VISIBILITY, because the one consumer that needs to see it is the only one specified to ignore it. A transport-level keepalive would have left the page exactly as falsely healthy as before while looking like a solution. ⚠️ Same shape as AST-0022 and AST-0028 once more: a mechanism that appears to close a gap because something is now happening, while the thing that needed to observe it still cannot.",
+    "openQuestions": [],
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Per the WHATWG specification, a line in an event stream beginning with a colon is ignored by the client parser. A comment heartbeat therefore fires no event and cannot be observed by page code; the specification names its purpose as preventing legacy proxies from dropping an idle connection. Making stream health visible to a client watchdog requires a named event carrying a data field, not a comment.",
+    "supportedBy": [
+      "EVD-0057",
+      "EVD-0058"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "client": "EventSource per WHATWG HTML",
+        "transport": "text/event-stream over http"
+      }
+    },
+    "title": "An SSE comment heartbeat is invisible to page JavaScript",
     "type": "assertion"
   }
 ]

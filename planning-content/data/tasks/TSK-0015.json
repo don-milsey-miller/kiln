@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0015",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the static planning-read and `<Suspense>` confinement check, with failing fixtures",
+  "statement": "Implement the analysis that runs without executing the application and reports file and line for a planning-content filesystem read performed anywhere other than the reader, and for a read site not enclosed by a `<Suspense>` boundary. Ship fixtures containing both violations and prove the check fails on each.",
+  "role": "platform",
+  "implements": [
+    "CMP-0019"
+  ],
+  "fulfils": [
+    "REQ-0021"
+  ],
+  "acceptedBy": [
+    "ACC-0021",
+    "ACC-0022",
+    "ACC-0024"
+  ],
+  "dependsOn": [
+    "TSK-0005"
+  ],
+  "notes": "⚠️ Split from TSK-0006 on 2026-08-27. This half needs the reader to exist, because the rule it enforces is 'reads go through the reader' — there is nothing to be outside of until there is one. ⚠️ ACC-0024 is satisfied by the PAIR with TSK-0006, and it holds for each half separately: a check nobody has seen fail is a check nobody has seen. ⚠️ Both halves land before any view work. Built afterwards they would arrive to a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code."
+}

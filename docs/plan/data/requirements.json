@@ -213,5 +213,99 @@
     ],
     "title": "The system runs locally for a single operator",
     "type": "requirement"
+  },
+  {
+    "id": "REQ-0016",
+    "lifecycle": "active",
+    "openQuestions": [],
+    "priority": "must",
+    "rationale": "REQ-0002 requires current project state to be inspectable at any time, and stage position is the coarsest form of that state. Deriving it rather than storing it follows #16: stage status is derived from artifacts, never persisted alongside them.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The application shows which stage the project is in, derived from the stage definitions and the recorded attestations rather than from a stored status value.",
+    "title": "The application displays the project's current stage",
+    "type": "requirement"
+  },
+  {
+    "evidencedBy": [
+      "AST-0029",
+      "AST-0031"
+    ],
+    "id": "REQ-0017",
+    "lifecycle": "active",
+    "openQuestions": [],
+    "priority": "must",
+    "rationale": "Stage documents are the narrative half of the plan and are agent-authored. Rendering them is the point of choosing MDX; bounding what they may execute is what keeps content from becoming application code.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The application renders the MDX stage document for a selected stage, and a document referencing a component outside the permitted set does not execute arbitrary code.",
+    "title": "The application renders a stage document authored in MDX",
+    "type": "requirement"
+  },
+  {
+    "evidencedBy": [
+      "AST-0034",
+      "AST-0036"
+    ],
+    "id": "REQ-0018",
+    "lifecycle": "active",
+    "openQuestions": [],
+    "priority": "must",
+    "rationale": "The agent and the operator write the same files (#15), so a view that only refreshes on reload shows state that has already moved. The second clause is the harder half: a silently dead stream renders stale content that looks live.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When a file under the content root is changed by something other than the application, the application's view updates without the operator reloading the page, and a dropped update stream is visibly distinguishable from an idle one.",
+    "title": "The application reflects external content changes without a manual reload",
+    "type": "requirement"
+  },
+  {
+    "evidencedBy": [
+      "AST-0032",
+      "AST-0033"
+    ],
+    "id": "REQ-0019",
+    "lifecycle": "active",
+    "openQuestions": [],
+    "priority": "must",
+    "rationale": "#88 forbids authoring content by any route but a typed operation, and #78 plus #72 make the write safe against the agent writing concurrently. A second write path in the app would be a second protocol against the same files.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A review-status change made in the application is written by the existing typed operation — lock, fresh read inside the lock, atomic write — and the application contains no other write path into content.",
+    "title": "The application performs review-status updates through the existing typed write path",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0020",
+    "lifecycle": "active",
+    "openQuestions": [],
+    "priority": "must",
+    "rationale": "The product is a local-first tool a consumer clones (#1, #20, #32). An application whose supported mode is undeclared cannot be validated against the configuration it actually ships in — which is why AST-0010 is deferred rather than answered.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "An operator can install and start the application on a clean machine from documented commands, and the supported deployment mode is stated rather than implied.",
+    "title": "The application is installable and runnable locally from a documented command",
+    "type": "requirement"
+  },
+  {
+    "derivedFrom": [
+      "REQ-0016",
+      "REQ-0017",
+      "REQ-0018"
+    ],
+    "evidencedBy": [
+      "AST-0021",
+      "AST-0022",
+      "AST-0033"
+    ],
+    "id": "REQ-0021",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS IS AN ARCHITECTURAL REQUIREMENT, NOT A TESTING PREFERENCE, and the distinction is what AST-0022 establishes. 'Verify it behaves correctly' is unavailable here as a matter of measured fact rather than of rigour — the observable behaviour of a compliant and a non-compliant read is IDENTICAL on a route that has at least one compliant read. The property has to be enforced where it is visible, which is in the source. ⚠️ TWO OBLIGATIONS, and the second is the one that gets forgotten: confine the read, AND check the boundary. DEC-0019 requires both `connection()` before the read and a `<Suspense>` boundary around it, and an abstraction can supply the first while a caller omits the second. A check that only looks for stray `readFileSync` calls would pass an application whose every read is correctly routed and unboundaried — which builds fine without Cache Components and FAILS THE BUILD with it, so the omission surfaces as a configuration change breaking the build rather than as the contract violation it is. ⚠️ THE MECHANISM IS DELIBERATELY UNSPECIFIED. A lint rule, a module-boundary constraint, a generated single accessor, or a build step that greps for content-root paths would each satisfy this; choosing among them is stage 5 design work that belongs with the components, and naming one here would decide it before the components exist. What is fixed is the PROPERTY: checkable without executing the application. ⚠️ IT INTERACTS WITH QST-0018 AND DOES NOT PRE-EMPT IT. If a stage document may reference components, then the permitted-component set is also a surface through which a direct read could enter, and static confinement has to cover it. That is a constraint QST-0018's answer must satisfy, not a decision about what that answer is. ⚠️ IT DOES NOT SETTLE CACHE COMPONENTS. DEC-0019 was chosen precisely so the contract holds with that flag either way, and a static check on source has nothing to say about it. Any enforcement design that only works under one setting would spend the property DEC-0019 bought. ⚠️ SCOPE EXTENDED 2026-08-27 BY DEC-0021: the same static check must also enforce that no application module outside `app/server/` imports from `lib/`, and must detect bypass paths. It is one more forbidden edge in the same import graph, not a second mechanism — and it is the same failure shape as AST-0022, because the adapter boundary is a convention that nothing observable distinguishes from a violation: an app module importing `lib/` directly behaves identically until someone renders it from a client component.",
+    "priority": "must",
+    "rationale": "AST-0022 measured that a read violating the contract is served FRESH whenever a compliant read shares its route — the compliant read makes the route dynamic and the violation rides along. So a behavioural check cannot see the violation: every freshness test passes on a codebase that breaks the contract, right up until the compliant sibling is moved, cached or deleted, at which point every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every read of planning content in the application goes through a single reading abstraction that applies the DEC-0019 contract. A direct filesystem read of the content root anywhere else in the application fails a check that does not depend on running the application or observing what it serves, and the same check verifies that each read site is enclosed by a `<Suspense>` boundary. Acceptance for REQ-0016, REQ-0017 and REQ-0018 may not rest on freshness behaviour alone.",
+    "title": "Planning-content reads are confined to the approved abstraction, and the confinement is checked statically",
+    "type": "requirement"
   }
 ]

@@ -456,5 +456,272 @@
     "statement": "Every file is rendered with a fixed placeholder where the snapshot goes; the entire tree - including MANIFEST.json and README.md - is hashed over canonical path names plus bytes; the placeholders are then replaced with the resulting hash. Verification performs the same normalization before recomputing. `toolVersion` is provenance metadata and carries no part of package identity. A separate generator fingerprint is optional and is not required.",
     "title": "The package snapshot is a normalized whole-package hash",
     "type": "decision"
+  },
+  {
+    "alternatives": [
+      {
+        "option": "Migrate app/server.mjs into the Next.js application and delete it",
+        "whyNot": "It removes the only working reference at exactly the moment a second implementation appears, so the first divergence would have nothing to be measured against. The skeleton's value is that it is verified; a migration converts it into unverified application code."
+      },
+      {
+        "option": "Reimplement the lint, derivation and locking inside the Next.js app",
+        "whyNot": "#47 has one implementation and three callers by design. A second copy inside the app becomes a second enforcement model within a month — the failure that row exists to prevent — and the lock in particular cannot be duplicated safely: two implementations of #78 are two lock protocols."
+      },
+      {
+        "option": "Defer the shell and extend app/server.mjs instead",
+        "whyNot": "#5 names Next.js and MDX and is untested by the skeleton (#100). Extending the skeleton indefinitely would keep deferring the only part of #5 that has never been exercised, while accumulating UI in a substrate that was explicitly not built to carry it."
+      }
+    ],
+    "decidedAt": "2026-08-24",
+    "id": "DEC-0017",
+    "lifecycle": "active",
+    "notes": "⚠️ Parity is the retirement condition, and it is deliberately not a date. `app/server.mjs` is retired when the Next.js slice demonstrably does what the skeleton's seven proven properties say it does — reads canonical files, derives at render time, persists nothing derived, refreshes on external change, writes through the lock, and surfaces lint findings without re-judging them. Until then two callers exist on purpose.",
+    "rationale": "The skeleton exists to prove the risky surface — the watcher, the derivation and the status write-back — and it has a test suite asserting exactly those properties. Migrating it would spend that proof on a rendering framework it was deliberately built to avoid, and would leave nothing to compare the new shell against. Keeping it as a reference makes parity CHECKABLE rather than asserted: two callers of the same modules should agree, and a disagreement is a finding about the new shell.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The Next.js/MDX application is built as a NEW shell that imports the existing lib/ modules — lint, derivation, locking and the typed operations — as the single implementation. `app/server.mjs` remains in place as the verified substrate reference until the Next.js slice reaches behavioural parity with it, and is not migrated, ported or edited to become the application.",
+    "title": "The Next.js shell reuses the substrate; the skeleton is not migrated",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0017",
+      "REQ-0020"
+    ],
+    "alternatives": [
+      {
+        "option": "Ship `next dev` as the supported configuration",
+        "whyNot": "It is cheaper today and permanently unvalidatable. AST-0015 shows the dev and production artifacts differ, so no experiment run against `next dev` says anything about what a consumer receives — the evidence loop this entire product is built around would be measuring the wrong thing forever. It also keeps AST-0010 deferred by keeping the deployment mode undeclared, which is deferral by avoiding the question rather than by judgement."
+      },
+      {
+        "option": "Support both modes as shipped configurations",
+        "whyNot": "Two supported configurations are two things to validate, and #96's applicability filter would need every claim scoped by mode — doubling the evidence work to serve a second configuration nobody asked for. A contributor workflow is not a shipped configuration, and naming it one would make it owed."
+      },
+      {
+        "option": "Defer pending discovery on long-running development servers",
+        "whyNot": "The question that discovery answers — is a long-lived `next dev` sound — is the wrong question. Even a perfectly stable development server would still be shipping an artifact that differs from the production one. More reading could not move the principle, so spending the search credential here would buy nothing; it is preserved for QST-0018 and QST-0020, where external failure reports can genuinely change the decision."
+      }
+    ],
+    "decidedAt": "2026-08-25",
+    "evidencedBy": [
+      "AST-0015",
+      "AST-0017",
+      "AST-0018"
+    ],
+    "id": "DEC-0018",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS MAKES AST-0010 OWED, IMMEDIATELY AND KNOWINGLY. Its reopening condition (#137, #80 branch 3) is 'execute before adopting `next build` / `next start`, or when upgrading beyond the tested version' — and BOTH clauses have now fired: this decision adopts production mode, and the version sourced and probed on 2026-08-24/25 is Next.js 16.3.2 against a claim tested at 16.3.1. The cost is accepted rather than discovered: #80's condition fires when the risk becomes POSSIBLE, not when it is observed, because the second means shipping the failure once to learn it was real. ⚠️ It lands at roadmap step 3b (stage 6, risk and feasibility), which is exactly where the roadmap said it would land when it was written — the ordering was not retrofitted to this answer.",
+    "rationale": "AST-0015 is decisive on its own: `next dev` and `next build` produce different artifacts, so shipping the development server means shipping a configuration this project can NEVER validate as production — every validation would be measuring something other than what users receive. A shipped configuration should be validated in the mode users receive, and that principle does not depend on how well the development server behaves. AST-0017 establishes the option is actually available: a self-hosted Node.js deployment supports all Next.js features with no platform or adapter, so production mode is reachable for a local-first clonable tool. AST-0018 removed the project-specific objection — a concurrent `next dev` did not measurably interfere with the chokidar watcher — but that argument was never the reason to prefer production, only a reason someone might have preferred dev.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The application shell's supported configuration is `next build` followed by `next start`. `next dev` remains available to contributors working on the application and is not a shipped configuration: nothing a consumer runs, and nothing the project validates against, is the development server.",
+    "title": "The application ships in production mode; `next dev` is a contributor workflow only",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0023",
+      "REQ-0016",
+      "REQ-0017",
+      "REQ-0018"
+    ],
+    "alternatives": [
+      {
+        "option": "`io()` from `next/cache` behind a Suspense boundary",
+        "whyNot": "It is the documented Cache Components primitive and it is the better-behaved mechanism where it applies — it does not block prefetching. But EVD-0023 measured it FROZEN with cacheComponents disabled, because the documentation is explicit that it resolves immediately in routes without Cache Components. A route built on `io()` would silently serve build-time content if that flag were ever turned off, and nothing in the build output or the served page would say so. Adopting it would also decide the caching model as a side effect of a freshness question, which is precisely the coupling this question was scoped to avoid."
+      },
+      {
+        "option": "`export const dynamic = 'force-dynamic'`",
+        "whyNot": "Measured fresh, and the simplest thing that works today. It was REMOVED in Next.js 16.0.0 when Cache Components is enabled, so it is not a contract — it is a mechanism with a known expiry date that the project would have to migrate off the first time anyone enables the flag."
+      },
+      {
+        "option": "`connection()` without a Suspense boundary",
+        "whyNot": "Measured fresh with Cache Components disabled, and it FAILS THE BUILD with Cache Components enabled (`blocking-prerender-dynamic`). Loud rather than silent, which is the better failure — but it still makes the contract conditional on a flag."
+      },
+      {
+        "option": "Read planning content from the client instead of the server",
+        "whyNot": "It sidesteps the prerender entirely and would work. It also moves every planning-content read out of the Server Component model, which pushes a component-boundary decision this question was explicitly scoped not to make (QST-0018), and it would need a fetch endpoint that does not exist. Available later if the prefetch cost turns out to matter; nothing here forecloses it."
+      },
+      {
+        "option": "Accept the staleness and document it",
+        "whyNot": "Not compatible with REQ-0016, REQ-0017 and REQ-0018 as written. Silently serving build-time content violates those requirements rather than raising the risk of violating them, so an accepted-risk signoff would be recording a requirement failure as a tolerance."
+      }
+    ],
+    "decidedAt": "2026-08-26",
+    "evidencedBy": [
+      "AST-0019",
+      "AST-0020",
+      "AST-0021",
+      "AST-0022",
+      "EVD-0023"
+    ],
+    "id": "DEC-0019",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PREFETCH LIMITATION IS AN ACCEPTED DESIGN COST, NOT AN OPEN HAZARD, and it is recorded here rather than as a question on purpose. The Next.js documentation states that `connection()` stays suspended until a full user navigation reaches the server, so it also blocks prefetches; `io()` does not. For a local-first tool served over loopback to one operator, correctness of what is on screen outranks the latency a prefetch would have saved. No artifact tracks this as unresolved, because it is not unresolved — it was weighed and paid. If prefetch latency ever becomes a measured problem, that is a new observation that would reopen this decision through supersession, not a deferral sitting open in the backlog today. ⚠️ WHAT THIS DELIBERATELY DOES NOT DECIDE. The Cache Components setting stays undecided — the whole point of the chosen mechanism is that the contract holds either way, so deciding it here would spend the property that was just bought. The MDX component boundary (QST-0018) is untouched: this constrains WHEN a planning-content read may happen, not which component performs it or how the document is rendered. ⚠️ VALIDATION IS OWED AND NOT YET DONE. EVD-0023 measured the mechanism; it has not yet measured the contract as stated above, with `connection()` before each read and a fallback that is a real loading state. Stage 6's `high-severity-risks-mitigated` stays `not-satisfied` until that validation passes — a decision to mitigate is not a mitigation, which is the correction the stage already carries from the AST-0010 round.",
+    "rationale": "The deciding property is independence from the Cache Components setting, not freshness. EVD-0023 measured three mechanisms that serve fresh reads, and only this one does so in both caching models: `export const dynamic` does not exist when Cache Components is enabled, `connection()` without a boundary fails the build there, and `io()` behind a boundary is fresh only when the flag is on. AST-0019 established that the freeze itself is unconditional, so the contract that fixes it must be unconditional too. A freshness contract that depends on an unrelated configuration flag is a contract that breaks silently when someone changes the flag — the same failure shape as the build-time freeze it replaces, and harder to see. Choosing `connection()` also keeps this decision inside the freshness contract: the caching model stays undecided, which is where it belongs until the component boundary work reaches it.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every server-side read of planning content must await `connection()` from `next/server` before the filesystem read, and that read must sit inside a `<Suspense>` boundary whose fallback is a real loading state for the content being read. This is the artifact-reading contract for REQ-0016, REQ-0017 and REQ-0018. A boundary added only to satisfy the build — one wrapping the whole page, or one whose fallback renders nothing — does not satisfy it: the boundary exists so the static shell can ship while the fresh read streams, and a page-level wrapper makes the whole page the fallback and buys nothing.",
+    "title": "Planning-content reads go through `connection()` inside a Suspense boundary",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0018",
+      "REQ-0017"
+    ],
+    "alternatives": [
+      {
+        "option": "Strip forbidden JavaScript silently, as `next-mdx-remote`'s `blockJS` does",
+        "whyNot": "It is the ecosystem default and it is safe in the security sense, which is why it was the original proposal. It fails on a different axis: the author gets no signal, and a stage document that quietly lost a paragraph still renders, still validates, and still ships in the handoff package. That is AST-0028's failure shape arriving through the content pipeline instead of the publisher. Retained UNDER the rejection as defence in depth, never as the contract."
+      },
+      {
+        "option": "Plain markdown for stage documents; MDX only for a fixed set of authored pages",
+        "whyNot": "Genuinely viable and materially simpler — no plugin, no compile-time contract, and the CVE class disappears rather than being managed. It loses the component vocabulary in stage documents, which is the reason MDX was proposed: the narrative half of the plan is where a callout, a status chip or a criterion table earns its place. Recorded as the fallback if the per-request compilation cost measured later proves unacceptable."
+      },
+      {
+        "option": "Unrestricted MDX, trusting the agent as the author",
+        "whyNot": "It is what MDX's documentation permits — trust your authors — and it is inconsistent with this project's own posture. #88 forbids hand-authoring artifacts precisely because the writer should be a typed operation with a schema behind it; treating the same agent as trusted to write executable documents contradicts that. AST-0028 makes it concrete rather than philosophical: the handoff package ships stage documents verbatim to other people, so unrestricted MDX exports execution to recipients."
+      },
+      {
+        "option": "Keep file-routed `app/**/page.mdx` and accept build-time compilation",
+        "whyNot": "Measured and rejected: AST-0030 shows a file-routed document is compiled into the build and does not reflect an edit, which REQ-0018 forbids. `connection()` cannot recover it because there is no request-time read left to make dynamic."
+      }
+    ],
+    "decidedAt": "2026-08-26",
+    "evidencedBy": [
+      "AST-0029",
+      "AST-0030",
+      "AST-0031",
+      "AST-0023",
+      "AST-0026",
+      "AST-0027",
+      "AST-0028"
+    ],
+    "id": "DEC-0020",
+    "lifecycle": "active",
+    "notes": "⚠️ RUNTIME COMPILATION IS FORCED, AND IT IS THE UNCOMFORTABLE PART. AST-0030 rules out file-routed MDX, so a fresh stage document must be compiled per request — which is what `next-mdx-remote` does and where CVE-2026-0969 lived. AST-0031 is what makes that acceptable: the rejection is a property of the plugin, so it holds identically in the runtime path. The restriction is not belt-and-braces here; it is what makes the only viable design defensible. ⚠️ REQ-0021 COVERS THE MAPPED COMPONENTS, and the two contracts help each other. The component implementations reachable from the mapping are ordinary application source, so REQ-0021's static confinement of planning-content reads applies to them exactly as to any other module — a mapped component performing a direct read is the violation REQ-0021 exists to catch. And because imports are refused inside documents, the mapping IS the complete set of components a document can reach, so the confinement check's scope is enumerable rather than open-ended. ⚠️ WHAT IS NOT ESTABLISHED. That the five rejected constructs are every way to reach JavaScript in MDX — six examples cannot show that, and it is the reason stripping stays underneath. That a later rehype or recma stage cannot reintroduce JavaScript. That per-request compilation is affordable at the sizes this project produces. And composing the compile with DEC-0019's `connection()` boundary, which has not been run. ⚠️ CONFIGURATION IS PART OF THE CONTRACT, not incidental: Turbopack is the default builder at 16.3.2 and serialises the config, so the plugin is referenced by ABSOLUTE module path. Both constraints were measured, and both first looked like the contract failing. ⚠️ DOES NOT SETTLE CACHE COMPONENTS. Nothing here touches that flag, and DEC-0019 was chosen so it does not have to be settled. ⚠️ AMENDED 2026-08-26, AND THE AMENDMENT IS THE MECHANISM RATHER THAN A CLARIFICATION. The decision as first recorded named the restriction but left the compilation path to be inferred from AST-0030 in the notes. It is now in the statement: `@mdx-js/mdx` at request time, NOT `@next/mdx` file routing. A reader who took the obvious path — `app/**/page.mdx`, which is what the Next.js documentation shows — would have built something that satisfies REQ-0017 and silently fails REQ-0018, and the decision would have looked satisfied. ⚠️ FOUR ACCEPTANCE OBLIGATIONS ARE CARRIED FORWARD, recorded here and in stage 7 §5. They are NOT `acceptance-criterion` artifacts yet, and that is the schema refusing rather than an oversight: `evaluates` is required with `minItems: 1` and targets `component`, and the application shell has no components until stage 5 runs. A criterion that evaluates nothing cannot be run. They become artifacts at roadmap step 3a. (1) PINNING — the compiler and plugin chain are fixed; changing MDX or adding a remark/rehype/recma plugin reopens security validation. This is a #80 reopening condition and it fires when the change is PROPOSED, not when a document is found to have escaped. (2) REJECTION HOLDS — document-supplied JavaScript stays refused, with stripping underneath as defence in depth. The criterion must check the refusal, not merely the absence of executed code, because stripping alone would also produce no executed code. (3) COST IS MEASURED — per-request compilation cost must be measured, not assumed acceptable. Plain markdown for stage documents remains the fallback, and it is this decision's second recorded alternative rather than a new decision to invent under time pressure. (4) COMPOSITION — runtime reading and compilation must compose with DEC-0019's `connection()` and `<Suspense>` contract. Neither contract has been observed with the other, and REQ-0021's static confinement covers the read that feeds the compiler exactly as it covers any other.",
+    "rationale": "AST-0023 established that MDX supplies no allowlist and that its own security model is trusting the author; AST-0026 recorded what that cost someone else, as CVE-2026-0969. AST-0027 showed the ecosystem's answer was to remove the capability rather than filter it. The amendment that shapes this decision is that removal must be LOUD: silent stripping reproduces exactly the failure AST-0028 found in the publisher, where content is absent while the output still looks valid, and this project already refuses that trade in `checkJob` — a shell-string command is refused rather than sanitised, because sanitising means guessing what the author meant. A document is a plan someone will act on; a line that vanished is worse than a build that stopped. Rejection also happens to be the only version that can produce a diagnostic at all: `file.fail` carries the node's position, while a stripping plugin has nothing to report because by construction nothing is wrong afterwards.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Stage documents are authored in MDX and compiled AT REQUEST TIME with `@mdx-js/mdx` (`compile` then `run`). They are NOT routed as `@next/mdx` file-based pages: that path compiles the document into the build and cannot satisfy REQ-0018. Compilation runs a remark plugin that REJECTS, with a file path and a line:column position, every ESM import or export, every JavaScript expression, every JSX attribute expression, every JSX spread attribute, and every JSX element whose name is not in the permitted component set. Rejection is the user-visible contract: forbidden JavaScript fails the compile and is never silently removed. The permitted set is the component mapping, which is the only route by which a component can reach a document once imports are refused. The compiler and its plugin chain are PINNED, and changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before the change may ship. Stripping may be retained beneath the rejection as defence in depth, but it may never be the observable behaviour.",
+    "title": "Stage documents are restricted MDX, compiled at request time; forbidden JavaScript is an error",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0020",
+      "REQ-0019"
+    ],
+    "alternatives": [
+      {
+        "option": "Put `import 'server-only'` at the top of each Node-only module in `lib/`",
+        "whyNot": "The documentation's own example, and what anyone would write first. Measured to break the tool: the package maps `react-server` to an empty module and everything else to one that THROWS on import, so `npm test` and every `bin/` command would fail. It guards the application by breaking the CLI the application exists to serve."
+      },
+      {
+        "option": "No guard; rely on the build failing anyway",
+        "whyNot": "It does fail — that is the trap. A check asking only whether the wrong import is prevented reports success here, which is why the Next.js documentation can honestly call the marker optional. The failure carries no file and no position, so the first person to hit it is debugging Turbopack rather than their own import."
+      },
+      {
+        "option": "`export *` from the adapter, so it stays a one-line file per module",
+        "whyNot": "It makes the adapter a hole rather than a door. The exposed surface would then grow silently every time `lib/` gains an export, including modules that spawn processes or take locks, and nobody would review the widening because there is no diff to review. Explicit named exports make the surface a decision each time it changes."
+      },
+      {
+        "option": "Reimplement the needed logic inside the application",
+        "whyNot": "Contradicts DEC-0017 and #47 directly: one implementation, several callers. It is also unnecessary, since the plain relative import was measured to work."
+      }
+    ],
+    "decidedAt": "2026-08-27",
+    "evidencedBy": [
+      "AST-0032",
+      "AST-0033"
+    ],
+    "id": "DEC-0021",
+    "lifecycle": "active",
+    "notes": "⚠️ REQ-0021 GAINS AN EDGE, NOT A SECOND MECHANISM. Its static confinement already has to find planning-content reads outside the approved abstraction; `app/**` importing `lib/**` outside `app/server/` is the same kind of forbidden edge in the same import graph. One check, two rules — and the bypass path is the thing it must detect, because the adapter is a convention until something enforces it and `import '../../lib/x.mjs'` goes straight around the guard. ⚠️ TESTS ASSERT A LOCATABLE FAILURE, NEVER THE WORDING, and this is a measured precaution rather than a style rule. Next.js produced two different messages for the same violation reached two ways, and one of them was WRONG — it said \"you are using it in the Pages Router\" for an App Router project. A test pinned to that string would pass on a wrong message today and break on a correct one after an upgrade. The contract is: the build fails, it names the file, and it carries a line:column. The prose belongs to Next.js. ⚠️ PROCESS-SPAWNING, LOCKING AND STATEFUL MODULES ARE HELD BACK DELIBERATELY. The probe re-exported two pure-ish functions; it did not establish that a lock or a child process survives the adapter, and a Server Component may run concurrently in ways a CLI never does. Each such module is reviewed on its own before it is exposed, so the unexamined case cannot arrive as a side effect of adding a line to an adapter. ⚠️ WHAT IS NOT ESTABLISHED: whether every module the shell eventually needs can be re-exported this way, and whether the unguarded failure mode differs under webpack rather than Turbopack. ⚠️ DOES NOT SETTLE CACHE COMPONENTS.",
+    "rationale": "AST-0032 measured that the import itself needs nothing: a Server Component reaches a sibling `lib/` module by plain relative path with no alias or bundler configuration, so #47's single implementation stays single for free. What needed deciding was the boundary. A `'use client'` file drags all of its imports into the client bundle (EVD-0046), and while that already fails the build, unguarded it fails as a Turbopack internal error with `location: undefined` and no filename — indistinguishable from a bundler bug. The `server-only` marker changes no runtime behaviour and prevents nothing that was not already prevented; it makes the failure LOCATABLE, which in a tool whose whole premise is legible refusals is the difference that matters. AST-0033 then forced the placement: `server-only` throws when imported outside the RSC compiler, and `lib/` is imported by every `bin/` command and the whole test suite, so the marker cannot live there. The adapter is the only location that guards the app without breaking the tool, and the marker was measured to propagate through a re-export.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Application code reaches the shared `lib/` modules exclusively through a thin adapter layer under `app/server/`. Every adapter module begins with `import 'server-only'`, before any other import. Adapters re-export by EXPLICIT NAMED EXPORT or wrap the underlying function; blanket `export *` is not permitted. An adapter exposes only the capabilities the shell actually needs, and any module that spawns a process, takes a lock, or holds module-level state requires individual review before it may be exposed at all. No application code outside `app/server/` may import from `lib/` directly. `lib/` itself carries no `server-only` marker, so it remains importable by the CLIs in `bin/` and by the test suite under plain Node. REQ-0021's static check enforces this boundary and detects bypass paths.",
+    "title": "The shell reaches `lib/` only through an `app/server/*` adapter carrying `server-only`",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0021",
+      "REQ-0018",
+      "REQ-0020"
+    ],
+    "alternatives": [
+      {
+        "option": "Comment-line keepalive every 15 seconds, as the specification's authoring note suggests",
+        "whyNot": "It is the documented idiom and it solves the problem the specification raises — legacy proxies dropping idle connections. It does not solve THIS problem. The client parser ignores comment lines, so no page code can observe one, and the operator's page would remain indistinguishable from a healthy one after the stream died. Correct for its purpose, invisible for ours."
+      },
+      {
+        "option": "Event ids plus `Last-Event-ID` resumption, so a client can recover missed changes",
+        "whyNot": "The complete answer to a delta stream, and unnecessary here. Events are hints, not deltas (#73), so there is nothing to replay: a reconnecting client that reloads has the current state by definition. Adding ids would mean maintaining a server-side buffer and a replay path whose only purpose is to reproduce what a reload already achieves."
+      },
+      {
+        "option": "Assert that the watcher starts on `listen` and closes through `server.close()`",
+        "whyNot": "True of the walking skeleton and NOT established for the shell. That lifecycle belongs to a `node app/server.mjs` process that owns its own HTTP server; under `next build` + `next start` there is no such object and the process model differs. Writing it into a decision would record an untested claim about a configuration that has never been run."
+      },
+      {
+        "option": "Log watcher failures to the server console and leave the page alone",
+        "whyNot": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing."
+      }
+    ],
+    "decidedAt": "2026-08-27",
+    "evidencedBy": [
+      "AST-0036",
+      "AST-0034",
+      "AST-0035"
+    ],
+    "id": "DEC-0022",
+    "lifecycle": "active",
+    "notes": "⚠️ THE WATCHER LIFECYCLE IS STATED AS AN OBLIGATION, NOT A MECHANISM, and the difference is the point of the amendment. 'The launcher owns both processes and terminates the watcher with the application' is a contract stage 5 must satisfy and validate. The skeleton's create-on-listen / close-in-`close()` pattern is evidence that the shape works for a process that owns its own server; it is not evidence about `next start`, and the two were nearly conflated here. ⚠️ WHAT THE WATCHDOG WINDOW IS, IS NOT DECIDED. The heartbeat interval and the client's tolerance are stage 5 parameters; what is fixed is that a missed heartbeat becomes visible rather than inferred. ⚠️ THE TRUTHFUL-COUNT RULE IS DELIBERATELY ABSOLUTE. 'No rendered count may include an artifact the page did not render' admits no partial-failure exception, because every version of this defect found so far arrived as a reasonable-looking exception: the publisher skipped what it did not recognise, the read path skipped what it could not parse. A count is a claim, and a claim about content that was not rendered is false. ⚠️ NOT ESTABLISHED: browser reconnect behaviour (specification-only; no `EventSource` in this Node build and no browser on this host), idle timeouts beyond six seconds, concurrent clients, and malformation modes other than invalid JSON. ⚠️ DOES NOT SETTLE CACHE COMPONENTS.",
+    "rationale": "AST-0034 measured that the skeleton's idle stream and its dead stream are byte-identical and that a change during a disconnect gap is never recovered, which refutes REQ-0018's second clause by construction. AST-0036 then removed the obvious repair: a comment heartbeat is ignored by the client parser, so it fixes the bytes without fixing the visibility — the page stays falsely healthy while something is demonstrably happening on the wire. A named event with a client watchdog is the smallest mechanism the requirement can actually be met with. The reconnect-as-change-hint design survives unchanged and is the part that removes work rather than adding it: because #73 makes events hints rather than deltas, a client that reloads on reconnection is exactly caught up, so the buffering and resumption machinery that a delta stream would need is unnecessary. AST-0035 supplies the read-path half: a corrupt artifact currently vanishes while the header still counts it, which tells the operator the missing thing is present.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The application is started by a documented launcher that owns both the application process and the file watcher, and that terminates the watcher with the application. The mechanism binding them is stage 5's to choose and to validate; nothing is claimed today about how the watcher's lifetime is enforced under `next start`. The update stream emits a NAMED heartbeat event carrying data at a fixed interval, and the client runs a watchdog that renders a visibly disconnected state when a heartbeat fails to arrive within its window; comment-only keepalives are not sufficient because the client parser ignores them. A watcher failure must either emit a visible failure signal on the stream or close the stream — logging alone is not permitted, because a page whose watcher has died otherwise stays live-looking and stale. On reconnection the client reloads, treating reconnection itself as a change hint; no event buffer, event id or `Last-Event-ID` handling is required, because events are hints and never deltas. A malformed or unreadable artifact must be surfaced visibly and located, and no rendered count may include an artifact the page did not render.",
+    "title": "The shell's lifecycle contract: a launcher owns both processes, and stream health is a visible event",
+    "type": "decision"
+  },
+  {
+    "addresses": [
+      "QST-0019",
+      "REQ-0016"
+    ],
+    "alternatives": [
+      {
+        "option": "Start with the assertion/evidence view, which already has a working implementation",
+        "whyNot": "The cheapest view to reach and the wrong one to start with. DEC-0017 keeps `app/server.mjs` as the verified substrate reference until the shell reaches parity, so that view HAS a working home today — building it again first would spend the slice re-achieving something that already works while REQ-0016 and REQ-0017 stay unaddressed. It is an argument about order, and the order it argues for is later."
+      },
+      {
+        "option": "A single combined view: current stage and its document on one page",
+        "whyNot": "Fewer routes, and it collapses navigation into the thing being navigated. Nine stages need somewhere to be listed with their gate state, and REQ-0016 is about the project's position rather than one stage's content. Merging them would also put the derived stage list behind the per-request MDX compile, paying an unmeasured cost to render something that does not need it."
+      },
+      {
+        "option": "Add a tracker or dashboard to the first slice",
+        "whyNot": "No requirement in REQ-0016..REQ-0019 asks for one, and DEC-0022's truthful-count rule binds every summary surface — so a tracker is not a view, it is a view plus an obligation to prove every total it prints. Deferred until something demands it (#106)."
+      },
+      {
+        "option": "Permit client-held view state for interface smoothness",
+        "whyNot": "Rejected as stated, and permitted as amended. Blanket 'no client state' was too strong — transient interface state is harmless and forbidding it would be a rule nobody could follow. What may not live only in the client is anything whose loss is a correctness problem, because the reload contract will destroy it without warning and the user will not know what they lost."
+      }
+    ],
+    "decidedAt": "2026-08-27",
+    "evidencedBy": [
+      "AST-0034",
+      "AST-0035"
+    ],
+    "id": "DEC-0023",
+    "lifecycle": "active",
+    "notes": "⚠️ THE STATE RULE IS THE LOAD-BEARING CLAUSE, and its wording was corrected during approval. 'No client state' is unenforceable and wrong — a disclosure triangle holds client state. The rule is about CONSEQUENCE: DEC-0022 reloads the page on every content change and every reconnection, so any state held only in the client is state the system will silently discard at a moment the user did not choose. Transient interface state survives that fine because losing it costs nothing. Filters, a selected section, unsaved work and navigational context do not, so they are URL-encoded or persisted. ⚠️ DEFERRED IS NOT REMOVED, and the distinction is recorded because deferral silently becoming deletion is #107's failure. The artifact tracker and the assertion/evidence view remain in the roadmap at step 5; the latter has a working reference implementation in the skeleton, which is why it can wait rather than why it is unnecessary. ⚠️ WHAT WOULD CHANGE THIS. If per-request MDX compilation is measured expensive (DEC-0020's third obligation), the stage view is where it lands, and the fallback is that decision's own second alternative — plain markdown — not a different information architecture. If reload-on-change proves too coarse in use, the answer is a finer change signal, not client-held correctness state: the reload contract is what makes the missed-change defect impossible. ⚠️ DOES NOT SETTLE CACHE COMPONENTS. Nothing in this architecture depends on that flag, which is the property DEC-0019 was chosen to preserve and the fourth decision in a row to preserve it.",
+    "rationale": "This is a product decision and no source settles it; sequencing it fifth bought elimination rather than evidence. DEC-0022 makes every content change and every reconnection a full page reload, which is the sharpest constraint and the one that would have been discovered last — it decides what state a view may hold far more than any preference about views does. DEC-0019's blocked prefetching argues for fewer, denser views, an inference from an accepted cost rather than a measurement. DEC-0020's per-request compilation cost is explicitly unmeasured, which caps the design at one stage document per view. DEC-0021 makes read-only views cheap while the review-status write is the one locking capability the slice must get individually reviewed and exposed. Two views is what remains once those four have spoken, and it satisfies REQ-0016 through REQ-0019 without adding a surface the truthful-count rule would then have to cover.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The application shell opens with exactly two views. `/` is the project view: the derived current stage, navigation across all nine stages with their gate state, artifact counts under the truthful-count rule, and lint findings surfaced rather than re-judged. `/stage/[stageId]` is the stage view: the working stage document rendered as restricted MDX, the stage's exit criteria with their recorded attestations, and review actions through the typed write path. Both views are URL-addressable and server-rendered. NO CORRECTNESS-CRITICAL STATE IS HELD ONLY IN THE CLIENT: transient interface state is permitted, but anything a user must not lose — filters, a selected section, unsaved work, navigational context — is URL-encoded or persisted. The artifact tracker and the assertion/evidence view are DEFERRED, not removed.",
+    "title": "The first slice is two views: a project view and a stage view",
+    "type": "decision"
   }
 ]

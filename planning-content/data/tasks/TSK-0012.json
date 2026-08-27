@@ -2,7 +2,7 @@
   "id": "TSK-0012",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Expose the review-status write through the adapter, with individual review",
   "statement": "Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.",
@@ -17,7 +17,7 @@
     "ACC-0034"
   ],
   "dependsOn": [
-    "TSK-0011"
+    "TSK-0010"
   ],
-  "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added."
+  "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added. ⚠️ DEPENDENCY CHANGED 2026-08-27: it waited on the change stream, which coupled the first WRITE path to the streaming work for no reason. The review action needs a view to sit in and a URL to identify an artifact by, and nothing else. Review writing and the stream now proceed independently."
 }

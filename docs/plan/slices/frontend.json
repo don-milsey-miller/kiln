@@ -1,0 +1,417 @@
+{
+  "acceptanceCriteria": [
+    {
+      "evaluates": [
+        "CMP-0015"
+      ],
+      "id": "ACC-0013",
+      "lifecycle": "active",
+      "notes": "Two halves, and the second is what makes the first mean anything: a stored status field could produce the same display and go stale silently. Pass/fail without judgement — the stage either changes or it does not, and the field either exists or it does not.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "With the application running, changing a recorded attestation so that a different stage becomes the earliest unready one causes the project view to display that stage as current, without restarting the application. No field storing a stage or status value exists anywhere under the content root.",
+      "title": "The displayed current stage follows the attestations on disk",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0016"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0015"
+      ],
+      "id": "ACC-0014",
+      "lifecycle": "active",
+      "notes": "⚠️ NO PARTIAL-FAILURE EXCEPTION, deliberately. AST-0035 measured the skeleton printing 178 while rendering 177 — the count is what turns an incomplete page into a misleading one, because an operator reading the total has been told the missing thing is present. ⚠️ AMENDED 2026-08-27, AND THE ORIGINAL WAS NOT MERELY IMPRECISE — IT WAS UNFALSIFIABLE. It asked that each displayed total equal 'the number rendered on the page'. The project view renders TOTALS, not artifact entries, so there is nothing on the page to count: the criterion compared a number with itself and would have passed on any implementation, including one that printed a constant. ⚠️ The fix is an INDEPENDENT ORACLE. A fixture with known composition is the only source of truth the application cannot influence, which is what makes this a test rather than a tautology. It is the same defect as a check nobody has seen fail (ACC-0024), reached from the other direction: there, the check had never been shown to fail; here, it could not.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Evaluated against a fixture content root whose composition is known in advance. For each artifact type, the total the project view displays equals the number of files of that type in the fixture that parse successfully and validate. Ground truth comes from the fixture, not from the page: the count is computed independently of the application and compared with what was rendered.",
+      "title": "Every displayed total equals the fixture's parsable artifacts of that type",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0016"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0015"
+      ],
+      "id": "ACC-0015",
+      "lifecycle": "active",
+      "notes": "All three clauses are required together. Naming the file without correcting the count still leaves the page asserting an artifact it did not render; correcting the count without naming the file leaves an operator hunting for what changed.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "With exactly one artifact file under the content root made unparseable, the project view (a) names that file's path, (b) shows a parse position, and (c) prints a total for that type exactly one lower than before. The response is not an error page: every other artifact still renders.",
+      "title": "An unreadable artifact is named, located, and subtracted from its count",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0016"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0012",
+        "CMP-0016"
+      ],
+      "id": "ACC-0016",
+      "lifecycle": "active",
+      "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
+      "title": "The stage view's reads resolve behind separate boundaries",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013",
+        "CMP-0016"
+      ],
+      "id": "ACC-0018",
+      "lifecycle": "active",
+      "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
+      "title": "A permitted document renders, including its mapped components",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0017"
+      ],
+      "id": "ACC-0029",
+      "lifecycle": "active",
+      "notes": "AST-0034 measured the skeleton's idle and dead streams as byte-identical, which is the strongest possible form of indistinguishable. 'Not by colour alone' keeps the fix legible to anyone who cannot rely on a colour difference.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "When heartbeats stop arriving, the page shows a stale indication that is distinguishable from the healthy state by text or icon and not by colour alone, within the configured watchdog window.",
+      "title": "A stopped heartbeat produces a visibly stale page within the watchdog window",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0018"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0017"
+      ],
+      "id": "ACC-0030",
+      "lifecycle": "active",
+      "notes": "AST-0034 measured the gap being lost with nothing to recover it from. The last sentence records the design that makes this cheap: because events are hints and never deltas, a reconnecting client that reloads is exactly caught up.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "After the stream drops and reconnects, the client reloads, and a content change made during the disconnected window is reflected in what the page then shows. No event buffer, event id or `Last-Event-ID` handling is required to achieve this.",
+      "title": "Reconnection reloads, and a change made while disconnected is then visible",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0018"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0015",
+        "CMP-0016"
+      ],
+      "id": "ACC-0035",
+      "lifecycle": "active",
+      "notes": "⚠️ SCOPED TO CORRECTNESS-CRITICAL STATE, per DEC-0023's corrected wording. Transient interface state is permitted and is not covered here. The reason this needs a criterion at all is that DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "For each selection the views expose that is not purely presentational — at minimum the selected stage and the selected artifact — opening the same URL in a session with no prior client storage restores the same selection.",
+      "title": "Every correctness-critical selection survives a reload in a fresh session",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0016"
+      ]
+    }
+  ],
+  "accepted": [],
+  "blockedByOtherRoles": [
+    {
+      "role": "platform",
+      "task": "TSK-0006"
+    },
+    {
+      "role": "platform",
+      "task": "TSK-0008"
+    },
+    {
+      "role": "platform",
+      "task": "TSK-0011"
+    },
+    {
+      "role": "platform",
+      "task": "TSK-0015"
+    }
+  ],
+  "components": [
+    {
+      "id": "CMP-0015",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47).",
+      "responsibility": "Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0016"
+      ],
+      "schemaVersion": 2,
+      "title": "Project view",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0016",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ AT MOST ONE STAGE DOCUMENT PER RENDER, because DEC-0020's per-request compilation cost is explicitly unmeasured and a view rendering several would multiply an unknown. ⚠️ NO CORRECTNESS-CRITICAL CLIENT STATE. Transient interface state is fine; anything a user must not lose is URL-encoded or persisted, because DEC-0022 reloads this page on every content change and every reconnection — at a moment the user did not choose and without telling them what went. ⚠️ OUTSIDE ITS BOUNDARY: it does not compile, read or write; it composes the components that do.",
+      "responsibility": "Render `/stage/[stageId]`: the stage's document through the restricted MDX compiler, its exit criteria with their recorded attestations, and the entry points for review actions. Hold no correctness-critical state in the client.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0017",
+        "REQ-0019"
+      ],
+      "schemaVersion": 2,
+      "title": "Stage view",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0017",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly.",
+      "responsibility": "Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0018"
+      ],
+      "schemaVersion": 2,
+      "title": "Change stream",
+      "type": "component"
+    }
+  ],
+  "note": "Generated as a query over the task graph, grouped by `task.role` (#19). Nothing here is authored: re-running the handoff recomputes it, so a slice cannot drift from the plan. `tasks` is work REMAINING; `accepted` is work already finished, listed so nobody repeats it. Both statuses are derived from acceptance criteria, never stored.",
+  "requirements": [
+    {
+      "id": "REQ-0016",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "REQ-0002 requires current project state to be inspectable at any time, and stage position is the coarsest form of that state. Deriving it rather than storing it follows #16: stage status is derived from artifacts, never persisted alongside them.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The application shows which stage the project is in, derived from the stage definitions and the recorded attestations rather than from a stored status value.",
+      "title": "The application displays the project's current stage",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0029",
+        "AST-0031"
+      ],
+      "id": "REQ-0017",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "Stage documents are the narrative half of the plan and are agent-authored. Rendering them is the point of choosing MDX; bounding what they may execute is what keeps content from becoming application code.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The application renders the MDX stage document for a selected stage, and a document referencing a component outside the permitted set does not execute arbitrary code.",
+      "title": "The application renders a stage document authored in MDX",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0034",
+        "AST-0036"
+      ],
+      "id": "REQ-0018",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "The agent and the operator write the same files (#15), so a view that only refreshes on reload shows state that has already moved. The second clause is the harder half: a silently dead stream renders stale content that looks live.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "When a file under the content root is changed by something other than the application, the application's view updates without the operator reloading the page, and a dropped update stream is visibly distinguishable from an idle one.",
+      "title": "The application reflects external content changes without a manual reload",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0032",
+        "AST-0033"
+      ],
+      "id": "REQ-0019",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "#88 forbids authoring content by any route but a typed operation, and #78 plus #72 make the write safe against the agent writing concurrently. A second write path in the app would be a second protocol against the same files.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A review-status change made in the application is written by the existing typed operation — lock, fresh read inside the lock, atomic write — and the application contains no other write path into content.",
+      "title": "The application performs review-status updates through the existing typed write path",
+      "type": "requirement"
+    }
+  ],
+  "role": "frontend",
+  "tasks": [
+    {
+      "acceptedBy": [
+        "ACC-0013"
+      ],
+      "dependsOn": [
+        "TSK-0006",
+        "TSK-0015"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0016"
+      ],
+      "id": "TSK-0007",
+      "implements": [
+        "CMP-0015"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one. ⚠️ SPLIT 2026-08-27 — it was named as visibly oversized when the plan was written, and it was. The totals, the lint surface and located parse failures are its sibling. This half is the navigation spine; that half is the truthfulness rules, and they fail in different ways. ⚠️ Depends on BOTH boundary checks, so every view file written from here on is checked as it lands.",
+      "reviewStatus": "amended",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
+      "title": "Build the project view's stage navigation and derived current stage",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0016",
+        "ACC-0018"
+      ],
+      "dependsOn": [
+        "TSK-0008",
+        "TSK-0007"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0017",
+        "REQ-0019"
+      ],
+      "id": "TSK-0009",
+      "implements": [
+        "CMP-0016"
+      ],
+      "lifecycle": "active",
+      "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
+      "title": "Build the stage view: criteria above the document, artifact-scoped review",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0035"
+      ],
+      "dependsOn": [
+        "TSK-0009"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0016"
+      ],
+      "id": "TSK-0010",
+      "implements": [
+        "CMP-0015",
+        "CMP-0016"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Needed because DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Encode the selected stage and the selected artifact in the URL so that opening it in a session with no prior client storage restores the same selection. Transient interface state may remain in the client.",
+      "title": "Put every correctness-critical selection in the URL",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0014",
+        "ACC-0015"
+      ],
+      "dependsOn": [
+        "TSK-0007"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0016"
+      ],
+      "id": "TSK-0016",
+      "implements": [
+        "CMP-0015"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Split from TSK-0007 on 2026-08-27, because the truthfulness rules are where this view fails SILENTLY and they deserve their own review rather than riding along with the navigation. ⚠️ THE COUNT RULE ADMITS NO PARTIAL-FAILURE EXCEPTION. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one, because an operator reading it has been told the missing thing is present. ⚠️ ACC-0014 is evaluated against a FIXTURE of known composition, never against the page — the page renders totals rather than entries, so counting what it shows would compare a number with itself.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
+      "title": "Build the project view's artifact totals, lint surface and located parse failures",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0029",
+        "ACC-0030"
+      ],
+      "dependsOn": [
+        "TSK-0011"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0018"
+      ],
+      "id": "TSK-0017",
+      "implements": [
+        "CMP-0017"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Split from TSK-0011 on 2026-08-27. This is the half REQ-0018's second clause actually lands on. AST-0034 measured the skeleton's idle and dead streams as byte-identical and no client-side cleverness recovers a difference that was never transmitted — but equally, a heartbeat nothing listens for is not visibility either, so neither half is sufficient alone. ⚠️ Reload on reconnection is what removes the work: events are hints and never deltas (#73), so a reconnecting client that reloads is exactly caught up and no replay machinery is needed.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.",
+      "title": "Build the change-stream client: listener, watchdog, stale state, reload on reconnect",
+      "type": "task"
+    }
+  ]
+}

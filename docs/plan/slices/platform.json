@@ -50,6 +50,300 @@
       "verifies": [
         "REQ-0009"
       ]
+    },
+    {
+      "evaluates": [
+        "CMP-0012",
+        "CMP-0016"
+      ],
+      "id": "ACC-0016",
+      "lifecycle": "active",
+      "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
+      "title": "The stage view's reads resolve behind separate boundaries",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013"
+      ],
+      "id": "ACC-0017",
+      "lifecycle": "active",
+      "notes": "⚠️ THE LAST SENTENCE IS THE WHOLE CRITERION. Stripping also produces a page with no executed code, so a test that renders a document and looks for a side effect passes identically on rejection and on silent removal — which is exactly the distinction the amendment to DEC-0020 exists to preserve. The observable being checked is the refusal, not the absence.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "For each of an ESM import, an ESM export, a flow expression, a text expression, a JSX attribute expression, a JSX spread attribute, and a JSX element outside the permitted set: compiling a stage document containing it produces a FAILURE that names the document path and a line:column position. A document that merely renders without the forbidden construct's effect is a FAIL for this criterion.",
+      "title": "Each forbidden construct FAILS the compile with a file and position",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013",
+        "CMP-0016"
+      ],
+      "id": "ACC-0018",
+      "lifecycle": "active",
+      "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
+      "title": "A permitted document renders, including its mapped components",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013"
+      ],
+      "id": "ACC-0019",
+      "lifecycle": "active",
+      "notes": "AST-0030 measured file-routed `@next/mdx` failing exactly this: the document is compiled into the build and an edit changes nothing. That configuration satisfies REQ-0017 and silently fails REQ-0018, which is why this is a criterion rather than an implementation note.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "With the built application serving, editing a stage document on disk changes what the next request for that stage returns, with no rebuild and no restart.",
+      "title": "Stage documents compile at request time, not at build time",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017",
+        "REQ-0018"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013"
+      ],
+      "id": "ACC-0020",
+      "lifecycle": "active",
+      "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail. ⚠️ AMENDED 2026-08-27 WITH A PROTOCOL, because the number alone was not a test. A budget with no pinned environment, no timing boundary and no warm-up treatment produces a figure nobody can reproduce or dispute, and 'p95 under 300 ms' would have been satisfiable by measuring the wrong thing on an unstated machine. ⚠️ THE VERIFICATION CLAUSE IS THE ONE THAT MATTERS MOST, and it is not routine hygiene. Without it the easiest way to pass is to cache the compiled document — which would report excellent numbers while measuring nothing, and would ALSO violate DEC-0020's request-time requirement and AST-0030's finding underneath it. A void run is not a failure and must not be recorded as one; it means the instrument was wrong, which is a different problem from the budget being missed. ⚠️ The 300 ms is still a TARGET rather than a measurement, and DEC-0020's third obligation stands: if the first valid run misses it by a wide margin the answer is that decision's own second alternative, plain markdown for stage documents — not a larger number.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The 95th-percentile server-side time to compile and render the largest stage document in the project is at or below 300 ms, measured under this protocol. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. TIMING BOUNDARY: from the moment the request handler begins the planning-content read to the moment the rendered document markup is complete, measured server-side; network and client time are excluded. WARM-UP: 10 requests are issued and discarded before measurement begins. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency, are the measured set. VERIFICATION: each of the 50 must be shown to have actually compiled — a counter incremented per compile, or an equivalent observation, reported with the result. A run in which any measured request did not compile is VOID, not a pass.",
+      "title": "Per-request compilation stays within 300 ms at p95, under a pinned protocol",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0019"
+      ],
+      "id": "ACC-0021",
+      "lifecycle": "active",
+      "notes": "⚠️ 'Without executing the application' is load-bearing. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural check passes on a codebase that violates the contract until the compliant sibling moves.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A check that runs WITHOUT executing the application reports a failure naming file and line when any module other than the planning-content reader performs a filesystem read rooted at the content directory.",
+      "title": "The boundary check fails on a planning-content read outside the reader",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0021"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0019"
+      ],
+      "id": "ACC-0022",
+      "lifecycle": "active",
+      "notes": "The clause that gets dropped. An abstraction can supply `connection()` while a caller omits the boundary; that builds fine without Cache Components and fails the build with it, so the omission would surface as an unrelated configuration change breaking the build.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The same non-executing check reports a failure when a planning-content read site is not enclosed by a `<Suspense>` boundary, naming file and line.",
+      "title": "The boundary check fails on a read outside a Suspense boundary",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0021"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0019",
+        "CMP-0014"
+      ],
+      "id": "ACC-0023",
+      "lifecycle": "active",
+      "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The same non-executing check reports a failure naming file and line when any module outside `app/server/` imports from `lib/`, including through a re-export chain that reaches `lib/` indirectly.",
+      "title": "The boundary check fails on an app module importing `lib/` directly",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0021",
+        "REQ-0019"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0019"
+      ],
+      "id": "ACC-0024",
+      "lifecycle": "active",
+      "notes": "⚠️ ADDED BECAUSE IT HAPPENED. A refusal test written during this work passed with the refusal deleted — the assertion that mattered sat behind a condition that was never true. A check nobody has seen fail is a check nobody has seen. This criterion is what makes the three above mean something rather than merely exist.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The check is evaluated against a fixture set containing at least one instance of each violation it claims to detect, and reports a failure for every one. A check that passes the fixture set is a FAIL for this criterion.",
+      "title": "The boundary check is itself falsified against known violations",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0021"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0014"
+      ],
+      "id": "ACC-0025",
+      "lifecycle": "active",
+      "notes": "`export *` would make the adapter a hole rather than a door: the exposed surface would widen every time `lib/` gains an export, including locking and process-spawning modules, with no diff for anyone to review.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Every module under `app/server/` has `import 'server-only'` as its first statement and contains no `export *`. Checked statically over the whole directory, with no exemptions.",
+      "title": "Every adapter module is guarded and explicitly exported",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0019"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0014"
+      ],
+      "id": "ACC-0026",
+      "lifecycle": "active",
+      "notes": "AST-0033 measured `server-only` throwing outside the RSC compiler. This criterion is what stops the guard migrating into `lib/` later as a tidy-up and breaking the tool to protect the app.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Every command under `bin/` and the full test suite run to completion with the shell present, importing `lib/` directly under plain Node with no RSC compiler in play.",
+      "title": "`lib/` stays importable under plain Node",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0019"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0014"
+      ],
+      "id": "ACC-0027",
+      "lifecycle": "active",
+      "notes": "⚠️ THE WORDING CLAUSE IS MEASURED, NOT STYLISTIC. Next.js produced two different messages for the same violation reached two ways, and one of them said 'you are using it in the Pages Router' for an App Router project. A test pinned to that string would pass on a wrong message today and break on a corrected one after an upgrade.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A `'use client'` module importing any `app/server/` adapter causes the build to fail with a message naming the offending file and a line:column position. The criterion asserts the presence of a file and a position, and MUST NOT assert the diagnostic's wording.",
+      "title": "A client component reaching an adapter fails the build, locatably",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0019"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0017"
+      ],
+      "id": "ACC-0028",
+      "lifecycle": "active",
+      "notes": "⚠️ AST-0036: a line beginning with a colon is ignored by the client parser, so a comment heartbeat keeps the socket warm and fires nothing. The criterion is the listener firing, not bytes arriving, because bytes arriving was never the problem.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "While connected and with no content changing, the stream delivers an event with a name and a data field at least once per configured heartbeat interval, and a client listener registered for that event name fires. A comment-only keepalive is a FAIL for this criterion.",
+      "title": "The stream emits a named heartbeat event that page code can observe",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0018"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0017"
+      ],
+      "id": "ACC-0031",
+      "lifecycle": "active",
+      "notes": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "When the file watcher fails, the page shows the stale indication or the stream closes. A run in which the failure appears only in server output while the page continues to indicate health is a FAIL.",
+      "title": "A watcher failure reaches the page, never only a log",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0018"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0020"
+      ],
+      "id": "ACC-0032",
+      "lifecycle": "active",
+      "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+      "title": "Stopping the launcher leaves nothing behind",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0020"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0020"
+      ],
+      "id": "ACC-0033",
+      "lifecycle": "active",
+      "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
+      "title": "The application installs and starts from one documented command",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0020"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0018"
+      ],
+      "id": "ACC-0034",
+      "lifecycle": "active",
+      "notes": "The byte-identical clause is what makes this objective rather than a claim about intent. #82's two-axis split is the reason `lifecycle` is named explicitly: one `status` field would have let this endpoint retire an artifact by accident.",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The review action identifies the artifact by id and type and shows its current status. Submitting a change updates only that artifact's `reviewStatus`, through the existing typed write path with its lock and atomic write; the artifact's `lifecycle` and every other artifact on disk are byte-identical afterwards.",
+      "title": "A review update changes one artifact's reviewStatus and nothing else",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0019"
+      ]
     }
   ],
   "accepted": [
@@ -107,7 +401,20 @@
       "type": "task"
     }
   ],
-  "blockedByOtherRoles": [],
+  "blockedByOtherRoles": [
+    {
+      "role": "frontend",
+      "task": "TSK-0009"
+    },
+    {
+      "role": "frontend",
+      "task": "TSK-0010"
+    },
+    {
+      "role": "frontend",
+      "task": "TSK-0010"
+    }
+  ],
   "components": [
     {
       "id": "CMP-0002",
@@ -145,6 +452,99 @@
       ],
       "schemaVersion": 2,
       "title": "Handoff export",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0012",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ OUTSIDE ITS BOUNDARY: it does not parse artifacts, derive verdicts or compile documents — it supplies content and the freshness guarantee, and the modules that interpret content are `lib/`'s, reached through CMP-adapter. ⚠️ IT IS THE THING REQ-0021 CONFINES READS TO. AST-0022 measured that a read bypassing this component is served FRESH whenever a compliant read shares its route, so a bypass is invisible to any behavioural test — which is why the confinement is static and why this component's value depends on nothing being able to go around it.",
+      "responsibility": "Be the single path by which the application reads planning content from disk, applying the DEC-0019 contract on every read: await `connection()` before the filesystem access, inside a `<Suspense>` boundary whose fallback is a real loading state for that content. Everything the shell knows about the plan enters through here.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0016",
+        "REQ-0017",
+        "REQ-0018"
+      ],
+      "schemaVersion": 2,
+      "title": "Planning-content reader",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0013",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ REQUEST-TIME, NOT BUILD-TIME, AND THAT IS NOT A PERFORMANCE CHOICE. AST-0030 measured that a file-routed `@next/mdx` page is compiled into the build and does not reflect an edit, which REQ-0018 forbids. Routing stage documents as pages would satisfy REQ-0017 and silently fail REQ-0018 while looking correct. ⚠️ OUTSIDE ITS BOUNDARY: it does not read the document (that is the reader) and does not decide the component vocabulary (that is the mapping it is given). ⚠️ IT OWNS DEC-0020's PINNING OBLIGATION: changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. The rejection was measured at the remark stage only; a later stage could reintroduce what it refused.",
+      "responsibility": "Compile a stage document to a renderable component at request time using `@mdx-js/mdx`, running the rejection plugin that fails the compile with a file path and a line:column position on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted component set. Own the pinned compiler and plugin chain.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0017"
+      ],
+      "schemaVersion": 2,
+      "title": "Restricted MDX compiler",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0014",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE GUARD CANNOT LIVE IN `lib/`, which is why this component exists rather than a one-line edit. AST-0033 measured that `server-only` throws when imported outside the RSC compiler, and `lib/` is imported by every `bin/` command and the whole test suite — marking it would guard the application by breaking the tool. ⚠️ IT PREVENTS NOTHING THE BUILD DID NOT ALREADY PREVENT. Both client-import cases already fail; what the marker buys is a LOCATABLE failure. Unguarded, Turbopack reports an internal error with `location: undefined` and no filename (AST-0032). ⚠️ OUTSIDE ITS BOUNDARY: it holds no logic of its own. A wrapper that adapts a signature is permitted; a wrapper that decides anything belongs in `lib/`, where the tool and the app share it.",
+      "responsibility": "Be the only door from application code into `lib/`. Each module begins with `import 'server-only'`, re-exports by explicit name or wrapper rather than `export *`, and exposes only the capabilities the shell needs; process-spawning, locking and stateful modules pass through individual review before they are exposed at all.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0019"
+      ],
+      "schemaVersion": 2,
+      "title": "Server adapter layer",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0017",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly.",
+      "responsibility": "Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0018"
+      ],
+      "schemaVersion": 2,
+      "title": "Change stream",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0018",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT IS THE FIRST LOCKING CAPABILITY THE ADAPTER MUST EXPOSE, and DEC-0021 holds locking modules back for individual review precisely so this one is examined rather than arriving as a line in an adapter. A Server Component may run concurrently in ways a CLI never does. ⚠️ `reviewStatus` ONLY. #82's two-axis split is doing work here: review progress is the application's to change and `lifecycle` is not, and a single `status` field would have let this endpoint retire an artifact by accident. ⚠️ OUTSIDE ITS BOUNDARY: it does not decide whether a status change is allowed — the typed tool owns that, and one implementation serves both the CLI and the app (#47).",
+      "responsibility": "Perform review-status changes from the application through the existing typed write path — lock, fresh read inside the lock, atomic write — reusing `lib/tools/review-status.mjs` rather than reimplementing it, and reaching it through the server adapter layer.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0019"
+      ],
+      "schemaVersion": 2,
+      "title": "Review action",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0019",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT EXISTS BECAUSE TESTING CANNOT DO THIS. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural freshness check passes on a codebase that breaks the contract — until the compliant sibling moves, and then every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked. ⚠️ TWO EDGES, ONE GRAPH: reads outside the abstraction, and `app/**` importing `lib/**` outside `app/server/`. The adapter boundary has the same property — an app module importing `lib/` directly behaves identically until someone renders it from a client component. ⚠️ THE MECHANISM IS NOT FIXED HERE: a lint rule, a module-boundary constraint, a generated accessor or a build-step scan would each satisfy it. What is fixed is that it runs without executing the application.",
+      "responsibility": "Statically prove, without executing the application, that every planning-content read goes through the reader inside a `<Suspense>` boundary and that no module outside `app/server/` imports from `lib/`. Detect bypass paths rather than only direct violations.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0021"
+      ],
+      "schemaVersion": 2,
+      "title": "Import-boundary check",
+      "type": "component"
+    },
+    {
+      "id": "CMP-0020",
+      "lifecycle": "active",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ PRODUCTION MODE ONLY (DEC-0018): `next build` then `next start`. `next dev` is a contributor workflow and is not a shipped configuration — AST-0015 showed the two produce different artifacts, so shipping the development server would mean shipping something this project can never validate. ⚠️ THE PROCESS OWNERSHIP IS AN OBLIGATION WITH NO MECHANISM YET, deliberately. The skeleton creates its watcher on `listen` and closes it in its own `close()`, but that belongs to a process owning its own HTTP server; under `next start` there is no such object and nothing has been run. Choosing and validating the binding is this component's design work.",
+      "responsibility": "Install and run the shell from one documented command: build the application, start it, own both the application process and the file watcher, and terminate the watcher with the application.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0020"
+      ],
+      "schemaVersion": 2,
+      "title": "Launcher",
       "type": "component"
     }
   ],
@@ -192,8 +592,394 @@
       ],
       "title": "The output serves a human or an agent implementer",
       "type": "requirement"
+    },
+    {
+      "id": "REQ-0016",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "REQ-0002 requires current project state to be inspectable at any time, and stage position is the coarsest form of that state. Deriving it rather than storing it follows #16: stage status is derived from artifacts, never persisted alongside them.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The application shows which stage the project is in, derived from the stage definitions and the recorded attestations rather than from a stored status value.",
+      "title": "The application displays the project's current stage",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0029",
+        "AST-0031"
+      ],
+      "id": "REQ-0017",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "Stage documents are the narrative half of the plan and are agent-authored. Rendering them is the point of choosing MDX; bounding what they may execute is what keeps content from becoming application code.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The application renders the MDX stage document for a selected stage, and a document referencing a component outside the permitted set does not execute arbitrary code.",
+      "title": "The application renders a stage document authored in MDX",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0034",
+        "AST-0036"
+      ],
+      "id": "REQ-0018",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "The agent and the operator write the same files (#15), so a view that only refreshes on reload shows state that has already moved. The second clause is the harder half: a silently dead stream renders stale content that looks live.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "When a file under the content root is changed by something other than the application, the application's view updates without the operator reloading the page, and a dropped update stream is visibly distinguishable from an idle one.",
+      "title": "The application reflects external content changes without a manual reload",
+      "type": "requirement"
+    },
+    {
+      "evidencedBy": [
+        "AST-0032",
+        "AST-0033"
+      ],
+      "id": "REQ-0019",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "#88 forbids authoring content by any route but a typed operation, and #78 plus #72 make the write safe against the agent writing concurrently. A second write path in the app would be a second protocol against the same files.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "A review-status change made in the application is written by the existing typed operation — lock, fresh read inside the lock, atomic write — and the application contains no other write path into content.",
+      "title": "The application performs review-status updates through the existing typed write path",
+      "type": "requirement"
+    },
+    {
+      "id": "REQ-0020",
+      "lifecycle": "active",
+      "openQuestions": [],
+      "priority": "must",
+      "rationale": "The product is a local-first tool a consumer clones (#1, #20, #32). An application whose supported mode is undeclared cannot be validated against the configuration it actually ships in — which is why AST-0010 is deferred rather than answered.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "An operator can install and start the application on a clean machine from documented commands, and the supported deployment mode is stated rather than implied.",
+      "title": "The application is installable and runnable locally from a documented command",
+      "type": "requirement"
+    },
+    {
+      "derivedFrom": [
+        "REQ-0016",
+        "REQ-0017",
+        "REQ-0018"
+      ],
+      "evidencedBy": [
+        "AST-0021",
+        "AST-0022",
+        "AST-0033"
+      ],
+      "id": "REQ-0021",
+      "lifecycle": "active",
+      "notes": "⚠️ THIS IS AN ARCHITECTURAL REQUIREMENT, NOT A TESTING PREFERENCE, and the distinction is what AST-0022 establishes. 'Verify it behaves correctly' is unavailable here as a matter of measured fact rather than of rigour — the observable behaviour of a compliant and a non-compliant read is IDENTICAL on a route that has at least one compliant read. The property has to be enforced where it is visible, which is in the source. ⚠️ TWO OBLIGATIONS, and the second is the one that gets forgotten: confine the read, AND check the boundary. DEC-0019 requires both `connection()` before the read and a `<Suspense>` boundary around it, and an abstraction can supply the first while a caller omits the second. A check that only looks for stray `readFileSync` calls would pass an application whose every read is correctly routed and unboundaried — which builds fine without Cache Components and FAILS THE BUILD with it, so the omission surfaces as a configuration change breaking the build rather than as the contract violation it is. ⚠️ THE MECHANISM IS DELIBERATELY UNSPECIFIED. A lint rule, a module-boundary constraint, a generated single accessor, or a build step that greps for content-root paths would each satisfy this; choosing among them is stage 5 design work that belongs with the components, and naming one here would decide it before the components exist. What is fixed is the PROPERTY: checkable without executing the application. ⚠️ IT INTERACTS WITH QST-0018 AND DOES NOT PRE-EMPT IT. If a stage document may reference components, then the permitted-component set is also a surface through which a direct read could enter, and static confinement has to cover it. That is a constraint QST-0018's answer must satisfy, not a decision about what that answer is. ⚠️ IT DOES NOT SETTLE CACHE COMPONENTS. DEC-0019 was chosen precisely so the contract holds with that flag either way, and a static check on source has nothing to say about it. Any enforcement design that only works under one setting would spend the property DEC-0019 bought. ⚠️ SCOPE EXTENDED 2026-08-27 BY DEC-0021: the same static check must also enforce that no application module outside `app/server/` imports from `lib/`, and must detect bypass paths. It is one more forbidden edge in the same import graph, not a second mechanism — and it is the same failure shape as AST-0022, because the adapter boundary is a convention that nothing observable distinguishes from a violation: an app module importing `lib/` directly behaves identically until someone renders it from a client component.",
+      "priority": "must",
+      "rationale": "AST-0022 measured that a read violating the contract is served FRESH whenever a compliant read shares its route — the compliant read makes the route dynamic and the violation rides along. So a behavioural check cannot see the violation: every freshness test passes on a codebase that breaks the contract, right up until the compliant sibling is moved, cached or deleted, at which point every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Every read of planning content in the application goes through a single reading abstraction that applies the DEC-0019 contract. A direct filesystem read of the content root anywhere else in the application fails a check that does not depend on running the application or observing what it serves, and the same check verifies that each read site is enclosed by a `<Suspense>` boundary. Acceptance for REQ-0016, REQ-0017 and REQ-0018 may not rest on freshness behaviour alone.",
+      "title": "Planning-content reads are confined to the approved abstraction, and the confinement is checked statically",
+      "type": "requirement"
     }
   ],
   "role": "platform",
-  "tasks": []
+  "tasks": [
+    {
+      "acceptedBy": [
+        "ACC-0033"
+      ],
+      "dependsOn": [],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0020"
+      ],
+      "id": "TSK-0003",
+      "implements": [
+        "CMP-0020"
+      ],
+      "lifecycle": "active",
+      "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option. ⚠️ AMENDED 2026-08-27 — A DISCARDED ARCHITECTURE HAD LEAKED IN. The original statement configured `@next/mdx`, an absolute remark-plugin path and Turbopack's config-serialisation constraint. All three belong to FILE-ROUTED MDX, which DEC-0020 explicitly rejected: AST-0030 measured that path compiling the document into the build so an edit changes nothing, which fails REQ-0018. ⚠️ HOW IT GOT IN IS WORTH RECORDING. Those settings came from the PROBE that measured the rejected option. The probe's incidental setup was carried into the plan as though it were the design — the measurement was right and the configuration it needed was the losing alternative's.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
+      "title": "Scaffold the Next.js application and its production build/start primitives",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0025",
+        "ACC-0026",
+        "ACC-0027"
+      ],
+      "dependsOn": [
+        "TSK-0003"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 3
+      },
+      "fulfils": [
+        "REQ-0019"
+      ],
+      "id": "TSK-0004",
+      "implements": [
+        "CMP-0014"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ The review-status write is a LOCKING capability and DEC-0021 holds those back for individual review before exposure — so it is deliberately NOT part of this task. It arrives with the review action, where it can be examined on its own.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Create the adapter modules the shell needs, each beginning with `import 'server-only'` and re-exporting by explicit name or wrapper. Expose only the capabilities the first slice requires. `lib/` itself is not modified and gains no marker, so `bin/` and the test suite keep working under plain Node.",
+      "title": "Build the `app/server/*` adapter layer over `lib/`",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0016"
+      ],
+      "dependsOn": [
+        "TSK-0004"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0016",
+        "REQ-0017",
+        "REQ-0018"
+      ],
+      "id": "TSK-0005",
+      "implements": [
+        "CMP-0012"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",
+      "title": "Build the planning-content reader on the `connection()` + Suspense contract",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0023",
+        "ACC-0024"
+      ],
+      "dependsOn": [
+        "TSK-0004"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0019",
+        "REQ-0021"
+      ],
+      "id": "TSK-0006",
+      "implements": [
+        "CMP-0014",
+        "CMP-0019"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen. ⚠️ SPLIT 2026-08-27. This half needs only the adapter to exist, so it moves earlier and no longer waits on the reader. The read and `<Suspense>` confinement analysis is its sibling. ⚠️ ACC-0024 is satisfied by the PAIR, not by this task alone: both halves must be shown to fail on their own fixtures before the criterion passes.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Implement the analysis that runs without executing the application and reports file and line when any module outside `app/server/` imports from `lib/`, whether directly or through a re-export chain that reaches `lib/` indirectly. Ship fixtures containing both shapes and prove the check fails on each.",
+      "title": "Build the static `app/server` → `lib/` import-boundary check, with failing fixtures",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0017",
+        "ACC-0018",
+        "ACC-0019"
+      ],
+      "dependsOn": [
+        "TSK-0005"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 3
+      },
+      "fulfils": [
+        "REQ-0017"
+      ],
+      "id": "TSK-0008",
+      "implements": [
+        "CMP-0013"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.",
+      "title": "Build the restricted MDX compiler with rejection diagnostics",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0028",
+        "ACC-0031"
+      ],
+      "dependsOn": [
+        "TSK-0010"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0018"
+      ],
+      "id": "TSK-0011",
+      "implements": [
+        "CMP-0017"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ A comment-line keepalive is ignored by the client parser (AST-0036) — it keeps the socket warm and leaves the page looking healthy. The heartbeat must be an event a listener can fire on. ⚠️ No event buffer, event id or `Last-Event-ID`: events are hints and never deltas, so a reconnecting client that reloads is exactly caught up. ⚠️ Logging a watcher failure to the server console is explicitly not enough. The operator is looking at a browser. ⚠️ SPLIT 2026-08-27 — also named as visibly oversized, and also correctly. The client listener, watchdog, stale state and reload-on-reconnect are its sibling. The split runs along the wire: this task is what is SENT, that one is what is OBSERVED, and AST-0036 is why those are different problems — a comment keepalive is sent and never observed.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Watch the content root and deliver change hints over an event stream. Emit a NAMED heartbeat event carrying data at a fixed interval. When the watcher fails, emit a visible failure signal on the stream or close the stream; logging alone is not permitted.",
+      "title": "Build the change-stream server: watcher, transport, named heartbeat, failure propagation",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0034"
+      ],
+      "dependsOn": [
+        "TSK-0010"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0019"
+      ],
+      "id": "TSK-0012",
+      "implements": [
+        "CMP-0018"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added. ⚠️ DEPENDENCY CHANGED 2026-08-27: it waited on the change stream, which coupled the first WRITE path to the streaming work for no reason. The review action needs a view to sit in and a URL to identify an artifact by, and nothing else. Review writing and the stream now proceed independently.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.",
+      "title": "Expose the review-status write through the adapter, with individual review",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0032",
+        "ACC-0033"
+      ],
+      "dependsOn": [
+        "TSK-0011"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0020"
+      ],
+      "id": "TSK-0013",
+      "implements": [
+        "CMP-0020"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Deliberately AFTER the change stream, because there is no watcher to own until then. ⚠️ The skeleton's create-on-`listen` / close-in-`close()` pattern does not carry: under `next start` there is no server object the application owns. Choosing the binding is this task's work, and DEC-0022 states the obligation without a mechanism for exactly that reason. ⚠️ Verified by observation, not by the absence of an error — the destroy path's own rule. ⚠️ AMENDED 2026-08-27 to OWN the documented launcher, which TSK-0003 previously claimed. TSK-0003 scaffolds build and start; a launcher that owns two processes cannot exist until there is a watcher to own, so the command is finished here. ACC-0033 stays traced from both — the scaffold is a necessary condition — but this is where it is SATISFIED.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Provide the single documented command that installs and starts the application in production mode, owning both the application process and the watcher and terminating the watcher with the application. Verify by observation after termination: no watcher process, nothing listening on the port, no surviving temporary directory.",
+      "title": "Own the documented one-command launcher, and prove its cleanup",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0020"
+      ],
+      "dependsOn": [
+        "TSK-0009"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0017"
+      ],
+      "id": "TSK-0014",
+      "implements": [
+        "CMP-0013"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
+      "title": "Run the compile benchmark under the pinned protocol",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0021",
+        "ACC-0022",
+        "ACC-0024"
+      ],
+      "dependsOn": [
+        "TSK-0005"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 3
+      },
+      "fulfils": [
+        "REQ-0021"
+      ],
+      "id": "TSK-0015",
+      "implements": [
+        "CMP-0019"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Split from TSK-0006 on 2026-08-27. This half needs the reader to exist, because the rule it enforces is 'reads go through the reader' — there is nothing to be outside of until there is one. ⚠️ ACC-0024 is satisfied by the PAIR with TSK-0006, and it holds for each half separately: a check nobody has seen fail is a check nobody has seen. ⚠️ Both halves land before any view work. Built afterwards they would arrive to a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Implement the analysis that runs without executing the application and reports file and line for a planning-content filesystem read performed anywhere other than the reader, and for a read site not enclosed by a `<Suspense>` boundary. Ship fixtures containing both violations and prove the check fails on each.",
+      "title": "Build the static planning-read and `<Suspense>` confinement check, with failing fixtures",
+      "type": "task"
+    }
+  ]
 }

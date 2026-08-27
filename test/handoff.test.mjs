@@ -137,26 +137,20 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   // by a defect: stage 5 regressed on the application requirements and recovered on CMP-0012..0020,
   // stage 6 regressed on DEC-0018 and recovered on DEC-0019's validated read contract, and stage 8
   // regressed when TSK-0003..TSK-0014 arrived unjudged.
-  assert.deepEqual(notReady, ["08-implementation-plan"], "twelve new tasks are not yet reviewed");
+  assert.deepEqual(notReady, [], "every stage gate is ready; the plan is publishable");
+  assert.deepEqual(c.blockers, [], JSON.stringify(c.blockers, null, 2));
+  assert.equal(c.ready, true, "with no unready stage the handoff must be ready");
 
-  // ⚠️ TWO INDEPENDENT REFUSALS, and grouping by reason is what keeps them distinguishable. The
-  // stage-gate pair comes from attestations; the twelve come from DEC-0015, because a `task` is
-  // executable content a recipient ACTS on and every one of them is still `draft`. A test that only
-  // counted blockers would have read the second set as noise around the first.
-  const byReason = c.blockers.reduce((m, b) => ({ ...m, [b.reason]: (m[b.reason] ?? 0) + 1 }), {});
-  assert.deepEqual(
-    byReason,
-    { "executable-content-not-approved": 12, "criterion-not-satisfied": 2 },
-    JSON.stringify(c.blockers.map((b) => [b.reason, b.detail?.slice(0, 60)]), null, 2)
-  );
-  assert.deepEqual(
-    c.blockers.filter((b) => b.stageId).map((b) => `${b.stageId}:${b.ruleId}`),
-    [
-      "08-implementation-plan:gate/criterion-not-satisfied",
-      "08-implementation-plan:gate/criterion-not-satisfied",
-    ],
-    JSON.stringify(c.blockers, null, 2)
-  );
+  // ⚠️ READY IS NOT THE SAME AS BUILT, and the package has to keep saying so. Every application
+  // component is planned-not-built, so its `implementedBy` must stay absent and the renderer must
+  // mark it — a publishable plan that reads as a finished system is the QST-0015 hazard leaving the
+  // repository.
+  const comps = readdirSync(join(contentRoot, "data", "components"))
+    .map((f) => JSON.parse(readFileSync(join(contentRoot, "data", "components", f), "utf-8")))
+    .filter((d) => Number(d.id.slice(4)) >= 12);
+  assert.equal(comps.length, 9, "the nine application components");
+  for (const d of comps)
+    assert.equal((d.implementedBy ?? []).length, 0, `${d.id} claims code that does not exist yet`);
 
   // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying
   // why teaches people to route around it, which is how a gate stops being a gate. Vacuous while

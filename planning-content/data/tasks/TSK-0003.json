@@ -2,10 +2,10 @@
   "id": "TSK-0003",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "amended",
   "lifecycle": "active",
-  "title": "Scaffold the Next.js application and its production launch command",
-  "statement": "Create the application under `app/` with `@next/mdx` configured, and a documented command that runs `next build` followed by `next start` on loopback. No views yet beyond a route that responds. The remark plugin is referenced by ABSOLUTE module path because Turbopack serialises the config and `@next/mdx` resolves a relative path from its own package directory.",
+  "title": "Scaffold the Next.js application and its production build/start primitives",
+  "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
   "role": "platform",
   "implements": [
     "CMP-0020"
@@ -16,6 +16,6 @@
   "acceptedBy": [
     "ACC-0033"
   ],
-  "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option.",
+  "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option. ⚠️ AMENDED 2026-08-27 — A DISCARDED ARCHITECTURE HAD LEAKED IN. The original statement configured `@next/mdx`, an absolute remark-plugin path and Turbopack's config-serialisation constraint. All three belong to FILE-ROUTED MDX, which DEC-0020 explicitly rejected: AST-0030 measured that path compiling the document into the build so an edit changes nothing, which fails REQ-0018. ⚠️ HOW IT GOT IN IS WORTH RECORDING. Those settings came from the PROBE that measured the rejected option. The probe's incidental setup was carried into the plan as though it were the design — the measurement was right and the configuration it needed was the losing alternative's.",
   "dependsOn": []
 }

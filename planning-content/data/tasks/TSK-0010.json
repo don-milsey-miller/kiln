@@ -2,7 +2,7 @@
   "id": "TSK-0010",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
   "title": "Put every correctness-critical selection in the URL",
   "statement": "Encode the selected stage and the selected artifact in the URL so that opening it in a session with no prior client storage restores the same selection. Transient interface state may remain in the client.",

@@ -41,5 +41,368 @@
     "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
     "title": "Derive stage 6's scope from graph use rather than a flag",
     "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0033"
+    ],
+    "dependsOn": [],
+    "fulfils": [
+      "REQ-0020"
+    ],
+    "id": "TSK-0003",
+    "implements": [
+      "CMP-0020"
+    ],
+    "lifecycle": "active",
+    "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option. ⚠️ AMENDED 2026-08-27 — A DISCARDED ARCHITECTURE HAD LEAKED IN. The original statement configured `@next/mdx`, an absolute remark-plugin path and Turbopack's config-serialisation constraint. All three belong to FILE-ROUTED MDX, which DEC-0020 explicitly rejected: AST-0030 measured that path compiling the document into the build so an edit changes nothing, which fails REQ-0018. ⚠️ HOW IT GOT IN IS WORTH RECORDING. Those settings came from the PROBE that measured the rejected option. The probe's incidental setup was carried into the plan as though it were the design — the measurement was right and the configuration it needed was the losing alternative's.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
+    "title": "Scaffold the Next.js application and its production build/start primitives",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0025",
+      "ACC-0026",
+      "ACC-0027"
+    ],
+    "dependsOn": [
+      "TSK-0003"
+    ],
+    "fulfils": [
+      "REQ-0019"
+    ],
+    "id": "TSK-0004",
+    "implements": [
+      "CMP-0014"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ The review-status write is a LOCKING capability and DEC-0021 holds those back for individual review before exposure — so it is deliberately NOT part of this task. It arrives with the review action, where it can be examined on its own.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Create the adapter modules the shell needs, each beginning with `import 'server-only'` and re-exporting by explicit name or wrapper. Expose only the capabilities the first slice requires. `lib/` itself is not modified and gains no marker, so `bin/` and the test suite keep working under plain Node.",
+    "title": "Build the `app/server/*` adapter layer over `lib/`",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0016"
+    ],
+    "dependsOn": [
+      "TSK-0004"
+    ],
+    "fulfils": [
+      "REQ-0016",
+      "REQ-0017",
+      "REQ-0018"
+    ],
+    "id": "TSK-0005",
+    "implements": [
+      "CMP-0012"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",
+    "title": "Build the planning-content reader on the `connection()` + Suspense contract",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0023",
+      "ACC-0024"
+    ],
+    "dependsOn": [
+      "TSK-0004"
+    ],
+    "fulfils": [
+      "REQ-0019",
+      "REQ-0021"
+    ],
+    "id": "TSK-0006",
+    "implements": [
+      "CMP-0014",
+      "CMP-0019"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen. ⚠️ SPLIT 2026-08-27. This half needs only the adapter to exist, so it moves earlier and no longer waits on the reader. The read and `<Suspense>` confinement analysis is its sibling. ⚠️ ACC-0024 is satisfied by the PAIR, not by this task alone: both halves must be shown to fail on their own fixtures before the criterion passes.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement the analysis that runs without executing the application and reports file and line when any module outside `app/server/` imports from `lib/`, whether directly or through a re-export chain that reaches `lib/` indirectly. Ship fixtures containing both shapes and prove the check fails on each.",
+    "title": "Build the static `app/server` → `lib/` import-boundary check, with failing fixtures",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0013"
+    ],
+    "dependsOn": [
+      "TSK-0006",
+      "TSK-0015"
+    ],
+    "fulfils": [
+      "REQ-0016"
+    ],
+    "id": "TSK-0007",
+    "implements": [
+      "CMP-0015"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one. ⚠️ SPLIT 2026-08-27 — it was named as visibly oversized when the plan was written, and it was. The totals, the lint surface and located parse failures are its sibling. This half is the navigation spine; that half is the truthfulness rules, and they fail in different ways. ⚠️ Depends on BOTH boundary checks, so every view file written from here on is checked as it lands.",
+    "reviewStatus": "amended",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
+    "title": "Build the project view's stage navigation and derived current stage",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0017",
+      "ACC-0018",
+      "ACC-0019"
+    ],
+    "dependsOn": [
+      "TSK-0005"
+    ],
+    "fulfils": [
+      "REQ-0017"
+    ],
+    "id": "TSK-0008",
+    "implements": [
+      "CMP-0013"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.",
+    "title": "Build the restricted MDX compiler with rejection diagnostics",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0016",
+      "ACC-0018"
+    ],
+    "dependsOn": [
+      "TSK-0008",
+      "TSK-0007"
+    ],
+    "fulfils": [
+      "REQ-0017",
+      "REQ-0019"
+    ],
+    "id": "TSK-0009",
+    "implements": [
+      "CMP-0016"
+    ],
+    "lifecycle": "active",
+    "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown.",
+    "reviewStatus": "approved",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
+    "title": "Build the stage view: criteria above the document, artifact-scoped review",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0035"
+    ],
+    "dependsOn": [
+      "TSK-0009"
+    ],
+    "fulfils": [
+      "REQ-0016"
+    ],
+    "id": "TSK-0010",
+    "implements": [
+      "CMP-0015",
+      "CMP-0016"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Needed because DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+    "reviewStatus": "approved",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Encode the selected stage and the selected artifact in the URL so that opening it in a session with no prior client storage restores the same selection. Transient interface state may remain in the client.",
+    "title": "Put every correctness-critical selection in the URL",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0028",
+      "ACC-0031"
+    ],
+    "dependsOn": [
+      "TSK-0010"
+    ],
+    "fulfils": [
+      "REQ-0018"
+    ],
+    "id": "TSK-0011",
+    "implements": [
+      "CMP-0017"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ A comment-line keepalive is ignored by the client parser (AST-0036) — it keeps the socket warm and leaves the page looking healthy. The heartbeat must be an event a listener can fire on. ⚠️ No event buffer, event id or `Last-Event-ID`: events are hints and never deltas, so a reconnecting client that reloads is exactly caught up. ⚠️ Logging a watcher failure to the server console is explicitly not enough. The operator is looking at a browser. ⚠️ SPLIT 2026-08-27 — also named as visibly oversized, and also correctly. The client listener, watchdog, stale state and reload-on-reconnect are its sibling. The split runs along the wire: this task is what is SENT, that one is what is OBSERVED, and AST-0036 is why those are different problems — a comment keepalive is sent and never observed.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Watch the content root and deliver change hints over an event stream. Emit a NAMED heartbeat event carrying data at a fixed interval. When the watcher fails, emit a visible failure signal on the stream or close the stream; logging alone is not permitted.",
+    "title": "Build the change-stream server: watcher, transport, named heartbeat, failure propagation",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0034"
+    ],
+    "dependsOn": [
+      "TSK-0010"
+    ],
+    "fulfils": [
+      "REQ-0019"
+    ],
+    "id": "TSK-0012",
+    "implements": [
+      "CMP-0018"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added. ⚠️ DEPENDENCY CHANGED 2026-08-27: it waited on the change stream, which coupled the first WRITE path to the streaming work for no reason. The review action needs a view to sit in and a URL to identify an artifact by, and nothing else. Review writing and the stream now proceed independently.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.",
+    "title": "Expose the review-status write through the adapter, with individual review",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0032",
+      "ACC-0033"
+    ],
+    "dependsOn": [
+      "TSK-0011"
+    ],
+    "fulfils": [
+      "REQ-0020"
+    ],
+    "id": "TSK-0013",
+    "implements": [
+      "CMP-0020"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Deliberately AFTER the change stream, because there is no watcher to own until then. ⚠️ The skeleton's create-on-`listen` / close-in-`close()` pattern does not carry: under `next start` there is no server object the application owns. Choosing the binding is this task's work, and DEC-0022 states the obligation without a mechanism for exactly that reason. ⚠️ Verified by observation, not by the absence of an error — the destroy path's own rule. ⚠️ AMENDED 2026-08-27 to OWN the documented launcher, which TSK-0003 previously claimed. TSK-0003 scaffolds build and start; a launcher that owns two processes cannot exist until there is a watcher to own, so the command is finished here. ACC-0033 stays traced from both — the scaffold is a necessary condition — but this is where it is SATISFIED.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Provide the single documented command that installs and starts the application in production mode, owning both the application process and the watcher and terminating the watcher with the application. Verify by observation after termination: no watcher process, nothing listening on the port, no surviving temporary directory.",
+    "title": "Own the documented one-command launcher, and prove its cleanup",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0020"
+    ],
+    "dependsOn": [
+      "TSK-0009"
+    ],
+    "fulfils": [
+      "REQ-0017"
+    ],
+    "id": "TSK-0014",
+    "implements": [
+      "CMP-0013"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
+    "title": "Run the compile benchmark under the pinned protocol",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0021",
+      "ACC-0022",
+      "ACC-0024"
+    ],
+    "dependsOn": [
+      "TSK-0005"
+    ],
+    "fulfils": [
+      "REQ-0021"
+    ],
+    "id": "TSK-0015",
+    "implements": [
+      "CMP-0019"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Split from TSK-0006 on 2026-08-27. This half needs the reader to exist, because the rule it enforces is 'reads go through the reader' — there is nothing to be outside of until there is one. ⚠️ ACC-0024 is satisfied by the PAIR with TSK-0006, and it holds for each half separately: a check nobody has seen fail is a check nobody has seen. ⚠️ Both halves land before any view work. Built afterwards they would arrive to a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement the analysis that runs without executing the application and reports file and line for a planning-content filesystem read performed anywhere other than the reader, and for a read site not enclosed by a `<Suspense>` boundary. Ship fixtures containing both violations and prove the check fails on each.",
+    "title": "Build the static planning-read and `<Suspense>` confinement check, with failing fixtures",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0014",
+      "ACC-0015"
+    ],
+    "dependsOn": [
+      "TSK-0007"
+    ],
+    "fulfils": [
+      "REQ-0016"
+    ],
+    "id": "TSK-0016",
+    "implements": [
+      "CMP-0015"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Split from TSK-0007 on 2026-08-27, because the truthfulness rules are where this view fails SILENTLY and they deserve their own review rather than riding along with the navigation. ⚠️ THE COUNT RULE ADMITS NO PARTIAL-FAILURE EXCEPTION. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one, because an operator reading it has been told the missing thing is present. ⚠️ ACC-0014 is evaluated against a FIXTURE of known composition, never against the page — the page renders totals rather than entries, so counting what it shows would compare a number with itself.",
+    "reviewStatus": "approved",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
+    "title": "Build the project view's artifact totals, lint surface and located parse failures",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0029",
+      "ACC-0030"
+    ],
+    "dependsOn": [
+      "TSK-0011"
+    ],
+    "fulfils": [
+      "REQ-0018"
+    ],
+    "id": "TSK-0017",
+    "implements": [
+      "CMP-0017"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ Split from TSK-0011 on 2026-08-27. This is the half REQ-0018's second clause actually lands on. AST-0034 measured the skeleton's idle and dead streams as byte-identical and no client-side cleverness recovers a difference that was never transmitted — but equally, a heartbeat nothing listens for is not visibility either, so neither half is sufficient alone. ⚠️ Reload on reconnection is what removes the work: events are hints and never deltas (#73), so a reconnecting client that reloads is exactly caught up and no replay machinery is needed.",
+    "reviewStatus": "approved",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.",
+    "title": "Build the change-stream client: listener, watchdog, stale state, reload on reconnect",
+    "type": "task"
   }
 ]

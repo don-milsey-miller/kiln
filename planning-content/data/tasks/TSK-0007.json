@@ -2,10 +2,10 @@
   "id": "TSK-0007",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "amended",
   "lifecycle": "active",
-  "title": "Build the project view with truthful counts and located parse failures",
-  "statement": "Render `/`: the derived current stage, all nine stages with gate state, artifact totals, and lint findings surfaced rather than re-judged. A file that fails to parse is named with its path and position, is omitted from the page, and is subtracted from its type's total. Status is conveyed by text or icon, never by colour alone.",
+  "title": "Build the project view's stage navigation and derived current stage",
+  "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
   "role": "frontend",
   "implements": [
     "CMP-0015"
@@ -14,12 +14,11 @@
     "REQ-0016"
   ],
   "acceptedBy": [
-    "ACC-0013",
-    "ACC-0014",
-    "ACC-0015"
+    "ACC-0013"
   ],
   "dependsOn": [
-    "TSK-0006"
+    "TSK-0006",
+    "TSK-0015"
   ],
-  "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one."
+  "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one. ⚠️ SPLIT 2026-08-27 — it was named as visibly oversized when the plan was written, and it was. The totals, the lint surface and located parse failures are its sibling. This half is the navigation spine; that half is the truthfulness rules, and they fail in different ways. ⚠️ Depends on BOTH boundary checks, so every view file written from here on is checked as it lands."
 }

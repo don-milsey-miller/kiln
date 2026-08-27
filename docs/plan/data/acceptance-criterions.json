@@ -202,5 +202,402 @@
     "verifies": [
       "REQ-0009"
     ]
+  },
+  {
+    "evaluates": [
+      "CMP-0015"
+    ],
+    "id": "ACC-0013",
+    "lifecycle": "active",
+    "notes": "Two halves, and the second is what makes the first mean anything: a stored status field could produce the same display and go stale silently. Pass/fail without judgement — the stage either changes or it does not, and the field either exists or it does not.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the application running, changing a recorded attestation so that a different stage becomes the earliest unready one causes the project view to display that stage as current, without restarting the application. No field storing a stage or status value exists anywhere under the content root.",
+    "title": "The displayed current stage follows the attestations on disk",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0016"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0015"
+    ],
+    "id": "ACC-0014",
+    "lifecycle": "active",
+    "notes": "⚠️ NO PARTIAL-FAILURE EXCEPTION, deliberately. AST-0035 measured the skeleton printing 178 while rendering 177 — the count is what turns an incomplete page into a misleading one, because an operator reading the total has been told the missing thing is present. ⚠️ AMENDED 2026-08-27, AND THE ORIGINAL WAS NOT MERELY IMPRECISE — IT WAS UNFALSIFIABLE. It asked that each displayed total equal 'the number rendered on the page'. The project view renders TOTALS, not artifact entries, so there is nothing on the page to count: the criterion compared a number with itself and would have passed on any implementation, including one that printed a constant. ⚠️ The fix is an INDEPENDENT ORACLE. A fixture with known composition is the only source of truth the application cannot influence, which is what makes this a test rather than a tautology. It is the same defect as a check nobody has seen fail (ACC-0024), reached from the other direction: there, the check had never been shown to fail; here, it could not.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Evaluated against a fixture content root whose composition is known in advance. For each artifact type, the total the project view displays equals the number of files of that type in the fixture that parse successfully and validate. Ground truth comes from the fixture, not from the page: the count is computed independently of the application and compared with what was rendered.",
+    "title": "Every displayed total equals the fixture's parsable artifacts of that type",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0016"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0015"
+    ],
+    "id": "ACC-0015",
+    "lifecycle": "active",
+    "notes": "All three clauses are required together. Naming the file without correcting the count still leaves the page asserting an artifact it did not render; correcting the count without naming the file leaves an operator hunting for what changed.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With exactly one artifact file under the content root made unparseable, the project view (a) names that file's path, (b) shows a parse position, and (c) prints a total for that type exactly one lower than before. The response is not an error page: every other artifact still renders.",
+    "title": "An unreadable artifact is named, located, and subtracted from its count",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0016"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0012",
+      "CMP-0016"
+    ],
+    "id": "ACC-0016",
+    "lifecycle": "active",
+    "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
+    "title": "The stage view's reads resolve behind separate boundaries",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0013"
+    ],
+    "id": "ACC-0017",
+    "lifecycle": "active",
+    "notes": "⚠️ THE LAST SENTENCE IS THE WHOLE CRITERION. Stripping also produces a page with no executed code, so a test that renders a document and looks for a side effect passes identically on rejection and on silent removal — which is exactly the distinction the amendment to DEC-0020 exists to preserve. The observable being checked is the refusal, not the absence.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For each of an ESM import, an ESM export, a flow expression, a text expression, a JSX attribute expression, a JSX spread attribute, and a JSX element outside the permitted set: compiling a stage document containing it produces a FAILURE that names the document path and a line:column position. A document that merely renders without the forbidden construct's effect is a FAIL for this criterion.",
+    "title": "Each forbidden construct FAILS the compile with a file and position",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0013",
+      "CMP-0016"
+    ],
+    "id": "ACC-0018",
+    "lifecycle": "active",
+    "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
+    "title": "A permitted document renders, including its mapped components",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0013"
+    ],
+    "id": "ACC-0019",
+    "lifecycle": "active",
+    "notes": "AST-0030 measured file-routed `@next/mdx` failing exactly this: the document is compiled into the build and an edit changes nothing. That configuration satisfies REQ-0017 and silently fails REQ-0018, which is why this is a criterion rather than an implementation note.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the built application serving, editing a stage document on disk changes what the next request for that stage returns, with no rebuild and no restart.",
+    "title": "Stage documents compile at request time, not at build time",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017",
+      "REQ-0018"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0013"
+    ],
+    "id": "ACC-0020",
+    "lifecycle": "active",
+    "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail. ⚠️ AMENDED 2026-08-27 WITH A PROTOCOL, because the number alone was not a test. A budget with no pinned environment, no timing boundary and no warm-up treatment produces a figure nobody can reproduce or dispute, and 'p95 under 300 ms' would have been satisfiable by measuring the wrong thing on an unstated machine. ⚠️ THE VERIFICATION CLAUSE IS THE ONE THAT MATTERS MOST, and it is not routine hygiene. Without it the easiest way to pass is to cache the compiled document — which would report excellent numbers while measuring nothing, and would ALSO violate DEC-0020's request-time requirement and AST-0030's finding underneath it. A void run is not a failure and must not be recorded as one; it means the instrument was wrong, which is a different problem from the budget being missed. ⚠️ The 300 ms is still a TARGET rather than a measurement, and DEC-0020's third obligation stands: if the first valid run misses it by a wide margin the answer is that decision's own second alternative, plain markdown for stage documents — not a larger number.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The 95th-percentile server-side time to compile and render the largest stage document in the project is at or below 300 ms, measured under this protocol. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. TIMING BOUNDARY: from the moment the request handler begins the planning-content read to the moment the rendered document markup is complete, measured server-side; network and client time are excluded. WARM-UP: 10 requests are issued and discarded before measurement begins. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency, are the measured set. VERIFICATION: each of the 50 must be shown to have actually compiled — a counter incremented per compile, or an equivalent observation, reported with the result. A run in which any measured request did not compile is VOID, not a pass.",
+    "title": "Per-request compilation stays within 300 ms at p95, under a pinned protocol",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0019"
+    ],
+    "id": "ACC-0021",
+    "lifecycle": "active",
+    "notes": "⚠️ 'Without executing the application' is load-bearing. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural check passes on a codebase that violates the contract until the compliant sibling moves.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A check that runs WITHOUT executing the application reports a failure naming file and line when any module other than the planning-content reader performs a filesystem read rooted at the content directory.",
+    "title": "The boundary check fails on a planning-content read outside the reader",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0021"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0019"
+    ],
+    "id": "ACC-0022",
+    "lifecycle": "active",
+    "notes": "The clause that gets dropped. An abstraction can supply `connection()` while a caller omits the boundary; that builds fine without Cache Components and fails the build with it, so the omission would surface as an unrelated configuration change breaking the build.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The same non-executing check reports a failure when a planning-content read site is not enclosed by a `<Suspense>` boundary, naming file and line.",
+    "title": "The boundary check fails on a read outside a Suspense boundary",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0021"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0019",
+      "CMP-0014"
+    ],
+    "id": "ACC-0023",
+    "lifecycle": "active",
+    "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The same non-executing check reports a failure naming file and line when any module outside `app/server/` imports from `lib/`, including through a re-export chain that reaches `lib/` indirectly.",
+    "title": "The boundary check fails on an app module importing `lib/` directly",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0021",
+      "REQ-0019"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0019"
+    ],
+    "id": "ACC-0024",
+    "lifecycle": "active",
+    "notes": "⚠️ ADDED BECAUSE IT HAPPENED. A refusal test written during this work passed with the refusal deleted — the assertion that mattered sat behind a condition that was never true. A check nobody has seen fail is a check nobody has seen. This criterion is what makes the three above mean something rather than merely exist.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The check is evaluated against a fixture set containing at least one instance of each violation it claims to detect, and reports a failure for every one. A check that passes the fixture set is a FAIL for this criterion.",
+    "title": "The boundary check is itself falsified against known violations",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0021"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0014"
+    ],
+    "id": "ACC-0025",
+    "lifecycle": "active",
+    "notes": "`export *` would make the adapter a hole rather than a door: the exposed surface would widen every time `lib/` gains an export, including locking and process-spawning modules, with no diff for anyone to review.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every module under `app/server/` has `import 'server-only'` as its first statement and contains no `export *`. Checked statically over the whole directory, with no exemptions.",
+    "title": "Every adapter module is guarded and explicitly exported",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0019"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0014"
+    ],
+    "id": "ACC-0026",
+    "lifecycle": "active",
+    "notes": "AST-0033 measured `server-only` throwing outside the RSC compiler. This criterion is what stops the guard migrating into `lib/` later as a tidy-up and breaking the tool to protect the app.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every command under `bin/` and the full test suite run to completion with the shell present, importing `lib/` directly under plain Node with no RSC compiler in play.",
+    "title": "`lib/` stays importable under plain Node",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0019"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0014"
+    ],
+    "id": "ACC-0027",
+    "lifecycle": "active",
+    "notes": "⚠️ THE WORDING CLAUSE IS MEASURED, NOT STYLISTIC. Next.js produced two different messages for the same violation reached two ways, and one of them said 'you are using it in the Pages Router' for an App Router project. A test pinned to that string would pass on a wrong message today and break on a corrected one after an upgrade.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A `'use client'` module importing any `app/server/` adapter causes the build to fail with a message naming the offending file and a line:column position. The criterion asserts the presence of a file and a position, and MUST NOT assert the diagnostic's wording.",
+    "title": "A client component reaching an adapter fails the build, locatably",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0019"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0017"
+    ],
+    "id": "ACC-0028",
+    "lifecycle": "active",
+    "notes": "⚠️ AST-0036: a line beginning with a colon is ignored by the client parser, so a comment heartbeat keeps the socket warm and fires nothing. The criterion is the listener firing, not bytes arriving, because bytes arriving was never the problem.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "While connected and with no content changing, the stream delivers an event with a name and a data field at least once per configured heartbeat interval, and a client listener registered for that event name fires. A comment-only keepalive is a FAIL for this criterion.",
+    "title": "The stream emits a named heartbeat event that page code can observe",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0018"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0017"
+    ],
+    "id": "ACC-0029",
+    "lifecycle": "active",
+    "notes": "AST-0034 measured the skeleton's idle and dead streams as byte-identical, which is the strongest possible form of indistinguishable. 'Not by colour alone' keeps the fix legible to anyone who cannot rely on a colour difference.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When heartbeats stop arriving, the page shows a stale indication that is distinguishable from the healthy state by text or icon and not by colour alone, within the configured watchdog window.",
+    "title": "A stopped heartbeat produces a visibly stale page within the watchdog window",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0018"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0017"
+    ],
+    "id": "ACC-0030",
+    "lifecycle": "active",
+    "notes": "AST-0034 measured the gap being lost with nothing to recover it from. The last sentence records the design that makes this cheap: because events are hints and never deltas, a reconnecting client that reloads is exactly caught up.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After the stream drops and reconnects, the client reloads, and a content change made during the disconnected window is reflected in what the page then shows. No event buffer, event id or `Last-Event-ID` handling is required to achieve this.",
+    "title": "Reconnection reloads, and a change made while disconnected is then visible",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0018"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0017"
+    ],
+    "id": "ACC-0031",
+    "lifecycle": "active",
+    "notes": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When the file watcher fails, the page shows the stale indication or the stream closes. A run in which the failure appears only in server output while the page continues to indicate health is a FAIL.",
+    "title": "A watcher failure reaches the page, never only a log",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0018"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0020"
+    ],
+    "id": "ACC-0032",
+    "lifecycle": "active",
+    "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+    "title": "Stopping the launcher leaves nothing behind",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0020"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0020"
+    ],
+    "id": "ACC-0033",
+    "lifecycle": "active",
+    "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
+    "title": "The application installs and starts from one documented command",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0020"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0018"
+    ],
+    "id": "ACC-0034",
+    "lifecycle": "active",
+    "notes": "The byte-identical clause is what makes this objective rather than a claim about intent. #82's two-axis split is the reason `lifecycle` is named explicitly: one `status` field would have let this endpoint retire an artifact by accident.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The review action identifies the artifact by id and type and shows its current status. Submitting a change updates only that artifact's `reviewStatus`, through the existing typed write path with its lock and atomic write; the artifact's `lifecycle` and every other artifact on disk are byte-identical afterwards.",
+    "title": "A review update changes one artifact's reviewStatus and nothing else",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0019"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0015",
+      "CMP-0016"
+    ],
+    "id": "ACC-0035",
+    "lifecycle": "active",
+    "notes": "⚠️ SCOPED TO CORRECTNESS-CRITICAL STATE, per DEC-0023's corrected wording. Transient interface state is permitted and is not covered here. The reason this needs a criterion at all is that DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For each selection the views expose that is not purely presentational — at minimum the selected stage and the selected artifact — opening the same URL in a session with no prior client storage restores the same selection.",
+    "title": "Every correctness-critical selection survives a reload in a fresh session",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0016"
+    ]
   }
 ]

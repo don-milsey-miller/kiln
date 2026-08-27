@@ -395,5 +395,1120 @@
     "summary": "`npm run research:probe` printed: available, backend=tavily, probed live, no search credit spent; quota 1500 of 1500 credits remaining (0 used); tools research_capability, research_search, research_fetch.",
     "title": "npm run research:probe, PM's host, 2026-08-22",
     "type": "evidence"
+  },
+  {
+    "id": "EVD-0018",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Development builds output to `.next/dev` instead of `.next`. This allows you to run `next dev` and `next build` concurrently without conflicts.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/api-reference/cli/next",
+        "retrievedAt": "2026-08-24",
+        "title": "https://nextjs.org/docs/app/api-reference/cli/next"
+      }
+    ],
+    "summary": "Next.js 16.3.2 development builds output to .next/dev instead of .next, so dev and production are different build artifacts",
+    "title": "Source: https://nextjs.org/docs/app/api-reference/cli/next",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0019",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"`next start` starts the application in production mode. The application should be compiled with\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/api-reference/cli/next",
+        "retrievedAt": "2026-08-24",
+        "title": "https://nextjs.org/docs/app/api-reference/cli/next"
+      }
+    ],
+    "summary": "next start runs production mode and requires a prior next build",
+    "title": "Source: https://nextjs.org/docs/app/api-reference/cli/next",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0020",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Node.js deployments support all Next.js features.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/deploying",
+        "retrievedAt": "2026-08-24",
+        "title": "https://nextjs.org/docs/app/getting-started/deploying"
+      }
+    ],
+    "summary": "Node.js self-hosted deployment is supported and supports all Next.js features",
+    "title": "Source: https://nextjs.org/docs/app/getting-started/deploying",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "install": "local to the temporary directory; no global install, no repository change",
+        "network": "loopback only for the dev server; npm install reached the public registry",
+        "nextVersion": "16.3.2",
+        "node-version": "v24.18.0",
+        "os": "win32 x64",
+        "workspace": "dedicated temporary directory, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation",
+          "freedom-from-concurrent-host-activity"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "sustained-runtime-behaviour",
+          "reason": "The dev server ran for well under a minute. Handle count, memory growth and watcher stability over hours were not measured, and that is the actual concern behind QST-0017 rather than the burst behaviour this did measure.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "content-root-outside-app-root",
+          "reason": "The watched directory sat inside the Next.js project root. An application watching a content root OUTSIDE the app root is a different arrangement and was not exercised.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "other-operating-systems",
+          "reason": "One host was available. #73 already records that file-watching behaviour differs by platform, so this result is scoped to Windows and cannot be generalised from here.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "concurrent-host-activity",
+          "reason": "Execution was on the host with no containment, so whatever else the machine was doing during the runs is unknown. The two controls bound this rather than remove it: an unrelated disturbance would have had to affect the treatment alone.",
+          "state": "unavailable"
+        }
+      ]
+    },
+    "id": "EVD-0021",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ HOST EXECUTION, stated rather than implied. The tier-1 controller could not run this at all: the job declares `requires: { network: true }` for `npm install` and the approved ceiling refuses it before provisioning (#77), and — separately and more fundamentally — the job model has no form for a long-lived service alongside commands, so the probe is not expressible under it regardless of the ceiling. See the capability gap recorded as its own question. ⚠️ Controls before AND after the treatment, so 'no interference' is a comparison rather than an assertion: a second control isolates interference from any second-run effect. ⚠️ The workspace was removed and its ABSENCE checked rather than the removal call trusted — the same discipline the controller uses, applied by hand because no controller ran. ⚠️ METHODOLOGY HISTORY — AN INVALIDATED FIRST RUN, EXPLICITLY EXCLUDED FROM THE FINDING ABOVE. An earlier execution of this probe reported treatment 0/20 with the controls at 20/20, which read as total interference from `next dev`. It was a FIXTURE DEFECT, not an observation: both runs wrote the same filenames into the same directory, so the control created the files and the treatment only modified them, while the watcher listened for `add`. A second defect in the same version measured latency as elapsed-time-since-watcher-start, which reports the write schedule (20 files x 120ms) rather than detection lag and would have read as ~2.4s of latency on a completely idle watcher. ⚠️ NONE OF THAT RUN'S NUMBERS CONTRIBUTE ANYTHING HERE. They are void rather than weak, and the summary, outcome and omissions above describe only the corrected execution: a fresh directory per run, per-file observed-minus-written latency, and a control taken after the treatment as well as before. Both defects were in the fixture; neither touched the code under observation. ⚠️ It is preserved because the correction is WHY this result can be trusted rather than a detail about how it was obtained. The control is what exposed it — a result that dramatic, from a change that small, is a bug before it is a finding — and a probe whose only reported run is the one that worked has not demonstrated that it could have failed.",
+    "observedAt": "2026-08-25",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Three runs of the same measurement in one disposable workspace. control: 20/20 observed, median lag 3ms, max 6ms; treatment: 20/20 observed, median lag 3ms, max 10ms with `next dev` serving on 127.0.0.1:3987; control2: 20/20 observed, median lag 3ms, max 7ms after the dev server was killed. No file was missed in any run, and `next dev` did not recompile during the content writes.",
+    "title": "Experiment: chokidar detection with and without a concurrent `next dev`",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "network": "loopback only for `next start`; npm install reached the public registry",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync",
+        "workspace": "two dedicated temporary directories, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "revalidation-beyond-ten-seconds",
+          "reason": "Requests were made immediately after the external write and again six seconds later. A revalidation window longer than that would not have been seen, so this shows the value is frozen across ten seconds, not that it is frozen forever.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "dynamic-route-configurations",
+          "reason": "Only the default static outcome was exercised. Whether an explicitly dynamic route, or a read through a dynamic API, reflects external writes was not tested — and that is precisely what the application needs to know next.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "other-operating-systems",
+          "reason": "One host was available; this is scoped to Windows and cannot be generalised from here.",
+          "state": "not-observable"
+        }
+      ]
+    },
+    "id": "EVD-0022",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ BOTH CONFIGURATIONS WERE RUN ON PURPOSE. The claim names the cacheComponents-enabled case, and testing only that case would have left the undecided configuration as a third deferral — which is the outcome #80's condition exists to prevent. Running both is what produced the second finding. ⚠️ Host execution: the tier-1 controller could not run this (network for `npm install`, and no long-lived service form — QST-0022). Two disposable workspaces, removal observed rather than trusted, whole process tree terminated between configurations.",
+    "observedAt": "2026-08-25",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Two full builds. With cacheComponents ENABLED the route built as \"┌ ○ /\" and served \"VALUE_AT_BUILD_TIME\" on the first request; after an external write of a different value it still served \"VALUE_AT_BUILD_TIME\", and \"VALUE_AT_BUILD_TIME\" six seconds later. With cacheComponents DISABLED the result was identical: route \"┌ ○ /\", and the same build-time value on all three requests. In both configurations a later external write did not change what a fresh request returned.",
+    "title": "Experiment: production-build artifact read, Cache Components enabled and disabled",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "network": "loopback only for `next start`; npm install reached the public registry",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync",
+        "workspace": "one disposable workspace per pass, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "revalidation-beyond-five-seconds",
+          "reason": "Each variant was re-requested about two and five seconds after the external write. A longer revalidation window would not have been seen.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "concurrent-request-load",
+          "reason": "One request at a time. Whether a dynamic route holds up under concurrent requests reading the same artifacts was not exercised, and bears on the runtime lifecycle question rather than on freshness.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "other-operating-systems",
+          "reason": "One host was available; scoped to Windows.",
+          "state": "not-observable"
+        }
+      ]
+    },
+    "id": "EVD-0023",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ TWO INSTRUMENT DEFECTS were found and corrected before these numbers were trusted, and both would have read as findings. (1) The marker extractor sliced between two sentinels in the HTML; under Cache Components the Suspense fallback ships in the static shell and the value STREAMS, so the first match landed inside escaped RSC flight data and both Cache Components runs scored 'inconclusive' while plainly serving the right value. Replaced with sentinel presence, which is immune to escaping because only one sentinel is on disk at a time. (2) The route-symbol matcher did not know `◐` (partially prerendered), so it fell through and reported `○ /_not-found` as the route under test. Both defects were in the instrument, not in Next.js. ⚠️ The baseline was re-run in the same pass as the corrected variants rather than carried over from the earlier pass, so every row here was measured by ONE instrument.",
+    "observedAt": "2026-08-25",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Seven distinct mechanism/caching-model combinations built and served under `next build` + `next start`, each measured by writing a different value to the artifact after the server was live and re-requesting. Results: baseline/cacheComponents:false -> ┌ ○ / frozen; baseline/cacheComponents:true -> ┌ ○ / frozen; connection/cacheComponents:false -> ┌ ƒ / FRESH; connection/cacheComponents:true -> BUILD FAILED; force-dynamic/cacheComponents:false -> ┌ ƒ / FRESH; baseline/cacheComponents:false -> ┌ ○ / frozen; baseline/cacheComponents:true -> ┌ ○ / frozen; connection-suspense/cacheComponents:false -> ┌ ƒ / FRESH; connection-suspense/cacheComponents:true -> ┌ ◐ / FRESH; io-suspense/cacheComponents:false -> ┌ ○ / frozen; io-suspense/cacheComponents:true -> ┌ ◐ / FRESH. Only `connection()` behind a Suspense boundary reflected the external write in BOTH caching models.",
+    "title": "Experiment: which freshness mechanisms survive a production build",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "network": "loopback only for `next start`; npm install reached the public registry",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "readApi": "fs.readFileSync",
+        "workspace": "one disposable workspace, installed once, rebuilt per configuration; removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "prefetch-latency",
+          "reason": "The cost DEC-0019 accepts — that `connection()` blocks prefetching — was NOT measured here. It is taken from the Next.js documentation, so the accepted cost sits at source-supported while the benefit sits at environment-matched. Measuring it needs client-side navigation between routes, which this probe does not perform.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "revalidation-beyond-five-seconds",
+          "reason": "Routes were re-requested about two and five seconds after the external write. This shows the control route is frozen across five seconds, not that it is frozen forever — the same bound EVD-0023 carries.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "integration-with-the-project-content-loaders",
+          "reason": "The application shell does not exist yet, so reads went through `fs.readFileSync` and `JSON.parse` on copies of real artifacts. That matches the READ SHAPE the requirements need but not the project's own loader modules, which the shell is required to reuse rather than rewrite.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "concurrent-request-load",
+          "reason": "One request at a time. Whether a dynamic route holds up under concurrent reads of the same artifacts bears on runtime lifecycle, not on freshness.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "other-operating-systems",
+          "reason": "One host was available; scoped to Windows.",
+          "state": "not-observable"
+        }
+      ]
+    },
+    "id": "EVD-0024",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS IS NOT A RE-RUN OF EVD-0023, and the difference is the point. EVD-0023 compared MECHANISMS, one read per build, to choose one. This measures the CONTRACT AS WRITTEN — `connection()` before EACH read, a fallback that is a real loading state — and it carries a NEGATIVE CONTROL inside the same build. Without the control, a fresh result would not distinguish the contract doing the work from something incidental about the build. The control was stale in both configurations, so the contract is load-bearing rather than decorative. ⚠️ THE CONTROL INDEPENDENTLY REPRODUCES AST-0019 a third time, in a third instrument: `○ /bare` built static and served build-time content with cacheComponents both enabled and disabled. ⚠️ THE MIXED ROUTE IS THE FINDING NOBODY ASKED FOR. Its non-compliant read came back FRESH in both configurations, because a compliant sibling had already made the route dynamic. See AST-0022 — it is the reason the 'each read' clause is not redundant.",
+    "observedAt": "2026-08-26",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "One application, three routes, built and served twice under `next build` + `next start`. The contract route makes two planning-content reads, each awaiting `connection()` inside its own Suspense boundary with a named loading fallback. The control route makes the same read with neither. A third route mixes one of each. Copies of real planning artifacts were read through `JSON.parse(readFileSync(...))` and a markdown read, then rewritten externally with the server live. With cacheComponents DISABLED the routes built as \"┌ ƒ /\", \"└ ƒ /mixed\" and \"├ ○ /bare\"; with it ENABLED, \"┌ ◐ /\", \"└ ◐ /mixed\" and \"├ ○ /bare\". In BOTH configurations the contract route served the externally written values on every request after the write, its Suspense fallback was present in the initial HTML, and the control route served its build-time values on every request including five seconds later. The mixed route served BOTH slots fresh — including the non-compliant one.",
+    "title": "Experiment: the DEC-0019 read contract, with a non-compliant control on the same build",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0025",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Expressions can contain whole JavaScript programs as long as they’re (wrapped in) an expression that evaluates to something that can be rendered.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/docs/what-is-mdx/",
+        "retrievedAt": "2026-08-26",
+        "title": "What is MDX? | MDX"
+      }
+    ],
+    "summary": "An MDX document may contain whole JavaScript programs, so compiling one is executing author-supplied code.",
+    "title": "Source: What is MDX? | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0026",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"MDX supports import and export statements from JavaScript as well.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/docs/what-is-mdx/",
+        "retrievedAt": "2026-08-26",
+        "title": "What is MDX? | MDX"
+      }
+    ],
+    "summary": "MDX documents may import and export ES modules, so a document can pull in any module the bundler can resolve.",
+    "title": "Source: What is MDX? | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0027",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"MDX is a programming language. If you trust your authors, that’s fine. If you don’t, it’s unsafe.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/docs/getting-started/",
+        "retrievedAt": "2026-08-26",
+        "title": "Getting started | MDX"
+      }
+    ],
+    "summary": "MDX's own security model is author trust rather than containment; it classifies MDX as a programming language.",
+    "title": "Source: Getting started | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0028",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Do not let random people from the internet write MDX.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/docs/getting-started/",
+        "retrievedAt": "2026-08-26",
+        "title": "Getting started | MDX"
+      }
+    ],
+    "summary": "The MDX project advises against letting untrusted parties author MDX and offers no in-language sandbox.",
+    "title": "Source: Getting started | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0029",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Expected component `NoteIcon` to be defined: you likely forgot to import, pass, or provide it.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/packages/mdx/",
+        "retrievedAt": "2026-08-26",
+        "title": "@mdx-js/mdx | MDX"
+      }
+    ],
+    "summary": "A reference to a component that was never provided fails at RUNTIME with a named MDX error, not at compile time.",
+    "title": "Source: @mdx-js/mdx | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0030",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Note that components must be defined. You can import them, define them locally, or pass them in later\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://mdxjs.com/docs/what-is-mdx/",
+        "retrievedAt": "2026-08-26",
+        "title": "What is MDX? | MDX"
+      }
+    ],
+    "summary": "MDX requires components to be defined, and names exactly three ways a document may obtain one.",
+    "title": "Source: What is MDX? | MDX",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0031",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"`mdx-components.tsx` is **required** to use `@next/mdx` with App Router and will not work without it.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/guides/mdx",
+        "retrievedAt": "2026-08-26",
+        "title": "https://nextjs.org/docs/app/guides/mdx"
+      }
+    ],
+    "summary": "With @next/mdx and the App Router, the global component-mapping file is mandatory.",
+    "title": "Source: https://nextjs.org/docs/app/guides/mdx",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0032",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Adding styles and components in `mdx-components.tsx` will affect *all* MDX files in your application.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/guides/mdx",
+        "retrievedAt": "2026-08-26",
+        "title": "https://nextjs.org/docs/app/guides/mdx"
+      }
+    ],
+    "summary": "The global MDX component mapping applies to every MDX file in the application, not per document.",
+    "title": "Source: https://nextjs.org/docs/app/guides/mdx",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0033",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"These will merge with and override\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/guides/mdx",
+        "retrievedAt": "2026-08-26",
+        "title": "https://nextjs.org/docs/app/guides/mdx"
+      }
+    ],
+    "summary": "Per-page components merge with and override the global mapping rather than replacing it.",
+    "title": "Source: https://nextjs.org/docs/app/guides/mdx",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0034",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"The serialize function used to compile MDX in next-mdx-remote is vulnerable to arbitrary code execution due to insufficient sanitization of MDX content.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+        "retrievedAt": "2026-08-26",
+        "title": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m"
+      }
+    ],
+    "summary": "Server-side rendering of untrusted MDX produced a real, GitHub-reviewed high-severity code-execution vulnerability.",
+    "title": "Source: https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0035",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"\"vulnerable_version_range\":\">= 4.3.0, < 6.0.0\",\"first_patched_version\":\"6.0.0\"\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+        "retrievedAt": "2026-08-26",
+        "title": "https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m"
+      }
+    ],
+    "summary": "CVE-2026-0969 is classified as code injection at CVSS 8.8, affecting next-mdx-remote up to 6.0.0.",
+    "title": "Source: https://api.github.com/advisories/GHSA-g4xw-jxrg-5f6m",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0036",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Introduced the parameters `blockJS` and `blockDangerousJS` that controls how JS in interpreted during compiling MDX. Both default to true for security reasons.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0",
+        "retrievedAt": "2026-08-26",
+        "title": "https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0"
+      }
+    ],
+    "summary": "The maintainers' remedy was to BLOCK JavaScript in MDX by default rather than to sanitise it.",
+    "title": "Source: https://api.github.com/repos/hashicorp/next-mdx-remote/releases/tags/v6.0.0",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0037",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"By default, JavaScript expressions (like `{variable}` or `{func()}`) are **disabled for security** for versions 6.0.0 and above.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+        "retrievedAt": "2026-08-26",
+        "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md"
+      }
+    ],
+    "summary": "From 6.0.0 onward JavaScript expressions in MDX are disabled by default for security.",
+    "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0038",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"which will provide a best effort option to blocks dangerous operations like `eval`, `Function`, `process`, `require`, and other globals that could lead to remote code execution (RCE)\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+        "retrievedAt": "2026-08-26",
+        "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md"
+      }
+    ],
+    "summary": "Even with JS enabled, the protective mode is described by its own maintainers as best effort rather than a boundary.",
+    "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0039",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Only set `blockDangerousJS: false` if you completely trust the MDX content source. This removes critical security protections and could allow RCE attacks.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+        "retrievedAt": "2026-08-26",
+        "title": "https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md"
+      }
+    ],
+    "summary": "Fully unrestricted MDX is documented as safe only for content the operator completely trusts.",
+    "title": "Source: https://raw.githubusercontent.com/hashicorp/next-mdx-remote/main/README.md",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0040",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"plugin **to remove import and/or export statements (`mdxjsEsm`) in MDX documents.**\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md",
+        "retrievedAt": "2026-08-26",
+        "title": "https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md"
+      }
+    ],
+    "summary": "Stripping ESM import/export from MDX at compile time is an established published practice, not a bespoke idea.",
+    "title": "Source: https://raw.githubusercontent.com/ipikuka/remark-mdx-remove-esm/main/README.md",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "packageRoot": "docs/plan/",
+        "publisher": "lib/handoff/publish.mjs readStageDocs()",
+        "repository": "visual-project-workflow",
+        "snapshot": "6c86330767dcbbfa"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "recipient-rendering-behaviour",
+          "reason": "What a recipient DOES with a package is outside this repository. The package ships document text; whether anyone compiles it, and with which toolchain, cannot be observed from here — which is exactly why the property matters rather than why it does not.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "mdx-extension-behaviour",
+          "reason": "No `.mdx` file exists under `planning-content/stages/`, so the filter's behaviour on one was read from the source rather than exercised. Running it would need a stage document that does not yet exist.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0041",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ Recorded as an observation of THIS repository because the consequence below is not derivable from any external source, and it is the point at which an ecosystem CVE becomes a fact about this project rather than an interesting story about someone else's.",
+    "observedAt": "2026-08-26",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "`lib/handoff/publish.mjs` reads `planning-content/stages/`, filters `readdirSync(dir).filter((f) => f.endsWith(\".md\"))`, and copies each file's text unchanged into the package — the code comments it as \"Stage narratives ship as-is: they are authored planning content, not generated output.\" The published package at `docs/plan/` contains nine such documents under `docs/`, one per stage, at snapshot 6c86330767dcbbfa.",
+    "title": "Observation: the handoff package ships every stage document verbatim, and filters on `.md`",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "integration": "@next/mdx",
+        "network": "npm install reached the public registry",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "permittedComponents": "Callout",
+        "react": "19.2.8",
+        "workspace": "one disposable workspace, rebuilt per case, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "rejection-completeness",
+          "reason": "Five forbidden constructs were exercised: import/export, flow and text expressions, JSX attribute expressions, spread attributes, and unmapped components. That the plugin catches EVERY way to reach JavaScript in MDX was not established and cannot be by example — it needs an argument over the mdast node types, which is why stripping is retained as defence in depth.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "rehype-and-recma-stages",
+          "reason": "The plugin runs at the remark (mdast) stage only. Whether a later rehype or recma plugin could reintroduce JavaScript was not tested.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0042",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ TWO CONFIGURATION CONSTRAINTS WERE MEASURED, and both first presented as the contract failing. (1) Next.js 16.3.2 builds with TURBOPACK by default, which serialises the config — so a remark plugin must be given as a module path, not a function reference. (2) That path must be ABSOLUTE: `@next/mdx` resolves a relative path with `require.resolve(p, {paths:[projectRoot]})` from its own package directory, so `./lib/plugin.mjs` fails with `Cannot find module` and a require stack rooted in `node_modules/@next/mdx`. That message reads like a broken plugin rather than a configuration rule, and it cost a build to tell apart. ⚠️ REJECT, NOT STRIP, is what makes the diagnostics possible at all. `file.fail` carries the node's position; a stripping plugin has nothing to report because by construction nothing is wrong afterwards.",
+    "observedAt": "2026-08-26",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "One `@next/mdx` application, a remark plugin that calls `file.fail` on forbidden nodes, and six documents built through `next build`. accept: built ✓; reject-import: refused @ 1:1 ✓; reject-expression: refused @ 3:8 ✓; reject-attr-expression: refused @ 3:10 ✓; reject-spread: refused @ 3:10 ✓; reject-unmapped: refused @ 3:1 ✓. The accepted document built as a route, rendered its markdown, and rendered the mapped component. Each of the five refusals failed the build and named the file with a line:column position and a reason.",
+    "title": "Experiment: restricted MDX rejects forbidden JavaScript at build time, with positions",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "integration": "@next/mdx",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "route": "app/doc/page.mdx",
+        "workspace": "disposable, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "connection-contract-applied",
+          "reason": "DEC-0019's contract was deliberately NOT applied here, because it could not help: the document becomes JavaScript at build time, so there is no request-time read for `connection()` to make dynamic. Measuring it would have confirmed the same value for a different reason and invited the wrong conclusion.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0043",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ FOUND BY LOOKING AT THE ROUTE SYMBOL, not by asking the question. The accepted case built as `○ /doc` — static — which is the symbol AST-0019 is about, and the freshness matrix had already made it worth chasing.",
+    "observedAt": "2026-08-26",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "An `app/doc/page.mdx` containing a mapped component built as a static route under `next build`. With `next start` serving it, the file was rewritten with a different marker and re-requested: the served page continued to show the build-time marker.",
+    "title": "Experiment: a file-routed MDX document is compiled into the build and does not reflect an edit",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "framework": "@mdx-js/mdx",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "outputFormat": "function-body",
+        "permittedComponents": "Callout",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "server-component-integration",
+          "reason": "Compilation and rendering were exercised directly, not inside a Next.js Server Component behind DEC-0019's `connection()` boundary. Composing the two is the next step and has not been run.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "compilation-cost-per-request",
+          "reason": "Timing was not collected. Whether compiling a stage document per request is acceptable at the sizes this project produces is unmeasured.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0044",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS BECAME LOAD-BEARING ONLY BECAUSE OF THE FRESHNESS FINDING. If file-routed MDX had reflected edits, runtime compilation would never have been needed and this would be a curiosity. As it stands the requirements force runtime compilation, runtime compilation of author-controlled MDX is the exact shape of CVE-2026-0969, and this is the measurement that says the plugin still refuses there.",
+    "observedAt": "2026-08-26",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The identical remark plugin was run through `@mdx-js/mdx`'s `compile` + `run` in a Node process rather than a bundler, against the same six documents, rendering with `renderToStaticMarkup`. accept: compiled; reject-import: refused @ 1:1; reject-expression: refused @ 3:8; reject-attr-expression: refused @ 3:10; reject-spread: refused @ 3:10; reject-unmapped: refused @ 3:1. All six matched the build-time outcomes, and every refusal carried a position and the source path.",
+    "title": "Experiment: the same rejection contract holds under runtime MDX compilation",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0045",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"JavaScript modules can be shared between both Server and Client Components modules. This means it's possible to accidentally import server-only code into the client.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+        "retrievedAt": "2026-08-27",
+        "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components"
+      }
+    ],
+    "summary": "Modules are shared between server and client, so server-only code can be imported into the client by accident.",
+    "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0046",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Once a file is marked with `\"use client\"`, **all of its imports and the components it directly renders are included in the client bundle**.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+        "retrievedAt": "2026-08-27",
+        "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components"
+      }
+    ],
+    "summary": "The client-bundle rule is TRANSITIVE: a `use client` file drags all of its imports into the client bundle.",
+    "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0047",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"Next.js handles `server-only` and `client-only` imports internally to provide clearer error messages when a module is used in the wrong environment. The contents of these packages from NPM are not used by Next.js.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+        "retrievedAt": "2026-08-27",
+        "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components"
+      }
+    ],
+    "summary": "Next.js implements the server-only guard itself; the npm package's contents are not used.",
+    "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0048",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"In Next.js, installing `server-only` or `client-only` is **optional**.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+        "retrievedAt": "2026-08-27",
+        "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components"
+      }
+    ],
+    "summary": "Installing the server-only package is optional in Next.js.",
+    "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "layout": "lib/ as a sibling of app/, plain relative import",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "workspace": "disposable, rebuilt per case, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "runtime-behaviour-of-an-unguarded-client-import",
+          "reason": "The build never completed, so there is no server to observe. Whether a different bundler configuration would have produced a running app with a broken client chunk was not explored.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "webpack-builder",
+          "reason": "Turbopack is the default at 16.3.2 and was the only builder exercised. The unguarded failure mode is a Turbopack internal error and may differ under webpack.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0049",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE CONTRAST IS THE FINDING, not the failure. Both client cases fail, so a probe that only asked 'is it prevented' would have reported success for both and concluded the marker was optional — which is what the Next.js documentation says. What separates them is whether anyone can tell WHY: `TurbopackInternalError` with `location: undefined` is indistinguishable from a bundler bug. ⚠️ MESSAGE ACCURACY CAVEAT, recorded because it would mislead: in the guarded direct-import case Next.js said \"you are using it in the Pages Router\" — this project uses the App Router, and the wording is simply wrong. The adapter case (EVD-0050) produced the correct App Router message. The diagnostic is locatable either way; its prose is not always right.",
+    "observedAt": "2026-08-27",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A `lib/planning.js` using `node:fs`, `node:child_process` and a lock-shaped API, imported four ways under `next build`. Imported by a Server Component it built and rendered the value, with and without a `server-only` marker. Imported by a `'use client'` component it failed both times — but differently: UNGUARDED the build failed with `Error: Failed to write app endpoint /page`, `type: 'TurbopackInternalError'`, `location: undefined`, naming no file; GUARDED it failed at `./lib/planning.js:1:1` with the offending source line, a caret, an explanation and a docs link.",
+    "title": "Experiment: a Node-only module across the Server/Client boundary, guarded and unguarded",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "guardLocation": "app-side adapter, not lib/",
+        "layout": "lib/ as a sibling of app/, plain relative import",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8",
+        "workspace": "disposable, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "adapter-completeness",
+          "reason": "One adapter re-exporting two functions was exercised. Whether every module the shell needs from lib/ can be re-exported this way — some take locks, spawn processes, or hold module-level state — was not tested, and the answer may differ per module.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "enforcement-that-app-code-never-imports-lib-directly",
+          "reason": "The adapter is a convention here, not a checked rule. Nothing in this probe stops a component importing `../../lib/planning.js` and bypassing the guard entirely. That is REQ-0021's territory and it is unbuilt.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0050",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PLAIN-NODE CHECK IS THE POINT OF THIS PROBE. `server-only` resolves `react-server` to `empty.js` only inside the RSC compiler; everywhere else it resolves to `index.js`, which THROWS. Measured directly: importing it under bare Node throws \"This module cannot be imported from a Client Component module.\" So the obvious placement — mark `lib/` and be done — would break every CLI in `bin/` and the entire test suite, which import `lib/` under plain Node.",
+    "observedAt": "2026-08-27",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "`lib/planning.js` carries no marker and stays importable by plain Node — verified by importing it in a bare `node -e` process, which returned the artifact value. An `app/server/planning.js` adapter carries `import 'server-only'` and re-exports from it. A Server Component importing the adapter built and rendered the value. A `'use client'` component importing the adapter FAILED the build at `./app/server/planning.js:1:1`, quoting the import line and the re-export beneath it, with the correct App Router message: the module is a Client Component because one of its parents is marked `use client`.",
+    "title": "Experiment: the `server-only` guard on an app-side adapter, with `lib/` left unmarked",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0051",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"it does not attempt to reconnect.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "Once an SSE connection is FAILED (as opposed to merely dropped), the client never retries.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0052",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"unless the user agent knows that to be futile, in which case the user agent may fail the connection\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "A network error reconnects, but the user agent may give up permanently if it judges retrying futile.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0053",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"s status is not 200, or if res 's ` Content-Type ` is not ` text/event-stream `, then fail the connection\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "A non-200 status or a wrong Content-Type FAILS the connection, which is the terminal state, not a retry.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0054",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"is not a network error , then reestablish the connection\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "A stream that ends without a network error is reconnected automatically.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "substrate": "app/server.mjs walking skeleton",
+        "transport": "text/event-stream over http",
+        "watcher": "chokidar",
+        "workspace": "copy of planning-content in a disposable directory, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "browser-client-reconnect-behaviour",
+          "reason": "There is no global `EventSource` in this Node build and no browser on this host. Writing a polyfill and measuring it would have measured my own code while implying a browser had been observed. The client half is source-supported only, from the WHATWG specification (EVD-0051..EVD-0054).",
+          "state": "not-observable"
+        },
+        {
+          "fact": "idle-timeout-beyond-six-seconds",
+          "reason": "The idle stream was observed for six seconds. Whether an intermediary or the OS would drop a longer-idle connection was not exercised, and it is the case a heartbeat would exist to survive.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "concurrent-clients",
+          "reason": "One reader at a time. Fan-out behaviour across several open pages was not measured.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0055",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE SERVER HALF IS MEASURABLE AND THE CLIENT HALF IS NOT, and the split is stated here so nothing downstream reads a browser claim into this record. What a reconnecting client can RECOVER is a property of what the server sent, and that is what was measured.",
+    "observedAt": "2026-08-27",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The skeleton was started against a copy of this project's planning content and its `/events` stream read directly over HTTP. The opening frame is exactly \"retry: 500\\n\\n\" — a reconnection time and nothing else; no `id:` field is ever sent. A change made while connected was delivered as `data: changed`. A change made during a disconnected window was NOT delivered on reconnect. An idle stream emitted ZERO bytes over six seconds after the opening frame. A write after a client had left did not disturb the server.",
+    "title": "Experiment: the walking skeleton's server-side SSE contract",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "corruption": "one assertion file replaced with invalid JSON",
+        "node": "v24.18.0",
+        "node-version": "v24.18.0",
+        "os": "Windows 11",
+        "substrate": "app/server.mjs walking skeleton",
+        "transport": "text/event-stream over http",
+        "watcher": "chokidar",
+        "workspace": "disposable copy, removal verified"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "other-malformation-modes",
+          "reason": "One mode was exercised — syntactically invalid JSON. Schema-valid-but-wrong content, an unreadable file, and a directory in place of a file were not tested and may behave differently.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0056",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE COUNT IS THE PART THAT MAKES THIS BAD. A view that quietly omitted a broken artifact would merely be incomplete. This one omits it AND prints a total that still includes it, so the page actively asserts the artifact is present. An operator has no reason to look for what is missing.",
+    "observedAt": "2026-08-27",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "With the skeleton serving a copy of this project's content, the page reported 178 artifacts and rendered AST-0001. One artifact file was then replaced with invalid JSON. The next request returned HTTP 200 with a normally-formed page, the header still reported 178 artifacts, the number of lint findings shown was unchanged, and AST-0001 was absent from the page. No error, no warning, and no indication that anything had failed to load.",
+    "title": "Experiment: a malformed artifact is dropped from the view while the count still includes it",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0057",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"If the line starts with a U+003A COLON character (:) Ignore the line.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "A comment line in an SSE stream is IGNORED by the client parser, so it fires no JavaScript event and cannot be observed by page code.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
+  },
+  {
+    "id": "EVD-0058",
+    "kind": "source",
+    "lifecycle": "active",
+    "notes": "Quoted from the page, verified present at retrieval time: \"To protect against such proxy servers, authors can include a comment line (one starting with a ':' character) every 15 seconds or so.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "sources": [
+      {
+        "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+        "retrievedAt": "2026-08-27",
+        "title": "HTML Standard"
+      }
+    ],
+    "summary": "Comment lines exist to keep proxies from dropping the connection — a transport keepalive, not a client-visible signal.",
+    "title": "Source: HTML Standard",
+    "type": "evidence"
   }
 ]

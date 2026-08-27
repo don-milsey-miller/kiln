@@ -193,5 +193,125 @@
     "schemaVersion": 2,
     "title": "Handoff export",
     "type": "component"
+  },
+  {
+    "id": "CMP-0012",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ OUTSIDE ITS BOUNDARY: it does not parse artifacts, derive verdicts or compile documents — it supplies content and the freshness guarantee, and the modules that interpret content are `lib/`'s, reached through CMP-adapter. ⚠️ IT IS THE THING REQ-0021 CONFINES READS TO. AST-0022 measured that a read bypassing this component is served FRESH whenever a compliant read shares its route, so a bypass is invisible to any behavioural test — which is why the confinement is static and why this component's value depends on nothing being able to go around it.",
+    "responsibility": "Be the single path by which the application reads planning content from disk, applying the DEC-0019 contract on every read: await `connection()` before the filesystem access, inside a `<Suspense>` boundary whose fallback is a real loading state for that content. Everything the shell knows about the plan enters through here.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0016",
+      "REQ-0017",
+      "REQ-0018"
+    ],
+    "schemaVersion": 2,
+    "title": "Planning-content reader",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0013",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ REQUEST-TIME, NOT BUILD-TIME, AND THAT IS NOT A PERFORMANCE CHOICE. AST-0030 measured that a file-routed `@next/mdx` page is compiled into the build and does not reflect an edit, which REQ-0018 forbids. Routing stage documents as pages would satisfy REQ-0017 and silently fail REQ-0018 while looking correct. ⚠️ OUTSIDE ITS BOUNDARY: it does not read the document (that is the reader) and does not decide the component vocabulary (that is the mapping it is given). ⚠️ IT OWNS DEC-0020's PINNING OBLIGATION: changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. The rejection was measured at the remark stage only; a later stage could reintroduce what it refused.",
+    "responsibility": "Compile a stage document to a renderable component at request time using `@mdx-js/mdx`, running the rejection plugin that fails the compile with a file path and a line:column position on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted component set. Own the pinned compiler and plugin chain.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0017"
+    ],
+    "schemaVersion": 2,
+    "title": "Restricted MDX compiler",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0014",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE GUARD CANNOT LIVE IN `lib/`, which is why this component exists rather than a one-line edit. AST-0033 measured that `server-only` throws when imported outside the RSC compiler, and `lib/` is imported by every `bin/` command and the whole test suite — marking it would guard the application by breaking the tool. ⚠️ IT PREVENTS NOTHING THE BUILD DID NOT ALREADY PREVENT. Both client-import cases already fail; what the marker buys is a LOCATABLE failure. Unguarded, Turbopack reports an internal error with `location: undefined` and no filename (AST-0032). ⚠️ OUTSIDE ITS BOUNDARY: it holds no logic of its own. A wrapper that adapts a signature is permitted; a wrapper that decides anything belongs in `lib/`, where the tool and the app share it.",
+    "responsibility": "Be the only door from application code into `lib/`. Each module begins with `import 'server-only'`, re-exports by explicit name or wrapper rather than `export *`, and exposes only the capabilities the shell needs; process-spawning, locking and stateful modules pass through individual review before they are exposed at all.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0019"
+    ],
+    "schemaVersion": 2,
+    "title": "Server adapter layer",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0015",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47).",
+    "responsibility": "Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0016"
+    ],
+    "schemaVersion": 2,
+    "title": "Project view",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0016",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ AT MOST ONE STAGE DOCUMENT PER RENDER, because DEC-0020's per-request compilation cost is explicitly unmeasured and a view rendering several would multiply an unknown. ⚠️ NO CORRECTNESS-CRITICAL CLIENT STATE. Transient interface state is fine; anything a user must not lose is URL-encoded or persisted, because DEC-0022 reloads this page on every content change and every reconnection — at a moment the user did not choose and without telling them what went. ⚠️ OUTSIDE ITS BOUNDARY: it does not compile, read or write; it composes the components that do.",
+    "responsibility": "Render `/stage/[stageId]`: the stage's document through the restricted MDX compiler, its exit criteria with their recorded attestations, and the entry points for review actions. Hold no correctness-critical state in the client.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0017",
+      "REQ-0019"
+    ],
+    "schemaVersion": 2,
+    "title": "Stage view",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0017",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly.",
+    "responsibility": "Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0018"
+    ],
+    "schemaVersion": 2,
+    "title": "Change stream",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0018",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT IS THE FIRST LOCKING CAPABILITY THE ADAPTER MUST EXPOSE, and DEC-0021 holds locking modules back for individual review precisely so this one is examined rather than arriving as a line in an adapter. A Server Component may run concurrently in ways a CLI never does. ⚠️ `reviewStatus` ONLY. #82's two-axis split is doing work here: review progress is the application's to change and `lifecycle` is not, and a single `status` field would have let this endpoint retire an artifact by accident. ⚠️ OUTSIDE ITS BOUNDARY: it does not decide whether a status change is allowed — the typed tool owns that, and one implementation serves both the CLI and the app (#47).",
+    "responsibility": "Perform review-status changes from the application through the existing typed write path — lock, fresh read inside the lock, atomic write — reusing `lib/tools/review-status.mjs` rather than reimplementing it, and reaching it through the server adapter layer.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0019"
+    ],
+    "schemaVersion": 2,
+    "title": "Review action",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0019",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT EXISTS BECAUSE TESTING CANNOT DO THIS. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural freshness check passes on a codebase that breaks the contract — until the compliant sibling moves, and then every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked. ⚠️ TWO EDGES, ONE GRAPH: reads outside the abstraction, and `app/**` importing `lib/**` outside `app/server/`. The adapter boundary has the same property — an app module importing `lib/` directly behaves identically until someone renders it from a client component. ⚠️ THE MECHANISM IS NOT FIXED HERE: a lint rule, a module-boundary constraint, a generated accessor or a build-step scan would each satisfy it. What is fixed is that it runs without executing the application.",
+    "responsibility": "Statically prove, without executing the application, that every planning-content read goes through the reader inside a `<Suspense>` boundary and that no module outside `app/server/` imports from `lib/`. Detect bypass paths rather than only direct violations.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0021"
+    ],
+    "schemaVersion": 2,
+    "title": "Import-boundary check",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0020",
+    "lifecycle": "active",
+    "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ PRODUCTION MODE ONLY (DEC-0018): `next build` then `next start`. `next dev` is a contributor workflow and is not a shipped configuration — AST-0015 showed the two produce different artifacts, so shipping the development server would mean shipping something this project can never validate. ⚠️ THE PROCESS OWNERSHIP IS AN OBLIGATION WITH NO MECHANISM YET, deliberately. The skeleton creates its watcher on `listen` and closes it in its own `close()`, but that belongs to a process owning its own HTTP server; under `next start` there is no such object and nothing has been run. Choosing and validating the binding is this component's design work.",
+    "responsibility": "Install and run the shell from one documented command: build the application, start it, own both the application process and the file watcher, and terminate the watcher with the application.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0020"
+    ],
+    "schemaVersion": 2,
+    "title": "Launcher",
+    "type": "component"
   }
 ]

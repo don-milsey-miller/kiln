@@ -2,7 +2,7 @@
   "id": "TSK-0005",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
   "title": "Build the planning-content reader on the `connection()` + Suspense contract",
   "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",

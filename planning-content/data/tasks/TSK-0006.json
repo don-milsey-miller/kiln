@@ -2,25 +2,25 @@
   "id": "TSK-0006",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "amended",
   "lifecycle": "active",
-  "title": "Build the static import- and read-boundary check, with failing fixtures",
-  "statement": "Implement the check that runs without executing the application and reports file and line for: a planning-content read outside the reader, a read site not enclosed by a `<Suspense>` boundary, and any module outside `app/server/` importing from `lib/` directly or through a re-export chain. Ship a fixture set containing one instance of each violation, and prove the check fails on every one.",
+  "title": "Build the static `app/server` → `lib/` import-boundary check, with failing fixtures",
+  "statement": "Implement the analysis that runs without executing the application and reports file and line when any module outside `app/server/` imports from `lib/`, whether directly or through a re-export chain that reaches `lib/` indirectly. Ship fixtures containing both shapes and prove the check fails on each.",
   "role": "platform",
   "implements": [
+    "CMP-0014",
     "CMP-0019"
   ],
   "fulfils": [
+    "REQ-0019",
     "REQ-0021"
   ],
   "acceptedBy": [
-    "ACC-0021",
-    "ACC-0022",
     "ACC-0023",
     "ACC-0024"
   ],
   "dependsOn": [
-    "TSK-0005"
+    "TSK-0004"
   ],
-  "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen."
+  "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen. ⚠️ SPLIT 2026-08-27. This half needs only the adapter to exist, so it moves earlier and no longer waits on the reader. The read and `<Suspense>` confinement analysis is its sibling. ⚠️ ACC-0024 is satisfied by the PAIR, not by this task alone: both halves must be shown to fail on their own fixtures before the criterion passes."
 }

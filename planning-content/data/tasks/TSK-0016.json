@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0016",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the project view's artifact totals, lint surface and located parse failures",
+  "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
+  "role": "frontend",
+  "implements": [
+    "CMP-0015"
+  ],
+  "fulfils": [
+    "REQ-0016"
+  ],
+  "acceptedBy": [
+    "ACC-0014",
+    "ACC-0015"
+  ],
+  "dependsOn": [
+    "TSK-0007"
+  ],
+  "notes": "⚠️ Split from TSK-0007 on 2026-08-27, because the truthfulness rules are where this view fails SILENTLY and they deserve their own review rather than riding along with the navigation. ⚠️ THE COUNT RULE ADMITS NO PARTIAL-FAILURE EXCEPTION. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one, because an operator reading it has been told the missing thing is present. ⚠️ ACC-0014 is evaluated against a FIXTURE of known composition, never against the page — the page renders totals rather than entries, so counting what it shows would compare a number with itself."
+}
