@@ -1,0 +1,38 @@
+{
+  "id": "DEC-0021",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The shell reaches `lib/` only through an `app/server/*` adapter carrying `server-only`",
+  "statement": "Application code reaches the shared `lib/` modules exclusively through a thin adapter layer under `app/server/`. Every adapter module begins with `import 'server-only'`, before any other import. Adapters re-export by EXPLICIT NAMED EXPORT or wrap the underlying function; blanket `export *` is not permitted. An adapter exposes only the capabilities the shell actually needs, and any module that spawns a process, takes a lock, or holds module-level state requires individual review before it may be exposed at all. No application code outside `app/server/` may import from `lib/` directly. `lib/` itself carries no `server-only` marker, so it remains importable by the CLIs in `bin/` and by the test suite under plain Node. REQ-0021's static check enforces this boundary and detects bypass paths.",
+  "rationale": "AST-0032 measured that the import itself needs nothing: a Server Component reaches a sibling `lib/` module by plain relative path with no alias or bundler configuration, so #47's single implementation stays single for free. What needed deciding was the boundary. A `'use client'` file drags all of its imports into the client bundle (EVD-0046), and while that already fails the build, unguarded it fails as a Turbopack internal error with `location: undefined` and no filename — indistinguishable from a bundler bug. The `server-only` marker changes no runtime behaviour and prevents nothing that was not already prevented; it makes the failure LOCATABLE, which in a tool whose whole premise is legible refusals is the difference that matters. AST-0033 then forced the placement: `server-only` throws when imported outside the RSC compiler, and `lib/` is imported by every `bin/` command and the whole test suite, so the marker cannot live there. The adapter is the only location that guards the app without breaking the tool, and the marker was measured to propagate through a re-export.",
+  "alternatives": [
+    {
+      "option": "Put `import 'server-only'` at the top of each Node-only module in `lib/`",
+      "whyNot": "The documentation's own example, and what anyone would write first. Measured to break the tool: the package maps `react-server` to an empty module and everything else to one that THROWS on import, so `npm test` and every `bin/` command would fail. It guards the application by breaking the CLI the application exists to serve."
+    },
+    {
+      "option": "No guard; rely on the build failing anyway",
+      "whyNot": "It does fail — that is the trap. A check asking only whether the wrong import is prevented reports success here, which is why the Next.js documentation can honestly call the marker optional. The failure carries no file and no position, so the first person to hit it is debugging Turbopack rather than their own import."
+    },
+    {
+      "option": "`export *` from the adapter, so it stays a one-line file per module",
+      "whyNot": "It makes the adapter a hole rather than a door. The exposed surface would then grow silently every time `lib/` gains an export, including modules that spawn processes or take locks, and nobody would review the widening because there is no diff to review. Explicit named exports make the surface a decision each time it changes."
+    },
+    {
+      "option": "Reimplement the needed logic inside the application",
+      "whyNot": "Contradicts DEC-0017 and #47 directly: one implementation, several callers. It is also unnecessary, since the plain relative import was measured to work."
+    }
+  ],
+  "decidedAt": "2026-08-27",
+  "addresses": [
+    "QST-0020",
+    "REQ-0019"
+  ],
+  "evidencedBy": [
+    "AST-0032",
+    "AST-0033"
+  ],
+  "notes": "⚠️ REQ-0021 GAINS AN EDGE, NOT A SECOND MECHANISM. Its static confinement already has to find planning-content reads outside the approved abstraction; `app/**` importing `lib/**` outside `app/server/` is the same kind of forbidden edge in the same import graph. One check, two rules — and the bypass path is the thing it must detect, because the adapter is a convention until something enforces it and `import '../../lib/x.mjs'` goes straight around the guard. ⚠️ TESTS ASSERT A LOCATABLE FAILURE, NEVER THE WORDING, and this is a measured precaution rather than a style rule. Next.js produced two different messages for the same violation reached two ways, and one of them was WRONG — it said \"you are using it in the Pages Router\" for an App Router project. A test pinned to that string would pass on a wrong message today and break on a correct one after an upgrade. The contract is: the build fails, it names the file, and it carries a line:column. The prose belongs to Next.js. ⚠️ PROCESS-SPAWNING, LOCKING AND STATEFUL MODULES ARE HELD BACK DELIBERATELY. The probe re-exported two pure-ish functions; it did not establish that a lock or a child process survives the adapter, and a Server Component may run concurrently in ways a CLI never does. Each such module is reviewed on its own before it is exposed, so the unexamined case cannot arrive as a side effect of adding a line to an adapter. ⚠️ WHAT IS NOT ESTABLISHED: whether every module the shell eventually needs can be re-exported this way, and whether the unguarded failure mode differs under webpack rather than Turbopack. ⚠️ DOES NOT SETTLE CACHE COMPONENTS."
+}

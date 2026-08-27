@@ -8,7 +8,9 @@
   "statement": "A review-status change made in the application is written by the existing typed operation — lock, fresh read inside the lock, atomic write — and the application contains no other write path into content.",
   "rationale": "#88 forbids authoring content by any route but a typed operation, and #78 plus #72 make the write safe against the agent writing concurrently. A second write path in the app would be a second protocol against the same files.",
   "priority": "must",
-  "openQuestions": [
-    "QST-0020"
+  "openQuestions": [],
+  "evidencedBy": [
+    "AST-0032",
+    "AST-0033"
   ]
 }
