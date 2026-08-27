@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0045",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  "kind": "source",
+  "summary": "Modules are shared between server and client, so server-only code can be imported into the client by accident.",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"JavaScript modules can be shared between both Server and Client Components modules. This means it's possible to accidentally import server-only code into the client.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

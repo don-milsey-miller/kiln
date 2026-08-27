@@ -1,0 +1,29 @@
+{
+  "id": "AST-0033",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The `server-only` guard cannot live in `lib/`, and works on an app-side adapter",
+  "statement": "The `server-only` package maps the `react-server` export condition to an empty module and everything else to a module that throws on import. `lib/` is imported by the CLIs in `bin/` and by the test suite under plain Node, where that condition does not apply, so marking `lib/` would make those throw. Placing the marker on a thin adapter inside the application that re-exports from `lib/` preserves both: `lib/` stays importable by plain Node, a Server Component importing the adapter builds and renders, and a `'use client'` component importing the adapter fails the build at the adapter's own line 1 with the correct App Router message. The marker therefore propagates through a re-export.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "layout": "lib/ as a sibling of app/, plain relative import",
+      "guardLocation": "app-side adapter, not lib/"
+    }
+  },
+  "openQuestions": [
+    "QST-0020"
+  ],
+  "notes": "⚠️ FOUND BY CHECKING THE OBVIOUS DESIGN BEFORE PROPOSING IT. 'Put `import \"server-only\"` at the top of each Node-only lib module' is what the documentation's example does, it is what anyone would write first, and here it breaks `npm test` and every `bin/` command. The package's conditional export is what makes the app-facing guard and the tool-facing import mutually exclusive in one file. ⚠️ THE ADAPTER IS A CONVENTION UNTIL REQ-0021 MAKES IT A RULE. Nothing measured here stops a component importing `../../lib/x.mjs` directly and going around the guard — and that is exactly the class of violation REQ-0021's static confinement exists to catch, so the two want the same check rather than two.",
+  "supportedBy": [
+    "EVD-0046",
+    "EVD-0050"
+  ]
+}

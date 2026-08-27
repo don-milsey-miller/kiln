@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0048",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  "kind": "source",
+  "summary": "Installing the server-only package is optional in Next.js.",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"In Next.js, installing `server-only` or `client-only` is **optional**.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

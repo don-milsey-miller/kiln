@@ -1,0 +1,27 @@
+{
+  "id": "AST-0032",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A Server Component imports sibling `lib/` directly, and the client-bundle failure is unreadable without a guard",
+  "statement": "Under Next.js 16.3.2 with Turbopack, a Server Component imports a Node-only module from a sibling `lib/` directory by plain relative path — no alias, no `transpilePackages`, no bundler configuration — and the value it computes renders in the page. When the same module is reached from a `'use client'` component the build fails either way, but only the `server-only` marker makes the failure locatable: without it Turbopack reports an internal error naming no file and no position; with it the build fails at the marked file's line 1 with the source line and an explanation.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "layout": "lib/ as a sibling of app/, plain relative import"
+    }
+  },
+  "openQuestions": [
+    "QST-0020"
+  ],
+  "notes": "⚠️ THE DOCUMENTATION CALLS THE MARKER OPTIONAL, AND FOR THIS PROJECT IT IS NOT. `server-only` changes no runtime behaviour and prevents nothing that was not already prevented — both client imports fail. What it changes is whether the failure is diagnosable, and an unlocatable build error in a tool whose whole premise is legible refusals is the wrong kind of correct. ⚠️ It is the same shape as DEC-0020 and the publisher refusal, arriving a third time: the question is never only whether the wrong thing is stopped, but whether the stop says where.",
+  "supportedBy": [
+    "EVD-0049"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "EVD-0049",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: a Node-only module across the Server/Client boundary, guarded and unguarded",
+  "kind": "experiment",
+  "summary": "A `lib/planning.js` using `node:fs`, `node:child_process` and a lock-shaped API, imported four ways under `next build`. Imported by a Server Component it built and rendered the value, with and without a `server-only` marker. Imported by a `'use client'` component it failed both times — but differently: UNGUARDED the build failed with `Error: Failed to write app endpoint /page`, `type: 'TurbopackInternalError'`, `location: undefined`, naming no file; GUARDED it failed at `./lib/planning.js:1:1` with the offending source line, a caret, an explanation and a docs link.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "layout": "lib/ as a sibling of app/, plain relative import",
+      "node-version": "v24.18.0",
+      "workspace": "disposable, rebuilt per case, removal verified"
+    },
+    "omissions": [
+      {
+        "fact": "runtime-behaviour-of-an-unguarded-client-import",
+        "state": "not-observable",
+        "reason": "The build never completed, so there is no server to observe. Whether a different bundler configuration would have produced a running app with a broken client chunk was not explored."
+      },
+      {
+        "fact": "webpack-builder",
+        "state": "not-captured",
+        "reason": "Turbopack is the default at 16.3.2 and was the only builder exercised. The unguarded failure mode is a Turbopack internal error and may differ under webpack."
+      }
+    ]
+  },
+  "notes": "⚠️ THE CONTRAST IS THE FINDING, not the failure. Both client cases fail, so a probe that only asked 'is it prevented' would have reported success for both and concluded the marker was optional — which is what the Next.js documentation says. What separates them is whether anyone can tell WHY: `TurbopackInternalError` with `location: undefined` is indistinguishable from a bundler bug. ⚠️ MESSAGE ACCURACY CAVEAT, recorded because it would mislead: in the guarded direct-import case Next.js said \"you are using it in the Pages Router\" — this project uses the App Router, and the wording is simply wrong. The adapter case (EVD-0050) produced the correct App Router message. The diagnostic is locatable either way; its prose is not always right."
+}

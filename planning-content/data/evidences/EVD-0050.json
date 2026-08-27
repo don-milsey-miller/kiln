@@ -1,0 +1,48 @@
+{
+  "id": "EVD-0050",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the `server-only` guard on an app-side adapter, with `lib/` left unmarked",
+  "kind": "experiment",
+  "summary": "`lib/planning.js` carries no marker and stays importable by plain Node — verified by importing it in a bare `node -e` process, which returned the artifact value. An `app/server/planning.js` adapter carries `import 'server-only'` and re-exports from it. A Server Component importing the adapter built and rendered the value. A `'use client'` component importing the adapter FAILED the build at `./app/server/planning.js:1:1`, quoting the import line and the re-export beneath it, with the correct App Router message: the module is a Client Component because one of its parents is marked `use client`.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "layout": "lib/ as a sibling of app/, plain relative import",
+      "node-version": "v24.18.0",
+      "guardLocation": "app-side adapter, not lib/",
+      "workspace": "disposable, removal verified"
+    },
+    "omissions": [
+      {
+        "fact": "adapter-completeness",
+        "state": "not-captured",
+        "reason": "One adapter re-exporting two functions was exercised. Whether every module the shell needs from lib/ can be re-exported this way — some take locks, spawn processes, or hold module-level state — was not tested, and the answer may differ per module."
+      },
+      {
+        "fact": "enforcement-that-app-code-never-imports-lib-directly",
+        "state": "not-captured",
+        "reason": "The adapter is a convention here, not a checked rule. Nothing in this probe stops a component importing `../../lib/planning.js` and bypassing the guard entirely. That is REQ-0021's territory and it is unbuilt."
+      }
+    ]
+  },
+  "notes": "⚠️ THE PLAIN-NODE CHECK IS THE POINT OF THIS PROBE. `server-only` resolves `react-server` to `empty.js` only inside the RSC compiler; everywhere else it resolves to `index.js`, which THROWS. Measured directly: importing it under bare Node throws \"This module cannot be imported from a Client Component module.\" So the obvious placement — mark `lib/` and be done — would break every CLI in `bin/` and the entire test suite, which import `lib/` under plain Node."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0046",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  "kind": "source",
+  "summary": "The client-bundle rule is TRANSITIVE: a `use client` file drags all of its imports into the client bundle.",
+  "sources": [
+    {
+      "title": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "locator": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"Once a file is marked with `\"use client\"`, **all of its imports and the components it directly renders are included in the client bundle**.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}
