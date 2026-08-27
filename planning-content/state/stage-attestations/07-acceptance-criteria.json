@@ -2,9 +2,9 @@
   "stageId": "07-acceptance-criteria",
   "attestations": {
     "criteria-objective": {
-      "result": "satisfied",
+      "result": "not-satisfied",
       "decidedBy": "pm",
-      "reason": "Run against CMP-0011, the only component whose acceptance bar was written BEFORE the code. Eight of its nine criteria are pass/fail outright and all nine pass. ⚠️ AC-9 ('include the snapshot identity without introducing authored state') is objective only in its testable half: no test can look at a string and tell whether a human wrote it. What is testable are proxies - no wall-clock anywhere, and byte-identical reproduction from the same input - and they are strong proxies that remain proxies. Recorded rather than rounded up. ⚠️ Basis is prose: the criteria are a table in the stage document, not artifacts, pending the PM's decision on `acceptance-criterion` (demand recorded, #41 applied, not built)."
+      "reason": "REGRESSED 2026-08-27 BY AUTHORING WORK, not by discovering a defect in what was already attested. The 2026-08-22 attestation was evaluated against NINE criteria, all CMP-0011's. Run 2 added twenty-three more (ACC-0013..ACC-0035) across CMP-0012..CMP-0020, and none of them had been judged against this criterion. Attesting satisfied over an unexamined set is the small dishonesty section 1 of this stage document warns about, so the criterion goes not-satisfied until the review happens. ⚠️ TWO CRITERIA ARE DEFECTIVE AND ARE WHY THIS IS NOT A FORMALITY. ACC-0014 asks that every rendered count equal the number of entries rendered — but the project view shows TOTALS, not artifact entries, so there is nothing independent to count and the criterion compares a number with itself. ACC-0020 states a 300 ms p95 compile budget with no protocol: no pinned environment, no timing boundaries, no warm-up treatment, and no check that compilation actually occurred on each request — so a cache could satisfy it while measuring nothing. ⚠️ RETURNS TO SATISFIED when those two are amended and the full set of thirty-two is judged. The other twenty-one from run 2 are sufficiently objective as written. ⚠️ NOT A JUDGEMENT ON THE COMPONENTS. Every run-2 criterion is not-evaluated because nothing is built; that is correct and is not what this criterion asks. Stage 7 defines the tests, it does not claim anything passes them."
     }
   }
 }
