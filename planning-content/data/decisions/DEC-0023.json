@@ -1,0 +1,38 @@
+{
+  "id": "DEC-0023",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The first slice is two views: a project view and a stage view",
+  "statement": "The application shell opens with exactly two views. `/` is the project view: the derived current stage, navigation across all nine stages with their gate state, artifact counts under the truthful-count rule, and lint findings surfaced rather than re-judged. `/stage/[stageId]` is the stage view: the working stage document rendered as restricted MDX, the stage's exit criteria with their recorded attestations, and review actions through the typed write path. Both views are URL-addressable and server-rendered. NO CORRECTNESS-CRITICAL STATE IS HELD ONLY IN THE CLIENT: transient interface state is permitted, but anything a user must not lose — filters, a selected section, unsaved work, navigational context — is URL-encoded or persisted. The artifact tracker and the assertion/evidence view are DEFERRED, not removed.",
+  "rationale": "This is a product decision and no source settles it; sequencing it fifth bought elimination rather than evidence. DEC-0022 makes every content change and every reconnection a full page reload, which is the sharpest constraint and the one that would have been discovered last — it decides what state a view may hold far more than any preference about views does. DEC-0019's blocked prefetching argues for fewer, denser views, an inference from an accepted cost rather than a measurement. DEC-0020's per-request compilation cost is explicitly unmeasured, which caps the design at one stage document per view. DEC-0021 makes read-only views cheap while the review-status write is the one locking capability the slice must get individually reviewed and exposed. Two views is what remains once those four have spoken, and it satisfies REQ-0016 through REQ-0019 without adding a surface the truthful-count rule would then have to cover.",
+  "alternatives": [
+    {
+      "option": "Start with the assertion/evidence view, which already has a working implementation",
+      "whyNot": "The cheapest view to reach and the wrong one to start with. DEC-0017 keeps `app/server.mjs` as the verified substrate reference until the shell reaches parity, so that view HAS a working home today — building it again first would spend the slice re-achieving something that already works while REQ-0016 and REQ-0017 stay unaddressed. It is an argument about order, and the order it argues for is later."
+    },
+    {
+      "option": "A single combined view: current stage and its document on one page",
+      "whyNot": "Fewer routes, and it collapses navigation into the thing being navigated. Nine stages need somewhere to be listed with their gate state, and REQ-0016 is about the project's position rather than one stage's content. Merging them would also put the derived stage list behind the per-request MDX compile, paying an unmeasured cost to render something that does not need it."
+    },
+    {
+      "option": "Add a tracker or dashboard to the first slice",
+      "whyNot": "No requirement in REQ-0016..REQ-0019 asks for one, and DEC-0022's truthful-count rule binds every summary surface — so a tracker is not a view, it is a view plus an obligation to prove every total it prints. Deferred until something demands it (#106)."
+    },
+    {
+      "option": "Permit client-held view state for interface smoothness",
+      "whyNot": "Rejected as stated, and permitted as amended. Blanket 'no client state' was too strong — transient interface state is harmless and forbidding it would be a rule nobody could follow. What may not live only in the client is anything whose loss is a correctness problem, because the reload contract will destroy it without warning and the user will not know what they lost."
+    }
+  ],
+  "decidedAt": "2026-08-27",
+  "addresses": [
+    "QST-0019",
+    "REQ-0016"
+  ],
+  "evidencedBy": [
+    "AST-0034",
+    "AST-0035"
+  ],
+  "notes": "⚠️ THE STATE RULE IS THE LOAD-BEARING CLAUSE, and its wording was corrected during approval. 'No client state' is unenforceable and wrong — a disclosure triangle holds client state. The rule is about CONSEQUENCE: DEC-0022 reloads the page on every content change and every reconnection, so any state held only in the client is state the system will silently discard at a moment the user did not choose. Transient interface state survives that fine because losing it costs nothing. Filters, a selected section, unsaved work and navigational context do not, so they are URL-encoded or persisted. ⚠️ DEFERRED IS NOT REMOVED, and the distinction is recorded because deferral silently becoming deletion is #107's failure. The artifact tracker and the assertion/evidence view remain in the roadmap at step 5; the latter has a working reference implementation in the skeleton, which is why it can wait rather than why it is unnecessary. ⚠️ WHAT WOULD CHANGE THIS. If per-request MDX compilation is measured expensive (DEC-0020's third obligation), the stage view is where it lands, and the fallback is that decision's own second alternative — plain markdown — not a different information architecture. If reload-on-change proves too coarse in use, the answer is a finer change signal, not client-held correctness state: the reload contract is what makes the missed-change defect impossible. ⚠️ DOES NOT SETTLE CACHE COMPONENTS. Nothing in this architecture depends on that flag, which is the property DEC-0019 was chosen to preserve and the fourth decision in a row to preserve it."
+}

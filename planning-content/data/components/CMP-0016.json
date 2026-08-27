@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0016",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage view",
+  "responsibility": "Render `/stage/[stageId]`: the stage's document through the restricted MDX compiler, its exit criteria with their recorded attestations, and the entry points for review actions. Hold no correctness-critical state in the client.",
+  "satisfies": [
+    "REQ-0017",
+    "REQ-0019"
+  ],
+  "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ AT MOST ONE STAGE DOCUMENT PER RENDER, because DEC-0020's per-request compilation cost is explicitly unmeasured and a view rendering several would multiply an unknown. ⚠️ NO CORRECTNESS-CRITICAL CLIENT STATE. Transient interface state is fine; anything a user must not lose is URL-encoded or persisted, because DEC-0022 reloads this page on every content change and every reconnection — at a moment the user did not choose and without telling them what went. ⚠️ OUTSIDE ITS BOUNDARY: it does not compile, read or write; it composes the components that do."
+}

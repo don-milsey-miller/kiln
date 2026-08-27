@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0019",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Import-boundary check",
+  "responsibility": "Statically prove, without executing the application, that every planning-content read goes through the reader inside a `<Suspense>` boundary and that no module outside `app/server/` imports from `lib/`. Detect bypass paths rather than only direct violations.",
+  "satisfies": [
+    "REQ-0021"
+  ],
+  "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT EXISTS BECAUSE TESTING CANNOT DO THIS. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural freshness check passes on a codebase that breaks the contract — until the compliant sibling moves, and then every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked. ⚠️ TWO EDGES, ONE GRAPH: reads outside the abstraction, and `app/**` importing `lib/**` outside `app/server/`. The adapter boundary has the same property — an app module importing `lib/` directly behaves identically until someone renders it from a client component. ⚠️ THE MECHANISM IS NOT FIXED HERE: a lint rule, a module-boundary constraint, a generated accessor or a build-step scan would each satisfy it. What is fixed is that it runs without executing the application."
+}

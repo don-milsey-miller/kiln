@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0012",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Planning-content reader",
+  "responsibility": "Be the single path by which the application reads planning content from disk, applying the DEC-0019 contract on every read: await `connection()` before the filesystem access, inside a `<Suspense>` boundary whose fallback is a real loading state for that content. Everything the shell knows about the plan enters through here.",
+  "satisfies": [
+    "REQ-0016",
+    "REQ-0017",
+    "REQ-0018"
+  ],
+  "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ OUTSIDE ITS BOUNDARY: it does not parse artifacts, derive verdicts or compile documents — it supplies content and the freshness guarantee, and the modules that interpret content are `lib/`'s, reached through CMP-adapter. ⚠️ IT IS THE THING REQ-0021 CONFINES READS TO. AST-0022 measured that a read bypassing this component is served FRESH whenever a compliant read shares its route, so a bypass is invisible to any behavioural test — which is why the confinement is static and why this component's value depends on nothing being able to go around it."
+}

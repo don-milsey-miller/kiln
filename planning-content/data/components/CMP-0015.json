@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0015",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Project view",
+  "responsibility": "Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.",
+  "satisfies": [
+    "REQ-0016"
+  ],
+  "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47)."
+}

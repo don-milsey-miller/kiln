@@ -8,7 +8,5 @@
   "statement": "The application shows which stage the project is in, derived from the stage definitions and the recorded attestations rather than from a stored status value.",
   "rationale": "REQ-0002 requires current project state to be inspectable at any time, and stage position is the coarsest form of that state. Deriving it rather than storing it follows #16: stage status is derived from artifacts, never persisted alongside them.",
   "priority": "must",
-  "openQuestions": [
-    "QST-0019"
-  ]
+  "openQuestions": []
 }
