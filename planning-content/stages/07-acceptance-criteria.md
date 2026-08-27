@@ -117,12 +117,38 @@ That is a condition `QST-0018`'s answer must satisfy — **not a decision about 
 
 ---
 
+## 5. ⚠️ Carried forward — `DEC-0020`'s four acceptance obligations
+
+**Also not a run of this stage**, and recorded here for the same reason as §4: the constraint should
+arrive before the criteria are written, not as a correction afterwards.
+
+⚠️ **These are deliberately NOT `acceptance-criterion` artifacts yet, and the schema is what says so.**
+`evaluates` is required with `minItems: 1` and targets `component` — *"a criterion that evaluates
+nothing cannot be run"*. The application shell has no components until stage 5 produces them, so
+authoring criteria now would mean either inventing a component to point at or weakening the field that
+makes the cascade traversable. They become artifacts at roadmap step 3a; until then they are prose
+with a named home.
+
+| | Obligation | Why it is not obvious |
+|---|---|---|
+| 1 | **The compiler and plugin chain are pinned.** Changing the MDX version, or adding any remark / rehype / recma plugin, reopens security validation before the change ships. | The validated property belongs to a *chain*, not to a line of code. A later rehype or recma stage could reintroduce JavaScript after the remark plugin has already approved the document — and `EVD-0042` records that stage as **not tested**. This is a #80 condition: it fires when the change is **proposed**, not when a document is found to have escaped. |
+| 2 | **Document-supplied JavaScript stays rejected**, with stripping underneath as defence in depth. | ⚠️ The criterion must check **the refusal**, not the absence of executed code. Stripping alone also produces no executed code, so a test that renders a document and finds no side effect passes identically on both — and the whole point of the amendment is that the two are not the same. |
+| 3 | **Per-request compilation cost is measured**, not assumed acceptable. | It is unmeasured today (`EVD-0044` omission). The fallback if it is unaffordable is plain markdown for stage documents — already `DEC-0020`'s second recorded alternative, so it is a decision to *return to*, not one to invent under pressure. |
+| 4 | **Runtime reading and compilation compose with `DEC-0019`.** The read that feeds the compiler awaits `connection()` inside a `<Suspense>` boundary. | Neither contract has been observed with the other. And `REQ-0021` covers this read exactly as it covers any other — the compiler's input is a planning-content read like any other planning-content read. |
+
+⚠️ **Obligations 2 and 4 are the ones that can be written as criteria; 1 and 3 are not product
+properties.** Pinning is a reopening condition and cost is an owed measurement. Recording all four
+here rather than forcing them into one shape keeps the axes separate — the same reason `resolution`
+was not folded into `reviewStatus`.
+
+---
+
 ## Exit criteria
 
 | Criterion | Attestation |
 |---|---|
 | **criteria-objective** | ✅ `satisfied` — eight of nine are pass/fail outright; AC-9's testable half is objective and its judgment half is named rather than hidden. ⚠️ Basis is prose: the criteria are a table here, not artifacts, pending the PM's decision on `acceptance-criterion`. |
 
-⚠️ **This attestation covers the 2026-08-22 run against `CMP-0011` and nothing else.** §4 is a
-constraint recorded ahead of a run that has not happened; the application shell reaches this stage
-only after stage 5 produces its components. **Nothing in §4 is attested.**
+⚠️ **This attestation covers the 2026-08-22 run against `CMP-0011` and nothing else.** §4 and §5 are
+constraints recorded ahead of a run that has not happened; the application shell reaches this stage
+only after stage 5 produces its components. **Nothing in §4 or §5 is attested.**
