@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0020",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Per-request compilation stays within its budget",
+  "statement": "Over 50 consecutive requests for the largest stage document in the project, the 95th-percentile server-side compile-and-render time is at or below 300 ms on the reference host.",
+  "evaluates": [
+    "CMP-0013"
+  ],
+  "verifies": [
+    "REQ-0017"
+  ],
+  "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail."
+}

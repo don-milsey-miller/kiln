@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0028",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The stream emits a named heartbeat event that page code can observe",
+  "statement": "While connected and with no content changing, the stream delivers an event with a name and a data field at least once per configured heartbeat interval, and a client listener registered for that event name fires. A comment-only keepalive is a FAIL for this criterion.",
+  "evaluates": [
+    "CMP-0017"
+  ],
+  "verifies": [
+    "REQ-0018"
+  ],
+  "notes": "⚠️ AST-0036: a line beginning with a colon is ignored by the client parser, so a comment heartbeat keeps the socket warm and fires nothing. The criterion is the listener firing, not bytes arriving, because bytes arriving was never the problem."
+}

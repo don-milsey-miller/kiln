@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0022",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The boundary check fails on a read outside a Suspense boundary",
+  "statement": "The same non-executing check reports a failure when a planning-content read site is not enclosed by a `<Suspense>` boundary, naming file and line.",
+  "evaluates": [
+    "CMP-0019"
+  ],
+  "verifies": [
+    "REQ-0021"
+  ],
+  "notes": "The clause that gets dropped. An abstraction can supply `connection()` while a caller omits the boundary; that builds fine without Cache Components and fails the build with it, so the omission would surface as an unrelated configuration change breaking the build."
+}

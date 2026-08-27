@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0030",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Reconnection reloads, and a change made while disconnected is then visible",
+  "statement": "After the stream drops and reconnects, the client reloads, and a content change made during the disconnected window is reflected in what the page then shows. No event buffer, event id or `Last-Event-ID` handling is required to achieve this.",
+  "evaluates": [
+    "CMP-0017"
+  ],
+  "verifies": [
+    "REQ-0018"
+  ],
+  "notes": "AST-0034 measured the gap being lost with nothing to recover it from. The last sentence records the design that makes this cheap: because events are hints and never deltas, a reconnecting client that reloads is exactly caught up."
+}

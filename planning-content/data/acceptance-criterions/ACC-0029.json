@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0029",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A stopped heartbeat produces a visibly stale page within the watchdog window",
+  "statement": "When heartbeats stop arriving, the page shows a stale indication that is distinguishable from the healthy state by text or icon and not by colour alone, within the configured watchdog window.",
+  "evaluates": [
+    "CMP-0017"
+  ],
+  "verifies": [
+    "REQ-0018"
+  ],
+  "notes": "AST-0034 measured the skeleton's idle and dead streams as byte-identical, which is the strongest possible form of indistinguishable. 'Not by colour alone' keeps the fix legible to anyone who cannot rely on a colour difference."
+}

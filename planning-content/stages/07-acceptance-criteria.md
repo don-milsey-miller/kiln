@@ -143,12 +143,65 @@ was not folded into `reviewStatus`.
 
 ---
 
+## 6. Run 2 — 2026-08-27: criteria for the application shell
+
+`ACC-0013`–`ACC-0035`, twenty-three criteria across `CMP-0012`–`CMP-0020`. Every one of the nine
+components is evaluated by at least one; none was left to be covered later.
+
+| Component | Criteria |
+|---|---|
+| `CMP-0012` reader | `ACC-0016` |
+| `CMP-0013` MDX compiler | `ACC-0017`–`ACC-0020` |
+| `CMP-0014` server adapter | `ACC-0023`, `ACC-0025`–`ACC-0027` |
+| `CMP-0015` project view | `ACC-0013`–`ACC-0015`, `ACC-0035` |
+| `CMP-0016` stage view | `ACC-0016`, `ACC-0018`, `ACC-0035` |
+| `CMP-0017` change stream | `ACC-0028`–`ACC-0031` |
+| `CMP-0018` review action | `ACC-0034` |
+| `CMP-0019` boundary check | `ACC-0021`–`ACC-0024` |
+| `CMP-0020` launcher | `ACC-0032`, `ACC-0033` |
+
+**All twenty-three are `not-evaluated`.** Nothing is built, so nothing has been run. That is the
+correct state and it is also §2's answer working: `implementedBy` is empty, the criteria are
+unevaluated, and between them they say plainly that this design exists and does not yet work.
+
+### ⚠️ Four criteria exist to defeat a test that would otherwise pass on broken code
+
+This is what §1's *"objective"* standard does not by itself catch, and the run turned it up four
+times:
+
+- **`ACC-0017`** ends *"a document that merely renders without the forbidden construct's effect is a
+  FAIL"*. Stripping produces a page with no executed code, exactly as rejection does — so a test that
+  renders and looks for a side effect passes identically on both, and the distinction `DEC-0020` was
+  amended to preserve would be lost by a criterion that looked perfectly reasonable.
+- **`ACC-0021`–`ACC-0023`** all say *"without executing the application"*. `AST-0022` measured that a
+  non-compliant read is served fresh whenever a compliant read shares its route, so every behavioural
+  check passes on a codebase that violates the contract.
+- **`ACC-0024`** requires the boundary check to be **falsified against known violations**, and fails
+  the check if the fixtures pass. ⚠️ Added because it happened during this work: a refusal test written
+  the same week passed with the refusal deleted, because the assertion that mattered sat behind a
+  condition that was never true. **A check nobody has seen fail is a check nobody has seen.**
+- **`ACC-0027`** forbids asserting the diagnostic's *wording*. Next.js produced two different messages
+  for one violation reached two ways, and one of them named the wrong router — a test pinned to that
+  string would pass on a wrong message and break on a corrected one.
+
+**`ACC-0020` is the one criterion carrying a number nobody has measured** — a 300 ms p95 compile
+budget. It is written as a number rather than as "acceptable" so it stays pass/fail, and the note says
+what to do if the first evaluation misses it badly: not relax the number, but take `DEC-0020`'s own
+second alternative, plain markdown for stage documents.
+
+---
+
 ## Exit criteria
 
 | Criterion | Attestation |
 |---|---|
 | **criteria-objective** | ✅ `satisfied` — eight of nine are pass/fail outright; AC-9's testable half is objective and its judgment half is named rather than hidden. ⚠️ Basis is prose: the criteria are a table here, not artifacts, pending the PM's decision on `acceptance-criterion`. |
 
-⚠️ **This attestation covers the 2026-08-22 run against `CMP-0011` and nothing else.** §4 and §5 are
-constraints recorded ahead of a run that has not happened; the application shell reaches this stage
-only after stage 5 produces its components. **Nothing in §4 or §5 is attested.**
+⚠️ **THIS ATTESTATION IS NOW STALE, and it is left standing rather than quietly re-scoped.** It was
+evaluated on 2026-08-22 against the NINE criteria in §1, all of them `CMP-0011`'s. §6 added
+twenty-three more against nine components, and **no one has judged those against this criterion.**
+`criteria-objective` needs re-attesting for run 2 before stage 7 can be said to have passed for the
+application shell — the same drift stage 6 carried for two days, named here on the day it appeared
+rather than found later.
+
+⚠️ §4 and §5 remain constraints recorded ahead of work, not attested claims.

@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0018",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A permitted document renders, including its mapped components",
+  "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
+  "evaluates": [
+    "CMP-0013",
+    "CMP-0016"
+  ],
+  "verifies": [
+    "REQ-0017"
+  ],
+  "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that."
+}

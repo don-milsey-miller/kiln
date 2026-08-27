@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0013",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The displayed current stage follows the attestations on disk",
+  "statement": "With the application running, changing a recorded attestation so that a different stage becomes the earliest unready one causes the project view to display that stage as current, without restarting the application. No field storing a stage or status value exists anywhere under the content root.",
+  "evaluates": [
+    "CMP-0015"
+  ],
+  "verifies": [
+    "REQ-0016"
+  ],
+  "notes": "Two halves, and the second is what makes the first mean anything: a stored status field could produce the same display and go stale silently. Pass/fail without judgement — the stage either changes or it does not, and the field either exists or it does not."
+}

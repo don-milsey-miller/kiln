@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0015",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An unreadable artifact is named, located, and subtracted from its count",
+  "statement": "With exactly one artifact file under the content root made unparseable, the project view (a) names that file's path, (b) shows a parse position, and (c) prints a total for that type exactly one lower than before. The response is not an error page: every other artifact still renders.",
+  "evaluates": [
+    "CMP-0015"
+  ],
+  "verifies": [
+    "REQ-0016"
+  ],
+  "notes": "All three clauses are required together. Naming the file without correcting the count still leaves the page asserting an artifact it did not render; correcting the count without naming the file leaves an operator hunting for what changed."
+}

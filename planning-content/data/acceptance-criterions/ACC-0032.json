@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0032",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Stopping the launcher leaves nothing behind",
+  "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+  "evaluates": [
+    "CMP-0020"
+  ],
+  "verifies": [
+    "REQ-0020"
+  ],
+  "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`."
+}

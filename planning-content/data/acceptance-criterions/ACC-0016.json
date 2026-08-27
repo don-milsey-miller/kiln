@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0016",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The stage view's reads resolve behind separate boundaries",
+  "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
+  "evaluates": [
+    "CMP-0012",
+    "CMP-0016"
+  ],
+  "verifies": [
+    "REQ-0017"
+  ],
+  "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing."
+}

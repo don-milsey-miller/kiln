@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0026",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "`lib/` stays importable under plain Node",
+  "statement": "Every command under `bin/` and the full test suite run to completion with the shell present, importing `lib/` directly under plain Node with no RSC compiler in play.",
+  "evaluates": [
+    "CMP-0014"
+  ],
+  "verifies": [
+    "REQ-0019"
+  ],
+  "notes": "AST-0033 measured `server-only` throwing outside the RSC compiler. This criterion is what stops the guard migrating into `lib/` later as a tidy-up and breaking the tool to protect the app."
+}

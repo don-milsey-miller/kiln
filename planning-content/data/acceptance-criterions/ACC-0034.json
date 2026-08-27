@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0034",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A review update changes one artifact's reviewStatus and nothing else",
+  "statement": "The review action identifies the artifact by id and type and shows its current status. Submitting a change updates only that artifact's `reviewStatus`, through the existing typed write path with its lock and atomic write; the artifact's `lifecycle` and every other artifact on disk are byte-identical afterwards.",
+  "evaluates": [
+    "CMP-0018"
+  ],
+  "verifies": [
+    "REQ-0019"
+  ],
+  "notes": "The byte-identical clause is what makes this objective rather than a claim about intent. #82's two-axis split is the reason `lifecycle` is named explicitly: one `status` field would have let this endpoint retire an artifact by accident."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0024",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The boundary check is itself falsified against known violations",
+  "statement": "The check is evaluated against a fixture set containing at least one instance of each violation it claims to detect, and reports a failure for every one. A check that passes the fixture set is a FAIL for this criterion.",
+  "evaluates": [
+    "CMP-0019"
+  ],
+  "verifies": [
+    "REQ-0021"
+  ],
+  "notes": "⚠️ ADDED BECAUSE IT HAPPENED. A refusal test written during this work passed with the refusal deleted — the assertion that mattered sat behind a condition that was never true. A check nobody has seen fail is a check nobody has seen. This criterion is what makes the three above mean something rather than merely exist."
+}

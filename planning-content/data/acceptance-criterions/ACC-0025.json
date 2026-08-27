@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0025",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Every adapter module is guarded and explicitly exported",
+  "statement": "Every module under `app/server/` has `import 'server-only'` as its first statement and contains no `export *`. Checked statically over the whole directory, with no exemptions.",
+  "evaluates": [
+    "CMP-0014"
+  ],
+  "verifies": [
+    "REQ-0019"
+  ],
+  "notes": "`export *` would make the adapter a hole rather than a door: the exposed surface would widen every time `lib/` gains an export, including locking and process-spawning modules, with no diff for anyone to review."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0014",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Every rendered count equals what was rendered",
+  "statement": "For each artifact-type total the project view prints, the number rendered on the page equals the number printed. Evaluated by counting rendered entries and comparing, for every type shown, with no tolerance.",
+  "evaluates": [
+    "CMP-0015"
+  ],
+  "verifies": [
+    "REQ-0016"
+  ],
+  "notes": "⚠️ NO PARTIAL-FAILURE EXCEPTION, deliberately. AST-0035 measured the skeleton printing 178 while rendering 177 — the count is what turns an incomplete page into a misleading one, because an operator reading the total has been told the missing thing is present."
+}

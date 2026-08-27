@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0033",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The application installs and starts from one documented command",
+  "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
+  "evaluates": [
+    "CMP-0020"
+  ],
+  "verifies": [
+    "REQ-0020"
+  ],
+  "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server."
+}
