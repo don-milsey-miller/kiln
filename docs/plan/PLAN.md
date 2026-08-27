@@ -264,7 +264,7 @@ Statically prove, without executing the application, that every planning-content
 Install and run the shell from one documented command: build the application, start it, own both the application process and the file watcher, and terminate the watcher with the application.
 
 *Satisfies: REQ-0020*
-*Not yet implemented.*
+*Implemented by: next.config.mjs, app/layout.js, app/page.js*
 
 ## Decisions
 

@@ -141,16 +141,36 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   assert.deepEqual(c.blockers, [], JSON.stringify(c.blockers, null, 2));
   assert.equal(c.ready, true, "with no unready stage the handoff must be ready");
 
-  // ⚠️ READY IS NOT THE SAME AS BUILT, and the package has to keep saying so. Every application
-  // component is planned-not-built, so its `implementedBy` must stay absent and the renderer must
-  // mark it — a publishable plan that reads as a finished system is the QST-0015 hazard leaving the
-  // repository.
-  const comps = readdirSync(join(contentRoot, "data", "components"))
-    .map((f) => JSON.parse(readFileSync(join(contentRoot, "data", "components", f), "utf-8")))
-    .filter((d) => Number(d.id.slice(4)) >= 12);
+  // ⚠️ READY IS NOT THE SAME AS BUILT, and the package has to keep saying so — a publishable plan
+  // that reads as a finished system is the QST-0015 hazard leaving the repository. Two checks,
+  // because the two facts move at different rates.
+  const read = (dir) =>
+    readdirSync(join(contentRoot, "data", dir)).map((f) =>
+      JSON.parse(readFileSync(join(contentRoot, "data", dir, f), "utf-8"))
+    );
+  const comps = read("components").filter((d) => Number(d.id.slice(4)) >= 12);
   assert.equal(comps.length, 9, "the nine application components");
-  for (const d of comps)
-    assert.equal((d.implementedBy ?? []).length, 0, `${d.id} claims code that does not exist yet`);
+
+  // The INVARIANT: nothing in the shell has been accepted. `implementedBy` says code exists;
+  // only a criterion's outcome says it works, and conflating them is what the planned/built flag
+  // was rejected for. This line must not move until work is genuinely accepted.
+  const shellIds = new Set(comps.map((d) => d.id));
+  const shellCriteria = read("acceptance-criterions").filter((a) =>
+    (a.evaluates ?? []).some((id) => shellIds.has(id))
+  );
+  assert.equal(shellCriteria.length, 23, "every run-2 criterion");
+  assert.deepEqual(
+    [...new Set(shellCriteria.map((a) => a.outcome))],
+    ["not-evaluated"],
+    "an application criterion has been evaluated — update this only when that is genuinely true"
+  );
+
+  // Today's state, one line to edit as implementation lands.
+  assert.deepEqual(
+    comps.filter((d) => (d.implementedBy ?? []).length).map((d) => d.id),
+    ["CMP-0020"],
+    "TSK-0003 scaffolded the app; nothing else has code yet"
+  );
 
   // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying
   // why teaches people to route around it, which is how a gate stops being a gate. Vacuous while

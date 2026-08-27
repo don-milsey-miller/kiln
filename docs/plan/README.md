@@ -3,7 +3,7 @@
 **Generated. Nothing here was written by hand**, and editing it edits a rendering — the next
 `npm run handoff` overwrites you. Change `planning-content/` instead.
 
-- snapshot: `fc2f6a3d797661eb`
+- snapshot: `f17dff27dc28b360`
 - tool version: `0.0.0`
 
 ## What is in it
