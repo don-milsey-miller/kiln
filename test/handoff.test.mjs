@@ -133,25 +133,20 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
     );
 
   // ---- today's state. Deliberately compact, so a legitimate movement of the plan edits these lines
-  // and nothing else. It has moved three times: stage 5 regressed when the application requirements
-  // were authored, stage 6 followed when DEC-0018 adopted production mode and reopened AST-0010, and
-  // stage 6 recovered when DEC-0019's read contract was validated against a negative control.
-  assert.deepEqual(
-    notReady,
-    ["05-solution-design"],
-    "requirements trace to no component yet"
-  );
-  assert.deepEqual(
-    c.blockers.map((b) => `${b.stageId}:${b.ruleId}`),
-    ["05-solution-design:gate/criterion-not-satisfied"],
-    JSON.stringify(c.blockers, null, 2)
-  );
+  // and nothing else. It has moved four times: stage 5 regressed when the application requirements
+  // were authored, stage 6 followed when DEC-0018 adopted production mode and reopened AST-0010,
+  // stage 6 recovered when DEC-0019's read contract was validated against a negative control, and
+  // stage 5 recovered when CMP-0012..CMP-0020 gave those requirements components to trace to.
+  assert.deepEqual(notReady, [], "every stage gate is currently ready");
+  assert.deepEqual(c.blockers, [], JSON.stringify(c.blockers, null, 2));
+  assert.equal(c.ready, true, "with no unready stage the handoff must be ready");
 
   // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying
-  // why teaches people to route around it, which is how a gate stops being a gate.
+  // why teaches people to route around it, which is how a gate stops being a gate. Vacuous while
+  // nothing blocks -- kept because the next regression is what it exists for, and deleting a check
+  // the moment it stops firing is how the check is missing when it matters.
   for (const b of c.blockers)
     assert.ok((b.detail ?? "").length > 120, `${b.stageId} blocks without a substantive reason: ${b.detail}`);
-  assert.match(c.blockers[0].detail, /REGRESSED DELIBERATELY/);
 
   // ---- and the refusal must be EARNED. A gate blocked because nobody had looked reports the same
   // boolean as one blocked by a recorded verdict, so: nothing here is merely unattested.
