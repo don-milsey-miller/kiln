@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0053",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: HTML Standard",
+  "kind": "source",
+  "summary": "A non-200 status or a wrong Content-Type FAILS the connection, which is the terminal state, not a retry.",
+  "sources": [
+    {
+      "title": "HTML Standard",
+      "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"s status is not 200, or if res 's ` Content-Type ` is not ` text/event-stream `, then fail the connection\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

@@ -1,0 +1,29 @@
+{
+  "id": "AST-0034",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The skeleton's idle stream and its dead stream are byte-identical, and a gap is never recovered",
+  "statement": "The walking skeleton's `/events` stream sends `retry: 500` once and then nothing until a change occurs: an idle stream emitted zero bytes over six seconds. It sends no `id:` field, so a reconnecting client has no `Last-Event-ID` to present and the server has no position to resume from; a change made while disconnected was not delivered after reconnection. A client therefore cannot distinguish an idle stream from a dead one, and cannot learn that it missed anything.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "substrate": "app/server.mjs walking skeleton",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "watcher": "chokidar",
+      "transport": "text/event-stream over http"
+    }
+  },
+  "openQuestions": [
+    "QST-0021"
+  ],
+  "notes": "⚠️ THIS REFUTES REQ-0018's SECOND CLAUSE FOR THE SUBSTRATE, by construction rather than by accident. The requirement asks that *a dropped update stream is visibly distinguishable from an idle one*. Byte-identical is the strongest possible form of indistinguishable — no client-side cleverness can recover a difference that was never transmitted. ⚠️ AND THE TWO GAPS COMPOUND. Per the WHATWG specification a client usually reconnects on its own (EVD-0054), which sounds like it makes the missed change harmless — it does not, because reconnection delivers nothing and the page only reloads on a message. So the page is stale, correctly connected, and silent, until some unrelated later change happens to arrive. ⚠️ Spec-side caveat carried explicitly: a FAILED connection is terminal and never retried (EVD-0051), and a non-200 or wrong Content-Type causes exactly that (EVD-0053). That path was not exercised here and is the one where the stream is genuinely gone for good. ⚠️ The server half is measured; browser reconnect behaviour is source-supported only.",
+  "supportedBy": [
+    "EVD-0051",
+    "EVD-0053",
+    "EVD-0054",
+    "EVD-0055"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "EVD-0055",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the walking skeleton's server-side SSE contract",
+  "kind": "experiment",
+  "summary": "The skeleton was started against a copy of this project's planning content and its `/events` stream read directly over HTTP. The opening frame is exactly \"retry: 500\\n\\n\" — a reconnection time and nothing else; no `id:` field is ever sent. A change made while connected was delivered as `data: changed`. A change made during a disconnected window was NOT delivered on reconnect. An idle stream emitted ZERO bytes over six seconds after the opening frame. A write after a client had left did not disturb the server.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "substrate": "app/server.mjs walking skeleton",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "watcher": "chokidar",
+      "transport": "text/event-stream over http",
+      "node-version": "v24.18.0",
+      "workspace": "copy of planning-content in a disposable directory, removal verified"
+    },
+    "omissions": [
+      {
+        "fact": "browser-client-reconnect-behaviour",
+        "state": "not-observable",
+        "reason": "There is no global `EventSource` in this Node build and no browser on this host. Writing a polyfill and measuring it would have measured my own code while implying a browser had been observed. The client half is source-supported only, from the WHATWG specification (EVD-0051..EVD-0054)."
+      },
+      {
+        "fact": "idle-timeout-beyond-six-seconds",
+        "state": "not-captured",
+        "reason": "The idle stream was observed for six seconds. Whether an intermediary or the OS would drop a longer-idle connection was not exercised, and it is the case a heartbeat would exist to survive."
+      },
+      {
+        "fact": "concurrent-clients",
+        "state": "not-captured",
+        "reason": "One reader at a time. Fan-out behaviour across several open pages was not measured."
+      }
+    ]
+  },
+  "notes": "⚠️ THE SERVER HALF IS MEASURABLE AND THE CLIENT HALF IS NOT, and the split is stated here so nothing downstream reads a browser claim into this record. What a reconnecting client can RECOVER is a property of what the server sent, and that is what was measured."
+}

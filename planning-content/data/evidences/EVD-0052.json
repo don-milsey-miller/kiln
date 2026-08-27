@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0052",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: HTML Standard",
+  "kind": "source",
+  "summary": "A network error reconnects, but the user agent may give up permanently if it judges retrying futile.",
+  "sources": [
+    {
+      "title": "HTML Standard",
+      "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"unless the user agent knows that to be futile, in which case the user agent may fail the connection\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

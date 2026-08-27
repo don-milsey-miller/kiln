@@ -1,0 +1,42 @@
+{
+  "id": "EVD-0056",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: a malformed artifact is dropped from the view while the count still includes it",
+  "kind": "experiment",
+  "summary": "With the skeleton serving a copy of this project's content, the page reported 178 artifacts and rendered AST-0001. One artifact file was then replaced with invalid JSON. The next request returned HTTP 200 with a normally-formed page, the header still reported 178 artifacts, the number of lint findings shown was unchanged, and AST-0001 was absent from the page. No error, no warning, and no indication that anything had failed to load.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "substrate": "app/server.mjs walking skeleton",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "watcher": "chokidar",
+      "transport": "text/event-stream over http",
+      "node-version": "v24.18.0",
+      "corruption": "one assertion file replaced with invalid JSON",
+      "workspace": "disposable copy, removal verified"
+    },
+    "omissions": [
+      {
+        "fact": "other-malformation-modes",
+        "state": "not-captured",
+        "reason": "One mode was exercised — syntactically invalid JSON. Schema-valid-but-wrong content, an unreadable file, and a directory in place of a file were not tested and may behave differently."
+      }
+    ]
+  },
+  "notes": "⚠️ THE COUNT IS THE PART THAT MAKES THIS BAD. A view that quietly omitted a broken artifact would merely be incomplete. This one omits it AND prints a total that still includes it, so the page actively asserts the artifact is present. An operator has no reason to look for what is missing."
+}

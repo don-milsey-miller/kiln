@@ -1,0 +1,26 @@
+{
+  "id": "AST-0035",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A malformed artifact vanishes from the view while the header count still counts it",
+  "statement": "When one artifact file under the content root contains invalid JSON, the walking skeleton returns HTTP 200 with a normally-formed page, omits that artifact entirely, shows no additional lint finding, and continues to report the same artifact total as before the corruption. The rendered page therefore claims a count it did not render.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "substrate": "app/server.mjs walking skeleton",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "watcher": "chokidar",
+      "transport": "text/event-stream over http"
+    }
+  },
+  "openQuestions": [
+    "QST-0021"
+  ],
+  "notes": "⚠️ IT IS THE COUNT, NOT THE OMISSION, that turns this from incomplete into misleading. An operator reading `178 artifacts` has been told the thing they cannot see is there. ⚠️ Same family as everything else this question found: absence presented as validity. The handoff publisher dropped stage documents silently (AST-0028), a non-compliant read is fresh by proximity (AST-0022), and a stripped MDX expression leaves a document that still renders — this is the read path's version of it.",
+  "supportedBy": [
+    "EVD-0056"
+  ]
+}
