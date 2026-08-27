@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0004",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the `app/server/*` adapter layer over `lib/`",
+  "statement": "Create the adapter modules the shell needs, each beginning with `import 'server-only'` and re-exporting by explicit name or wrapper. Expose only the capabilities the first slice requires. `lib/` itself is not modified and gains no marker, so `bin/` and the test suite keep working under plain Node.",
+  "role": "platform",
+  "implements": [
+    "CMP-0014"
+  ],
+  "fulfils": [
+    "REQ-0019"
+  ],
+  "acceptedBy": [
+    "ACC-0025",
+    "ACC-0026",
+    "ACC-0027"
+  ],
+  "dependsOn": [
+    "TSK-0003"
+  ],
+  "notes": "⚠️ The review-status write is a LOCKING capability and DEC-0021 holds those back for individual review before exposure — so it is deliberately NOT part of this task. It arrives with the review action, where it can be examined on its own."
+}

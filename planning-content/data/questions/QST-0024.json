@@ -1,0 +1,11 @@
+{
+  "id": "QST-0024",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "How is handoff readiness inspected without publishing?",
+  "statement": "`npm run handoff` is the only way to learn whether the gates pass, and it PUBLISHES: on success it replaces `docs/plan/` with a new package. There is no read-only form, so checking readiness and performing publication are the same act, and anyone who wants the first necessarily performs the second.",
+  "notes": "⚠️ FOUND BY DOING IT, 2026-08-27. The command was run to check whether closing stage 5 had cleared the last blocker. It had — and the run published 22 files and moved the package snapshot from 6c86330767dcbbfa to 3c7d695551d607ce. The change was reverted with `git checkout` before anything was committed, but the point is that a status check cannot be performed without the side effect. ⚠️ THE COST IS NOT THE ACCIDENT, IT IS THE INCENTIVE. Publication is supposed to be a deliberate act — DEC-0009 chose an explicit deterministic command precisely so the gate stays read-only and publishing is never a side effect of evaluation. That decision is honoured in one direction only: the gate does not publish, but the only exposed way to READ the gate does. ⚠️ THE DESIGN IS OPEN, WHICH IS WHY THIS IS A QUESTION AND NOT A REQUIREMENT. Plausible shapes: a `--check` flag on the existing command, a separate `handoff:check` script, or exposing `handoffCompleteness` through a small status command that the app could also use. All three are cheap; none is obviously right, and the third overlaps with what CMP-0015 needs anyway. ⚠️ RECORDED AS A QUESTION RATHER THAN A REQUIREMENT ON PURPOSE. Stage 5's `requirements-traced-to-components` is attestation-only, so authoring a requirement here would NOT trip the gate — it would simply make the attestation written today silently false, which is worse than a visible regression. A question tracks the gap without claiming a design or quietly invalidating a judgement someone just made. ⚠️ NOT TO BE BUILT AS A DETOUR. The application shell is the work in progress; this is a one-command convenience in the tool that surrounds it. It belongs in a later cycle unless someone publishes by accident and does not notice, which is the trigger that would make it urgent."
+}

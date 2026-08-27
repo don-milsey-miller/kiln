@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0008",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the restricted MDX compiler with rejection diagnostics",
+  "statement": "Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.",
+  "role": "platform",
+  "implements": [
+    "CMP-0013"
+  ],
+  "fulfils": [
+    "REQ-0017"
+  ],
+  "acceptedBy": [
+    "ACC-0017",
+    "ACC-0018",
+    "ACC-0019"
+  ],
+  "dependsOn": [
+    "TSK-0005"
+  ],
+  "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships."
+}

@@ -1,0 +1,21 @@
+{
+  "id": "TSK-0003",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Scaffold the Next.js application and its production launch command",
+  "statement": "Create the application under `app/` with `@next/mdx` configured, and a documented command that runs `next build` followed by `next start` on loopback. No views yet beyond a route that responds. The remark plugin is referenced by ABSOLUTE module path because Turbopack serialises the config and `@next/mdx` resolves a relative path from its own package directory.",
+  "role": "platform",
+  "implements": [
+    "CMP-0020"
+  ],
+  "fulfils": [
+    "REQ-0020"
+  ],
+  "acceptedBy": [
+    "ACC-0033"
+  ],
+  "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option.",
+  "dependsOn": []
+}

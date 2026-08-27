@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0007",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the project view with truthful counts and located parse failures",
+  "statement": "Render `/`: the derived current stage, all nine stages with gate state, artifact totals, and lint findings surfaced rather than re-judged. A file that fails to parse is named with its path and position, is omitted from the page, and is subtracted from its type's total. Status is conveyed by text or icon, never by colour alone.",
+  "role": "frontend",
+  "implements": [
+    "CMP-0015"
+  ],
+  "fulfils": [
+    "REQ-0016"
+  ],
+  "acceptedBy": [
+    "ACC-0013",
+    "ACC-0014",
+    "ACC-0015"
+  ],
+  "dependsOn": [
+    "TSK-0006"
+  ],
+  "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one."
+}

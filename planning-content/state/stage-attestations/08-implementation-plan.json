@@ -2,14 +2,14 @@
   "stageId": "08-implementation-plan",
   "attestations": {
     "tasks-trace-to-requirement": {
-      "result": "satisfied",
+      "result": "not-satisfied",
       "decidedBy": "pm",
-      "reason": "Six rows of remaining work; every one traces to a requirement or is explicitly not-work-today with a stated trigger (AST-0010's deployment mode, QST-0002's same-configuration conflict, DEC-0001's product UI). ⚠️ Basis is prose - the same limit stage 5 had before `component` existed, and it is precisely what this stage's demand for `task` is about."
+      "reason": "REGRESSED 2026-08-27 BY AUTHORING WORK, on the same pattern as stage 7 the same day. The previous attestation was evaluated against six prose rows of remaining tool work, before `task` was a type. TSK-0003..TSK-0014 are twelve new task artifacts for the application shell, and nobody has judged them against this criterion. ⚠️ THE TRACING IS MEASURABLY COMPLETE, WHICH IS NOT THE SAME AS ATTESTED. Checked on the live project: all fourteen active tasks carry a non-empty `fulfils`, every run-2 acceptance criterion (ACC-0013..ACC-0035) is named by at least one task's `acceptedBy`, and each of CMP-0012..CMP-0020 is implemented by at least one task. That measurement is what a reviewer should check rather than what replaces them. ⚠️ THIS ALSO KEEPS THE HANDOFF SHUT, DELIBERATELY. With stage 5 and stage 7 both closed, every gate passed and `npm run handoff` would publish on the next run — publication being withheld would have rested on everyone remembering not to run a command. A criterion that has genuinely not been evaluated is the honest reason it refuses, and it makes the policy mechanical rather than remembered. ⚠️ RETURNS TO SATISFIED when the twelve tasks are reviewed and the ordering is accepted."
     },
     "tasks-developer-sized": {
-      "result": "n/a",
+      "result": "not-satisfied",
       "decidedBy": "pm",
-      "reason": "Three of six rows are not tasks at all but triggered conditions, and the three that are cannot be sized as developer work until the types they depend on (`task`, `acceptance-criterion`) are approved. Recorded n/a WITH a reason rather than guessed: #45's shape, and #93's point that a PM who looked and said 'does not apply' is a different state from nobody having looked."
+      "reason": "RE-EVALUATED 2026-08-27 AND NO LONGER `n/a`, because the condition that made it n/a has gone. The previous reason said three of six rows were triggered conditions rather than tasks, and the rest could not be sized until `task` and `acceptance-criterion` were approved types. Both types now exist and TSK-0003..TSK-0014 are real tasks, so the criterion applies and has an empty answer no longer. ⚠️ NOT-SATISFIED RATHER THAN SATISFIED, because sizing is a judgement about the person who will do the work and no one has made it. Two are visibly at risk and are named here rather than left for the reviewer to find: TSK-0007 (the project view) carries the derived stage, the nine-stage list, the counts, the lint surface AND located parse failures, and TSK-0011 (the change stream) carries the watcher, the transport, the named heartbeat, the client watchdog and the reload-on-reconnect. Either may want splitting. ⚠️ THE ORDERING IS THE PART WORTH REVIEWING MOST, and it contains one deliberate choice: the boundary check is FOURTH, not last. Built last it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built early it constrains every task after it while compliance costs one file at a time. ⚠️ RETURNS TO SATISFIED when a reviewer has sized the twelve, split whatever needs splitting, and accepted the order."
     }
   }
 }

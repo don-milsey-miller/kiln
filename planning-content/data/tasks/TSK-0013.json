@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0013",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Bind the watcher's lifetime to the launcher and prove the cleanup",
+  "statement": "Make the documented launcher own both the application process and the watcher, terminating the watcher with the application. Verify by observation after termination: no watcher process, nothing listening on the port, no surviving temporary directory.",
+  "role": "platform",
+  "implements": [
+    "CMP-0020"
+  ],
+  "fulfils": [
+    "REQ-0020"
+  ],
+  "acceptedBy": [
+    "ACC-0032"
+  ],
+  "dependsOn": [
+    "TSK-0011"
+  ],
+  "notes": "⚠️ Deliberately AFTER the change stream, because there is no watcher to own until then. ⚠️ The skeleton's create-on-`listen` / close-in-`close()` pattern does not carry: under `next start` there is no server object the application owns. Choosing the binding is this task's work, and DEC-0022 states the obligation without a mechanism for exactly that reason. ⚠️ Verified by observation, not by the absence of an error — the destroy path's own rule."
+}

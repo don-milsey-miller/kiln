@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0005",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the planning-content reader on the `connection()` + Suspense contract",
+  "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",
+  "role": "platform",
+  "implements": [
+    "CMP-0012"
+  ],
+  "fulfils": [
+    "REQ-0016",
+    "REQ-0017",
+    "REQ-0018"
+  ],
+  "acceptedBy": [
+    "ACC-0016"
+  ],
+  "dependsOn": [
+    "TSK-0004"
+  ],
+  "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing."
+}

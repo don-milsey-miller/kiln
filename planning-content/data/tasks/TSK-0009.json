@@ -1,0 +1,26 @@
+{
+  "id": "TSK-0009",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the stage view: criteria above the document, artifact-scoped review",
+  "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
+  "role": "frontend",
+  "implements": [
+    "CMP-0016"
+  ],
+  "fulfils": [
+    "REQ-0017",
+    "REQ-0019"
+  ],
+  "acceptedBy": [
+    "ACC-0016",
+    "ACC-0018"
+  ],
+  "dependsOn": [
+    "TSK-0008",
+    "TSK-0007"
+  ],
+  "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown."
+}

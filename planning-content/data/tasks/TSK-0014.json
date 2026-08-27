@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0014",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Run the compile benchmark under the pinned protocol",
+  "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
+  "role": "platform",
+  "implements": [
+    "CMP-0013"
+  ],
+  "fulfils": [
+    "REQ-0017"
+  ],
+  "acceptedBy": [
+    "ACC-0020"
+  ],
+  "dependsOn": [
+    "TSK-0009"
+  ],
+  "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it."
+}

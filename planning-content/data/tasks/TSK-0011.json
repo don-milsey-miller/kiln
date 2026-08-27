@@ -1,0 +1,26 @@
+{
+  "id": "TSK-0011",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Build the change stream: named heartbeat, watchdog, visible stale state, reload on reconnect",
+  "statement": "Watch the content root and deliver change hints. Emit a NAMED heartbeat event carrying data at a fixed interval. Run a client watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on reconnection. A watcher failure emits a visible signal or closes the stream.",
+  "role": "platform",
+  "implements": [
+    "CMP-0017"
+  ],
+  "fulfils": [
+    "REQ-0018"
+  ],
+  "acceptedBy": [
+    "ACC-0028",
+    "ACC-0029",
+    "ACC-0030",
+    "ACC-0031"
+  ],
+  "dependsOn": [
+    "TSK-0010"
+  ],
+  "notes": "⚠️ A comment-line keepalive is ignored by the client parser (AST-0036) — it keeps the socket warm and leaves the page looking healthy. The heartbeat must be an event a listener can fire on. ⚠️ No event buffer, event id or `Last-Event-ID`: events are hints and never deltas, so a reconnecting client that reloads is exactly caught up. ⚠️ Logging a watcher failure to the server console is explicitly not enough. The operator is looking at a browser."
+}
