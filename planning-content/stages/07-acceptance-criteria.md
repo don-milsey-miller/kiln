@@ -197,11 +197,18 @@ second alternative, plain markdown for stage documents.
 |---|---|
 | **criteria-objective** | ✅ `satisfied` — eight of nine are pass/fail outright; AC-9's testable half is objective and its judgment half is named rather than hidden. ⚠️ Basis is prose: the criteria are a table here, not artifacts, pending the PM's decision on `acceptance-criterion`. |
 
-⚠️ **THIS ATTESTATION IS NOW STALE, and it is left standing rather than quietly re-scoped.** It was
-evaluated on 2026-08-22 against the NINE criteria in §1, all of them `CMP-0011`'s. §6 added
-twenty-three more against nine components, and **no one has judged those against this criterion.**
-`criteria-objective` needs re-attesting for run 2 before stage 7 can be said to have passed for the
-application shell — the same drift stage 6 carried for two days, named here on the day it appeared
-rather than found later.
+⚠️ **It went `not-satisfied` in between, and the round trip is the point.** Run 2 added twenty-three
+criteria that nobody had judged against this criterion, so it regressed the moment they were authored
+— by authoring work, not by a defect in what was already attested. **Two of the twenty-three were
+genuinely defective**, which is why the regression was not a formality:
+
+| | Defect | Amendment |
+|---|---|---|
+| `ACC-0014` | **Unfalsifiable**, not merely imprecise: it asked that a displayed total equal *the number of entries rendered*, and the project view renders **totals, not entries**. It compared a number with itself and would have passed on an implementation that printed a constant. | An **independent oracle** — a fixture of known composition, counted outside the application. |
+| `ACC-0020` | A number with no test: no pinned environment, no timing boundary, no warm-up treatment, and no check that compilation happened. | A full protocol, and a **void-on-no-compile** clause — because the easiest way to hit a compile budget is to cache the document, which reports excellent numbers while measuring nothing. |
+
+⚠️ **This criterion regresses every time the stage runs again**, and that is correct behaviour rather
+than a defect in the gate: criteria authored for a new component have by definition not been judged
+against it yet.
 
 ⚠️ §4 and §5 remain constraints recorded ahead of work, not attested claims.
