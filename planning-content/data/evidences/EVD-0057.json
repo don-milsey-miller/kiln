@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0057",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: HTML Standard",
+  "kind": "source",
+  "summary": "A comment line in an SSE stream is IGNORED by the client parser, so it fires no JavaScript event and cannot be observed by page code.",
+  "sources": [
+    {
+      "title": "HTML Standard",
+      "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"If the line starts with a U+003A COLON character (:) Ignore the line.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

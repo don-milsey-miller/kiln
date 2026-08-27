@@ -1,0 +1,40 @@
+{
+  "id": "DEC-0022",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The shell's lifecycle contract: a launcher owns both processes, and stream health is a visible event",
+  "statement": "The application is started by a documented launcher that owns both the application process and the file watcher, and that terminates the watcher with the application. The mechanism binding them is stage 5's to choose and to validate; nothing is claimed today about how the watcher's lifetime is enforced under `next start`. The update stream emits a NAMED heartbeat event carrying data at a fixed interval, and the client runs a watchdog that renders a visibly disconnected state when a heartbeat fails to arrive within its window; comment-only keepalives are not sufficient because the client parser ignores them. A watcher failure must either emit a visible failure signal on the stream or close the stream — logging alone is not permitted, because a page whose watcher has died otherwise stays live-looking and stale. On reconnection the client reloads, treating reconnection itself as a change hint; no event buffer, event id or `Last-Event-ID` handling is required, because events are hints and never deltas. A malformed or unreadable artifact must be surfaced visibly and located, and no rendered count may include an artifact the page did not render.",
+  "rationale": "AST-0034 measured that the skeleton's idle stream and its dead stream are byte-identical and that a change during a disconnect gap is never recovered, which refutes REQ-0018's second clause by construction. AST-0036 then removed the obvious repair: a comment heartbeat is ignored by the client parser, so it fixes the bytes without fixing the visibility — the page stays falsely healthy while something is demonstrably happening on the wire. A named event with a client watchdog is the smallest mechanism the requirement can actually be met with. The reconnect-as-change-hint design survives unchanged and is the part that removes work rather than adding it: because #73 makes events hints rather than deltas, a client that reloads on reconnection is exactly caught up, so the buffering and resumption machinery that a delta stream would need is unnecessary. AST-0035 supplies the read-path half: a corrupt artifact currently vanishes while the header still counts it, which tells the operator the missing thing is present.",
+  "alternatives": [
+    {
+      "option": "Comment-line keepalive every 15 seconds, as the specification's authoring note suggests",
+      "whyNot": "It is the documented idiom and it solves the problem the specification raises — legacy proxies dropping idle connections. It does not solve THIS problem. The client parser ignores comment lines, so no page code can observe one, and the operator's page would remain indistinguishable from a healthy one after the stream died. Correct for its purpose, invisible for ours."
+    },
+    {
+      "option": "Event ids plus `Last-Event-ID` resumption, so a client can recover missed changes",
+      "whyNot": "The complete answer to a delta stream, and unnecessary here. Events are hints, not deltas (#73), so there is nothing to replay: a reconnecting client that reloads has the current state by definition. Adding ids would mean maintaining a server-side buffer and a replay path whose only purpose is to reproduce what a reload already achieves."
+    },
+    {
+      "option": "Assert that the watcher starts on `listen` and closes through `server.close()`",
+      "whyNot": "True of the walking skeleton and NOT established for the shell. That lifecycle belongs to a `node app/server.mjs` process that owns its own HTTP server; under `next build` + `next start` there is no such object and the process model differs. Writing it into a decision would record an untested claim about a configuration that has never been run."
+    },
+    {
+      "option": "Log watcher failures to the server console and leave the page alone",
+      "whyNot": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing."
+    }
+  ],
+  "decidedAt": "2026-08-27",
+  "addresses": [
+    "QST-0021",
+    "REQ-0018",
+    "REQ-0020"
+  ],
+  "evidencedBy": [
+    "AST-0036",
+    "AST-0034",
+    "AST-0035"
+  ],
+  "notes": "⚠️ THE WATCHER LIFECYCLE IS STATED AS AN OBLIGATION, NOT A MECHANISM, and the difference is the point of the amendment. 'The launcher owns both processes and terminates the watcher with the application' is a contract stage 5 must satisfy and validate. The skeleton's create-on-listen / close-in-`close()` pattern is evidence that the shape works for a process that owns its own server; it is not evidence about `next start`, and the two were nearly conflated here. ⚠️ WHAT THE WATCHDOG WINDOW IS, IS NOT DECIDED. The heartbeat interval and the client's tolerance are stage 5 parameters; what is fixed is that a missed heartbeat becomes visible rather than inferred. ⚠️ THE TRUTHFUL-COUNT RULE IS DELIBERATELY ABSOLUTE. 'No rendered count may include an artifact the page did not render' admits no partial-failure exception, because every version of this defect found so far arrived as a reasonable-looking exception: the publisher skipped what it did not recognise, the read path skipped what it could not parse. A count is a claim, and a claim about content that was not rendered is false. ⚠️ NOT ESTABLISHED: browser reconnect behaviour (specification-only; no `EventSource` in this Node build and no browser on this host), idle timeouts beyond six seconds, concurrent clients, and malformation modes other than invalid JSON. ⚠️ DOES NOT SETTLE CACHE COMPONENTS."
+}

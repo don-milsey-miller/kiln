@@ -1,0 +1,18 @@
+{
+  "id": "EVD-0058",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Source: HTML Standard",
+  "kind": "source",
+  "summary": "Comment lines exist to keep proxies from dropping the connection — a transport keepalive, not a client-visible signal.",
+  "sources": [
+    {
+      "title": "HTML Standard",
+      "locator": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+      "retrievedAt": "2026-08-27"
+    }
+  ],
+  "notes": "Quoted from the page, verified present at retrieval time: \"To protect against such proxy servers, authors can include a comment line (one starting with a ':' character) every 15 seconds or so.\" ⚠️ The full document was NOT retained — there is no capture store yet (7b builds capture plans). What survives is the locator, the retrieval date and the verified quote."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "AST-0036",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "An SSE comment heartbeat is invisible to page JavaScript",
+  "statement": "Per the WHATWG specification, a line in an event stream beginning with a colon is ignored by the client parser. A comment heartbeat therefore fires no event and cannot be observed by page code; the specification names its purpose as preventing legacy proxies from dropping an idle connection. Making stream health visible to a client watchdog requires a named event carrying a data field, not a comment.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "transport": "text/event-stream over http",
+      "client": "EventSource per WHATWG HTML"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS CORRECTS A PROPOSAL I MADE, and the way it was wrong is worth keeping. QST-0021's measurement showed idle and dead streams are byte-identical, and the fix I offered was a periodic comment frame — which fixes the BYTES and not the VISIBILITY, because the one consumer that needs to see it is the only one specified to ignore it. A transport-level keepalive would have left the page exactly as falsely healthy as before while looking like a solution. ⚠️ Same shape as AST-0022 and AST-0028 once more: a mechanism that appears to close a gap because something is now happening, while the thing that needed to observe it still cannot.",
+  "supportedBy": [
+    "EVD-0057",
+    "EVD-0058"
+  ]
+}
