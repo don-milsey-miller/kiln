@@ -1,5 +1,16 @@
 import { readStageDocument } from "../../_read/planning.js";
-import { compileStageDocument, StageDocumentRejected } from "../../_mdx/compile.js";
+import { compileStageDocument, StageDocumentRejected, compileCount } from "../../_mdx/compile.js";
+
+/**
+ * ⚠️ ACC-0020'S INSTRUMENT, silent unless `VPW_BENCH` is set. The protocol's timing boundary starts
+ * where the request handler begins the planning-content read — the first line of this component —
+ * and ends where the document's markup is complete, which is AFTER this component returns and is
+ * therefore not observable from inside it. So this reports the part it can bound exactly (read plus
+ * compile, on a monotonic clock) and an absolute wall-clock stamp for the start, letting the
+ * harness close the boundary from the other end by watching the markup arrive. Two numbers, each
+ * honest about which end it comes from, rather than one number pretending to be the whole span.
+ */
+const benching = process.env.VPW_BENCH === "1";
 
 /**
  * A stage's document, compiled at request time under the restricted contract — the second of the
@@ -20,7 +31,9 @@ import { compileStageDocument, StageDocumentRejected } from "../../_mdx/compile.
  * path, so nothing here can leak where the server keeps its content.
  */
 export default async function DocumentPanel({ stageId }) {
+  const started = benching ? { wall: Date.now(), mono: performance.now() } : null;
   const doc = await readStageDocument(stageId);
+  const readDone = started ? performance.now() : 0;
 
   if (!doc)
     return (
@@ -39,6 +52,21 @@ export default async function DocumentPanel({ stageId }) {
     if (!(e instanceof StageDocumentRejected)) throw e;
     rejection = e;
   }
+
+  if (started)
+    console.error(
+      "vpw-bench " +
+        JSON.stringify({
+          doc: doc.name,
+          bytes: doc.text.length,
+          startWall: started.wall,
+          readMs: readDone - started.mono,
+          compileMs: performance.now() - readDone,
+          readAndCompileMs: performance.now() - started.mono,
+          compiles: compileCount(),
+          rejected: Boolean(rejection),
+        })
+    );
 
   if (rejection)
     return (

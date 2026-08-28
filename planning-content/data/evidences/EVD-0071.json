@@ -1,0 +1,54 @@
+{
+  "id": "EVD-0071",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Benchmark: request-time compile costs 16-29 ms; the read around it costs 234-359 ms",
+  "kind": "experiment",
+  "summary": "Six valid runs of ACC-0020's protocol against the largest stage document (02-intent-decomposition.md, 21,047 bytes): production build, ten discarded warm-up requests, fifty serial measured requests, compile counter verified to advance 49/49 in every run. THREE RUNS PASSED AND THREE MISSED. Combined p95 by run: 253.72, 246.22, 314.65, 374.68, 342.18, 245.31 ms against a 300 ms budget; the upper-bound span (read start to complete markup received) tracked it at 267, 255, 327, 387, 357, 251 ms. THE SPLIT IS THE RESULT: MDX compilation was 15.41-29.05 ms p95 in every run, between 4% and 12% of the span, while the planning-content read around it was 233.87-358.89 ms p95. The variance that decides the verdict lives entirely in the read.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "mdx": "@mdx-js/mdx 3.1.1",
+      "node": "v24.18.0",
+      "os": "Windows 11, win32 x64",
+      "cpu": "AMD Ryzen AI MAX+ 395 w/ Radeon 8060S, 32 cores",
+      "memory": "27.6 GB",
+      "mode": "next build + next start",
+      "document": "02-intent-decomposition.md, 21047 bytes, the largest at time of evaluation",
+      "protocol": "10 warm-up discarded, 50 serial measured, concurrency 1, p95 nearest-rank",
+      "harness": "bin/bench-compile.mjs"
+    },
+    "omissions": [
+      {
+        "fact": "ambient-load",
+        "state": "not-captured",
+        "reason": "The protocol pins the host, the document, the warm-up and the sample, but says only 'no other significant load'. Nothing measured what else the machine was doing, and the runs were taken back to back with a full production build immediately before each. That is the most likely source of a 50% spread, and it is NOT controlled by the protocol as written."
+      },
+      {
+        "fact": "read-cost-attribution",
+        "state": "not-captured",
+        "reason": "The read was measured as one span. Which part of it dominates — reading the artifact files, validating them against schemas, or the lint pass over them — was not separated, so the obvious optimisation is not yet identified, only its location."
+      },
+      {
+        "fact": "other-documents",
+        "state": "not-captured",
+        "reason": "Only the largest document was measured, as the protocol specifies. The read cost is per-request and appears independent of document size, so smaller documents likely cost nearly the same — but that was not measured."
+      }
+    ]
+  },
+  "notes": "⚠️ THE PRESCRIBED REMEDY DOES NOT ADDRESS THE MEASURED COST, AND THIS IS THE FINDING. DEC-0020 and ACC-0020 both record that if the budget is missed by a wide margin the answer is that decision's second alternative — plain markdown for stage documents — rather than a larger number. The measurement says that would remove 15-29 ms from a 245-375 ms span. The restricted MDX contract would be given up, its rejection guarantee with it, and the budget would still be missed in the same three runs. The cost is the planning-content read, which happens per request under DEC-0019's freshness contract and is unaffected by what the document is written in. ⚠️ THE VERDICT IS NOT STABLE, SO A SINGLE RUN IS NOT A RESULT. Three passes and three misses from an identical protocol on an idle-looking host, spread 245-375 ms. Reporting the first run alone would have recorded a pass; reporting the fourth alone would have recorded a 25% miss. Both would have been true of that run and useless as a judgement. ⚠️ VOID WAS FALSIFIED, NOT ASSUMED. Memoising the compiled document by name — the exact defect the verification clause exists to catch, and the change that would report the best numbers this benchmark has ever produced — makes the harness report VOID with a non-zero exit and NO timing figures at all, because the compile counter stops advancing between measured requests. ⚠️ THE COMPILE COUNTER IS NOT GATED BEHIND AN ENVIRONMENT VARIABLE. An instrument that must be switched on can be left off, and a benchmark that verifies nothing is worse than none."
+}

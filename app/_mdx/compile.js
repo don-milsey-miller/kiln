@@ -37,6 +37,20 @@ export class StageDocumentRejected extends Error {
 }
 
 /**
+ * ⚠️ HOW MANY COMPILES HAVE ACTUALLY HAPPENED. This exists for ACC-0020, whose verification clause
+ * is the part that matters: the easiest way to meet a compile budget is to cache the compiled
+ * document, which would report excellent numbers while measuring nothing — and would break
+ * DEC-0020's request-time requirement and AST-0030's finding underneath it. A run in which the
+ * count does not advance once per measured request is VOID, not a pass.
+ *
+ * It is NOT gated behind an environment variable. An instrument that has to be switched on can be
+ * left off, and then a benchmark verifies nothing; one integer increment per document costs
+ * nothing worth saving.
+ */
+let compiles = 0;
+export const compileCount = () => compiles;
+
+/**
  * Compile one stage document to a renderable component.
  *
  * @param {{name: string, text: string}} doc  the document as authored, from the reader
@@ -45,6 +59,7 @@ export class StageDocumentRejected extends Error {
  */
 export async function compileStageDocument({ name, text }) {
   let compiled;
+  compiles += 1;
   try {
     compiled = await compile(
       { path: name, value: text },
