@@ -47,8 +47,14 @@ test("⚠️ any client component must not hold the selection", () => {
     for (const bad of [/useState\s*\([^)]*artifact/i, /useState\s*\([^)]*stageId/i])
       assert.ok(!bad.test(src), `${relative(ROOT, f)} holds a correctness-critical selection in client state`);
   }
-  // Recorded so the count moving is a visible event rather than a silent one.
-  assert.equal(clients.length, 0, `expected no client components yet, found ${clients.map((f) => relative(ROOT, f))}`);
+  // ⚠️ Recorded so the count moving is a visible event rather than a silent one. It moved from 0 to
+  // 1 with TSK-0017: the stream watchdog is the application's only client component, and it holds
+  // the stream's health — transient by definition — while both selections stay in the URL.
+  assert.deepEqual(
+    clients.map((f) => relative(ROOT, f).split("\\").join("/")),
+    ["app/_stream/watchdog.js"],
+    "a new client component is a deliberate act; say why it needs to be one"
+  );
 });
 
 test("the selections come from the route and the query, and from nowhere else", () => {

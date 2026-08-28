@@ -212,6 +212,34 @@ test("every required route is built and served, proven by an application-owned m
     assert.match(frames, /event: change/, "and a change hint after a real file was written");
     assert.ok(!/^id:/m.test(frames), "no event ids: hints are not deltas, so there is nothing to resume");
 
+    /* ------------------------------------------------- the client half actually SHIPS (CMP-0017) */
+
+    // ⚠️ THE BUILD SUCCEEDING PROVES NOTHING HERE, AND NEITHER DOES THE HTML. A client component
+    // that renders on the server and is never sent to the browser produces byte-identical markup
+    // and is inert — the indicator would show "Connecting…" forever, or worse, sit on a reassuring
+    // label while nothing can refresh the page. That is the same class of failure as a route that
+    // builds while rendering nothing you wrote. So this asserts the markup is served AND that the
+    // component's own text is inside a script the page actually loads.
+    const shell = await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text();
+    assert.match(shell, /data-vpw-stream="/, "the indicator renders on every page, because it is in the layout");
+    assert.match(shell, /Connecting|Receiving updates/, "and states itself in words, not colour alone");
+
+    const scripts = [...shell.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(scripts.length > 0, "a client component whose page loads no script can never run");
+
+    let carriesWatchdog = false;
+    for (const src of scripts) {
+      const js = await (
+        await fetch(new URL(src, `http://127.0.0.1:${PORT}/`), { signal: AbortSignal.timeout(15_000) })
+      ).text();
+      if (js.includes("Not receiving updates")) carriesWatchdog = true;
+    }
+    assert.ok(
+      carriesWatchdog,
+      "no script this page loads contains the watchdog's own text — the indicator would render once " +
+        "and never change again, which is worse than having none: a label that reassures permanently"
+    );
+
     /* ------------------------------------------------- totals stay truthful under corruption (ACC-0014/0015) */
 
     const diagnosticsOf = async () => {

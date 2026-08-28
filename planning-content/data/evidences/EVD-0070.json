@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0070",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the change-stream client, deterministic under injection and shipped to the browser",
+  "kind": "experiment",
+  "summary": "Thirteen tests against the shipping watchdog logic with EventSource and timers injected, so timing is decided rather than waited for. Measured: the FIRST open goes live and does NOT reload, a reconnection after trouble DOES; an open with nothing wrong in between does not, so the rule is not merely 'reload on every open after the first'; each named heartbeat resets the deadline and restores live; expiry goes stale while the socket is still open; a watcher failure goes stale at once and stops waiting; three change hints reload once; start() twice makes one EventSource; stop() closes it, clears the timer and refuses to restart, and a hint arriving afterwards does not navigate. IN PRODUCTION, against a real build, the served page carries the indicator markup AND a script the page loads that contains the component's own state text.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "eventSource": "a fake driven by the test; no browser was involved"
+    },
+    "omissions": [
+      {
+        "fact": "browser-behaviour",
+        "state": "not-observable",
+        "reason": "No browser was available in this environment. What a real EventSource does on reconnect — its own backoff, whether it fires `open` again rather than constructing afresh, how quickly it notices a dropped connection — was NOT measured. ACC-0029 and ACC-0030 are about what a PAGE does and remain not-evaluated."
+      },
+      {
+        "fact": "hydration",
+        "state": "not-captured",
+        "reason": "The check proves the component's code is inside a script the page loads. That the script then executes, hydrates and opens a connection follows from it but was not watched happening."
+      }
+    ]
+  },
+  "notes": "⚠️ THE HARD PART IS TIMING, AND TIMING IS NOT TESTABLE INSIDE A HOOK. The logic lives in `app/_stream/logic.js` taking EventSource and its timers as arguments; the component is the thin part around it. Every distinction that could be got wrong — connection versus reconnection, a deadline that must reset, a reload that must not cause another — is decided by a test rather than waited for. ⚠️ IT LIVES IN `app/`, NOT `lib/`, BECAUSE THE BOUNDARY CHECK SAID SO. The first draft put it beside the server half in `lib/` and `lint:shell` refused the import immediately. It could not have gone through `app/server/*` either: those carry `server-only`, which throws in a client component by design. REQ-0021's check located a real design mistake rather than an inconvenience. ⚠️ FALSIFIED: a static stand-in in the layout — the same markup and the same words, with no client component behind it — passes both HTML assertions and fails only the script assertion, which is the exact failure the check exists for: an indicator that renders once and then reassures permanently while nothing can refresh the page."
+}
