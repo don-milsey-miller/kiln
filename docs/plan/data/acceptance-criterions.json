@@ -207,10 +207,13 @@
     "evaluates": [
       "CMP-0015"
     ],
+    "evidencedBy": [
+      "EVD-0063"
+    ],
     "id": "ACC-0013",
     "lifecycle": "active",
     "notes": "Two halves, and the second is what makes the first mean anything: a stored status field could produce the same display and go stale silently. Pass/fail without judgement — the stage either changes or it does not, and the field either exists or it does not.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With the application running, changing a recorded attestation so that a different stage becomes the earliest unready one causes the project view to display that stage as current, without restarting the application. No field storing a stage or status value exists anywhere under the content root.",

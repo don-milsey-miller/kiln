@@ -4,10 +4,13 @@
       "evaluates": [
         "CMP-0015"
       ],
+      "evidencedBy": [
+        "EVD-0063"
+      ],
       "id": "ACC-0013",
       "lifecycle": "active",
       "notes": "Two halves, and the second is what makes the first mean anything: a stored status field could produce the same display and go stale silently. Pass/fail without judgement — the stage either changes or it does not, and the field either exists or it does not.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "With the application running, changing a recorded attestation so that a different stage becomes the earliest unready one causes the project view to display that stage as current, without restarting the application. No field storing a stage or status value exists anywhere under the content root.",
@@ -140,7 +143,37 @@
       ]
     }
   ],
-  "accepted": [],
+  "accepted": [
+    {
+      "acceptedBy": [
+        "ACC-0013"
+      ],
+      "dependsOn": [
+        "TSK-0006",
+        "TSK-0015"
+      ],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0016"
+      ],
+      "id": "TSK-0007",
+      "implements": [
+        "CMP-0015"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one. ⚠️ SPLIT 2026-08-27 — it was named as visibly oversized when the plan was written, and it was. The totals, the lint surface and located parse failures are its sibling. This half is the navigation spine; that half is the truthfulness rules, and they fail in different ways. ⚠️ Depends on BOTH boundary checks, so every view file written from here on is checked as it lands. ⚠️ DONE 2026-08-28, and it is the first task whose code the boundary checks actually guard. Before it the lint reported `0 reader consumer(s)` and the two `<Suspense>` detectors had nothing in the real project to examine; it now reports 1 consumer and 6 reachable modules, and both detectors were falsified against `app/page.js` itself. ⚠️ VERIFIED IN PRODUCTION, NOT INFERRED: with `next start` running and nothing rebuilt, changing one attestation on disk moved the displayed current stage from none to `04-requirement-gaps`, and reverting the file moved it back. ⚠️ The smoke check now asserts the READING PANEL's markers as well as the route's. Without that a page whose Suspense boundary never resolved would still pass — the shell ships, the fallback ships, and the content never arrives, which is the streaming form of a build that succeeds while rendering nothing.",
+      "reviewStatus": "amended",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
+      "title": "Build the project view's stage navigation and derived current stage",
+      "type": "task"
+    }
+  ],
   "blockedByOtherRoles": [
     {
       "role": "platform",
@@ -162,8 +195,13 @@
   "components": [
     {
       "id": "CMP-0015",
+      "implementedBy": [
+        "app/page.js",
+        "app/stages-panel.js",
+        "test/stage-derivation.test.mjs"
+      ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47).",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47). ⚠️ HALF BUILT 2026-08-28 BY TSK-0007: the derived current stage and all nine stages with their gate state. ACC-0013 passes, measured in production. ⚠️ ACC-0014, ACC-0015 AND ACC-0035 REMAIN `not-evaluated`. Counts, the lint surface and located parse failures are TSK-0016's, and URL-recoverable selection is TSK-0010's. The split was made because this half fails VISIBLY — a wrong stage is obvious — while the counting half fails silently, and they deserve separate review. ⚠️ THE READ LIVES IN `<StagesPanel />`, RENDERED LITERALLY INSIDE A `<Suspense>` AT THE PAGE'S OWN CALL SITE, and that form is now enforced rather than conventional: renaming it or handing it to a wrapper is refused as unsupported indirection, and removing the boundary is refused as a missing one. Both were falsified against this very file.",
       "responsibility": "Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -266,35 +304,6 @@
   ],
   "role": "frontend",
   "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0013"
-      ],
-      "dependsOn": [
-        "TSK-0006",
-        "TSK-0015"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0016"
-      ],
-      "id": "TSK-0007",
-      "implements": [
-        "CMP-0015"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ The count rule admits no partial-failure exception. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one. ⚠️ SPLIT 2026-08-27 — it was named as visibly oversized when the plan was written, and it was. The totals, the lint surface and located parse failures are its sibling. This half is the navigation spine; that half is the truthfulness rules, and they fail in different ways. ⚠️ Depends on BOTH boundary checks, so every view file written from here on is checked as it lands.",
-      "reviewStatus": "amended",
-      "role": "frontend",
-      "schemaVersion": 2,
-      "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
-      "title": "Build the project view's stage navigation and derived current stage",
-      "type": "task"
-    },
     {
       "acceptedBy": [
         "ACC-0016",

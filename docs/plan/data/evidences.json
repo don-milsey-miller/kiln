@@ -1695,5 +1695,50 @@
     "summary": "A second static analysis was added: it scans every module under `app/`, asserts the designated reader exists and was examined, and emits four kinds of violation. Six fixtures, one per detected violation plus an allowed control: ALLOWED reported clean with a consumer present; DIRECT caught a component importing an adapter at line 1; INDIRECT caught a helper re-exporting the adapter at its own line 1, not at the page that used it; MISSING-BOUNDARY caught `<Panel>` rendered bare at the rendering site, line 3; FS-DIRECT caught `node:fs` at line 1; ROUTE-READ caught a route entry awaiting the reader at line 3. Each of the four detectors was then falsified again against a TEMPORARY violation inserted into the real application, and each reported the real file and line before being reverted. A missing reader is reported as `readerSeen: false` rather than as a clean project.",
     "title": "Experiment: read and `<Suspense>` confinement, four detectors falsified twice over",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "push-based-refresh",
+          "reason": "The page was re-requested by hand. Whether a change reaches an OPEN page without a request is the change stream's job (TSK-0011, TSK-0017) and nothing here shows it.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "counts-lint-and-malformed-content",
+          "reason": "Deliberately not built in this task — they are TSK-0016's, and they are the half of this view that fails silently. Nothing about them was rendered, so nothing about them was measured.",
+          "state": "not-observable"
+        }
+      ]
+    },
+    "id": "EVD-0063",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ `ƒ` VERSUS `○` IS THE OBSERVABLE THAT MATTERS. Before this task `/` read nothing and built static; it now builds dynamic because the read awaits `connection()`. A route that had been frozen into the build would have kept serving `none` after the file changed — which is exactly the AST-0019 failure, and exactly what DEC-0019's contract exists to prevent. ⚠️ THE REVERT IS PART OF THE MEASUREMENT. A page that changed once could have been showing anything; changing back on the way out is what makes it a function of the file.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The project view was built with `next build` and served with `next start` on loopback. The route built as `ƒ /` — dynamic — where it had been `○` static before it read anything. Served initially it reported `data-vpw-current=\"none\"` and `data-vpw-stages=\"9\"`, showing every gate ready. One stage attestation was then changed on disk through the typed tool — `04-requirement-gaps` / `every-blocking-gap-decided` set to `not-satisfied` — with the server left running and nothing rebuilt. Three seconds later the same URL reported `data-vpw-current=\"04-requirement-gaps\"`, rendered NOT READY, and named the blocking criterion. Reverting the file returned the page to `data-vpw-current=\"none\"`.",
+    "title": "Experiment: the running application follows an attestation change on disk",
+    "type": "evidence"
   }
 ]

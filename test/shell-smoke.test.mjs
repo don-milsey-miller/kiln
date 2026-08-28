@@ -35,7 +35,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Every route the shell must serve, with the marker that proves the APPLICATION rendered it.
  * ⚠️ Extend this as routes land — `/stage/[stageId]` joins it with TSK-0009.
  */
-const ROUTES = [{ path: "/", marker: 'data-vpw-route="/"' }];
+const ROUTES = [
+  {
+    path: "/",
+    // The route rendered at all...
+    marker: 'data-vpw-route="/"',
+    // ...and the panel that does the READING rendered too. Without the second marker a page whose
+    // Suspense boundary never resolved would still pass: the shell ships, the fallback ships, and
+    // the content never arrives. That is the streaming version of "a build that succeeds while
+    // rendering nothing you wrote".
+    also: ["data-vpw-stages=", "data-vpw-current="],
+  },
+];
 
 async function killTree(proc) {
   if (!proc || proc.exitCode !== null) return;
@@ -79,10 +90,12 @@ test("every required route is built and served, proven by an application-owned m
     }
     assert.ok(up, `the server never accepted a connection on ${PORT}`);
 
-    for (const { path, marker } of ROUTES) {
+    for (const { path, marker, also = [] } of ROUTES) {
       const res = await fetch(`http://127.0.0.1:${PORT}${path}`, { signal: AbortSignal.timeout(15_000) });
       const html = await res.text();
       assert.equal(res.status, 200, `${path} returned ${res.status}`);
+      for (const m of also)
+        assert.ok(html.includes(m), `${path} rendered but its reading panel never produced ${m}`);
       assert.ok(
         html.includes(marker),
         `${path} responded without its application-owned marker ${marker}. A 200 alone does not ` +

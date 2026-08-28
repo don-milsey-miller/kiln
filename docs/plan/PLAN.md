@@ -229,7 +229,7 @@ Be the only door from application code into `lib/`. Each module begins with `imp
 Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.
 
 *Satisfies: REQ-0016*
-*Not yet implemented.*
+*Implemented by: app/page.js, app/stages-panel.js, test/stage-derivation.test.mjs*
 
 ### CMP-0016 — Stage view
 
@@ -758,7 +758,7 @@ Implement the analysis that runs without executing the application and reports f
 
 Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.
 
-**outstanding** (0/1 criteria passed) · role: frontend
+**accepted** (1/1 criteria passed) · role: frontend
 *Implements: CMP-0015 · fulfils: REQ-0016*
 
 ### TSK-0008 — Build the restricted MDX compiler with rejection diagnostics
