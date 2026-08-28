@@ -151,25 +151,34 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   const comps = read("components").filter((d) => Number(d.id.slice(4)) >= 12);
   assert.equal(comps.length, 9, "the nine application components");
 
-  // The INVARIANT: nothing in the shell has been accepted. `implementedBy` says code exists;
-  // only a criterion's outcome says it works, and conflating them is what the planned/built flag
-  // was rejected for. This line must not move until work is genuinely accepted.
   const shellIds = new Set(comps.map((d) => d.id));
+  const withCode = new Set(comps.filter((d) => (d.implementedBy ?? []).length).map((d) => d.id));
   const shellCriteria = read("acceptance-criterions").filter((a) =>
     (a.evaluates ?? []).some((id) => shellIds.has(id))
   );
   assert.equal(shellCriteria.length, 23, "every run-2 criterion");
+
+  // INVARIANT 1: a criterion may only be `pass` if every component it evaluates has code. Accepted
+  // work that nothing implements is the sharpest form of the QST-0015 hazard — it would put a tick
+  // beside a component the package also reports as unimplemented.
+  for (const a of shellCriteria.filter((x) => x.outcome === "pass"))
+    for (const id of a.evaluates.filter((i) => shellIds.has(i)))
+      assert.ok(withCode.has(id), `${a.id} passes but ${id} has no implementedBy`);
+
+  // INVARIANT 2: a `fail` is never shipped quietly. If one is ever recorded, this stops and someone
+  // decides what the package should say about it.
   assert.deepEqual(
-    [...new Set(shellCriteria.map((a) => a.outcome))],
-    ["not-evaluated"],
-    "an application criterion has been evaluated — update this only when that is genuinely true"
+    shellCriteria.filter((a) => a.outcome === "fail").map((a) => a.id),
+    [],
+    "a failing application criterion is in the package"
   );
 
-  // Today's state, one line to edit as implementation lands.
+  // Today's state — two lines to edit as implementation lands.
+  assert.deepEqual([...withCode].sort(), ["CMP-0014", "CMP-0020"], "components with code");
   assert.deepEqual(
-    comps.filter((d) => (d.implementedBy ?? []).length).map((d) => d.id),
-    ["CMP-0020"],
-    "TSK-0003 scaffolded the app; nothing else has code yet"
+    shellCriteria.filter((a) => a.outcome === "pass").map((a) => a.id).sort(),
+    ["ACC-0025", "ACC-0026", "ACC-0027"],
+    "criteria evaluated so far — all three are the adapter door's"
   );
 
   // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying

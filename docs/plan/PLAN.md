@@ -222,7 +222,7 @@ Compile a stage document to a renderable component at request time using `@mdx-j
 Be the only door from application code into `lib/`. Each module begins with `import 'server-only'`, re-exports by explicit name or wrapper rather than `export *`, and exposes only the capabilities the shell needs; process-spawning, locking and stateful modules pass through individual review before they are exposed at all.
 
 *Satisfies: REQ-0019*
-*Not yet implemented.*
+*Implemented by: app/server/content.js, app/server/stages.js, app/server/README.md, test/server-adapters.test.mjs*
 
 ### CMP-0015 — Project view
 
@@ -729,7 +729,7 @@ Create the application under `app/` and make `next build` followed by `next star
 
 Create the adapter modules the shell needs, each beginning with `import 'server-only'` and re-exporting by explicit name or wrapper. Expose only the capabilities the first slice requires. `lib/` itself is not modified and gains no marker, so `bin/` and the test suite keep working under plain Node.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**accepted** (3/3 criteria passed) · role: platform
 *Implements: CMP-0014 · fulfils: REQ-0019*
 
 ### TSK-0005 — Build the planning-content reader on the `connection()` + Suspense contract

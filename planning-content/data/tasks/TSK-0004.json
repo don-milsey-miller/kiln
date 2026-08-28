@@ -21,5 +21,5 @@
   "dependsOn": [
     "TSK-0003"
   ],
-  "notes": "⚠️ The review-status write is a LOCKING capability and DEC-0021 holds those back for individual review before exposure — so it is deliberately NOT part of this task. It arrives with the review action, where it can be examined on its own."
+  "notes": "⚠️ The review-status write is a LOCKING capability and DEC-0021 holds those back for individual review before exposure — so it is deliberately NOT part of this task. It arrives with the review action, where it can be examined on its own. ⚠️ DONE 2026-08-27. Two adapters, a README stating what is deliberately absent, and six static tests — each falsified before being trusted. ⚠️ THE PROBE ROUTES WERE TEMPORARY AND ARE GONE. Verifying that a Server Component can import the adapters needed a route that imports them; verifying the client refusal needed one that violates the rule. Both were built, measured, and deleted, and the tree was rebuilt clean afterwards. Neither reads planning content — REQ-0021 confines reads to the reader, which does not exist until TSK-0005, so even a throwaway route was written to import without reading. ⚠️ `server-only` was added as a dependency. Next.js implements the guard internally and the package's contents are unused, but the specifier must still RESOLVE, so it is a real dependency rather than a documentation flourish."
 }

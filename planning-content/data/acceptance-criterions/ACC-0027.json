@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A client component reaching an adapter fails the build, locatably",
   "statement": "A `'use client'` module importing any `app/server/` adapter causes the build to fail with a message naming the offending file and a line:column position. The criterion asserts the presence of a file and a position, and MUST NOT assert the diagnostic's wording.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0019"
   ],
-  "notes": "⚠️ THE WORDING CLAUSE IS MEASURED, NOT STYLISTIC. Next.js produced two different messages for the same violation reached two ways, and one of them said 'you are using it in the Pages Router' for an App Router project. A test pinned to that string would pass on a wrong message today and break on a corrected one after an upgrade."
+  "notes": "⚠️ THE WORDING CLAUSE IS MEASURED, NOT STYLISTIC. Next.js produced two different messages for the same violation reached two ways, and one of them said 'you are using it in the Pages Router' for an App Router project. A test pinned to that string would pass on a wrong message today and break on a corrected one after an upgrade.",
+  "evidencedBy": [
+    "EVD-0059"
+  ]
 }

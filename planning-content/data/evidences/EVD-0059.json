@@ -1,0 +1,46 @@
+{
+  "id": "EVD-0059",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the `app/server/` adapter door, verified in both directions",
+  "kind": "experiment",
+  "summary": "Two adapters were built over `lib/` — `content.js` and `stages.js` — each beginning with `import \"server-only\"` and re-exporting by explicit name. A Server Component importing both compiled, appeared in the route table as `○ /probe-adapters`, served HTTP 200, and reported every imported binding resolved to a real value (`function,object,function,function`). A `'use client'` module importing one of them FAILED the build at `./app/server/content.js:1:1`, quoting the offending source line with a caret and printing the import chain from the page through the client module to the adapter; `next build` exited 1 with the violation present and 0 once it was removed. Both probe routes were deleted afterwards and the tree rebuilt clean.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "mode": "next build",
+      "layout": "app/ at the repository root, adapters at app/server/"
+    },
+    "omissions": [
+      {
+        "fact": "webpack-builder",
+        "state": "not-captured",
+        "reason": "Turbopack is the default at 16.3.2 and was the only builder exercised. AST-0032 measured the UNGUARDED failure mode as a Turbopack internal error, and whether webpack reports it differently was not tested here either."
+      },
+      {
+        "fact": "indirect-reexport-chains",
+        "state": "not-captured",
+        "reason": "The client violation imported an adapter directly. A chain that reaches `lib/` through an intermediate module was not exercised — that is the bypass path TSK-0006's static check is required to detect, and it is not this task's."
+      }
+    ]
+  },
+  "notes": "⚠️ THE ROUTE TABLE CAUGHT A SILENT FAILURE AGAIN, on the second consecutive task. The probe was first placed at `app/_probe/`, the build succeeded, and the route never appeared: a leading underscore marks a PRIVATE FOLDER in the App Router and opts the directory out of routing. `✓ Compiled successfully` was printed either way. TSK-0003 hit the same class through `src/app/` precedence; the shape is 'a build that succeeds while rendering nothing you wrote', and only the route table distinguishes them. ⚠️ The wording of the client-side diagnostic is deliberately NOT recorded as a required string. ACC-0027 forbids asserting it, because Next.js produced two different messages for this violation reached two ways and one of them named the wrong router."
+}
