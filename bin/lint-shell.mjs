@@ -31,6 +31,7 @@ const reads = analyseReadBoundary({
   allowedDir: cfg.allowedDir,
   readerFile: READER,
   exclude: cfg.exclude,
+  adapterConsumers: cfg.adapterConsumers,
 });
 
 const problems = [];

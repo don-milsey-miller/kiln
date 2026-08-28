@@ -15,7 +15,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   analyseReadBoundary,
@@ -151,14 +151,31 @@ test("a missing reader is a REFUSAL, not a clean result", () => {
 
 test("the real application confines its reads, and the reader was examined", () => {
   const cfg = shellBoundaryConfig(ROOT);
-  const r = analyseReadBoundary({
-    appDir: cfg.appDir,
-    allowedDir: cfg.allowedDir,
-    readerFile: join(ROOT, "app", "_read", "planning.js"),
-    exclude: cfg.exclude,
-  });
+  // ⚠️ Built from the SHARED config, `adapterConsumers` included. An earlier version listed the
+  // options by hand and went red the moment the lint learned about a new adapter consumer — two
+  // descriptions of one rule, drifting apart on the first change.
+  const r = analyseReadBoundary({ ...cfg, readerFile: join(ROOT, "app", "_read", "planning.js") });
   assert.equal(r.readerSeen, true, "the designated reader must exist and be scanned");
   assert.equal(resolve(r.reader), resolve(join(ROOT, "app", "_read", "planning.js")));
   assert.ok(r.scanned.length >= 5, `only ${r.scanned.length} modules scanned — going vacuous`);
   assert.deepEqual(r.violations.map((v) => formatReadViolation(v, ROOT)), []);
+});
+
+test("⚠️ every adapter's permitted consumers are DECLARED, and the list is small", () => {
+  // Unlisted adapters admit the reader alone, so this map is the only place the rule is widened.
+  // Pinning it makes a widening a visible act rather than a line nobody re-reads — the same
+  // treatment `exclude` gets, for the same reason.
+  const cfg = shellBoundaryConfig(ROOT);
+  const declared = Object.entries(cfg.adapterConsumers ?? {}).map(([adapter, consumers]) => [
+    adapter.split(sep).slice(-2).join("/"),
+    consumers.map((c) => c.split(sep).slice(-2).join("/")),
+  ]);
+  assert.deepEqual(declared, [["server/change-stream.js", ["events/route.js"]]]);
+
+  // ...and the content adapters are NOT in it, so they still admit only the reader.
+  for (const name of ["content.js", "stages.js"])
+    assert.ok(
+      !declared.some(([a]) => a.endsWith(name)),
+      `${name} must keep the default: the reader and nobody else`
+    );
 });

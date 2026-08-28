@@ -243,7 +243,7 @@ Render `/stage/[stageId]`: the stage's document through the restricted MDX compi
 Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.
 
 *Satisfies: REQ-0018*
-*Not yet implemented.*
+*Implemented by: lib/change-stream.mjs, app/server/change-stream.js, app/events/route.js, test/change-stream.test.mjs*
 
 ### CMP-0018 — Review action
 
@@ -808,7 +808,7 @@ Encode the selected stage and the selected artifact in the URL so that opening i
 
 Watch the content root and deliver change hints over an event stream. Emit a NAMED heartbeat event carrying data at a fixed interval. When the watcher fails, emit a visible failure signal on the stream or close the stream; logging alone is not permitted.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0017 · fulfils: REQ-0018*
 
 ### TSK-0012 — Expose the review-status write through the adapter, with individual review

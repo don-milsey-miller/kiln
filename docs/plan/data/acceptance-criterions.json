@@ -509,10 +509,13 @@
     "evaluates": [
       "CMP-0017"
     ],
+    "evidencedBy": [
+      "EVD-0069"
+    ],
     "id": "ACC-0028",
     "lifecycle": "active",
     "notes": "⚠️ AST-0036: a line beginning with a colon is ignored by the client parser, so a comment heartbeat keeps the socket warm and fires nothing. The criterion is the listener firing, not bytes arriving, because bytes arriving was never the problem.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "While connected and with no content changing, the stream delivers an event with a name and a data field at least once per configured heartbeat interval, and a client listener registered for that event name fires. A comment-only keepalive is a FAIL for this criterion.",
@@ -560,10 +563,13 @@
     "evaluates": [
       "CMP-0017"
     ],
+    "evidencedBy": [
+      "EVD-0069"
+    ],
     "id": "ACC-0031",
     "lifecycle": "active",
     "notes": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "When the file watcher fails, the page shows the stale indication or the stream closes. A run in which the failure appears only in server output while the page continues to indicate health is a FAIL.",

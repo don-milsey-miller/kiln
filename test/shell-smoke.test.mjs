@@ -163,6 +163,55 @@ test("every required route is built and served, proven by an application-owned m
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
 
+    /* ------------------------------------------------- the change stream (ACC-0028) */
+
+    // ⚠️ READ INCREMENTALLY, NEVER `await res.text()`. An event stream does not finish; awaiting
+    // the body would hang until the timeout and report a stream that was working perfectly as a
+    // failure. The reader is released as soon as both frames have been seen.
+    const streamFrames = async (afterOpen) => {
+      const controller = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${PORT}/events`, {
+        signal: controller.signal,
+        headers: { accept: "text/event-stream" },
+      });
+      assert.equal(res.headers.get("content-type"), "text/event-stream; charset=utf-8");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      let fired = false;
+      const deadline = Date.now() + 20_000;
+
+      while (Date.now() < deadline) {
+        if (!fired && /event: heartbeat/.test(text)) {
+          fired = true;
+          await afterOpen();
+        }
+        if (/event: heartbeat/.test(text) && /event: change/.test(text)) break;
+        const { value, done } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+      }
+      controller.abort();
+      try {
+        await reader.cancel();
+      } catch {
+        /* the abort already tore it down */
+      }
+      return text;
+    };
+
+    const watched = join(contentCopy, "planning-content", "data", "assertions", "AST-0001.json");
+    const frames = await streamFrames(async () => {
+      await sleep(300);
+      writeFileSync(watched, readFileSync(watched, "utf-8"));
+    });
+
+    assert.match(frames, /event: heartbeat/, "a NAMED heartbeat, not a comment frame — a comment fires no listener");
+    assert.match(frames, /data: \{"ok":true\}/, "carrying data, so a client listener receives something");
+    assert.match(frames, /event: change/, "and a change hint after a real file was written");
+    assert.ok(!/^id:/m.test(frames), "no event ids: hints are not deltas, so there is nothing to resume");
+
     /* ------------------------------------------------- totals stay truthful under corruption (ACC-0014/0015) */
 
     const diagnosticsOf = async () => {

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A watcher failure reaches the page, never only a log",
   "statement": "When the file watcher fails, the page shows the stale indication or the stream closes. A run in which the failure appears only in server output while the page continues to indicate health is a FAIL.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0018"
   ],
-  "notes": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing."
+  "notes": "The operator is looking at a browser, not a terminal. A logged failure with a live-looking page is the retained-workspace-reported-destroyed defect in its purest form: the system knows, records it accurately, and tells the person who needs it nothing.",
+  "evidencedBy": [
+    "EVD-0069"
+  ]
 }

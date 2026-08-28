@@ -1,0 +1,50 @@
+{
+  "id": "EVD-0069",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the change-stream server, deterministic under injection and live in production",
+  "kind": "experiment",
+  "summary": "Nine tests against the shipping service with the watcher and timers injected, so failure, heartbeat, disconnect and cleanup are decided rather than waited for. Measured: nothing starts until the first subscription (no watcher, no timer); a heartbeat is a NAMED event carrying `{ok:true}`; two subscribers both receive a change hint and a late subscriber receives no replay; one subscriber leaving clears its own timer and leaves the shared watcher running for the other; the last one leaving closes it; a watcher `error` broadcasts a named `failure` event with the reason AND closes every stream, leaving no timer; a subscriber whose send throws is dropped without affecting the rest; and `close()` ends every stream, releases the watcher and refuses further subscriptions. IN PRODUCTION, against a real build serving a temporary content root, an event-stream client read `/events` incrementally and observed `event: heartbeat` with `data: {\"ok\":true}`, then `event: change` after a real file write, with no `id:` field anywhere.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "watcher": "chokidar, imported dynamically",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "contentRoot": "a disposable copy; the project's own content was not touched"
+    },
+    "omissions": [
+      {
+        "fact": "real-watcher-failure",
+        "state": "not-observable",
+        "reason": "A watcher error was injected, not provoked. A real one needs the OS to run out of watch descriptors or a directory to vanish under the process, neither of which can be asked for on demand — which is exactly why the collaborator is injectable."
+      },
+      {
+        "fact": "client-behaviour",
+        "state": "not-captured",
+        "reason": "This is the SERVER half. Whether a browser's EventSource fires a listener for these frames, and what a watchdog does when they stop, is TSK-0017's and ACC-0029/ACC-0030 remain not-evaluated."
+      },
+      {
+        "fact": "long-lived-connections",
+        "state": "not-captured",
+        "reason": "The production stream was read for seconds, not hours. Whether an idle connection survives a long period, and whether subscriber cleanup holds under many connect/disconnect cycles, was not exercised."
+      }
+    ]
+  },
+  "notes": "⚠️ THE INJECTION IS WHAT MAKES THE FAILURE PATH TESTABLE AT ALL. `ENOSPC: watchers exhausted` is not something a test can cause; without an injectable watcher the most important behaviour in this component — that a dead watcher tells every page rather than only the log — would have been asserted by reading the code. ⚠️ THE PRODUCTION CHECK READS THE STREAM INCREMENTALLY AND STOPS. An event stream never finishes, so `await res.text()` would hang until the timeout and report a working stream as a failure. The reader is released as soon as both frames have been seen. ⚠️ FALSIFIED THREE WAYS, each failing only its own assertion: replacing the named heartbeat with a comment keepalive fails the production check; logging a watcher failure instead of broadcasting it fails the failure test; tearing the watcher down on the first disconnect fails the shared-watcher test."
+}
