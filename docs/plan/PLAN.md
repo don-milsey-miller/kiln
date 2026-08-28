@@ -208,7 +208,7 @@ Produce the frozen handoff package under docs/plan/ from planning-content, on an
 Be the single path by which the application reads planning content from disk, applying the DEC-0019 contract on every read: await `connection()` before the filesystem access, inside a `<Suspense>` boundary whose fallback is a real loading state for that content. Everything the shell knows about the plan enters through here.
 
 *Satisfies: REQ-0016, REQ-0017, REQ-0018*
-*Not yet implemented.*
+*Implemented by: app/_read/planning.js, test/reader-discipline.test.mjs*
 
 ### CMP-0013 — Restricted MDX compiler
 
@@ -687,6 +687,14 @@ Per the WHATWG specification, a line in an event stream beginning with a colon i
 **supported · source-supported** (derived)
 
 Rests on: EVD-0057 (support), EVD-0058 (support)
+
+### AST-0037 — `toolRoot()` survived bundling, and the reader still passes roots explicitly
+
+Under `next build` + `next start` with Next.js 16.3.2 and Turbopack, `toolRoot()` — which resolves from `import.meta.url` inside `lib/content-root.mjs` — returned the repository root correctly from within the built server, matching `process.cwd()`. Next.js traced `lib/` rather than inlining it.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0060 (support)
 
 ## Open questions
 

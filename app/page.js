@@ -9,7 +9,7 @@
  */
 export default function Page() {
   return (
-    <main style={{ maxWidth: "60rem", margin: "2rem auto", padding: "0 1.5rem" }}>
+    <main data-vpw-route="/" style={{ maxWidth: "60rem", margin: "2rem auto", padding: "0 1.5rem" }}>
       <h1 style={{ fontSize: "1.15rem" }}>visual-project-workflow</h1>
       <p style={{ color: "#666" }}>
         The application shell is scaffolded and serving. No planning content is read yet.

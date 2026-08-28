@@ -1556,5 +1556,50 @@
     "summary": "Two adapters were built over `lib/` — `content.js` and `stages.js` — each beginning with `import \"server-only\"` and re-exporting by explicit name. A Server Component importing both compiled, appeared in the route table as `○ /probe-adapters`, served HTTP 200, and reported every imported binding resolved to a real value (`function,object,function,function`). A `'use client'` module importing one of them FAILED the build at `./app/server/content.js:1:1`, quoting the offending source line with a caret and printing the import chain from the page through the client module to the adapter; `next build` exited 1 with the violation present and 0 once it was removed. Both probe routes were deleted afterwards and the tree rebuilt clean.",
     "title": "Experiment: the `app/server/` adapter door, verified in both directions",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "builder": "Turbopack (16.3.2 default)",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "independent-suspense-boundaries",
+          "reason": "The reads are separate exports, which is the SHAPE independent boundaries require, but no view puts them behind boundaries yet — the stage view is TSK-0009. ACC-0016 therefore stays not-evaluated: the thing it measures does not exist.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "freshness-after-an-external-write",
+          "reason": "The route was measured as dynamic, not measured serving changed content after a write while running. That is what the route symbol predicts and it was not confirmed here.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0060",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ `ƒ` IS THE OBSERVABLE THAT MATTERS, and it is the contract showing up in the build output: `connection()` made the route dynamic, so nothing it reads can be baked into the build. `/` staying `○` in the same build is the control — the difference is the contract, not the project.",
+    "observedAt": "2026-08-27",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The reader was exercised from a temporary Server Component route under `next build` + `next start`. The route built as `ƒ /probe-read` — DYNAMIC — while `/`, which reads nothing, stayed `○` static. All three reads returned live project data: nine stages with `currentStage` null (every gate ready), 236 artifacts, 0 lint findings, 36 assertions; `06-risk-feasibility` ready with two criteria, the first `high-severity-risks-mitigated` satisfied; and the stage document read back as `06-risk-feasibility.md`, 10590 bytes. The probe route was deleted and the tree rebuilt clean.",
+    "title": "Experiment: the application reader under a production build",
+    "type": "evidence"
   }
 ]

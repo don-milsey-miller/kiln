@@ -105,7 +105,7 @@
       "CMP-0012"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing.",
+    "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing. ⚠️ DONE 2026-08-27. Five static tests, each falsified: removing a `connection()`, importing `node:fs`, importing `lib/` directly, and adding a synchronous export each turn the suite red. ⚠️ THE ADAPTER GAINED ONE NAME, deliberately and reviewably: `readStageDocs`, taken from the PUBLISHER rather than written fresh. It already owns what a stage document is — `.md` and `.mdx`, dotfiles ignored, anything else REFUSED — and a second reader in the application would have quietly disagreed with the package about which files count. ⚠️ A PREDICTION WAS WRONG AND IS RECORDED AS SUCH (AST-0037): the reader was designed expecting bundling to break `toolRoot()`, and it did not. The design is unchanged, for a narrower reason than the original one, and the comment that asserted the wrong thing was corrected.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,

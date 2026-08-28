@@ -1,0 +1,24 @@
+{
+  "id": "AST-0037",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "`toolRoot()` survived bundling, and the reader still passes roots explicitly",
+  "statement": "Under `next build` + `next start` with Next.js 16.3.2 and Turbopack, `toolRoot()` — which resolves from `import.meta.url` inside `lib/content-root.mjs` — returned the repository root correctly from within the built server, matching `process.cwd()`. Next.js traced `lib/` rather than inlining it.",
+  "loadBearing": false,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "builder": "Turbopack (16.3.2 default)",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ RECORDED BECAUSE THE PREDICTION WAS WRONG. The reader was designed around an expectation that bundling would repoint `import.meta.url` at a build artefact and silently break every default derived from `toolRoot()`. Measured: it did not. The comment asserting otherwise was corrected rather than left standing. ⚠️ THE DESIGN DID NOT CHANGE, and the reason is worth separating from the prediction. Whether `import.meta.url` survives is a property of the bundler's choices — a standalone output, a different builder, or a future Turbopack decision could inline `lib/`, and the failure would be a real directory that is not the project. Passing `process.cwd()` explicitly costs nothing and does not depend on a behaviour this project does not control. ⚠️ `loadBearing: false`: nothing rests on this holding. It is recorded so the next person does not re-derive the same wrong expectation from the same reasoning.",
+  "supportedBy": [
+    "EVD-0060"
+  ]
+}

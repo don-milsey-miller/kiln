@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0060",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the application reader under a production build",
+  "kind": "experiment",
+  "summary": "The reader was exercised from a temporary Server Component route under `next build` + `next start`. The route built as `ƒ /probe-read` — DYNAMIC — while `/`, which reads nothing, stayed `○` static. All three reads returned live project data: nine stages with `currentStage` null (every gate ready), 236 artifacts, 0 lint findings, 36 assertions; `06-risk-feasibility` ready with two criteria, the first `high-severity-risks-mitigated` satisfied; and the stage document read back as `06-risk-feasibility.md`, 10590 bytes. The probe route was deleted and the tree rebuilt clean.",
+  "outcome": "success",
+  "observedAt": "2026-08-27",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "builder": "Turbopack (16.3.2 default)",
+      "mode": "next build + next start"
+    },
+    "omissions": [
+      {
+        "fact": "independent-suspense-boundaries",
+        "state": "not-captured",
+        "reason": "The reads are separate exports, which is the SHAPE independent boundaries require, but no view puts them behind boundaries yet — the stage view is TSK-0009. ACC-0016 therefore stays not-evaluated: the thing it measures does not exist."
+      },
+      {
+        "fact": "freshness-after-an-external-write",
+        "state": "not-captured",
+        "reason": "The route was measured as dynamic, not measured serving changed content after a write while running. That is what the route symbol predicts and it was not confirmed here."
+      }
+    ]
+  },
+  "notes": "⚠️ `ƒ` IS THE OBSERVABLE THAT MATTERS, and it is the contract showing up in the build output: `connection()` made the route dynamic, so nothing it reads can be baked into the build. `/` staying `○` in the same build is the control — the difference is the contract, not the project."
+}
