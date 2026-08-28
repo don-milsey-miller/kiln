@@ -59,10 +59,13 @@
         "CMP-0012",
         "CMP-0016"
       ],
+      "evidencedBy": [
+        "EVD-0066"
+      ],
       "id": "ACC-0016",
       "lifecycle": "active",
       "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
@@ -77,10 +80,13 @@
         "CMP-0013",
         "CMP-0016"
       ],
+      "evidencedBy": [
+        "EVD-0066"
+      ],
       "id": "ACC-0018",
       "lifecycle": "active",
       "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
@@ -172,6 +178,37 @@
       "statement": "Render `/`: the current stage derived from stage definitions and recorded attestations, and all nine stages with their gate state. Status is conveyed by text or icon, never by colour alone. No stored status field is introduced anywhere.",
       "title": "Build the project view's stage navigation and derived current stage",
       "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0016",
+        "ACC-0018"
+      ],
+      "dependsOn": [
+        "TSK-0008",
+        "TSK-0007"
+      ],
+      "derivedStatus": {
+        "passed": 2,
+        "status": "accepted",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0017",
+        "REQ-0019"
+      ],
+      "id": "TSK-0009",
+      "implements": [
+        "CMP-0016"
+      ],
+      "lifecycle": "active",
+      "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown. ⚠️ DONE 2026-08-28. The smoke check now covers `/stage/[stageId]` and requires every region to RESOLVE — criteria, criterion rows, document and review — then rewrites the document in the copy twice: once with a permitted component, asserting it renders, and once with an unmapped one, asserting a located and escaped refusal beside intact criteria. Falsified by removing the catch: the rejection escapes, the region goes blank, and the check fails. ⚠️ ONE THING IS MEASURED AND NOT FIXABLE HERE: an unknown stage returns 200, not 404. `notFound()` runs inside a Suspense child, so the status is committed before the stage turns out not to exist. Validating earlier means reading in the route entry, which the boundary check refuses — so the honest position is that the failure is VISIBLE (Next.js's not-found UI) while the status is not available to make truthful. Recorded as an omission rather than quietly accepted.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
+      "title": "Build the stage view: criteria above the document, artifact-scoped review",
+      "type": "task"
     }
   ],
   "blockedByOtherRoles": [
@@ -213,8 +250,14 @@
     },
     {
       "id": "CMP-0016",
+      "implementedBy": [
+        "app/stage/[stageId]/page.js",
+        "app/stage/[stageId]/criteria-panel.js",
+        "app/stage/[stageId]/document-panel.js",
+        "app/stage/[stageId]/review-panel.js"
+      ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ AT MOST ONE STAGE DOCUMENT PER RENDER, because DEC-0020's per-request compilation cost is explicitly unmeasured and a view rendering several would multiply an unknown. ⚠️ NO CORRECTNESS-CRITICAL CLIENT STATE. Transient interface state is fine; anything a user must not lose is URL-encoded or persisted, because DEC-0022 reloads this page on every content change and every reconnection — at a moment the user did not choose and without telling them what went. ⚠️ OUTSIDE ITS BOUNDARY: it does not compile, read or write; it composes the components that do.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ AT MOST ONE STAGE DOCUMENT PER RENDER, because DEC-0020's per-request compilation cost is explicitly unmeasured and a view rendering several would multiply an unknown. ⚠️ NO CORRECTNESS-CRITICAL CLIENT STATE. Transient interface state is fine; anything a user must not lose is URL-encoded or persisted, because DEC-0022 reloads this page on every content change and every reconnection — at a moment the user did not choose and without telling them what went. ⚠️ OUTSIDE ITS BOUNDARY: it does not compile, read or write; it composes the components that do. ⚠️ BUILT 2026-08-28 BY TSK-0009. ACC-0016, ACC-0018 and ACC-0036 pass; ACC-0035 (URL-recoverable selection) stays `not-evaluated` and is TSK-0010's. ⚠️ THREE READS, THREE BOUNDARIES, and the independence was OBSERVED rather than argued: a successful response carried the resolved criteria alongside `data-vpw-loading=\"document\"`, the document region still showing its own fallback in the same stream. ⚠️ THE REJECTION IS CAUGHT BEFORE IT ESCAPES, which is ACC-0036 and came from a measurement (AST-0039) rather than from caution. Uncaught, a refused document reaches the browser as HTTP 200 and an opaque digest — a blank region and a success status for something the compiler refused precisely. Caught, the region names the document by repository-relative path with a line and column, escapes the diagnostic as text, and leaves the exit criteria rendered beside it. ⚠️ THE REVIEW PANEL HAS NO WRITE CAPABILITY, deliberately and visibly. It names the artifact, its type, title and current status, and says the action is unavailable rather than omitting it: DEC-0021 reviews locking capabilities one at a time and TSK-0012 is where this one is examined.",
       "responsibility": "Render `/stage/[stageId]`: the stage's document through the restricted MDX compiler, its exit criteria with their recorded attestations, and the entry points for review actions. Hold no correctness-critical state in the client.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -304,37 +347,6 @@
   ],
   "role": "frontend",
   "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0016",
-        "ACC-0018"
-      ],
-      "dependsOn": [
-        "TSK-0008",
-        "TSK-0007"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 2
-      },
-      "fulfils": [
-        "REQ-0017",
-        "REQ-0019"
-      ],
-      "id": "TSK-0009",
-      "implements": [
-        "CMP-0016"
-      ],
-      "lifecycle": "active",
-      "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown.",
-      "reviewStatus": "approved",
-      "role": "frontend",
-      "schemaVersion": 2,
-      "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
-      "title": "Build the stage view: criteria above the document, artifact-scoped review",
-      "type": "task"
-    },
     {
       "acceptedBy": [
         "ACC-0035"

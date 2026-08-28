@@ -87,3 +87,23 @@ test("the criteria and document reads are separate exports", () => {
   for (const name of ["readStageCriteria", "readStageDocument"])
     assert.match(src, new RegExp(`export\\s+async\\s+function\\s+${name}\\b`), `${name} must be its own read`);
 });
+
+test("⚠️ the stage view's reads sit behind DISTINCT boundaries with distinct fallbacks", () => {
+  // ACC-0016's structural half. One boundary around both reads would make the whole page the
+  // fallback and satisfy DEC-0019 on paper while buying nothing; the smoke test proves the other
+  // half — that a failure in one region leaves the other rendered.
+  const src = readFileSync(join(ROOT, "app", "stage", "[stageId]", "page.js"), "utf-8");
+  const opens = src.match(/<Suspense\b/g) ?? [];
+  assert.ok(opens.length >= 3, `expected a boundary per read, found ${opens.length}`);
+
+  const fallbacks = [...src.matchAll(/data-vpw-loading="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    [...fallbacks].sort(),
+    ["criteria", "document", "review"],
+    "each fallback must name the content it stands in for, and they must differ"
+  );
+
+  // ...and each panel is rendered literally, which the boundary check also enforces.
+  for (const name of ["CriteriaPanel", "DocumentPanel", "ReviewPanel"])
+    assert.ok(src.includes(`<${name} `), `${name} must be rendered by its declared name`);
+});

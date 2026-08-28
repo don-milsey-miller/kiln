@@ -262,10 +262,13 @@
       "CMP-0012",
       "CMP-0016"
     ],
+    "evidencedBy": [
+      "EVD-0066"
+    ],
     "id": "ACC-0016",
     "lifecycle": "active",
     "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
@@ -300,10 +303,13 @@
       "CMP-0013",
       "CMP-0016"
     ],
+    "evidencedBy": [
+      "EVD-0066"
+    ],
     "id": "ACC-0018",
     "lifecycle": "active",
     "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
@@ -628,6 +634,26 @@
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0016"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0016"
+    ],
+    "evidencedBy": [
+      "EVD-0066"
+    ],
+    "id": "ACC-0036",
+    "lifecycle": "active",
+    "notes": "⚠️ WRITTEN FROM A MEASUREMENT, not from caution. AST-0039 recorded what production actually does when the compiler refuses a document inside a `<Suspense>` boundary: HTTP 200, because the shell has already streamed, and a React error digest with no message, no path and no position. The compiler's diagnostic is exact and reaches only the server log. ⚠️ 200 IS NOT THE DEFECT AND IS EXPLICITLY ACCEPTED. Streaming means the status is committed before the failure is known, and demanding a 5xx would mean giving up streaming for a document the operator can be told about in place. What is refused is INVISIBILITY — a blank region and a success status for a document the compiler rejected precisely. ⚠️ THE ESCAPING CLAUSE IS NOT HOUSEKEEPING. The diagnostic quotes the offending source, which is agent-authored content; rendering it as markup would let a refused document inject into the page that reports its refusal — turning the safety mechanism into the delivery route. ⚠️ 'The rest of the page still renders' is what makes this a criterion about ONE region rather than about error handling in general: the exit criteria live behind their own boundary and a refused document must not take them down with it.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When the restricted compiler refuses a stage document, the served page renders an error inside the document region that (a) is visible in the response body, (b) names the document by a REPOSITORY-RELATIVE path, (c) carries a line and column, and (d) has its diagnostic text HTML-escaped rather than interpolated as markup. The stage's exit criteria and the rest of the page still render. A partial page returning HTTP 200 satisfies this criterion; a response whose document region contains only an opaque error digest, or nothing at all, FAILS it.",
+    "title": "A refused stage document fails VISIBLY, in the document region, with a location",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
     ]
   }
 ]

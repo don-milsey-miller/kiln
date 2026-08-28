@@ -56,10 +56,13 @@
         "CMP-0012",
         "CMP-0016"
       ],
+      "evidencedBy": [
+        "EVD-0066"
+      ],
       "id": "ACC-0016",
       "lifecycle": "active",
       "notes": "This is the clause that stops a page-level boundary satisfying DEC-0019 on paper. One boundary wrapping everything makes the whole page the fallback, which technically has a loading state and buys nothing.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "The initial HTML of the stage view contains a distinct loading fallback for the exit-criteria region and for the stage-document region. Delaying either read leaves the other region's content rendered and only its own fallback showing.",
@@ -94,10 +97,13 @@
         "CMP-0013",
         "CMP-0016"
       ],
+      "evidencedBy": [
+        "EVD-0066"
+      ],
       "id": "ACC-0018",
       "lifecycle": "active",
       "notes": "The negative criteria above are satisfiable by a compiler that refuses everything. This is the control that stops that.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "A stage document containing markdown and only components from the permitted set compiles, renders its markdown structure, and renders each permitted component it uses.",
@@ -459,6 +465,36 @@
     },
     {
       "acceptedBy": [
+        "ACC-0016"
+      ],
+      "dependsOn": [
+        "TSK-0004"
+      ],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0016",
+        "REQ-0017",
+        "REQ-0018"
+      ],
+      "id": "TSK-0005",
+      "implements": [
+        "CMP-0012"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing. ⚠️ DONE 2026-08-27. Five static tests, each falsified: removing a `connection()`, importing `node:fs`, importing `lib/` directly, and adding a synchronous export each turn the suite red. ⚠️ THE ADAPTER GAINED ONE NAME, deliberately and reviewably: `readStageDocs`, taken from the PUBLISHER rather than written fresh. It already owns what a stage document is — `.md` and `.mdx`, dotfiles ignored, anything else REFUSED — and a second reader in the application would have quietly disagreed with the package about which files count. ⚠️ A PREDICTION WAS WRONG AND IS RECORDED AS SUCH (AST-0037): the reader was designed expecting bundling to break `toolRoot()`, and it did not. The design is unchanged, for a narrower reason than the original one, and the comment that asserted the wrong thing was corrected.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",
+      "title": "Build the planning-content reader on the `connection()` + Suspense contract",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
         "ACC-0023",
         "ACC-0024"
       ],
@@ -486,6 +522,36 @@
       "schemaVersion": 2,
       "statement": "Implement the analysis that runs without executing the application and reports file and line when any module outside `app/server/` imports from `lib/`, whether directly or through a re-export chain that reaches `lib/` indirectly. Ship fixtures containing both shapes and prove the check fails on each.",
       "title": "Build the static `app/server` → `lib/` import-boundary check, with failing fixtures",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0017",
+        "ACC-0018",
+        "ACC-0019"
+      ],
+      "dependsOn": [
+        "TSK-0005"
+      ],
+      "derivedStatus": {
+        "passed": 3,
+        "status": "accepted",
+        "total": 3
+      },
+      "fulfils": [
+        "REQ-0017"
+      ],
+      "id": "TSK-0008",
+      "implements": [
+        "CMP-0013"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. ⚠️ DONE 2026-08-28. Twelve tests against a real `@mdx-js/mdx` compile, each rejection asserting a path AND a line:column, plus a control proving an unguarded compile really does evaluate the expression — without which a rejection and a silent strip would be indistinguishable. Falsified three ways: removing the ESM rule, disabling the unmapped-component check, and replacing rejection with stripping each turn the suite red. ⚠️ THE FORMAT DEFAULT WAS THE FINDING (AST-0038), and it was caught by the production probe rather than by the tests — the mapped component rendered as a bare `<p>`, which led to discovering that a `.md` path disables MDX parsing and with it every rejection. The test fixture is now deliberately named `.md`, so dropping `format: \"mdx\"` fails nineteen tests. ⚠️ `components.js` is written with `createElement` rather than JSX so that plain Node can import it. A JSX version would have forced the tests to build their own component map, which would have made them a check on a stub rather than on the vocabulary that ships.",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.",
+      "title": "Build the restricted MDX compiler with rejection diagnostics",
       "type": "task"
     },
     {
@@ -861,66 +927,6 @@
       "schemaVersion": 2,
       "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
       "title": "Scaffold the Next.js application and its production build/start primitives",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
-        "ACC-0016"
-      ],
-      "dependsOn": [
-        "TSK-0004"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0016",
-        "REQ-0017",
-        "REQ-0018"
-      ],
-      "id": "TSK-0005",
-      "implements": [
-        "CMP-0012"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ Independent boundaries per read region, not one page-level boundary — the latter makes the whole page the fallback and satisfies DEC-0019 on paper while buying nothing. ⚠️ DONE 2026-08-27. Five static tests, each falsified: removing a `connection()`, importing `node:fs`, importing `lib/` directly, and adding a synchronous export each turn the suite red. ⚠️ THE ADAPTER GAINED ONE NAME, deliberately and reviewably: `readStageDocs`, taken from the PUBLISHER rather than written fresh. It already owns what a stage document is — `.md` and `.mdx`, dotfiles ignored, anything else REFUSED — and a second reader in the application would have quietly disagreed with the package about which files count. ⚠️ A PREDICTION WAS WRONG AND IS RECORDED AS SUCH (AST-0037): the reader was designed expecting bundling to break `toolRoot()`, and it did not. The design is unchanged, for a narrower reason than the original one, and the comment that asserted the wrong thing was corrected.",
-      "reviewStatus": "approved",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.",
-      "title": "Build the planning-content reader on the `connection()` + Suspense contract",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
-        "ACC-0017",
-        "ACC-0018",
-        "ACC-0019"
-      ],
-      "dependsOn": [
-        "TSK-0005"
-      ],
-      "derivedStatus": {
-        "passed": 2,
-        "status": "outstanding",
-        "total": 3
-      },
-      "fulfils": [
-        "REQ-0017"
-      ],
-      "id": "TSK-0008",
-      "implements": [
-        "CMP-0013"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. ⚠️ DONE 2026-08-28. Twelve tests against a real `@mdx-js/mdx` compile, each rejection asserting a path AND a line:column, plus a control proving an unguarded compile really does evaluate the expression — without which a rejection and a silent strip would be indistinguishable. Falsified three ways: removing the ESM rule, disabling the unmapped-component check, and replacing rejection with stripping each turn the suite red. ⚠️ THE FORMAT DEFAULT WAS THE FINDING (AST-0038), and it was caught by the production probe rather than by the tests — the mapped component rendered as a bare `<p>`, which led to discovering that a `.md` path disables MDX parsing and with it every rejection. The test fixture is now deliberately named `.md`, so dropping `format: \"mdx\"` fails nineteen tests. ⚠️ `components.js` is written with `createElement` rather than JSX so that plain Node can import it. A JSX version would have forced the tests to build their own component map, which would have made them a check on a stub rather than on the vocabulary that ships.",
-      "reviewStatus": "approved",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.",
-      "title": "Build the restricted MDX compiler with rejection diagnostics",
       "type": "task"
     },
     {

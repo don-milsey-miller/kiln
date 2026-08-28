@@ -236,7 +236,7 @@ Render `/`: the project's current stage derived from stage definitions and recor
 Render `/stage/[stageId]`: the stage's document through the restricted MDX compiler, its exit criteria with their recorded attestations, and the entry points for review actions. Hold no correctness-critical state in the client.
 
 *Satisfies: REQ-0017, REQ-0019*
-*Not yet implemented.*
+*Implemented by: app/stage/[stageId]/page.js, app/stage/[stageId]/criteria-panel.js, app/stage/[stageId]/document-panel.js, app/stage/[stageId]/review-panel.js*
 
 ### CMP-0017 — Change stream
 
@@ -760,7 +760,7 @@ Create the adapter modules the shell needs, each beginning with `import 'server-
 
 Implement the single read path: await `connection()` before each filesystem read, with every read site enclosed by a `<Suspense>` boundary whose fallback names the content it stands in for. Reads reach `lib/` only through the adapter.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0012 · fulfils: REQ-0016, REQ-0017, REQ-0018*
 
 ### TSK-0006 — Build the static `app/server` → `lib/` import-boundary check, with failing fixtures
@@ -781,14 +781,14 @@ Render `/`: the current stage derived from stage definitions and recorded attest
 
 Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.
 
-**outstanding** (2/3 criteria passed) · role: platform
+**accepted** (3/3 criteria passed) · role: platform
 *Implements: CMP-0013 · fulfils: REQ-0017*
 
 ### TSK-0009 — Build the stage view: criteria above the document, artifact-scoped review
 
 Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.
 
-**outstanding** (0/2 criteria passed) · role: frontend
+**accepted** (2/2 criteria passed) · role: frontend
 *Implements: CMP-0016 · fulfils: REQ-0017, REQ-0019*
 
 ### TSK-0010 — Put every correctness-critical selection in the URL

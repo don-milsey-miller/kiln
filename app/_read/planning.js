@@ -174,3 +174,37 @@ export async function readStageDocument(stageId) {
   for (const [name, text] of docs) if (name.replace(/\.mdx?$/, "") === stageId) return { name, text };
   return null;
 }
+
+/**
+ * The known stage ids, for validating a URL segment by EXACT MATCH.
+ *
+ * ⚠️ This exists so no caller ever builds a filesystem path out of a URL. A route segment is
+ * compared against a set derived from the stage definitions; anything not in it is simply not a
+ * stage. There is no sanitising step to get wrong, because nothing is ever concatenated.
+ */
+export async function readKnownStageIds() {
+  await connection();
+  const { projectRoot } = roots();
+  return Object.keys(loadStageDefinitions(projectRoot) ?? {});
+}
+
+/**
+ * One artifact's identity and review state, for the review panel.
+ *
+ * ⚠️ Read from the linted records rather than by opening a file named after the id — same reason as
+ * above. An id that does not exist returns null; it never becomes a path.
+ */
+export async function readArtifactSummary(id) {
+  await connection();
+  const { projectRoot, contentRoot } = roots();
+  const { records } = lintProject(context(projectRoot, contentRoot));
+  const doc = records.map((r) => r.doc).find((d) => d?.id === id);
+  if (!doc) return null;
+  return {
+    id: doc.id,
+    type: doc.type,
+    title: doc.title ?? "",
+    reviewStatus: doc.reviewStatus ?? "draft",
+    lifecycle: doc.lifecycle ?? "active",
+  };
+}

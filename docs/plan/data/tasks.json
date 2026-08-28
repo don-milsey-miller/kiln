@@ -206,7 +206,7 @@
       "CMP-0016"
     ],
     "lifecycle": "active",
-    "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown.",
+    "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown. ⚠️ DONE 2026-08-28. The smoke check now covers `/stage/[stageId]` and requires every region to RESOLVE — criteria, criterion rows, document and review — then rewrites the document in the copy twice: once with a permitted component, asserting it renders, and once with an unmapped one, asserting a located and escaped refusal beside intact criteria. Falsified by removing the catch: the rejection escapes, the region goes blank, and the check fails. ⚠️ ONE THING IS MEASURED AND NOT FIXABLE HERE: an unknown stage returns 200, not 404. `notFound()` runs inside a Suspense child, so the status is committed before the stage turns out not to exist. Validating earlier means reading in the route entry, which the boundary check refuses — so the honest position is that the failure is VISIBLE (Next.js's not-found UI) while the status is not available to make truthful. Recorded as an omission rather than quietly accepted.",
     "reviewStatus": "approved",
     "role": "frontend",
     "schemaVersion": 2,

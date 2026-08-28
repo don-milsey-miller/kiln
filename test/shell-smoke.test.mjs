@@ -47,7 +47,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Every route the shell must serve, with the marker that proves the APPLICATION rendered it.
  * ⚠️ Extend this as routes land — `/stage/[stageId]` joins it with TSK-0009.
  */
+const STAGE = "06-risk-feasibility";
+
 const ROUTES = [
+  {
+    path: `/stage/${STAGE}?artifact=AST-0021`,
+    marker: 'data-vpw-route="/stage"',
+    // Each of the three independent boundaries must RESOLVE, not merely ship its fallback. A page
+    // whose reads never completed streams the shell and stops, which looks identical to success from
+    // the status line.
+    also: [`data-vpw-criteria="${STAGE}"`, "data-vpw-criterion=", "data-vpw-document=", 'data-vpw-review="AST-0021"'],
+  },
   {
     path: "/",
     // The route rendered at all...
@@ -152,6 +162,45 @@ test("every required route is built and served, proven by an application-owned m
         `That is a page frozen into the build, which is what AST-0019 measured and DEC-0019 forbids.`
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
+
+    /* ------------------------------------------------- a permitted component renders (ACC-0018) */
+
+    const stageDocForComponent = join(contentCopy, "planning-content", "stages", `${STAGE}.md`);
+    writeFileSync(
+      stageDocForComponent,
+      ["# Stage six", "", "<Callout>the mapped component rendered</Callout>", ""].join("\n")
+    );
+    await sleep(1500);
+
+    const permitted = await (
+      await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}`, { signal: AbortSignal.timeout(15_000) })
+    ).text();
+    assert.match(permitted, /data-vpw-mdx="Callout"/, "a permitted component must render, not be dropped");
+    assert.match(permitted, /the mapped component rendered/);
+    assert.match(permitted, /<h1[^>]*>Stage six/, "markdown structure must render too");
+
+    /* ------------------------------------------------- a refused document must fail VISIBLY */
+
+    // ⚠️ ACC-0036, and it is a regression test rather than a nicety: AST-0039 measured that an
+    // uncaught rejection reaches the browser as HTTP 200 and an opaque digest, so the operator sees a
+    // blank region and a success status for a document the compiler refused precisely.
+    const stageDoc = join(contentCopy, "planning-content", "stages", `${STAGE}.md`);
+    writeFileSync(stageDoc, ["# Stage", "", "<Danger>an unmapped component</Danger>", ""].join("\n"));
+    await sleep(1500);
+
+    const refused = await (await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}`, { signal: AbortSignal.timeout(15_000) })).text();
+
+    assert.match(refused, /data-vpw-document="rejected"/, "the document region must say it was refused");
+    assert.match(
+      refused,
+      // ⚠️ Character classes rather than `\d`/`\.` escapes: this is a template literal, and an escape
+      // here is consumed by the string before the regex ever sees it.
+      new RegExp(`data-vpw-rejection-at="planning-content/stages/${STAGE}[.]md:[0-9]+:[0-9]+"`),
+      "the refusal must carry a repository-relative path and a line:column"
+    );
+    assert.match(refused, /&lt;Danger&gt;/, "the diagnostic must be escaped as text, never interpolated as markup");
+    assert.ok(!refused.includes("<Danger>"), "the refused source must not reach the page as live markup");
+    assert.match(refused, /data-vpw-criterion=/, "the exit criteria must still render beside a refused document");
   } finally {
     await killTree(server);
   }

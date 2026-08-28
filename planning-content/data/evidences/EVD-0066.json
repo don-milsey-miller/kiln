@@ -1,0 +1,51 @@
+{
+  "id": "EVD-0066",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the stage view — three boundaries, a refused document, and an unknown stage",
+  "kind": "experiment",
+  "summary": "`/stage/[stageId]` built as `ƒ` and was served against a copy of `planning-content`. A valid stage returned 200 with all three regions resolved: `data-vpw-criteria=\"06-risk-feasibility\"` with both criterion markers, `data-vpw-document=\"06-risk-feasibility.md\"`, and `data-vpw-review=\"AST-0021\"` showing `draft`. The same response also carried `data-vpw-loading=\"document\"` — the criteria region had resolved while the document region was still showing its own fallback, which is the two boundaries resolving independently, observed rather than inferred. Replacing the document with `<Danger>` produced 200 with `data-vpw-document=\"rejected\"`, `data-vpw-rejection-at=\"planning-content/stages/06-risk-feasibility.md:3:1\"`, the diagnostic escaped as `&lt;Danger&gt;`, and both criterion markers still present. Replacing it with a permitted `<Callout>` rendered `data-vpw-mdx=\"Callout\"` and an `<h1>`. An unknown stage id, and two traversal-shaped ids, each returned 200 carrying Next.js's visible not-found UI.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "compiler": "@mdx-js/mdx 3.1.1 (pinned exactly)",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "contentRoot": "a disposable copy; the project's own content was not touched"
+    },
+    "omissions": [
+      {
+        "fact": "unknown-stage-status-code",
+        "state": "not-observable",
+        "reason": "`notFound()` is called inside a Suspense child, so the status is already committed when the stage turns out not to exist — the response is 200 carrying the not-found UI. Returning 404 would mean validating before streaming, which means reading in the route entry, which the boundary check refuses. The failure is visible; the status is not available to make truthful."
+      },
+      {
+        "fact": "review-write",
+        "state": "not-captured",
+        "reason": "No write capability exists yet by design: DEC-0021 reviews locking capabilities one at a time and TSK-0012 owns the first. The panel shows identity and status and says the action is unavailable."
+      },
+      {
+        "fact": "slow-read-independence",
+        "state": "not-captured",
+        "reason": "Independence was observed because the document read is genuinely slower than the criteria read, not because either was artificially delayed. A deliberate delay would prove it on demand; nothing here forces the ordering, so the observation is real but not reproducible on command."
+      }
+    ]
+  },
+  "notes": "⚠️ THE STAGE ID NEVER BECOMES A PATH. It is matched against the stage definitions by object key and against document names by exact comparison over a directory listing, so a traversal-shaped segment is simply an id that matches nothing. There is no sanitising step, which is why there is no sanitising step to get wrong. ⚠️ THE ESCAPED DIAGNOSTIC IS THE PART WORTH KEEPING. The message quotes agent-authored source; rendered as markup it would let a refused document inject into the page reporting its refusal, turning the safety mechanism into the delivery route."
+}

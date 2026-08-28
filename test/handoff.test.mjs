@@ -156,7 +156,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   const shellCriteria = read("acceptance-criterions").filter((a) =>
     (a.evaluates ?? []).some((id) => shellIds.has(id))
   );
-  assert.equal(shellCriteria.length, 23, "every run-2 criterion");
+  assert.equal(shellCriteria.length, 24, "every run-2 criterion, plus ACC-0036");
 
   // INVARIANT 1: a criterion may only be `pass` if every component it evaluates has code. Accepted
   // work that nothing implements is the sharpest form of the QST-0015 hazard — it would put a tick
@@ -174,10 +174,10 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   );
 
   // Today's state — two lines to edit as implementation lands.
-  assert.deepEqual([...withCode].sort(), ["CMP-0012", "CMP-0013", "CMP-0014", "CMP-0015", "CMP-0019", "CMP-0020"], "components with code");
+  assert.deepEqual([...withCode].sort(), ["CMP-0012", "CMP-0013", "CMP-0014", "CMP-0015", "CMP-0016", "CMP-0019", "CMP-0020"], "components with code");
   assert.deepEqual(
     shellCriteria.filter((a) => a.outcome === "pass").map((a) => a.id).sort(),
-    ["ACC-0013", "ACC-0017", "ACC-0019", "ACC-0021", "ACC-0022", "ACC-0023", "ACC-0024", "ACC-0025", "ACC-0026", "ACC-0027"],
+    ["ACC-0013", "ACC-0016", "ACC-0017", "ACC-0018", "ACC-0019", "ACC-0021", "ACC-0022", "ACC-0023", "ACC-0024", "ACC-0025", "ACC-0026", "ACC-0027", "ACC-0036"],
     "criteria evaluated so far — all three are the adapter door's"
   );
 
