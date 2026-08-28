@@ -14,17 +14,29 @@
  * page that failed to render cannot either. Parsing the build's output would just be trusting the
  * same sentence that was true both times it lied.
  *
+ * ⚠️ IT ALSO PROVES THE PAGE IS NOT FROZEN INTO THE BUILD, using the SAME build. The marker shows
+ * the panel resolved; it does not show the panel is still reading. So the server is started against
+ * a temporary COPY of `planning-content`, an attestation in that copy is changed while it runs, and
+ * the displayed stage is required to move. A route that had been prerendered would keep serving the
+ * first answer — which is AST-0019 exactly, and the failure DEC-0019's contract exists to prevent.
+ * The copy is why this can be a regression test rather than a one-off measurement: the real content
+ * is never touched.
+ *
  * ⚠️ It is slow on purpose: a real production build and a real server. This is the check that
  * ACC-0033 will ultimately rest on, and a fast proxy for it would be a proxy for the wrong thing.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync } from "node:fs";
+import { rmSync, existsSync, cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { reapLater, installReaper } from "./helpers/reap.mjs";
+
+installReaper();
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -70,12 +82,17 @@ test("every required route is built and served, proven by an application-owned m
   // The build's own words are NOT the assertion. They are kept only to report with a failure.
   const buildOut = `${build.stdout ?? ""}${build.stderr ?? ""}`;
 
+  // A COPY, so the regression can run on every commit without touching the project's own content.
+  const contentCopy = reapLater(mkdtempSync(join(tmpdir(), "vpw-smoke-")));
+  cpSync(join(ROOT, "planning-content"), join(contentCopy, "planning-content"), { recursive: true });
+
   let server = null;
   try {
     server = spawn("npx", ["next", "start", "--hostname", "127.0.0.1", "--port", String(PORT)], {
       cwd: ROOT,
       shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PLANNING_CONTENT_DIR: join(contentCopy, "planning-content") },
     });
 
     const readyBy = Date.now() + 90_000;
@@ -104,6 +121,37 @@ test("every required route is built and served, proven by an application-owned m
           `build output was:\n${buildOut.slice(-800)}`
       );
     }
+    /* ---------------------------------------------------------- the freshness regression */
+
+    const currentOf = async () => {
+      const html = await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text();
+      return (html.match(/data-vpw-current="([^"]*)"/) ?? [])[1] ?? null;
+    };
+
+    const before = await currentOf();
+    assert.ok(before !== null, "the panel never reported a current stage");
+
+    // Make the FIRST stage unready in the copy, so the earliest-unready rule has a definite answer.
+    const attestations = join(contentCopy, "planning-content", "state", "stage-attestations", "01-intake.json");
+    const doc = JSON.parse(readFileSync(attestations, "utf-8"));
+    const firstCriterion = Object.keys(doc.attestations)[0];
+    doc.attestations[firstCriterion] = {
+      result: "not-satisfied",
+      decidedBy: "smoke-test",
+      reason: "Temporary, in a copy: proving the running application still reads rather than serving a frozen build.",
+    };
+    writeFileSync(attestations, JSON.stringify(doc, null, 2) + "\n");
+
+    await sleep(1500);
+    const after = await currentOf();
+
+    assert.notEqual(
+      after,
+      before,
+      `the displayed stage did not move after an attestation changed on disk (still ${after}). ` +
+        `That is a page frozen into the build, which is what AST-0019 measured and DEC-0019 forbids.`
+    );
+    assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
   } finally {
     await killTree(server);
   }
