@@ -1,0 +1,47 @@
+{
+  "id": "EVD-0062",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: read and `<Suspense>` confinement, four detectors falsified twice over",
+  "kind": "experiment",
+  "summary": "A second static analysis was added: it scans every module under `app/`, asserts the designated reader exists and was examined, and emits four kinds of violation. Six fixtures, one per detected violation plus an allowed control: ALLOWED reported clean with a consumer present; DIRECT caught a component importing an adapter at line 1; INDIRECT caught a helper re-exporting the adapter at its own line 1, not at the page that used it; MISSING-BOUNDARY caught `<Panel>` rendered bare at the rendering site, line 3; FS-DIRECT caught `node:fs` at line 1; ROUTE-READ caught a route entry awaiting the reader at line 3. Each of the four detectors was then falsified again against a TEMPORARY violation inserted into the real application, and each reported the real file and line before being reverted. A missing reader is reported as `readerSeen: false` rather than as a clean project.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "analysis": "static, text only; no application code executed"
+    },
+    "omissions": [
+      {
+        "fact": "suspense-enclosure-in-the-real-application",
+        "state": "not-observable",
+        "reason": "No module in the real application consumes the reader yet — the lint reports `0 reader consumer(s)`. The two boundary detectors therefore have nothing to examine there and were falsified against temporary real-code violations and against fixtures instead. They begin covering real code at TSK-0007."
+      },
+      {
+        "fact": "jsx-enclosure-across-files",
+        "state": "not-captured",
+        "reason": "A component's enclosure is judged where it is RENDERED by name. A component passed as a prop, rendered through a variable, or wrapped by a boundary in a parent layout rather than at the call site would not be judged correctly. No such pattern exists yet; it is a real limit rather than a hypothetical one."
+      },
+      {
+        "fact": "computed-dynamic-imports",
+        "state": "not-observable",
+        "reason": "Unchanged from the import half: a computed specifier cannot be resolved by text, and the lint exits non-zero on one rather than passing over it."
+      }
+    ]
+  },
+  "notes": "⚠️ THE FIXTURES CAUGHT THREE DEFECTS, TWO OF THEM IN THE FIXTURES THEMSELVES. (1) The fixture components imported the reader with `../_read/planning` from `app/`, which climbs OUT of the app directory — so nothing resolved, `consumers` was empty, and the ALLOWED case reported clean for the worst possible reason. The `consumers.length > 0` assertion is what caught it, and it was written for exactly that. (2) A `sed` fix then broke the indirect fixture's path in the other direction. (3) In the analyser, two `new RegExp` template literals lost a backslash level, so `await\\s+` became `awaits+` and matched nothing — a detector that silently could not fire. ⚠️ FIXTURES ARE `.jsx` BECAUSE `node --test` COLLECTS `.js` UNDER `test/`, and these contain JSX that Node cannot parse. Collected, they failed the suite for a reason unrelated to what they test. `.jsx` sits outside the runner's patterns and inside the analyser's."
+}

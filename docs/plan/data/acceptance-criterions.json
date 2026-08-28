@@ -346,10 +346,13 @@
     "evaluates": [
       "CMP-0019"
     ],
+    "evidencedBy": [
+      "EVD-0062"
+    ],
     "id": "ACC-0021",
     "lifecycle": "active",
     "notes": "⚠️ 'Without executing the application' is load-bearing. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural check passes on a codebase that violates the contract until the compliant sibling moves.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A check that runs WITHOUT executing the application reports a failure naming file and line when any module other than the planning-content reader performs a filesystem read rooted at the content directory.",
@@ -363,10 +366,13 @@
     "evaluates": [
       "CMP-0019"
     ],
+    "evidencedBy": [
+      "EVD-0062"
+    ],
     "id": "ACC-0022",
     "lifecycle": "active",
     "notes": "The clause that gets dropped. An abstraction can supply `connection()` while a caller omits the boundary; that builds fine without Cache Components and fails the build with it, so the omission would surface as an unrelated configuration change breaking the build.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The same non-executing check reports a failure when a planning-content read site is not enclosed by a `<Suspense>` boundary, naming file and line.",
@@ -402,10 +408,13 @@
     "evaluates": [
       "CMP-0019"
     ],
+    "evidencedBy": [
+      "EVD-0062"
+    ],
     "id": "ACC-0024",
     "lifecycle": "active",
     "notes": "⚠️ ADDED BECAUSE IT HAPPENED. A refusal test written during this work passed with the refusal deleted — the assertion that mattered sat behind a condition that was never true. A check nobody has seen fail is a check nobody has seen. This criterion is what makes the three above mean something rather than merely exist.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The check is evaluated against a fixture set containing at least one instance of each violation it claims to detect, and reports a failure for every one. A check that passes the fixture set is a FAIL for this criterion.",

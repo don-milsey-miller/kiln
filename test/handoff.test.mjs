@@ -177,7 +177,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   assert.deepEqual([...withCode].sort(), ["CMP-0012", "CMP-0014", "CMP-0019", "CMP-0020"], "components with code");
   assert.deepEqual(
     shellCriteria.filter((a) => a.outcome === "pass").map((a) => a.id).sort(),
-    ["ACC-0023", "ACC-0025", "ACC-0026", "ACC-0027"],
+    ["ACC-0021", "ACC-0022", "ACC-0023", "ACC-0024", "ACC-0025", "ACC-0026", "ACC-0027"],
     "criteria evaluated so far — all three are the adapter door's"
   );
 

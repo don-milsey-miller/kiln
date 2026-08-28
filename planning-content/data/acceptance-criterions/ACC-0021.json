@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The boundary check fails on a planning-content read outside the reader",
   "statement": "A check that runs WITHOUT executing the application reports a failure naming file and line when any module other than the planning-content reader performs a filesystem read rooted at the content directory.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0021"
   ],
-  "notes": "⚠️ 'Without executing the application' is load-bearing. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural check passes on a codebase that violates the contract until the compliant sibling moves."
+  "notes": "⚠️ 'Without executing the application' is load-bearing. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural check passes on a codebase that violates the contract until the compliant sibling moves.",
+  "evidencedBy": [
+    "EVD-0062"
+  ]
 }

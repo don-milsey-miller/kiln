@@ -257,7 +257,7 @@ Perform review-status changes from the application through the existing typed wr
 Statically prove, without executing the application, that every planning-content read goes through the reader inside a `<Suspense>` boundary and that no module outside `app/server/` imports from `lib/`. Detect bypass paths rather than only direct violations.
 
 *Satisfies: REQ-0021*
-*Implemented by: lib/shell-boundary.mjs, bin/lint-shell.mjs, test/shell-boundary.test.mjs, test/fixtures/boundary/*
+*Implemented by: lib/shell-boundary.mjs, bin/lint-shell.mjs, test/shell-boundary.test.mjs, test/shell-read-boundary.test.mjs, test/fixtures/boundary/, test/fixtures/readboundary/*
 
 ### CMP-0020 — Launcher
 
@@ -751,7 +751,7 @@ Implement the single read path: await `connection()` before each filesystem read
 
 Implement the analysis that runs without executing the application and reports file and line when any module outside `app/server/` imports from `lib/`, whether directly or through a re-export chain that reaches `lib/` indirectly. Ship fixtures containing both shapes and prove the check fails on each.
 
-**outstanding** (1/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0014, CMP-0019 · fulfils: REQ-0019, REQ-0021*
 
 ### TSK-0007 — Build the project view's stage navigation and derived current stage
@@ -814,7 +814,7 @@ Measure the 95th-percentile server-side compile-and-render time for the largest 
 
 Implement the analysis that runs without executing the application and reports file and line for a planning-content filesystem read performed anywhere other than the reader, and for a read site not enclosed by a `<Suspense>` boundary. Ship fixtures containing both violations and prove the check fails on each.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**accepted** (3/3 criteria passed) · role: platform
 *Implements: CMP-0019 · fulfils: REQ-0021*
 
 ### TSK-0016 — Build the project view's artifact totals, lint surface and located parse failures
