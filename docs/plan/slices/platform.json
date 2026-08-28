@@ -73,10 +73,13 @@
       "evaluates": [
         "CMP-0013"
       ],
+      "evidencedBy": [
+        "EVD-0064"
+      ],
       "id": "ACC-0017",
       "lifecycle": "active",
       "notes": "⚠️ THE LAST SENTENCE IS THE WHOLE CRITERION. Stripping also produces a page with no executed code, so a test that renders a document and looks for a side effect passes identically on rejection and on silent removal — which is exactly the distinction the amendment to DEC-0020 exists to preserve. The observable being checked is the refusal, not the absence.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "For each of an ESM import, an ESM export, a flow expression, a text expression, a JSX attribute expression, a JSX spread attribute, and a JSX element outside the permitted set: compiling a stage document containing it produces a FAILURE that names the document path and a line:column position. A document that merely renders without the forbidden construct's effect is a FAIL for this criterion.",
@@ -108,10 +111,13 @@
       "evaluates": [
         "CMP-0013"
       ],
+      "evidencedBy": [
+        "EVD-0065"
+      ],
       "id": "ACC-0019",
       "lifecycle": "active",
       "notes": "AST-0030 measured file-routed `@next/mdx` failing exactly this: the document is compiled into the build and an edit changes nothing. That configuration satisfies REQ-0017 and silently fails REQ-0018, which is why this is a criterion rather than an implementation note.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "With the built application serving, editing a stage document on disk changes what the next request for that stage returns, with no rebuild and no restart.",
@@ -587,8 +593,14 @@
     },
     {
       "id": "CMP-0013",
+      "implementedBy": [
+        "app/_mdx/compile.js",
+        "app/_mdx/reject-js.js",
+        "app/_mdx/components.js",
+        "test/mdx-rejection.test.mjs"
+      ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ REQUEST-TIME, NOT BUILD-TIME, AND THAT IS NOT A PERFORMANCE CHOICE. AST-0030 measured that a file-routed `@next/mdx` page is compiled into the build and does not reflect an edit, which REQ-0018 forbids. Routing stage documents as pages would satisfy REQ-0017 and silently fail REQ-0018 while looking correct. ⚠️ OUTSIDE ITS BOUNDARY: it does not read the document (that is the reader) and does not decide the component vocabulary (that is the mapping it is given). ⚠️ IT OWNS DEC-0020's PINNING OBLIGATION: changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. The rejection was measured at the remark stage only; a later stage could reintroduce what it refused.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ REQUEST-TIME, NOT BUILD-TIME, AND THAT IS NOT A PERFORMANCE CHOICE. AST-0030 measured that a file-routed `@next/mdx` page is compiled into the build and does not reflect an edit, which REQ-0018 forbids. Routing stage documents as pages would satisfy REQ-0017 and silently fail REQ-0018 while looking correct. ⚠️ OUTSIDE ITS BOUNDARY: it does not read the document (that is the reader) and does not decide the component vocabulary (that is the mapping it is given). ⚠️ IT OWNS DEC-0020's PINNING OBLIGATION: changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. The rejection was measured at the remark stage only; a later stage could reintroduce what it refused. ⚠️ BUILT 2026-08-28 BY TSK-0008. `@mdx-js/mdx` pinned at 3.1.1 exactly, one remark plugin, no rehype or recma stage, compiled at request time. ACC-0017 and ACC-0019 pass. ACC-0018 stays `not-evaluated` because it also evaluates CMP-0016, which does not exist until TSK-0009 — the mapped component IS proven to render, by test and in production, but the criterion covers a pair. ⚠️ `format: \"mdx\"` IS PART OF THE CONTRACT, and AST-0038 is why. Left to infer the format from the path, the compiler parses a `.md` document as plain markdown: components render as bare paragraphs and expressions compile with NO REJECTION, because the parser produces no nodes for the plugin to refuse. The contract goes vacuous, silently, decided by a filename — and it had already made a test pass on all nine real stage documents for the wrong reason. ⚠️ REJECTION IS THE CONTRACT AND STRIPPING SITS UNDERNEATH IT. A test in the suite proves the difference is observable: with the plugin removed the same document compiles and its expression EVALUATES, so a check that only looked for an absent side effect could not tell a refusal from a silent removal. ⚠️ THE DIAGNOSTIC DOES NOT REACH THE BROWSER ON ITS OWN (AST-0039): a refusal surfaces as a 200 and an opaque digest. Catching `StageDocumentRejected` and rendering its path and position is the stage view's obligation.",
       "responsibility": "Compile a stage document to a renderable component at request time using `@mdx-js/mdx`, running the rejection plugin that fails the compile with a file path and a line:column position on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted component set. Own the pinned compiler and plugin chain.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -891,7 +903,7 @@
         "TSK-0005"
       ],
       "derivedStatus": {
-        "passed": 0,
+        "passed": 2,
         "status": "outstanding",
         "total": 3
       },
@@ -903,7 +915,7 @@
         "CMP-0013"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships.",
+      "notes": "⚠️ Request-time compilation, never file-routed `app/**/page.mdx`: AST-0030 measured that path compiling the document into the build, which satisfies REQ-0017 and silently fails REQ-0018. ⚠️ The compiler and plugin chain are PINNED. Changing the MDX version or adding any remark, rehype or recma plugin reopens security validation before it ships. ⚠️ DONE 2026-08-28. Twelve tests against a real `@mdx-js/mdx` compile, each rejection asserting a path AND a line:column, plus a control proving an unguarded compile really does evaluate the expression — without which a rejection and a silent strip would be indistinguishable. Falsified three ways: removing the ESM rule, disabling the unmapped-component check, and replacing rejection with stripping each turn the suite red. ⚠️ THE FORMAT DEFAULT WAS THE FINDING (AST-0038), and it was caught by the production probe rather than by the tests — the mapped component rendered as a bare `<p>`, which led to discovering that a `.md` path disables MDX parsing and with it every rejection. The test fixture is now deliberately named `.md`, so dropping `format: \"mdx\"` fails nineteen tests. ⚠️ `components.js` is written with `createElement` rather than JSX so that plain Node can import it. A JSX version would have forced the tests to build their own component map, which would have made them a check on a stub rather than on the vocabulary that ships.",
       "reviewStatus": "approved",
       "role": "platform",
       "schemaVersion": 2,

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Stage documents compile at request time, not at build time",
   "statement": "With the built application serving, editing a stage document on disk changes what the next request for that stage returns, with no rebuild and no restart.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0017",
     "REQ-0018"
   ],
-  "notes": "AST-0030 measured file-routed `@next/mdx` failing exactly this: the document is compiled into the build and an edit changes nothing. That configuration satisfies REQ-0017 and silently fails REQ-0018, which is why this is a criterion rather than an implementation note."
+  "notes": "AST-0030 measured file-routed `@next/mdx` failing exactly this: the document is compiled into the build and an edit changes nothing. That configuration satisfies REQ-0017 and silently fails REQ-0018, which is why this is a criterion rather than an implementation note.",
+  "evidencedBy": [
+    "EVD-0065"
+  ]
 }

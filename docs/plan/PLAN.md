@@ -215,7 +215,7 @@ Be the single path by which the application reads planning content from disk, ap
 Compile a stage document to a renderable component at request time using `@mdx-js/mdx`, running the rejection plugin that fails the compile with a file path and a line:column position on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted component set. Own the pinned compiler and plugin chain.
 
 *Satisfies: REQ-0017*
-*Not yet implemented.*
+*Implemented by: app/_mdx/compile.js, app/_mdx/reject-js.js, app/_mdx/components.js, test/mdx-rejection.test.mjs*
 
 ### CMP-0014 — Server adapter layer
 
@@ -696,6 +696,22 @@ Under `next build` + `next start` with Next.js 16.3.2 and Turbopack, `toolRoot()
 
 Rests on: EVD-0060 (support)
 
+### AST-0038 — MDX format inferred from a `.md` path disables the rejection contract entirely
+
+`@mdx-js/mdx` 3.1.1 infers its parsing format from the document path when `format` is not passed. With a `.md` path it parses as plain markdown: JSX is not parsed, so a permitted component renders as a bare paragraph and a JavaScript expression compiles with no error — the rejection plugin sees no nodes to reject and reports success. Passing `format: "mdx"` explicitly restores both the component and the refusal.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0064 (support)
+
+### AST-0039 — A refused stage document reaches the browser as a 200 and an opaque digest
+
+Under `next build` + `next start`, when the restricted compiler throws for a document rendered inside a `<Suspense>` boundary, the response is HTTP 200 — the shell having already streamed — and the boundary's slot resolves to a React error digest with no message, path or position. The compiler's diagnostic exists but does not reach the page.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0065 (support)
+
 ## Open questions
 
 ### QST-0002 — Does `research-finding` own anything irreducible, or is it a projection?
@@ -765,7 +781,7 @@ Render `/`: the current stage derived from stage definitions and recorded attest
 
 Compile stage documents at request time with `@mdx-js/mdx`, running a remark plugin that FAILS the compile — naming the document path and a line:column — on any ESM import or export, JavaScript expression, JSX attribute expression, JSX spread attribute, or JSX element outside the permitted set. Surface the failure to the operator. Stripping may sit beneath the rejection as defence in depth and may never be the observable behaviour.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**outstanding** (2/3 criteria passed) · role: platform
 *Implements: CMP-0013 · fulfils: REQ-0017*
 
 ### TSK-0009 — Build the stage view: criteria above the document, artifact-scoped review

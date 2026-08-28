@@ -1,0 +1,22 @@
+{
+  "id": "AST-0038",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "MDX format inferred from a `.md` path disables the rejection contract entirely",
+  "statement": "`@mdx-js/mdx` 3.1.1 infers its parsing format from the document path when `format` is not passed. With a `.md` path it parses as plain markdown: JSX is not parsed, so a permitted component renders as a bare paragraph and a JavaScript expression compiles with no error — the rejection plugin sees no nodes to reject and reports success. Passing `format: \"mdx\"` explicitly restores both the component and the refusal.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "compiler": "@mdx-js/mdx 3.1.1 (pinned exactly)",
+      "node": "v24.18.0",
+      "os": "Windows 11"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THIS IS A SECURITY-RELEVANT DEFAULT, not a formatting quirk. DEC-0020's whole contract is that forbidden JavaScript fails the compile with a diagnostic; under format inference it fails nothing, and the failure mode is silence. Stage documents are `.md` today, so the naive configuration is exactly the vacuous one. ⚠️ THE FIX IS TO PIN THE FORMAT, NOT TO RENAME THE DOCUMENTS. Renaming to `.mdx` would work today and would break again the first time anything reads a `.md` file — the contract would once more depend on a filename rather than on configuration. `format: \"mdx\"` is passed explicitly in `app/_mdx/compile.js`, and the test fixture is deliberately named `.md` so that dropping the option fails nineteen tests instead of passing quietly.",
+  "supportedBy": [
+    "EVD-0064"
+  ]
+}

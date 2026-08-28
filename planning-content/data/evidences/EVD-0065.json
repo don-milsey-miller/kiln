@@ -1,0 +1,46 @@
+{
+  "id": "EVD-0065",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: request-time recompilation, and what a rejected document looks like in production",
+  "kind": "experiment",
+  "summary": "The compiler was exercised from a temporary Server Component route under `next build` + `next start`, serving against a copy of `planning-content`. The route built as `ƒ /probe-mdx`. A stage document containing `<Callout>MARKER_ONE</Callout>` rendered the mapped component as `<aside data-vpw-mdx=\"Callout\">`. Editing that document on disk to MARKER_TWO, with nothing rebuilt and the server left running, made the next request return MARKER_TWO and the edited heading. Replacing the document with `Inline {1 + 1} expression.` made the next request return HTTP 200 whose Suspense slot resolved to a React error digest only — no message, no path, no position anywhere in the response.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "compiler": "@mdx-js/mdx 3.1.1 (pinned exactly)",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "contentRoot": "a disposable copy; the project's own content was not touched"
+    },
+    "omissions": [
+      {
+        "fact": "compilation-cost",
+        "state": "not-captured",
+        "reason": "ACC-0020's protocol was not run here — no warm-up, no sample, no timing. The budget remains an unmeasured target and TSK-0014 owns it."
+      },
+      {
+        "fact": "server-log-contents",
+        "state": "not-captured",
+        "reason": "The server's stdout was discarded. The diagnostic is presumed to be there because the compiler throws it, but presuming is why this is recorded as an omission rather than as a finding."
+      }
+    ]
+  },
+  "notes": "⚠️ THE REJECTION IS LOCATABLE TO A DEVELOPER AND INVISIBLE TO AN OPERATOR, which is the finding worth carrying forward. `StageDocumentRejected` carries the path, line and column; React's production error boundary replaces all of it with a digest, and the response is a 200 because the shell had already streamed. A stage view that simply renders `<Content />` would show a blank region and a success status for a document the compiler refused precisely. ⚠️ That is DEC-0022's rule arriving in a new place: the operator is looking at a browser, and a failure that reaches only the server log leaves the page looking fine. Catching `StageDocumentRejected` and rendering it is CMP-0016's work (TSK-0009), and it is now a measured obligation rather than a nicety."
+}

@@ -1,0 +1,40 @@
+{
+  "id": "EVD-0064",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: `@mdx-js/mdx` infers plain markdown from a `.md` path, and the contract goes silent",
+  "kind": "experiment",
+  "summary": "Compiling `# Doc\\n\\n<Callout>MARKER</Callout>` through the restricted plugin with `path: \"x.md\"` and no `format` option produced `<h1>Doc</h1><p>MARKER</p>` — the mapped component rendered as a bare paragraph. Compiling `Inline {1 + 1} expression.` the same way COMPILED SUCCESSFULLY with no rejection. With `format: \"mdx\"` passed explicitly, the same two inputs produced the mapped component's `<aside data-vpw-mdx=\"Callout\">` and a refusal naming the file and line:column respectively.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "compiler": "@mdx-js/mdx 3.1.1 (pinned exactly)",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "node, direct compile"
+    },
+    "omissions": [
+      {
+        "fact": "other-extensions",
+        "state": "not-captured",
+        "reason": "Only `.md` and an explicit `format` were exercised. Whether a pathless or unusual extension behaves as a third case was not tested; the fix removes the dependency on the path entirely."
+      }
+    ]
+  },
+  "notes": "⚠️ THE DANGEROUS HALF IS THE SECOND ONE. A component quietly rendering as a paragraph is visible to anyone looking at the page. An EXPRESSION COMPILING WITH NO REJECTION is not visible to anyone: the plugin runs, finds no expression nodes because the parser never produced any, and reports success. The entire restricted-MDX contract becomes vacuous, silently, decided by a filename. ⚠️ IT HAD ALREADY MADE A TEST LIE. The suite's 'every REAL stage document compiles under the restricted contract' case passed on all nine documents before the format was pinned — not because they are contract-clean, but because they are `.md` and were never subjected to the rules. They do pass with `format: \"mdx\"`, which is why the finding cost nothing beyond the measurement."
+}

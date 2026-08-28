@@ -1,0 +1,25 @@
+{
+  "id": "AST-0039",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A refused stage document reaches the browser as a 200 and an opaque digest",
+  "statement": "Under `next build` + `next start`, when the restricted compiler throws for a document rendered inside a `<Suspense>` boundary, the response is HTTP 200 — the shell having already streamed — and the boundary's slot resolves to a React error digest with no message, path or position. The compiler's diagnostic exists but does not reach the page.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "compiler": "@mdx-js/mdx 3.1.1 (pinned exactly)",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start"
+    }
+  },
+  "openQuestions": [],
+  "notes": "⚠️ THE STAGE VIEW MUST CATCH THE REJECTION, not let it throw. Rendering `<Content />` and trusting the compiler to have refused is enough for SAFETY — nothing forbidden executes — and not enough for LEGIBILITY, which is the half DEC-0022 makes a rule: an operator sees a blank region and a success status. ⚠️ It also means a 200 is not evidence a document rendered. Any acceptance check on the stage view must assert an application-owned marker, exactly as the route smoke check already does for the same reason.",
+  "supportedBy": [
+    "EVD-0065"
+  ]
+}
