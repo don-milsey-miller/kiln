@@ -381,10 +381,13 @@
       "CMP-0019",
       "CMP-0014"
     ],
+    "evidencedBy": [
+      "EVD-0061"
+    ],
     "id": "ACC-0023",
     "lifecycle": "active",
     "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The same non-executing check reports a failure naming file and line when any module outside `app/server/` imports from `lib/`, including through a re-export chain that reaches `lib/` indirectly.",

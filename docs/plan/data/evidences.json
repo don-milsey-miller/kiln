@@ -1601,5 +1601,52 @@
     "summary": "The reader was exercised from a temporary Server Component route under `next build` + `next start`. The route built as `ƒ /probe-read` — DYNAMIC — while `/`, which reads nothing, stayed `○` static. All three reads returned live project data: nine stages with `currentStage` null (every gate ready), 236 artifacts, 0 lint findings, 36 assertions; `06-risk-feasibility` ready with two criteria, the first `high-severity-risks-mitigated` satisfied; and the stage document read back as `06-risk-feasibility.md`, 10590 bytes. The probe route was deleted and the tree rebuilt clean.",
     "title": "Experiment: the application reader under a production build",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "analysis": "static, text only; no application code executed",
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "computed-dynamic-imports",
+          "reason": "`import(someVariable)` cannot be followed by a text analysis. It is DETECTED and reported as an unfollowable import, and the lint exits non-zero on one, so the blind spot is loud rather than silent — but a specifier that is computed cannot be resolved without running the code.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "non-relative-alias-imports",
+          "reason": "Only relative specifiers are resolved; a bare specifier is treated as a package. If a path alias (`@/lib/...`) is ever configured, the analyser would treat it as external and miss it. No alias is configured today.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "read-and-suspense-confinement",
+          "reason": "This task covers the import boundary only. The planning-read and `<Suspense>` half is TSK-0015, and ACC-0024 needs both.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0061",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE FIXTURES CAUGHT TWO REAL BUGS BEFORE THE CHECK WAS TRUSTED, which is the argument for writing them first. (1) Every violation was reported ONE LINE EARLY: the pattern consumes the character before `import`/`export` so a specifier inside an identifier cannot match, and that character is usually the previous line's newline. The transitive fixture caught it because its violation is deliberately not on line 1. (2) A lazy `[\\s\\S]*?` let a side-effect `import \"server-only\";` run on to the NEXT statement's `from` clause, attributing that specifier to the wrong line and swallowing the statement between them. ⚠️ A THIRD DEFECT WAS FOUND BY RUNNING IT, not by a fixture: the first version scoped the check to modules REACHABLE from a route, and since no view imports the reader yet it walked two files and reported the project clean without looking at the reader or either adapter. Scope is now every module under `app/`; reachability only supplies the chain.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A static analyser was built that reads application modules as text and never executes them. Run against three fixtures: the ALLOWED case (a page reaching `lib/` through an adapter) reported no violations while confirming the adapter was actually walked; the DIRECT case (a page importing `lib/` itself) was reported at `app/page.js:1`; the TRANSITIVE case (a page importing an innocent-looking helper that re-exports `lib/`) was reported at `app/_helpers/shim.js:2` — the file whose import statement is the violation — with the chain `app/page.js → app/_helpers/shim.js`. Run against the real project it reports no violations over 5 scanned modules. Falsified in real application code twice: a direct `lib/` import added to the reader was reported at `app/_read/planning.js:3` with exit 1, and a transitive one through a new `app/_helpers/shim.js` was reported at that file's line 1, also exit 1.",
+    "title": "Experiment: the import-boundary check, falsified against fixtures and against real code",
+    "type": "evidence"
   }
 ]

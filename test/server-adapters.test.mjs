@@ -17,6 +17,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { specifiersIn } from "../lib/shell-boundary.mjs";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -102,7 +103,13 @@ test("`lib/` carries no `server-only` marker, so the CLI and this suite keep wor
     readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? walk(join(dir, e.name)) : CODE.test(e.name) ? [join(dir, e.name)] : []
     );
-  const marked = walk(join(ROOT, "lib")).filter((f) => /["']server-only["']/.test(readFileSync(f, "utf-8")));
+  // ⚠️ Uses the specifier scanner, not a string match. The first version grepped for
+  // `"server-only"` and went red the moment a lib module MENTIONED the marker in a comment — which
+  // lib/shell-boundary.mjs does, since the guard is part of what it explains. A check that cannot
+  // tell an import from prose is a check that punishes documentation.
+  const marked = walk(join(ROOT, "lib")).filter((f) =>
+    specifiersIn(readFileSync(f, "utf-8")).some((i) => i.spec === "server-only")
+  );
   assert.deepEqual(marked, [], "a marked lib/ module would throw under plain Node");
 });
 

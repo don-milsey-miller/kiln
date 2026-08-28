@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The boundary check fails on an app module importing `lib/` directly",
   "statement": "The same non-executing check reports a failure naming file and line when any module outside `app/server/` imports from `lib/`, including through a re-export chain that reaches `lib/` indirectly.",
   "evaluates": [
@@ -15,5 +15,8 @@
     "REQ-0021",
     "REQ-0019"
   ],
-  "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer."
+  "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer.",
+  "evidencedBy": [
+    "EVD-0061"
+  ]
 }

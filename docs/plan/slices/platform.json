@@ -178,10 +178,13 @@
         "CMP-0019",
         "CMP-0014"
       ],
+      "evidencedBy": [
+        "EVD-0061"
+      ],
       "id": "ACC-0023",
       "lifecycle": "active",
       "notes": "The indirect clause is the bypass path DEC-0021 requires be detected. A direct import is easy to find; a module that re-exports `lib/` and is then imported freely is the same violation wearing one layer.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "The same non-executing check reports a failure naming file and line when any module outside `app/server/` imports from `lib/`, including through a re-export chain that reaches `lib/` indirectly.",
@@ -572,8 +575,14 @@
     },
     {
       "id": "CMP-0019",
+      "implementedBy": [
+        "lib/shell-boundary.mjs",
+        "bin/lint-shell.mjs",
+        "test/shell-boundary.test.mjs",
+        "test/fixtures/boundary/"
+      ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT EXISTS BECAUSE TESTING CANNOT DO THIS. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural freshness check passes on a codebase that breaks the contract — until the compliant sibling moves, and then every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked. ⚠️ TWO EDGES, ONE GRAPH: reads outside the abstraction, and `app/**` importing `lib/**` outside `app/server/`. The adapter boundary has the same property — an app module importing `lib/` directly behaves identically until someone renders it from a client component. ⚠️ THE MECHANISM IS NOT FIXED HERE: a lint rule, a module-boundary constraint, a generated accessor or a build-step scan would each satisfy it. What is fixed is that it runs without executing the application.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT EXISTS BECAUSE TESTING CANNOT DO THIS. AST-0022 measured that a non-compliant read is served FRESH whenever a compliant read shares its route, so every behavioural freshness check passes on a codebase that breaks the contract — until the compliant sibling moves, and then every read on that route silently reverts to build-time content. A test that passes on broken code is worse than no test, because it is also a claim that the code was checked. ⚠️ TWO EDGES, ONE GRAPH: reads outside the abstraction, and `app/**` importing `lib/**` outside `app/server/`. The adapter boundary has the same property — an app module importing `lib/` directly behaves identically until someone renders it from a client component. ⚠️ THE MECHANISM IS NOT FIXED HERE: a lint rule, a module-boundary constraint, a generated accessor or a build-step scan would each satisfy it. What is fixed is that it runs without executing the application. ⚠️ HALF BUILT 2026-08-28 BY TSK-0006. The `app/server` → `lib/` import boundary is analysed, falsified and wired into `npm run lint:shell` and the test suite. ACC-0023 passes. ⚠️ ACC-0021, ACC-0022 AND ACC-0024 REMAIN `not-evaluated`. The planning-read and `<Suspense>` confinement half is TSK-0015, and ACC-0024 asks for the FULL violation set with failing fixtures — marking it now would claim a pair on the strength of one half. ⚠️ SCOPE IS EVERY MODULE UNDER `app/`, NOT ONLY WHAT A ROUTE REACHES, and that was a corrected defect rather than an initial choice. Reachability-scoped, the check walked two files and reported the project clean while never looking at the reader or either adapter. Reachability now supplies only the chain that explains a violation. ⚠️ ONE EXCLUSION, DECLARED IN `shellBoundaryConfig`: `app/server.mjs`, the walking skeleton DEC-0017 preserves. Excluding it by name makes a second exclusion a visible act; excluding it by unreachability would have silently excluded most of the shell.",
       "responsibility": "Statically prove, without executing the application, that every planning-content read goes through the reader inside a `<Suspense>` boundary and that no module outside `app/server/` imports from `lib/`. Detect bypass paths rather than only direct violations.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -809,7 +818,7 @@
         "TSK-0004"
       ],
       "derivedStatus": {
-        "passed": 0,
+        "passed": 1,
         "status": "outstanding",
         "total": 2
       },
@@ -823,7 +832,7 @@
         "CMP-0019"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen. ⚠️ SPLIT 2026-08-27. This half needs only the adapter to exist, so it moves earlier and no longer waits on the reader. The read and `<Suspense>` confinement analysis is its sibling. ⚠️ ACC-0024 is satisfied by the PAIR, not by this task alone: both halves must be shown to fail on their own fixtures before the criterion passes.",
+      "notes": "⚠️ FOURTH ON PURPOSE, AND THIS IS THE ORDERING DECISION IN THIS PLAN. It could be built last, after there is more to check — and then it would arrive to find a codebase already full of violations, and the pressure would be to weaken the rule rather than fix the code. Built here, it constrains every task after it while the cost of complying is one file at a time. ⚠️ The failing fixtures are not optional polish (ACC-0024): a check nobody has seen fail is a check nobody has seen. ⚠️ SPLIT 2026-08-27. This half needs only the adapter to exist, so it moves earlier and no longer waits on the reader. The read and `<Suspense>` confinement analysis is its sibling. ⚠️ ACC-0024 is satisfied by the PAIR, not by this task alone: both halves must be shown to fail on their own fixtures before the criterion passes. ⚠️ DONE 2026-08-28. Three fixtures, eight tests, one lint command, and three defects found before the check was trusted — two by the fixtures (an off-by-one line, and a lazy pattern spanning two statements) and one by running it (a reachability-scoped check that examined almost nothing). ⚠️ A FOURTH DEFECT WAS FOUND IN AN EARLIER TASK'S TEST. ACC-0026's check grepped `lib/` for the string `\"server-only\"` and went red as soon as a lib module MENTIONED the marker in a comment — which `lib/shell-boundary.mjs` does, since the guard is part of what it explains. It now uses this task's comment-stripping scanner: a check that cannot tell an import from prose is a check that punishes documentation. ⚠️ Fixture adapters deliberately omit `import \"server-only\"`. Everything under `test/` is collected by `node --test`, and the marker throws outside the RSC compiler (AST-0033), so a fixture carrying it crashed the suite for a reason unrelated to what it tests.",
       "reviewStatus": "amended",
       "role": "platform",
       "schemaVersion": 2,

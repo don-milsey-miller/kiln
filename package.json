@@ -10,6 +10,7 @@
   "scripts": {
     "test": "node --test",
     "lint:plan": "node bin/lint-plan.mjs",
+    "lint:shell": "node bin/lint-shell.mjs",
     "dev": "node app/server.mjs",
     "shell:build": "next build",
     "shell:start": "next start --hostname 127.0.0.1",
