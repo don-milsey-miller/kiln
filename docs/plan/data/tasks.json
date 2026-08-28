@@ -230,7 +230,7 @@
       "CMP-0016"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ Needed because DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+    "notes": "⚠️ Needed because DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost. ⚠️ DONE 2026-08-28, and most of the mechanism arrived with TSK-0009 — the stage id is a route segment and the artifact id a query parameter, both read server-side and neither turned into a path. What this task added is the PROOF: fresh-session, reload and control fetches, an invalid-id case, and static checks that no application module reaches for browser storage and no client component holds a selection. ⚠️ THE STATIC CHECKS PASS TRIVIALLY TODAY because there are no client components at all. They are written anyway: the first `\"use client\"` file is exactly when someone reaches for `useState` to remember which artifact is open, and that is the moment this should fail rather than the moment someone notices a reload lost their place. The count of client components is pinned so it moving is a visible event. ⚠️ DEC-0024 records the accepted 200-for-an-unknown-stage tradeoff, with the reopening condition being a consumer that parses the response rather than reads it.",
     "reviewStatus": "approved",
     "role": "frontend",
     "schemaVersion": 2,

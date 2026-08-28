@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0067",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: both selections are recoverable from the URL alone",
+  "kind": "experiment",
+  "summary": "Against a production build serving a copy of `planning-content`, three fetches with no cookies and no shared state — each a fresh session by construction. `/stage/06-risk-feasibility?artifact=AST-0021` reported stage `06-risk-feasibility` and artifact `AST-0021`; the identical URL fetched again reported the same pair; and `/stage/01-intake?artifact=AST-0022` reported `01-intake` and `AST-0022`, which is the control against a page that ignores its URL. `?artifact=NOPE-9999` produced `data-vpw-review=\"unknown\"`, echoed the id back, selected no other artifact, and left the criteria region rendered.",
+  "outcome": "success",
+  "observedAt": "2026-08-28",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "react": "19.2.8",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "client": "fetch — no cookies, no storage, no shared session"
+    },
+    "omissions": [
+      {
+        "fact": "browser-restore-behaviour",
+        "state": "not-observable",
+        "reason": "No browser was available. What was measured is that the SERVER derives both selections from the URL and nothing else — which is the property that makes a browser restore work, but is not the same as watching one do it."
+      },
+      {
+        "fact": "client-held-transient-state",
+        "state": "not-captured",
+        "reason": "There are no client components yet, so the distinction DEC-0023 draws between transient and correctness-critical state has not been exercised. A static test now guards the first one that appears."
+      }
+    ]
+  },
+  "notes": "⚠️ THE CONTROL IS WHAT MAKES THIS A TEST. Asserting that a URL returns the selections it names passes trivially on a page that always shows the same thing; the second URL is what rules that out. Falsified by hard-coding the artifact id in the page — the control fails immediately. ⚠️ AN UNKNOWN ARTIFACT SELECTS NOTHING, which is the clause worth having separately: silently falling back to a valid artifact would be a page confidently showing the wrong record's review status."
+}

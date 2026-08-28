@@ -723,5 +723,37 @@
     "statement": "The application shell opens with exactly two views. `/` is the project view: the derived current stage, navigation across all nine stages with their gate state, artifact counts under the truthful-count rule, and lint findings surfaced rather than re-judged. `/stage/[stageId]` is the stage view: the working stage document rendered as restricted MDX, the stage's exit criteria with their recorded attestations, and review actions through the typed write path. Both views are URL-addressable and server-rendered. NO CORRECTNESS-CRITICAL STATE IS HELD ONLY IN THE CLIENT: transient interface state is permitted, but anything a user must not lose — filters, a selected section, unsaved work, navigational context — is URL-encoded or persisted. The artifact tracker and the assertion/evidence view are DEFERRED, not removed.",
     "title": "The first slice is two views: a project view and a stage view",
     "type": "decision"
+  },
+  {
+    "addresses": [
+      "REQ-0017"
+    ],
+    "alternatives": [
+      {
+        "option": "Read the stage definitions in the route entry and 404 before streaming",
+        "whyNot": "It would work and it would put a planning-content read outside the reader, in a route entry with no boundary above it — the exact violation `lint:shell` reports as `read-in-route-entry`. Weakening the read boundary to improve a status code trades a checked invariant for an unchecked convenience."
+      },
+      {
+        "option": "Hard-code the known stage ids in the route so it can validate without reading",
+        "whyNot": "A second registry of the same fact, free to drift from the definitions on disk. It would fail in the direction that looks fine: a newly added stage would 404 while its document sits there, and nothing would say why."
+      },
+      {
+        "option": "Render the whole page without streaming so the status stays available",
+        "whyNot": "It gives up the independent boundaries ACC-0016 requires, so a slow document read would hold the criteria hostage. Trading a real property of the page for a property of its envelope."
+      }
+    ],
+    "decidedAt": "2026-08-28",
+    "evidencedBy": [
+      "AST-0039"
+    ],
+    "id": "DEC-0024",
+    "lifecycle": "active",
+    "notes": "⚠️ WHAT IS ACCEPTED IS THE STATUS, NEVER THE SILENCE. The same streaming constraint produced AST-0039 — a refused document arriving as 200 and an opaque digest — and that was NOT accepted: ACC-0036 requires the refusal to be visible, located and escaped. The rule these two share is that a 200 with a truthful body is fine and a 200 with a blank region is not. ⚠️ THE REOPENING CONDITION IS A CONSUMER, NOT A DATE. Nothing about this is right in general; it is right for a page a person reads. The moment something parses the response rather than reads it — a crawler, a health check, an API client — the status becomes load-bearing and this comes back. #80's rule applies: the trigger fires when such a consumer is PROPOSED, not once one has been misled.",
+    "rationale": "The status is committed before the answer is known. `notFound()` runs inside a `<Suspense>` child, because the read that would reveal the id to be unknown may only happen there: DEC-0019 confines planning-content reads to the reader behind a boundary, and REQ-0021 makes that confinement a statically checked rule. By the time the stage is known not to exist, the shell has streamed and the status line is gone. The two ways to recover a 404 both cost more than it is worth here — validating in the route entry means reading outside the boundary, which the check refuses by design; keeping a separate list of stage ids in the route means a second registry that can silently disagree with the definitions on disk, which is the stored-derived-state failure #96 exists to prevent. This is a local, human-facing application served over loopback to one operator, and an operator reads the page rather than the status line.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When `/stage/[stageId]` is given an id matching no stage, the application responds 200 and renders a visible not-found state. It does not return 404. The body is required to be truthful; the status is not. This is revisited if an API, a crawler, or any automated client comes to depend on HTTP status semantics for this route.",
+    "title": "An unknown stage returns HTTP 200 with a truthful body — accepted for v1",
+    "type": "decision"
   }
 ]

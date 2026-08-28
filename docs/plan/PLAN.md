@@ -406,6 +406,12 @@ The application shell opens with exactly two views. `/` is the project view: the
 
 **Why:** This is a product decision and no source settles it; sequencing it fifth bought elimination rather than evidence. DEC-0022 makes every content change and every reconnection a full page reload, which is the sharpest constraint and the one that would have been discovered last — it decides what state a view may hold far more than any preference about views does. DEC-0019's blocked prefetching argues for fewer, denser views, an inference from an accepted cost rather than a measurement. DEC-0020's per-request compilation cost is explicitly unmeasured, which caps the design at one stage document per view. DEC-0021 makes read-only views cheap while the review-status write is the one locking capability the slice must get individually reviewed and exposed. Two views is what remains once those four have spoken, and it satisfies REQ-0016 through REQ-0019 without adding a surface the truthful-count rule would then have to cover.
 
+### DEC-0024 — An unknown stage returns HTTP 200 with a truthful body — accepted for v1
+
+When `/stage/[stageId]` is given an id matching no stage, the application responds 200 and renders a visible not-found state. It does not return 404. The body is required to be truthful; the status is not. This is revisited if an API, a crawler, or any automated client comes to depend on HTTP status semantics for this route.
+
+**Why:** The status is committed before the answer is known. `notFound()` runs inside a `<Suspense>` child, because the read that would reveal the id to be unknown may only happen there: DEC-0019 confines planning-content reads to the reader behind a boundary, and REQ-0021 makes that confinement a statically checked rule. By the time the stage is known not to exist, the shell has streamed and the status line is gone. The two ways to recover a 404 both cost more than it is worth here — validating in the route entry means reading outside the boundary, which the check refuses by design; keeping a separate list of stage ids in the route means a second registry that can silently disagree with the definitions on disk, which is the stored-derived-state failure #96 exists to prevent. This is a local, human-facing application served over loopback to one operator, and an operator reads the page rather than the status line.
+
 ## Claims
 
 ### AST-0001 — chokidar sees events fs.watch misses on Windows
@@ -795,7 +801,7 @@ Render `/stage/[stageId]`: the stage's exit criteria with their recorded attesta
 
 Encode the selected stage and the selected artifact in the URL so that opening it in a session with no prior client storage restores the same selection. Transient interface state may remain in the client.
 
-**outstanding** (0/1 criteria passed) · role: frontend
+**accepted** (1/1 criteria passed) · role: frontend
 *Implements: CMP-0015, CMP-0016 · fulfils: REQ-0016*
 
 ### TSK-0011 — Build the change-stream server: watcher, transport, named heartbeat, failure propagation

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Every correctness-critical selection survives a reload in a fresh session",
   "statement": "For each selection the views expose that is not purely presentational — at minimum the selected stage and the selected artifact — opening the same URL in a session with no prior client storage restores the same selection.",
   "evaluates": [
@@ -14,5 +14,8 @@
   "verifies": [
     "REQ-0016"
   ],
-  "notes": "⚠️ SCOPED TO CORRECTNESS-CRITICAL STATE, per DEC-0023's corrected wording. Transient interface state is permitted and is not covered here. The reason this needs a criterion at all is that DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost."
+  "notes": "⚠️ SCOPED TO CORRECTNESS-CRITICAL STATE, per DEC-0023's corrected wording. Transient interface state is permitted and is not covered here. The reason this needs a criterion at all is that DEC-0022 reloads the page on every content change and every reconnection — at a moment the user did not choose, and without telling them what was lost.",
+  "evidencedBy": [
+    "EVD-0067"
+  ]
 }

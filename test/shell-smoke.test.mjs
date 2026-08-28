@@ -163,6 +163,38 @@ test("every required route is built and served, proven by an application-owned m
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
 
+    /* ------------------------------------------------- selection is recoverable from the URL (ACC-0035) */
+
+    // ⚠️ A FRESH SESSION IS THE POINT. `fetch` carries no cookies, no storage and no memory of
+    // the previous request, so each call below IS a fresh session by construction. If either
+    // selection lived anywhere but the URL, the second visitor would not see what the first did.
+    const selectionsOf = (html) => ({
+      stage: (html.match(/data-vpw-criteria="([^"]*)"/) ?? [])[1] ?? null,
+      artifact: (html.match(/data-vpw-review="([^"]*)"/) ?? [])[1] ?? null,
+    });
+    const visit = async (url) =>
+      selectionsOf(await (await fetch(`http://127.0.0.1:${PORT}${url}`, { signal: AbortSignal.timeout(15_000) })).text());
+
+    const first = await visit(`/stage/${STAGE}?artifact=AST-0021`);
+    assert.deepEqual(first, { stage: STAGE, artifact: "AST-0021" }, "both selections must come back");
+
+    const reloaded = await visit(`/stage/${STAGE}?artifact=AST-0021`);
+    assert.deepEqual(reloaded, first, "the same URL in a fresh session must restore the same selections");
+
+    // ⚠️ The control. Without it the assertions above would pass on a page that ignored the URL
+    // entirely and always showed the same thing.
+    const other = await visit("/stage/01-intake?artifact=AST-0022");
+    assert.deepEqual(other, { stage: "01-intake", artifact: "AST-0022" }, "a different URL must select differently");
+
+    // An id that matches nothing is a VISIBLE not-found, never a silent fallback to another artifact.
+    const bogus = await (
+      await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}?artifact=NOPE-9999`, { signal: AbortSignal.timeout(15_000) })
+    ).text();
+    assert.match(bogus, /data-vpw-review="unknown"/, "an unknown artifact must say so");
+    assert.ok(!/data-vpw-review="[A-Z]{3}-[0-9]{4}"/.test(bogus), "and must not select a different artifact instead");
+    assert.match(bogus, /NOPE-9999/, "the id the operator asked for is echoed back so the typo is findable");
+    assert.match(bogus, new RegExp(`data-vpw-criteria="${STAGE}"`), "the rest of the page still renders");
+
     /* ------------------------------------------------- a permitted component renders (ACC-0018) */
 
     const stageDocForComponent = join(contentCopy, "planning-content", "stages", `${STAGE}.md`);

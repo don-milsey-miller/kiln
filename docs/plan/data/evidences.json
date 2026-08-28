@@ -1877,5 +1877,50 @@
     "summary": "`/stage/[stageId]` built as `ƒ` and was served against a copy of `planning-content`. A valid stage returned 200 with all three regions resolved: `data-vpw-criteria=\"06-risk-feasibility\"` with both criterion markers, `data-vpw-document=\"06-risk-feasibility.md\"`, and `data-vpw-review=\"AST-0021\"` showing `draft`. The same response also carried `data-vpw-loading=\"document\"` — the criteria region had resolved while the document region was still showing its own fallback, which is the two boundaries resolving independently, observed rather than inferred. Replacing the document with `<Danger>` produced 200 with `data-vpw-document=\"rejected\"`, `data-vpw-rejection-at=\"planning-content/stages/06-risk-feasibility.md:3:1\"`, the diagnostic escaped as `&lt;Danger&gt;`, and both criterion markers still present. Replacing it with a permitted `<Callout>` rendered `data-vpw-mdx=\"Callout\"` and an `<h1>`. An unknown stage id, and two traversal-shaped ids, each returned 200 carrying Next.js's visible not-found UI.",
     "title": "Experiment: the stage view — three boundaries, a refused document, and an unknown stage",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "client": "fetch — no cookies, no storage, no shared session",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "browser-restore-behaviour",
+          "reason": "No browser was available. What was measured is that the SERVER derives both selections from the URL and nothing else — which is the property that makes a browser restore work, but is not the same as watching one do it.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "client-held-transient-state",
+          "reason": "There are no client components yet, so the distinction DEC-0023 draws between transient and correctness-critical state has not been exercised. A static test now guards the first one that appears.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0067",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE CONTROL IS WHAT MAKES THIS A TEST. Asserting that a URL returns the selections it names passes trivially on a page that always shows the same thing; the second URL is what rules that out. Falsified by hard-coding the artifact id in the page — the control fails immediately. ⚠️ AN UNKNOWN ARTIFACT SELECTS NOTHING, which is the clause worth having separately: silently falling back to a valid artifact would be a page confidently showing the wrong record's review status.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Against a production build serving a copy of `planning-content`, three fetches with no cookies and no shared state — each a fresh session by construction. `/stage/06-risk-feasibility?artifact=AST-0021` reported stage `06-risk-feasibility` and artifact `AST-0021`; the identical URL fetched again reported the same pair; and `/stage/01-intake?artifact=AST-0022` reported `01-intake` and `AST-0022`, which is the control against a page that ignores its URL. `?artifact=NOPE-9999` produced `data-vpw-review=\"unknown\"`, echoed the id back, selected no other artifact, and left the criteria region rendered.",
+    "title": "Experiment: both selections are recoverable from the URL alone",
+    "type": "evidence"
   }
 ]
