@@ -24,10 +24,13 @@
       "evaluates": [
         "CMP-0015"
       ],
+      "evidencedBy": [
+        "EVD-0068"
+      ],
       "id": "ACC-0014",
       "lifecycle": "active",
       "notes": "⚠️ NO PARTIAL-FAILURE EXCEPTION, deliberately. AST-0035 measured the skeleton printing 178 while rendering 177 — the count is what turns an incomplete page into a misleading one, because an operator reading the total has been told the missing thing is present. ⚠️ AMENDED 2026-08-27, AND THE ORIGINAL WAS NOT MERELY IMPRECISE — IT WAS UNFALSIFIABLE. It asked that each displayed total equal 'the number rendered on the page'. The project view renders TOTALS, not artifact entries, so there is nothing on the page to count: the criterion compared a number with itself and would have passed on any implementation, including one that printed a constant. ⚠️ The fix is an INDEPENDENT ORACLE. A fixture with known composition is the only source of truth the application cannot influence, which is what makes this a test rather than a tautology. It is the same defect as a check nobody has seen fail (ACC-0024), reached from the other direction: there, the check had never been shown to fail; here, it could not.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "Evaluated against a fixture content root whose composition is known in advance. For each artifact type, the total the project view displays equals the number of files of that type in the fixture that parse successfully and validate. Ground truth comes from the fixture, not from the page: the count is computed independently of the application and compared with what was rendered.",
@@ -41,10 +44,13 @@
       "evaluates": [
         "CMP-0015"
       ],
+      "evidencedBy": [
+        "EVD-0068"
+      ],
       "id": "ACC-0015",
       "lifecycle": "active",
       "notes": "All three clauses are required together. Naming the file without correcting the count still leaves the page asserting an artifact it did not render; correcting the count without naming the file leaves an operator hunting for what changed.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "With exactly one artifact file under the content root made unparseable, the project view (a) names that file's path, (b) shows a parse position, and (c) prints a total for that type exactly one lower than before. The response is not an error page: every other artifact still renders.",
@@ -241,6 +247,35 @@
       "statement": "Encode the selected stage and the selected artifact in the URL so that opening it in a session with no prior client storage restores the same selection. Transient interface state may remain in the client.",
       "title": "Put every correctness-critical selection in the URL",
       "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0014",
+        "ACC-0015"
+      ],
+      "dependsOn": [
+        "TSK-0007"
+      ],
+      "derivedStatus": {
+        "passed": 2,
+        "status": "accepted",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0016"
+      ],
+      "id": "TSK-0016",
+      "implements": [
+        "CMP-0015"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Split from TSK-0007 on 2026-08-27, because the truthfulness rules are where this view fails SILENTLY and they deserve their own review rather than riding along with the navigation. ⚠️ THE COUNT RULE ADMITS NO PARTIAL-FAILURE EXCEPTION. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one, because an operator reading it has been told the missing thing is present. ⚠️ ACC-0014 is evaluated against a FIXTURE of known composition, never against the page — the page renders totals rather than entries, so counting what it shows would compare a number with itself. ⚠️ DONE 2026-08-28. Nine tests: an offline fixture with a declared composition, a corrupt-one case, a control proving a file count and a parsed count genuinely differ, static checks that the panel re-judges nothing, and a production sequence that corrupts a file while serving, requires the total to fall by one and the located error to appear, then restores it and requires both to recover — with no rebuild and no restart. ⚠️ FALSIFIED WITH A CONSTANT TOTAL AND WITH SUPPRESSED ERROR OUTPUT, as required, and each failed only its own assertion. That separation is the point: a single check covering both would let a page that counts correctly but hides failures pass on the strength of its arithmetic. ⚠️ THE READER HAD THE SAME DEFECT THE SKELETON DID. `artifactCount` was `lint.records.length` — a FILE count — since TSK-0005. It was never displayed, so nothing had caught it; writing the component that would have displayed it is what did.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
+      "title": "Build the project view's artifact totals, lint surface and located parse failures",
+      "type": "task"
     }
   ],
   "blockedByOtherRoles": [
@@ -267,10 +302,12 @@
       "implementedBy": [
         "app/page.js",
         "app/stages-panel.js",
-        "test/stage-derivation.test.mjs"
+        "app/diagnostics-panel.js",
+        "test/stage-derivation.test.mjs",
+        "test/diagnostics.test.mjs"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47). ⚠️ HALF BUILT 2026-08-28 BY TSK-0007: the derived current stage and all nine stages with their gate state. ACC-0013 passes, measured in production. ⚠️ ACC-0014, ACC-0015 AND ACC-0035 REMAIN `not-evaluated`. Counts, the lint surface and located parse failures are TSK-0016's, and URL-recoverable selection is TSK-0010's. The split was made because this half fails VISIBLY — a wrong stage is obvious — while the counting half fails silently, and they deserve separate review. ⚠️ THE READ LIVES IN `<StagesPanel />`, RENDERED LITERALLY INSIDE A `<Suspense>` AT THE PAGE'S OWN CALL SITE, and that form is now enforced rather than conventional: renaming it or handing it to a wrapper is refused as unsupported indirection, and removing the boundary is refused as a missing one. Both were falsified against this very file. ⚠️ ACC-0035 PASSED 2026-08-28 (TSK-0010), covering this component and CMP-0016 together: both selections come from the URL and nothing else, proven against a control URL rather than only against the happy path.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ DERIVED, NEVER STORED (#16). Stage position is computed from definitions plus attestations on every read; there is no status field to go stale. ⚠️ THE TRUTHFUL-COUNT RULE IS THIS COMPONENT'S SHARPEST CONSTRAINT and it comes from a measured defect: AST-0035 found the skeleton reporting 178 artifacts while rendering 177, because a malformed file vanished and the total did not move. A count is a claim, and a claim about content that was not rendered is false. No partial-failure exception. ⚠️ OUTSIDE ITS BOUNDARY: it surfaces lint findings, it does not re-judge them (#47). ⚠️ HALF BUILT 2026-08-28 BY TSK-0007: the derived current stage and all nine stages with their gate state. ACC-0013 passes, measured in production. ⚠️ ACC-0014, ACC-0015 AND ACC-0035 REMAIN `not-evaluated`. Counts, the lint surface and located parse failures are TSK-0016's, and URL-recoverable selection is TSK-0010's. The split was made because this half fails VISIBLY — a wrong stage is obvious — while the counting half fails silently, and they deserve separate review. ⚠️ THE READ LIVES IN `<StagesPanel />`, RENDERED LITERALLY INSIDE A `<Suspense>` AT THE PAGE'S OWN CALL SITE, and that form is now enforced rather than conventional: renaming it or handing it to a wrapper is refused as unsupported indirection, and removing the boundary is refused as a missing one. Both were falsified against this very file. ⚠️ ACC-0035 PASSED 2026-08-28 (TSK-0010), covering this component and CMP-0016 together: both selections come from the URL and nothing else, proven against a control URL rather than only against the happy path. ⚠️ COMPLETED 2026-08-28 BY TSK-0016. All four of its criteria now pass: ACC-0013 (derived stage), ACC-0014 (totals against an oracle), ACC-0015 (located parse failures) and ACC-0035 (URL-recoverable selection). ⚠️ TOTALS COME FROM THE PARSED SET FOR THAT REQUEST — never a file count, never a cached summary, never a displayed value. The split from TSK-0007 was made because this half fails SILENTLY, and it earned itself: a second instance of AST-0035's defect was found in the reader's own `artifactCount`, which had been counting files including unparsable ones since TSK-0005 and had simply never been rendered. ⚠️ LINT FINDINGS ARE SURFACED, NEVER RE-JUDGED (#47), and a static test forbids the panel calling `lintProject`, `loadArtifacts` or reclassifying a severity — a view that quietly disagreed with `npm run lint:plan` would be two answers to one question.",
       "responsibility": "Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -379,35 +416,6 @@
   ],
   "role": "frontend",
   "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0014",
-        "ACC-0015"
-      ],
-      "dependsOn": [
-        "TSK-0007"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 2
-      },
-      "fulfils": [
-        "REQ-0016"
-      ],
-      "id": "TSK-0016",
-      "implements": [
-        "CMP-0015"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ Split from TSK-0007 on 2026-08-27, because the truthfulness rules are where this view fails SILENTLY and they deserve their own review rather than riding along with the navigation. ⚠️ THE COUNT RULE ADMITS NO PARTIAL-FAILURE EXCEPTION. AST-0035 measured the skeleton printing 178 while rendering 177: the total is what turns an incomplete page into a misleading one, because an operator reading it has been told the missing thing is present. ⚠️ ACC-0014 is evaluated against a FIXTURE of known composition, never against the page — the page renders totals rather than entries, so counting what it shows would compare a number with itself.",
-      "reviewStatus": "approved",
-      "role": "frontend",
-      "schemaVersion": 2,
-      "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
-      "title": "Build the project view's artifact totals, lint surface and located parse failures",
-      "type": "task"
-    },
     {
       "acceptedBy": [
         "ACC-0029",

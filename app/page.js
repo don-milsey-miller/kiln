@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import StagesPanel from "./stages-panel.js";
+import DiagnosticsPanel from "./diagnostics-panel.js";
 
 /**
  * The project view — `/`.
@@ -10,7 +11,9 @@ import StagesPanel from "./stages-panel.js";
  * literally, inside a `<Suspense>` at this call site. That literal form is required: an alias, a
  * variable, or a boundary in the layout would each be refused as unsupported indirection.
  *
- * ⚠️ Counts, lint findings and malformed-file reporting are TSK-0016's and are deliberately not here.
+ * ⚠️ The diagnostics half — totals, the lint surface and unreadable files — is its own component
+ * behind its own boundary. It fails differently from the navigation: a wrong stage is obvious, a
+ * wrong total looks exactly like a right one, so the two are reviewed and rendered separately.
  */
 export default function Page() {
   return (
@@ -31,6 +34,18 @@ export default function Page() {
       >
         <StagesPanel />
       </Suspense>
+
+      <div style={{ marginTop: "28px" }}>
+        <Suspense
+          fallback={
+            <p data-vpw-loading="diagnostics" style={{ color: "#666" }}>
+              Counting artifacts and reading lint findings…
+            </p>
+          }
+        >
+          <DiagnosticsPanel />
+        </Suspense>
+      </div>
     </main>
   );
 }

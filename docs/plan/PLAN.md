@@ -229,7 +229,7 @@ Be the only door from application code into `lib/`. Each module begins with `imp
 Render `/`: the project's current stage derived from stage definitions and recorded attestations, navigation across all nine stages with each one's gate state, artifact counts, and lint findings. Report only counts it actually rendered.
 
 *Satisfies: REQ-0016*
-*Implemented by: app/page.js, app/stages-panel.js, test/stage-derivation.test.mjs*
+*Implemented by: app/page.js, app/stages-panel.js, app/diagnostics-panel.js, test/stage-derivation.test.mjs, test/diagnostics.test.mjs*
 
 ### CMP-0016 — Stage view
 
@@ -843,7 +843,7 @@ Implement the analysis that runs without executing the application and reports f
 
 Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.
 
-**outstanding** (0/2 criteria passed) · role: frontend
+**accepted** (2/2 criteria passed) · role: frontend
 *Implements: CMP-0015 · fulfils: REQ-0016*
 
 ### TSK-0017 — Build the change-stream client: listener, watchdog, stale state, reload on reconnect

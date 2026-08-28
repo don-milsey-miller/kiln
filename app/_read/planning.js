@@ -108,18 +108,36 @@ export async function readProjectOverview() {
     };
   });
 
+  // ⚠️ TOTALS COME FROM THE PARSED SET FOR THIS REQUEST, and from nothing else — not from a
+  // filename count, not from a cached summary, not from anything the view already displayed. A record
+  // whose file failed to parse has `doc: null`, so it contributes to no total. AST-0035 measured the
+  // skeleton reporting 178 while rendering 177 for exactly the opposite reason.
+  const parsed = lint.records.filter((r) => r.doc);
   const counts = {};
-  for (const r of lint.records) {
-    const type = r.doc?.type;
-    if (type) counts[type] = (counts[type] ?? 0) + 1;
-  }
+  for (const r of parsed) counts[r.doc.type] = (counts[r.doc.type] ?? 0) + 1;
+
+  // ⚠️ Every file that could NOT be parsed, with the position Node reports. Returned alongside the
+  // totals rather than thrown, so a single bad file costs one artifact rather than the whole page.
+  const unreadable = lint.records
+    .filter((r) => !r.doc)
+    .map((r) => {
+      const m = /\(line (\d+) column (\d+)\)/.exec(r.parseError ?? "");
+      return {
+        path: `planning-content/${r.relPath}`,
+        line: m ? Number(m[1]) : null,
+        column: m ? Number(m[2]) : null,
+        message: r.parseError ?? "could not be read",
+      };
+    })
+    .sort((a, b) => a.path.localeCompare(b.path));
 
   return {
     contentRoot,
     stages,
     currentStage: stages.find((s) => !s.ready)?.id ?? null,
     counts,
-    artifactCount: lint.records.length,
+    artifactCount: parsed.length,
+    unreadable,
     findings: lint.findings,
   };
 }

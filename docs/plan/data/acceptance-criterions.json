@@ -227,10 +227,13 @@
     "evaluates": [
       "CMP-0015"
     ],
+    "evidencedBy": [
+      "EVD-0068"
+    ],
     "id": "ACC-0014",
     "lifecycle": "active",
     "notes": "⚠️ NO PARTIAL-FAILURE EXCEPTION, deliberately. AST-0035 measured the skeleton printing 178 while rendering 177 — the count is what turns an incomplete page into a misleading one, because an operator reading the total has been told the missing thing is present. ⚠️ AMENDED 2026-08-27, AND THE ORIGINAL WAS NOT MERELY IMPRECISE — IT WAS UNFALSIFIABLE. It asked that each displayed total equal 'the number rendered on the page'. The project view renders TOTALS, not artifact entries, so there is nothing on the page to count: the criterion compared a number with itself and would have passed on any implementation, including one that printed a constant. ⚠️ The fix is an INDEPENDENT ORACLE. A fixture with known composition is the only source of truth the application cannot influence, which is what makes this a test rather than a tautology. It is the same defect as a check nobody has seen fail (ACC-0024), reached from the other direction: there, the check had never been shown to fail; here, it could not.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Evaluated against a fixture content root whose composition is known in advance. For each artifact type, the total the project view displays equals the number of files of that type in the fixture that parse successfully and validate. Ground truth comes from the fixture, not from the page: the count is computed independently of the application and compared with what was rendered.",
@@ -244,10 +247,13 @@
     "evaluates": [
       "CMP-0015"
     ],
+    "evidencedBy": [
+      "EVD-0068"
+    ],
     "id": "ACC-0015",
     "lifecycle": "active",
     "notes": "All three clauses are required together. Naming the file without correcting the count still leaves the page asserting an artifact it did not render; correcting the count without naming the file leaves an operator hunting for what changed.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With exactly one artifact file under the content root made unparseable, the project view (a) names that file's path, (b) shows a parse position, and (c) prints a total for that type exactly one lower than before. The response is not an error page: every other artifact still renders.",

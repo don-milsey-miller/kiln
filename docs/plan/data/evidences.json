@@ -1922,5 +1922,55 @@
     "summary": "Against a production build serving a copy of `planning-content`, three fetches with no cookies and no shared state — each a fresh session by construction. `/stage/06-risk-feasibility?artifact=AST-0021` reported stage `06-risk-feasibility` and artifact `AST-0021`; the identical URL fetched again reported the same pair; and `/stage/01-intake?artifact=AST-0022` reported `01-intake` and `AST-0022`, which is the control against a page that ignores its URL. `?artifact=NOPE-9999` produced `data-vpw-review=\"unknown\"`, echoed the id back, selected no other artifact, and left the criteria region rendered.",
     "title": "Experiment: both selections are recoverable from the URL alone",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "contentRoot": "a disposable copy; the project's own content was not touched",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "non-json-unreadability",
+          "reason": "Only invalid JSON was exercised. A file that is unreadable for another reason — permissions, a directory in place of a file, an encoding fault — reaches the same code path but was not tested, and would report whatever message the read threw rather than a line and column.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "many-simultaneous-failures",
+          "reason": "One corrupt file at a time. The panel renders a list and the count is per type, so several should behave the same way, but that is reasoning rather than measurement.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "lint-findings-under-corruption",
+          "reason": "The lint region was asserted to still RENDER while a file was corrupt, not that its findings are correct in that state. What the lint reports about a project with an unparsable artifact is the lint's business and is surfaced unchanged (#47).",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0068",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE ORACLE IS WHAT MAKES THIS A TEST. The original ACC-0014 asked that each displayed total equal 'the number rendered on the page' — and the page renders TOTALS, not entries, so it compared a number with itself and would have passed on an implementation printing a constant. Both halves here count parsable files independently of the application. ⚠️ FALSIFIED THE TWO WAYS THAT MATTER. A constant total fails the oracle comparison and the decrement assertion; suppressing the unreadable region fails the located-error assertion — and each fails only its own, which is what stops one check standing in for the other. ⚠️ A SECOND INSTANCE OF AST-0035 WAS FIXED HERE, in this project's own reader rather than in the skeleton: `artifactCount` was `lint.records.length`, which counts FILES including ones that failed to parse. It now counts documents. The defect had been sitting in the reader since TSK-0005 and had never been displayed.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Two measurements. OFFLINE, against a fixture whose composition was declared in the test — three requirements, two assertions, one decision — the counting rule returned exactly that; corrupting one requirement returned two requirements with every other type unchanged, and left the bad file visible with a parse error carrying a line and column. IN PRODUCTION, against a copy of `planning-content` served by a real build: the displayed assertion total equalled the number of parsable assertion files counted independently outside the application; corrupting one file with the server running dropped that total by exactly one, left every other type unchanged, rendered `data-vpw-unreadable-at=\"planning-content/data/assertions/…json:1:3\"`, and kept the stages and lint regions rendered; restoring the file returned the total and cleared the error state, all without a rebuild or a restart.",
+    "title": "Experiment: totals against an oracle, and a corrupted artifact reported and recovered live",
+    "type": "evidence"
   }
 ]

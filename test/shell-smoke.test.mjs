@@ -28,7 +28,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync, cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { rmSync, existsSync, cpSync, mkdtempSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,7 +66,7 @@ const ROUTES = [
     // Suspense boundary never resolved would still pass: the shell ships, the fallback ships, and
     // the content never arrives. That is the streaming version of "a build that succeeds while
     // rendering nothing you wrote".
-    also: ["data-vpw-stages=", "data-vpw-current="],
+    also: ["data-vpw-stages=", "data-vpw-current=", "data-vpw-diagnostics=", "data-vpw-count=", "data-vpw-lint="],
   },
 ];
 
@@ -162,6 +162,63 @@ test("every required route is built and served, proven by an application-owned m
         `That is a page frozen into the build, which is what AST-0019 measured and DEC-0019 forbids.`
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
+
+    /* ------------------------------------------------- totals stay truthful under corruption (ACC-0014/0015) */
+
+    const diagnosticsOf = async () => {
+      const html = await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text();
+      const counts = {};
+      for (const m of html.matchAll(/data-vpw-count="([^"]+)" data-vpw-count-value="([^"]+)"/g))
+        counts[m[1]] = Number(m[2]);
+      return { html, counts, unreadable: (html.match(/data-vpw-unreadable="([0-9]+)"/) ?? [])[1] ?? null };
+    };
+
+    const healthy = await diagnosticsOf();
+    assert.ok(healthy.counts.assertion > 0, "the totals must render at all");
+    assert.equal(healthy.unreadable, null, "a healthy project reports nothing unreadable");
+
+    // ⚠️ ORACLE: the count of PARSABLE files of that type in the copy, computed here, outside the
+    // application. Comparing the page against itself is what made the original ACC-0014 vacuous.
+    const assertionDir = join(contentCopy, "planning-content", "data", "assertions");
+    const parsable = readdirSync(assertionDir).filter((f) => {
+      if (!f.endsWith(".json")) return false;
+      try {
+        JSON.parse(readFileSync(join(assertionDir, f), "utf-8"));
+        return true;
+      } catch {
+        return false;
+      }
+    }).length;
+    assert.equal(healthy.counts.assertion, parsable, "the displayed total must equal the fixture oracle");
+
+    // Corrupt exactly one, with the server running and nothing rebuilt.
+    const victim = join(assertionDir, readdirSync(assertionDir).filter((f) => f.endsWith(".json")).sort()[0]);
+    const original = readFileSync(victim, "utf-8");
+    writeFileSync(victim, "{ this is not json");
+    await sleep(1500);
+
+    const corrupted = await diagnosticsOf();
+    assert.equal(
+      corrupted.counts.assertion,
+      healthy.counts.assertion - 1,
+      "the corrupted artifact must be subtracted from its own type"
+    );
+    assert.equal(corrupted.counts.decision, healthy.counts.decision, "and from no other type");
+    assert.equal(corrupted.unreadable, "1", "the page must say one artifact could not be read");
+    assert.match(
+      corrupted.html,
+      /data-vpw-unreadable-at="planning-content\/data\/assertions\/[A-Z]+-[0-9]+[.]json:[0-9]+:[0-9]+"/,
+      "with a repository-relative path and a parse position"
+    );
+    assert.match(corrupted.html, /data-vpw-stages=/, "every other section still renders");
+    assert.match(corrupted.html, /data-vpw-lint=/, "including the lint region");
+
+    // Restore it: both the count and the error state must recover, still without a rebuild.
+    writeFileSync(victim, original);
+    await sleep(1500);
+    const restored = await diagnosticsOf();
+    assert.equal(restored.counts.assertion, healthy.counts.assertion, "the total must come back");
+    assert.equal(restored.unreadable, null, "and the error state must clear");
 
     /* ------------------------------------------------- selection is recoverable from the URL (ACC-0035) */
 
