@@ -22,6 +22,8 @@ import {
   formatReadViolation,
   suspenseRanges,
   jsxUsages,
+  importBindings,
+  identifierUses,
   shellBoundaryConfig,
 } from "../lib/shell-boundary.mjs";
 
@@ -99,18 +101,38 @@ test("ROUTE-READ: a route entry awaiting the reader has nothing above it to wrap
   assert.match(r.violations[0].detail, /no <Suspense> can enclose it/);
 });
 
+test("⚠️ INDIRECTION: handing a reading component to a wrapper is REFUSED, not assumed safe", () => {
+  // A <Suspense> exists in that fixture. It is inside the wrapper, and nothing at the call site says
+  // the component ends up within it — which is precisely why the rule is fail-closed.
+  const r = fixture("indirection");
+  assert.deepEqual(kinds(r), ["unsupported-indirection"]);
+  assert.equal(r.violations[0].line, 2, "reported at the import that creates the indirection");
+  assert.match(r.violations[0].detail, /as a value/);
+});
+
+test("renaming a reader-consuming component is refused", () => {
+  const bindings = importBindings('import { Panel as P } from "./x.jsx";', () => true);
+  assert.deepEqual(bindings, [{ local: "P", imported: "Panel", isDefault: false, line: 1 }]);
+});
+
+test("a component imported but never rendered directly is refused", () => {
+  // total === jsx === 0 is not "clean"; it is "nothing here can be shown to be enclosed".
+  const src = ['import P from "./x.jsx";', "export default function A() { return <div />; }"].join("\n");
+  assert.deepEqual(identifierUses(src, "P"), { total: 0, jsx: 0, indirect: 0 });
+});
+
 test("⚠️ every detector the analyser can emit has a fixture that fires it", () => {
   // ACC-0024 asks for a fixture set containing at least one instance of EACH violation detected.
   // Two detectors were falsified only against temporary real-code violations at first; this is what
   // stops a detector being added later with no control, which is how a rule becomes decoration.
   const emitted = new Set(
-    ["direct", "indirect", "missing-boundary", "fs-direct", "route-read"].flatMap((n) =>
+    ["direct", "indirect", "missing-boundary", "fs-direct", "route-read", "indirection"].flatMap((n) =>
       fixture(n).violations.map((v) => v.kind)
     )
   );
   assert.deepEqual(
     [...emitted].sort(),
-    ["adapter-outside-reader", "fs-access", "missing-suspense", "read-in-route-entry"],
+    ["adapter-outside-reader", "fs-access", "missing-suspense", "read-in-route-entry", "unsupported-indirection"],
     "a detector without a failing fixture is a rule nobody has seen fire"
   );
 });
