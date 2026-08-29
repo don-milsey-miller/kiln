@@ -1,0 +1,54 @@
+{
+  "id": "EVD-0075",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: ACC-0029 and ACC-0030 in a real browser — and the defect that only a browser could find",
+  "kind": "experiment",
+  "summary": "Headless Chrome driven over the DevTools protocol against the real production build, with no injected EventSource and no injected timers. THE FIRST RUN FAILED ACC-0029: with the server's heartbeat interval set to 600s and the socket confirmed still open, the page stayed `Receiving updates` for the whole 40s budget. Diagnosis, measured rather than assumed: `document.visibilityState` was `visible` and an in-page 15000ms `setTimeout` returned in 15014ms, so timer throttling was excluded; a raw-socket read of `/events` showed exactly one heartbeat at 32ms then silence with the socket open, so the server was correct. The cause was `timers = { setTimeout, clearTimeout }` throwing `Illegal invocation` inside the open handler (AST-0040). AFTER WRAPPING THE DEFAULTS, both criteria pass: the indicator went from live to `Not receiving updates` while the stream was still open, changing its TEXT and its ICON and its colour; and after the server was dropped, an attestation changed, and the SAME build restarted, the page reconnected on its own, reloaded, and showed the changed stage 783ms later with its URL preserved.",
+  "outcome": "success",
+  "observedAt": "2026-08-29",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "browser": "Google Chrome, headless=new, driven over CDP with no automation library",
+      "framework": "Next.js 16.3.2",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "harness": "bin/browser-check.mjs",
+      "contentRoot": "a disposable copy; the project's own content was not touched",
+      "watchdogWindow": "15s, the shipped default",
+      "staleAfter": "12.7s from the moment it was observed live",
+      "recoveredAfter": "783ms from the server returning"
+    },
+    "omissions": [
+      {
+        "fact": "other-engines",
+        "state": "not-captured",
+        "reason": "Chrome only. Firefox and WebKit have their own EventSource reconnection behaviour and their own brand checks; neither was available on this host. The defect found here is a WebIDL requirement all of them share, but that is an argument, not a measurement."
+      },
+      {
+        "fact": "headed-browser",
+        "state": "not-captured",
+        "reason": "Headless. `document.visibilityState` reported `visible` and timers were shown to run at full speed, so the two behaviours under test were not affected — but a headed window was never opened, and nothing here observes what a person would actually see."
+      },
+      {
+        "fact": "long-disconnection",
+        "state": "not-captured",
+        "reason": "The server was down for roughly three seconds. EventSource's own backoff after repeated failures, and what the page does across a much longer outage, were not exercised."
+      }
+    ]
+  },
+  "notes": "⚠️ THIRTEEN PASSING UNIT TESTS DESCRIBED A COMPONENT THAT DID NOT WORK AT ALL. Every one of them injected timers, so not one of them ever called the default — and the default was the broken part. The shipped page went live and stayed live forever: not a degraded indicator, but the exact failure the component exists to prevent, and the most reassuring possible form of it. This is what 'inject the collaborators' costs when nothing ever exercises the real ones. ⚠️ THE PM'S CONSTRAINT IS WHAT FOUND IT. 'Do not inject EventSource or fake timers for this evidence' was the whole reason the run could fail. Any harness that supplied its own timers — which is to say, any faster or more convenient harness — would have reported both criteria passing. ⚠️ THE STALE CASE WAS PROVOKED WITHOUT BREAKING ANYTHING. The heartbeat interval was pushed past the client's window while the connection stayed open, and CDP network events confirm the `/events` request received a response and never finished or failed. Had the socket dropped, the page would have gone stale down the ERROR path and the watchdog would never have been the thing under test. ⚠️ COLOUR IS NOT DOING THE WORK. The text changed from `Receiving updates` to `Not receiving updates` and the icon changed from a tick to a warning triangle. The colour changed too, and the assertion does not depend on it."
+}

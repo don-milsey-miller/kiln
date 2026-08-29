@@ -218,3 +218,51 @@ test("live and stale are distinguished by TEXT, not by colour alone", () => {
   for (const word of ["Receiving updates", "Not receiving updates"])
     assert.ok(src.includes(word), `the state must be readable as words: missing ${JSON.stringify(word)}`);
 });
+
+/* ------------------------------------------------ the browser's brand check, emulated in Node */
+
+test("⚠️ the DEFAULT timers survive a WebIDL brand check — the defect a real browser found", async () => {
+  // ⚠️ THIS TEST EXISTS BECAUSE THIRTEEN PASSING TESTS ABOVE MISSED A TOTAL FAILURE. The default was
+  // `timers = { setTimeout, clearTimeout }`. In Node that works. In a browser, calling it as
+  // `timers.setTimeout(...)` passes `timers` as `this`, `Window.setTimeout`'s brand check rejects it,
+  // and the call throws `TypeError: Illegal invocation` inside an event listener that swallows it.
+  // The shipped page went live and never armed its watchdog: permanently reassuring, exactly the
+  // failure AST-0034 says this component is the only defence against.
+  //
+  // Everything above injects timers, so none of it could see the default at all. This calls the real
+  // default, with `globalThis.setTimeout` temporarily wrapped in the same brand check a browser
+  // applies — throw unless `this` is the global or absent.
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const brandChecked = function (...args) {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    return realSet.apply(globalThis, args);
+  };
+  globalThis.setTimeout = brandChecked;
+  globalThis.clearTimeout = function (...args) {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    return realClear.apply(globalThis, args);
+  };
+
+  try {
+    const { ES, made } = fakeEventSource();
+    let state = null;
+    // ⚠️ NO `timers` ARGUMENT. That is the whole point: the default is what ships.
+    const wd = createStreamWatchdog({
+      EventSourceImpl: ES,
+      watchdogMs: 20,
+      reload: () => {},
+      onState: (s) => (state = s),
+    });
+    wd.start();
+    made[0].fire("open"); // arms the watchdog through the default timers
+
+    assert.equal(state, STATE.LIVE, "the open handler must survive arming the watchdog");
+    await new Promise((r) => realSet(r, 80));
+    assert.equal(state, STATE.STALE, "the default timers must actually fire — a page that cannot arm never goes stale");
+    wd.stop();
+  } finally {
+    globalThis.setTimeout = realSet;
+    globalThis.clearTimeout = realClear;
+  }
+});

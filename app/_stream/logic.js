@@ -39,7 +39,14 @@ export function createStreamWatchdog({
   url = "/events",
   watchdogMs = 15000,
   EventSourceImpl,
-  timers = { setTimeout, clearTimeout },
+  // ⚠️ WRAPPED, NOT REFERENCED, AND A REAL BROWSER IS WHAT PROVED IT MATTERS. `{ setTimeout }` looks
+  // equivalent and is not: calling it as `timers.setTimeout(...)` passes `timers` as `this`, and the
+  // WebIDL brand check on `Window.setTimeout` throws `TypeError: Illegal invocation`. Node does not
+  // enforce that, so all thirteen unit tests passed while the shipped page NEVER armed its watchdog
+  // — it went live and stayed live forever, which is the precise failure this component exists to
+  // prevent. Measured in headless Chrome: two `Illegal invocation` exceptions per page load, both
+  // swallowed by the event listeners that raised them.
+  timers = { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (id) => clearTimeout(id) },
   reload,
   onState = () => {},
 }) {

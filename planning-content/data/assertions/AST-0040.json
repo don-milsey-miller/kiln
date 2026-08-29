@@ -1,0 +1,18 @@
+{
+  "id": "AST-0040",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A timer function referenced bare into an object cannot be called in a browser",
+  "statement": "`const timers = { setTimeout, clearTimeout }` followed by `timers.setTimeout(fn, ms)` throws `TypeError: Illegal invocation` in a browser, because `Window.setTimeout`'s WebIDL brand check requires `this` to be the Window and the method call passes the containing object instead. Node applies no such check, so the identical code works there and every Node test of it passes.",
+  "targetEnvironment": {
+    "facts": {
+      "browser": "Google Chrome, headless=new, driven over CDP with no automation library"
+    }
+  },
+  "notes": "⚠️ MEASURED IN HEADLESS CHROME, NOT REASONED ABOUT. In the page: `(() => { const t = { setTimeout }; try { t.setTimeout(()=>{},10) } catch (e) { return e.message } })()` returned `Illegal invocation`, while the same call wrapped as `(...a) => setTimeout(...a)` returned an id. Two `Illegal invocation` exceptions were recorded per page load. ⚠️ THE CONSEQUENCE IS SILENT BECAUSE THE THROW HAPPENS INSIDE AN EVENT LISTENER, which swallows it. The handler had already set the visible state before arming the timer, so the page showed its healthy state and simply never left it. ⚠️ IT IS A GENERAL HAZARD, NOT A DETAIL OF THIS COMPONENT. Any injectable-collaborator design that defaults to bare browser globals has it — `{ fetch }`, `{ addEventListener }`, `{ requestAnimationFrame }` all behave the same way. The defence is to wrap rather than reference, and to have at least one check that calls the DEFAULT rather than an injected substitute.",
+  "supportedBy": [
+    "EVD-0075"
+  ]
+}
