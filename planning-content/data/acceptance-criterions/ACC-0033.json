@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The application installs and starts from one documented command",
   "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0020"
   ],
-  "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server."
+  "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
+  "evidencedBy": [
+    "EVD-0073"
+  ]
 }

@@ -244,12 +244,14 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       "ACC-0027",
       "ACC-0028",
       "ACC-0031",
+      "ACC-0032",
+      "ACC-0033",
       "ACC-0034",
       "ACC-0035",
       "ACC-0036",
       "ACC-0037",
     ],
-    "criteria evaluated so far — all three are the adapter door's"
+    "criteria evaluated so far"
   );
 
   // ⚠️ Every refusal must carry the PM's REASON, not just a rule id. A gate that blocks without saying

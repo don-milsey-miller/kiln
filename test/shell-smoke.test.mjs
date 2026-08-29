@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { reapLater, installReaper } from "./helpers/reap.mjs";
+import { withBuildLock } from "./helpers/build-lock.mjs";
 
 installReaper();
 
@@ -82,6 +83,12 @@ async function killTree(proc) {
 test("every required route is built and served, proven by an application-owned marker", async (t) => {
   t.diagnostic("production build + start; this is the slow one");
 
+  // ⚠️ HELD FOR THE WHOLE TEST, not just the build. This deletes `.next` and then serves from it;
+  // `launcher.test.mjs` does the same, and `node --test` runs files in parallel.
+  await withBuildLock(() => runSmokeCheck(t));
+});
+
+async function runSmokeCheck(t) {
   rmSync(join(ROOT, ".next"), { recursive: true, force: true });
   const build = await execFileP("npx", ["next", "build"], {
     cwd: ROOT,
@@ -450,7 +457,7 @@ test("every required route is built and served, proven by an application-owned m
   } finally {
     await killTree(server);
   }
-});
+}
 
 test("the marker is application-owned, so the check cannot pass on a stray page", () => {
   // ⚠️ Falsification in miniature: if this string ever appears in the framework's own output the

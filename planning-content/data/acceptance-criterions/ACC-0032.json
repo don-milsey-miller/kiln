@@ -4,14 +4,17 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Stopping the launcher leaves nothing behind",
-  "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+  "statement": "After the documented launch command is run and then terminated, the child process it started is gone, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error. The run must have opened `/events` and observed a heartbeat before termination, so that a file watcher is known to have existed.",
   "evaluates": [
     "CMP-0020"
   ],
   "verifies": [
     "REQ-0020"
   ],
-  "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`."
+  "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`. ⚠️ CORRECTED 2026-08-29: THERE IS NO SECOND PROCESS, AND THERE NEVER WAS ONE TO OWN. This artifact previously said the launcher owns 'both the application process and the file watcher' and 'terminates the watcher with the application'. The watcher is chokidar, imported dynamically INSIDE the `next start` process and held by the change-stream service in that process's memory. A parent launcher cannot call `changeStream.close()` across that boundary without adding IPC or a shutdown endpoint, and neither is justified for a local-first tool. The old wording described a mechanism that could not be built, which is worse than an unmet obligation: it would have been 'satisfied' by a launcher that called nothing and reported success. ⚠️ WHAT IS TRUE INSTEAD, and all of it is enforceable. The launcher owns ONE child: the `next start` process. The change-stream service owns its watcher and closes it when its last subscriber leaves — already built and tested under TSK-0011. Terminating the application process releases any watcher still open through process teardown, which is the operating system's guarantee rather than the launcher's. `close()` stays what it is: a service and test lifecycle operation, never something the launcher claims to call across a process boundary. ⚠️ THIS CRITERION WAS UNSATISFIABLE AS WRITTEN, WHICH IS WHY IT IS AMENDED RATHER THAN REPHRASED. It required that 'no watcher process remains'. There is no watcher process, so the clause could never be observed either true or false — and an unobservable clause in a criterion whose whole point is 'verified by observation, not by the absence of an error' is the exact defect that rule exists to catch, sitting inside the rule. It is amended rather than superseded because it has never been evaluated: no measurement is being retired, and there is no failed outcome to preserve. ⚠️ THE HEARTBEAT PRECONDITION IS PART OF THE CRITERION, not of the test that runs it. The watcher is created lazily on first subscription, so a run that never subscribed would satisfy every remaining clause while having nothing to clean up.",
+  "evidencedBy": [
+    "EVD-0073"
+  ]
 }

@@ -1,0 +1,50 @@
+{
+  "id": "EVD-0073",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the launcher's cleanup, and what a cleanup observation cannot prove on Windows",
+  "kind": "experiment",
+  "summary": "Three tests against the shipping launcher. Measured: `npm start` installs if needed, builds for production, starts, and the project view responds with its reading panel resolved and no further steps; the content root is printed and is absolute; a content root that does not exist is a refusal with exit code 2 naming the path and the variable; Next is spawned directly, so the recorded pid is the server's rather than an npm shim's. Then, after subscribing to `/events` and observing a NAMED heartbeat — proving a watcher existed, since the service creates it lazily on first subscription — the launcher was stopped and observed: the child pid is gone, the port binds again, its run directory is removed, and no `vpw-launch-*` directory survives anywhere in the temp root.",
+  "outcome": "success",
+  "observedAt": "2026-08-29",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start, spawned directly",
+      "command": "npm start (node bin/start-shell.mjs)",
+      "port": "4413 in the test; 3000 by default"
+    },
+    "omissions": [
+      {
+        "fact": "posix-signal-path",
+        "state": "not-captured",
+        "reason": "The graceful stop was exercised through stdin, not through SIGTERM, because on Windows `process.kill` is `TerminateProcess` and no handler runs. The POSIX branch of the shutdown code (`child.kill('SIGTERM')` then `SIGKILL`) has never been executed — no Linux or macOS host was available."
+      },
+      {
+        "fact": "clean-machine-install",
+        "state": "not-captured",
+        "reason": "The install branch was not exercised: `node_modules` was present in every run, so the launcher took the `skipping install` path. ACC-0033's 'no prior application state' therefore rests on the build-and-start half, not on a genuinely cold install."
+      },
+      {
+        "fact": "who-killed-the-child",
+        "state": "not-observable",
+        "reason": "See the notes. On this platform the child dies when its parent exits regardless of whether the launcher terminated it, so the pid observation cannot attribute the kill. The launcher's own report of having SEEN its child exit is what distinguishes the two, and that is what is asserted."
+      }
+    ]
+  },
+  "notes": "⚠️ THE THREE CLEANUP OBSERVATIONS ARE NECESSARY AND NOT SUFFICIENT, AND THAT WAS MEASURED RATHER THAN REASONED. With child termination and its escalation commented out of the launcher entirely, the child was STILL gone 500ms after the launcher exited — Windows reaps it when its parent goes — so the first version of this test passed against a launcher that terminated nothing. Exactly the defect the review-write concurrency test had, found the same way. ⚠️ WHAT DISTINGUISHES THEM IS WHETHER THE LAUNCHER SAW ITS CHILD EXIT. Terminating it, the launcher observes the exit and reports `stopped.`; not terminating it, it waits out the grace period, escalates, and reports `stopped, but the child did not report exiting`. The message and the elapsed time are both asserted, and with termination disabled the test now fails on the message. ⚠️ A GRACEFUL SIGNAL IS NOT DELIVERABLE ON WINDOWS, WHICH THE FIRST RUN DEMONSTRATED. `process.kill(pid, 'SIGTERM')` is `TerminateProcess`: the launcher died instantly, no handler ran, cleanup never happened, and two run directories survived in the temp root. Ctrl+C reaches the process everywhere and is the operator's path; a supervising process writes `stop` to stdin or closes it. The affordance exists because the guarantee was otherwise unprovable on the platform this project runs on. ⚠️ THE HEARTBEAT PRECONDITION IS LOAD-BEARING. The watcher is created on first subscription, so a test that started the launcher and stopped it would observe the flawless teardown of something that never existed, and would keep passing if the watcher were never released."
+}
