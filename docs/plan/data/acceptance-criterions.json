@@ -350,13 +350,19 @@
     "evaluates": [
       "CMP-0013"
     ],
+    "evidencedBy": [
+      "EVD-0071"
+    ],
     "id": "ACC-0020",
-    "lifecycle": "active",
-    "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail. ⚠️ AMENDED 2026-08-27 WITH A PROTOCOL, because the number alone was not a test. A budget with no pinned environment, no timing boundary and no warm-up treatment produces a figure nobody can reproduce or dispute, and 'p95 under 300 ms' would have been satisfiable by measuring the wrong thing on an unstated machine. ⚠️ THE VERIFICATION CLAUSE IS THE ONE THAT MATTERS MOST, and it is not routine hygiene. Without it the easiest way to pass is to cache the compiled document — which would report excellent numbers while measuring nothing, and would ALSO violate DEC-0020's request-time requirement and AST-0030's finding underneath it. A void run is not a failure and must not be recorded as one; it means the instrument was wrong, which is a different problem from the budget being missed. ⚠️ The 300 ms is still a TARGET rather than a measurement, and DEC-0020's third obligation stands: if the first valid run misses it by a wide margin the answer is that decision's own second alternative, plain markdown for stage documents — not a larger number.",
-    "outcome": "not-evaluated",
+    "lifecycle": "superseded",
+    "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail. ⚠️ AMENDED 2026-08-27 WITH A PROTOCOL, because the number alone was not a test. A budget with no pinned environment, no timing boundary and no warm-up treatment produces a figure nobody can reproduce or dispute, and 'p95 under 300 ms' would have been satisfiable by measuring the wrong thing on an unstated machine. ⚠️ THE VERIFICATION CLAUSE IS THE ONE THAT MATTERS MOST, and it is not routine hygiene. Without it the easiest way to pass is to cache the compiled document — which would report excellent numbers while measuring nothing, and would ALSO violate DEC-0020's request-time requirement and AST-0030's finding underneath it. A void run is not a failure and must not be recorded as one; it means the instrument was wrong, which is a different problem from the budget being missed. ⚠️ The 300 ms is still a TARGET rather than a measurement, and DEC-0020's third obligation stands: if the first valid run misses it by a wide margin the answer is that decision's own second alternative, plain markdown for stage documents — not a larger number. ⚠️ EVALUATED 2026-08-28 (EVD-0071): FAIL, and the reason is not the compiler. Six valid runs, three at 245-254 ms and three at 315-375 ms against the 300 ms budget. A criterion stated as a p95 ceiling is not met when half the valid measurements are above it, so this is `fail` rather than a pass with a caveat — but it is also NOT the failure this criterion anticipated. ⚠️ THE FALLBACK CLAUSE IS AIMED AT THE WRONG COST. MDX compilation measured 15-29 ms p95, 4-12% of the span; the planning-content read measured 234-359 ms. Applying DEC-0020's second alternative would surrender the restricted-MDX contract to remove roughly 20 ms and would still miss the budget. That clause was written when the cost was unmeasured; it now is, and it is somewhere else. ⚠️ THE PROTOCOL ITSELF NEEDS ONE MORE PIN. It fixes the host, document, warm-up, sample and timing boundary, but 'no other significant load' is not enforceable, and the read is I/O and validation heavy enough that ambient load moves the p95 by 50%. A protocol whose verdict flips between identical runs cannot settle a pass/fail question, whatever the number is. ⚠️ CORRECTED 2026-08-28: the 234-359 ms span was attributed here to reading all 253 artifacts per request. It is not. `readStageDocument` awaits `connection()` and reads the nine stage documents only — `lintProject` is not on its path. What inside that span costs the time is an open question, not a known cost. ⚠️ SUPERSEDED 2026-08-28 BY ACC-0037, WITH THE FAILURE LEFT STANDING. The outcome remains `fail` and this record remains readable: the budget was missed and that is history now, not a tick that was quietly flipped. What changed is the question being asked. This criterion bounded read-plus-compile, and the measurement showed the read dominates and the compiler does not, so ACC-0037 bounds the compile alone and QST-0025 carries the read as an open question. DEC-0025 records why the plain-Markdown fallback did not fire. ⚠️ THE SUCCESSOR IS NOT THIS ONE RELABELLED. Superseding a failed criterion with a wider version of the same claim would be editing the failure rather than answering it; the successor measures a different, narrower thing, and the part it dropped is carried by a question rather than dropped.",
+    "outcome": "fail",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The 95th-percentile server-side time to compile and render the largest stage document in the project is at or below 300 ms, measured under this protocol. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. TIMING BOUNDARY: from the moment the request handler begins the planning-content read to the moment the rendered document markup is complete, measured server-side; network and client time are excluded. WARM-UP: 10 requests are issued and discarded before measurement begins. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency, are the measured set. VERIFICATION: each of the 50 must be shown to have actually compiled — a counter incremented per compile, or an equivalent observation, reported with the result. A run in which any measured request did not compile is VOID, not a pass.",
+    "supersededBy": [
+      "ACC-0037"
+    ],
     "title": "Per-request compilation stays within 300 ms at p95, under a pinned protocol",
     "type": "acceptance-criterion",
     "verifies": [
@@ -529,10 +535,13 @@
     "evaluates": [
       "CMP-0017"
     ],
+    "evidencedBy": [
+      "EVD-0075"
+    ],
     "id": "ACC-0029",
     "lifecycle": "active",
     "notes": "AST-0034 measured the skeleton's idle and dead streams as byte-identical, which is the strongest possible form of indistinguishable. 'Not by colour alone' keeps the fix legible to anyone who cannot rely on a colour difference.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "When heartbeats stop arriving, the page shows a stale indication that is distinguishable from the healthy state by text or icon and not by colour alone, within the configured watchdog window.",
@@ -546,10 +555,13 @@
     "evaluates": [
       "CMP-0017"
     ],
+    "evidencedBy": [
+      "EVD-0075"
+    ],
     "id": "ACC-0030",
     "lifecycle": "active",
     "notes": "AST-0034 measured the gap being lost with nothing to recover it from. The last sentence records the design that makes this cheap: because events are hints and never deltas, a reconnecting client that reloads is exactly caught up.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "After the stream drops and reconnects, the client reloads, and a content change made during the disconnected window is reflected in what the page then shows. No event buffer, event id or `Last-Event-ID` handling is required to achieve this.",
@@ -583,13 +595,16 @@
     "evaluates": [
       "CMP-0020"
     ],
+    "evidencedBy": [
+      "EVD-0073"
+    ],
     "id": "ACC-0032",
     "lifecycle": "active",
-    "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`.",
-    "outcome": "not-evaluated",
+    "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`. ⚠️ CORRECTED 2026-08-29: THERE IS NO SECOND PROCESS, AND THERE NEVER WAS ONE TO OWN. This artifact previously said the launcher owns 'both the application process and the file watcher' and 'terminates the watcher with the application'. The watcher is chokidar, imported dynamically INSIDE the `next start` process and held by the change-stream service in that process's memory. A parent launcher cannot call `changeStream.close()` across that boundary without adding IPC or a shutdown endpoint, and neither is justified for a local-first tool. The old wording described a mechanism that could not be built, which is worse than an unmet obligation: it would have been 'satisfied' by a launcher that called nothing and reported success. ⚠️ WHAT IS TRUE INSTEAD, and all of it is enforceable. The launcher owns ONE child: the `next start` process. The change-stream service owns its watcher and closes it when its last subscriber leaves — already built and tested under TSK-0011. Terminating the application process releases any watcher still open through process teardown, which is the operating system's guarantee rather than the launcher's. `close()` stays what it is: a service and test lifecycle operation, never something the launcher claims to call across a process boundary. ⚠️ THIS CRITERION WAS UNSATISFIABLE AS WRITTEN, WHICH IS WHY IT IS AMENDED RATHER THAN REPHRASED. It required that 'no watcher process remains'. There is no watcher process, so the clause could never be observed either true or false — and an unobservable clause in a criterion whose whole point is 'verified by observation, not by the absence of an error' is the exact defect that rule exists to catch, sitting inside the rule. It is amended rather than superseded because it has never been evaluated: no measurement is being retired, and there is no failed outcome to preserve. ⚠️ THE HEARTBEAT PRECONDITION IS PART OF THE CRITERION, not of the test that runs it. The watcher is created lazily on first subscription, so a run that never subscribed would satisfy every remaining clause while having nothing to clean up.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+    "statement": "After the documented launch command is run and then terminated, the child process it started is gone, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error. The run must have opened `/events` and observed a heartbeat before termination, so that a file watcher is known to have existed.",
     "title": "Stopping the launcher leaves nothing behind",
     "type": "acceptance-criterion",
     "verifies": [
@@ -600,10 +615,13 @@
     "evaluates": [
       "CMP-0020"
     ],
+    "evidencedBy": [
+      "EVD-0074"
+    ],
     "id": "ACC-0033",
     "lifecycle": "active",
-    "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
-    "outcome": "not-evaluated",
+    "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server. ⚠️ MARKED `pass` IN ERROR ON 2026-08-29 AND RETURNED TO `not-evaluated` THE SAME DAY. EVD-0073 recorded, in its own omissions, that the install branch was never taken: `node_modules` was present in every run, so the launcher printed `dependencies present; skipping install`. This criterion says 'on a machine with... no prior application state' and 'installs and starts'. Half of it was measured and the whole of it was ticked. ⚠️ THE EVIDENCE ITSELF SAID SO, WHICH IS THE PART WORTH RECORDING. The omission was written down accurately and then contradicted by the outcome three lines later — a criterion marked against evidence that explicitly disclaims the thing being claimed. Recording an omission is not the same as honouring it. ⚠️ WHAT WOULD SETTLE IT: the documented command run in a disposable copy of the repository with no `node_modules` and no `.next`, installing, building, serving and cleaning up with no further steps. ⚠️ EVALUATED PROPERLY 2026-08-29 (EVD-0074) AND RETURNED TO `pass`. The documented command was run in a disposable copy holding only tracked files, with `node_modules` and `.next` confirmed absent. It installed, built, served and cleaned up in 27.2s with no further steps, and the install branch was asserted positively rather than inferred from the run succeeding.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
@@ -617,10 +635,13 @@
     "evaluates": [
       "CMP-0018"
     ],
+    "evidencedBy": [
+      "EVD-0072"
+    ],
     "id": "ACC-0034",
     "lifecycle": "active",
     "notes": "The byte-identical clause is what makes this objective rather than a claim about intent. #82's two-axis split is the reason `lifecycle` is named explicitly: one `status` field would have let this endpoint retire an artifact by accident.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The review action identifies the artifact by id and type and shows its current status. Submitting a change updates only that artifact's `reviewStatus`, through the existing typed write path with its lock and atomic write; the artifact's `lifecycle` and every other artifact on disk are byte-identical afterwards.",
@@ -666,6 +687,26 @@
     "schemaVersion": 2,
     "statement": "When the restricted compiler refuses a stage document, the served page renders an error inside the document region that (a) is visible in the response body, (b) names the document by a REPOSITORY-RELATIVE path, (c) carries a line and column, and (d) has its diagnostic text HTML-escaped rather than interpolated as markup. The stage's exit criteria and the rest of the page still render. A partial page returning HTTP 200 satisfies this criterion; a response whose document region contains only an opaque error digest, or nothing at all, FAILS it.",
     "title": "A refused stage document fails VISIBLY, in the document region, with a location",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0017"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0013"
+    ],
+    "evidencedBy": [
+      "EVD-0071"
+    ],
+    "id": "ACC-0037",
+    "lifecycle": "active",
+    "notes": "⚠️ IT SUCCEEDS ACC-0020 AND IT IS NOT ACC-0020 WITH A BIGGER NUMBER. The predecessor bounded read-plus-compile at 300 ms and failed, but the measurement showed the failure came from the read. Widening that budget would have hidden a real unknown behind a comfortable ceiling. This one bounds only the cost that was ever in dispute — whether request-time MDX compilation is affordable — and the read it excluded is carried by its own open question, not dropped. ⚠️ 50 ms IS ROUGHLY TWICE THE MEASURED WORST CASE (29.05 ms p95 across six runs), chosen as headroom for document growth rather than as a description of today. A criterion set at the measurement passes by construction and detects nothing. ⚠️ THE VERIFICATION CLAUSE IS INHERITED DELIBERATELY, and it has been falsified: memoising the compiled document makes `bin/bench-compile.mjs` report VOID with a non-zero exit and no timing figures at all. Without it the cheapest way to pass a compile budget is to stop compiling, which would also break DEC-0020's request-time requirement and AST-0030's finding beneath it. ⚠️ EVALUATED `pass` ON EVD-0071, the same six runs that failed the predecessor: compile p95 was 15.41-29.05 ms in every one. The evidence did not change; the question it was asked did.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The 95th-percentile time spent in `compileStageDocument` for the largest stage document is at or below 50 ms. MEASURED SPAN: the compile call alone — from the moment the reader's document is handed to the compiler to the moment a renderable component is returned — EXCLUDING the planning-content read that precedes it, which is a separate cost under a separate question. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version, @mdx-js/mdx version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. WARM-UP: 10 requests issued and discarded. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency. VERIFICATION: the compile counter must advance by exactly one per measured request. A run in which any measured request did not compile is VOID, not a pass.",
+    "title": "Restricted-MDX compilation stays within 50 ms at p95, under ACC-0020's protocol",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0017"

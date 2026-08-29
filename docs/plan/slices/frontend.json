@@ -106,10 +106,13 @@
       "evaluates": [
         "CMP-0017"
       ],
+      "evidencedBy": [
+        "EVD-0075"
+      ],
       "id": "ACC-0029",
       "lifecycle": "active",
       "notes": "AST-0034 measured the skeleton's idle and dead streams as byte-identical, which is the strongest possible form of indistinguishable. 'Not by colour alone' keeps the fix legible to anyone who cannot rely on a colour difference.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "When heartbeats stop arriving, the page shows a stale indication that is distinguishable from the healthy state by text or icon and not by colour alone, within the configured watchdog window.",
@@ -123,10 +126,13 @@
       "evaluates": [
         "CMP-0017"
       ],
+      "evidencedBy": [
+        "EVD-0075"
+      ],
       "id": "ACC-0030",
       "lifecycle": "active",
       "notes": "AST-0034 measured the gap being lost with nothing to recover it from. The last sentence records the design that makes this cheap: because events are hints and never deltas, a reconnecting client that reloads is exactly caught up.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "After the stream drops and reconnects, the client reloads, and a content change made during the disconnected window is reflected in what the page then shows. No event buffer, event id or `Last-Event-ID` handling is required to achieve this.",
@@ -155,6 +161,26 @@
       "type": "acceptance-criterion",
       "verifies": [
         "REQ-0016"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0016"
+      ],
+      "evidencedBy": [
+        "EVD-0066"
+      ],
+      "id": "ACC-0036",
+      "lifecycle": "active",
+      "notes": "⚠️ WRITTEN FROM A MEASUREMENT, not from caution. AST-0039 recorded what production actually does when the compiler refuses a document inside a `<Suspense>` boundary: HTTP 200, because the shell has already streamed, and a React error digest with no message, no path and no position. The compiler's diagnostic is exact and reaches only the server log. ⚠️ 200 IS NOT THE DEFECT AND IS EXPLICITLY ACCEPTED. Streaming means the status is committed before the failure is known, and demanding a 5xx would mean giving up streaming for a document the operator can be told about in place. What is refused is INVISIBILITY — a blank region and a success status for a document the compiler rejected precisely. ⚠️ THE ESCAPING CLAUSE IS NOT HOUSEKEEPING. The diagnostic quotes the offending source, which is agent-authored content; rendering it as markup would let a refused document inject into the page that reports its refusal — turning the safety mechanism into the delivery route. ⚠️ 'The rest of the page still renders' is what makes this a criterion about ONE region rather than about error handling in general: the exit criteria live behind their own boundary and a refused document must not take them down with it.",
+      "outcome": "pass",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "When the restricted compiler refuses a stage document, the served page renders an error inside the document region that (a) is visible in the response body, (b) names the document by a REPOSITORY-RELATIVE path, (c) carries a line and column, and (d) has its diagnostic text HTML-escaped rather than interpolated as markup. The stage's exit criteria and the rest of the page still render. A partial page returning HTTP 200 satisfies this criterion; a response whose document region contains only an opaque error digest, or nothing at all, FAILS it.",
+      "title": "A refused stage document fails VISIBLY, in the document region, with a location",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
       ]
     }
   ],
@@ -191,16 +217,17 @@
     {
       "acceptedBy": [
         "ACC-0016",
-        "ACC-0018"
+        "ACC-0018",
+        "ACC-0036"
       ],
       "dependsOn": [
         "TSK-0008",
         "TSK-0007"
       ],
       "derivedStatus": {
-        "passed": 2,
+        "passed": 3,
         "status": "accepted",
-        "total": 2
+        "total": 3
       },
       "fulfils": [
         "REQ-0017",
@@ -212,7 +239,7 @@
       ],
       "lifecycle": "active",
       "notes": "At most one stage document per render: DEC-0020's per-request compilation cost is unmeasured, and a view rendering several would multiply an unknown. ⚠️ DONE 2026-08-28. The smoke check now covers `/stage/[stageId]` and requires every region to RESOLVE — criteria, criterion rows, document and review — then rewrites the document in the copy twice: once with a permitted component, asserting it renders, and once with an unmapped one, asserting a located and escaped refusal beside intact criteria. Falsified by removing the catch: the rejection escapes, the region goes blank, and the check fails. ⚠️ ONE THING IS MEASURED AND NOT FIXABLE HERE: an unknown stage returns 200, not 404. `notFound()` runs inside a Suspense child, so the status is committed before the stage turns out not to exist. Validating earlier means reading in the route entry, which the boundary check refuses — so the honest position is that the failure is VISIBLE (Next.js's not-found UI) while the status is not available to make truthful. Recorded as an omission rather than quietly accepted.",
-      "reviewStatus": "approved",
+      "reviewStatus": "amended",
       "role": "frontend",
       "schemaVersion": 2,
       "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
@@ -275,6 +302,35 @@
       "schemaVersion": 2,
       "statement": "Add to `/`: artifact totals for each type, lint findings surfaced rather than re-judged, and reporting for a file that fails to parse — named with its path and a position, omitted from the page, and subtracted from its type's total. No rendered total may include an artifact the page did not render.",
       "title": "Build the project view's artifact totals, lint surface and located parse failures",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0029",
+        "ACC-0030"
+      ],
+      "dependsOn": [
+        "TSK-0011"
+      ],
+      "derivedStatus": {
+        "passed": 2,
+        "status": "accepted",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0018"
+      ],
+      "id": "TSK-0017",
+      "implements": [
+        "CMP-0017"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Split from TSK-0011 on 2026-08-27. This is the half REQ-0018's second clause actually lands on. AST-0034 measured the skeleton's idle and dead streams as byte-identical and no client-side cleverness recovers a difference that was never transmitted — but equally, a heartbeat nothing listens for is not visibility either, so neither half is sufficient alone. ⚠️ Reload on reconnection is what removes the work: events are hints and never deltas (#73), so a reconnecting client that reloads is exactly caught up and no replay machinery is needed. ⚠️ DONE 2026-08-28. Thirteen deterministic tests plus a production check that the client half actually reaches the browser. ⚠️ ACC-0029 AND ACC-0030 REMAIN NOT-EVALUATED, DELIBERATELY. No browser was available, so a visibly stale page within the watchdog window and a reconnection that recovers a missed change have not been seen happening. They are the two criteria a reasonable person would most want ticked, which is precisely why they are not. ⚠️ THE BOUNDARY CHECK RELOCATED THE CODE. `lib/stream-watchdog.mjs` was refused by `lint:shell` on its first run; `app/server/*` was impossible because `server-only` throws in a client component. `app/_stream/logic.js` is neither tool nor adapter, which is what a client component needs — the same shape `app/_mdx/reject-js.js` already had. ⚠️ THE SMOKE CHECK LOOKS PAST THE HTML. Server-rendered markup for a client component is identical whether or not the script ships, so the check fetches every script the page loads and requires one to contain the component's own text. Falsified with a static stand-in that passes the markup assertions and fails only that one.",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.",
+      "title": "Build the change-stream client: listener, watchdog, stale state, reload on reconnect",
       "type": "task"
     }
   ],
@@ -343,10 +399,15 @@
         "lib/change-stream.mjs",
         "app/server/change-stream.js",
         "app/events/route.js",
-        "test/change-stream.test.mjs"
+        "app/_stream/logic.js",
+        "app/_stream/watchdog.js",
+        "app/layout.js",
+        "bin/browser-check.mjs",
+        "test/change-stream.test.mjs",
+        "test/stream-watchdog.test.mjs"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly. ⚠️ SERVER HALF BUILT 2026-08-28 BY TSK-0011. ACC-0028 and ACC-0031 pass. ACC-0029 (a stopped heartbeat produces a visibly stale page) and ACC-0030 (reconnect reloads and recovers a missed change) stay `not-evaluated` — they are about the CLIENT, and TSK-0017 owns it. ⚠️ IT IS A SERVICE, NOT AN IMPORT-TIME SIDE EFFECT. Nothing starts until the first subscription, chokidar is imported dynamically inside the factory, and `close()` is explicit for TSK-0013's launcher to own. `next build` imports every route module to collect page data, and a watcher started at import would run during the build and outlive it. ⚠️ THE WATCHER IS SHARED AND THE SUBSCRIBERS ARE NOT. One tab closing clears its own timer and leaves every other page refreshing; the watcher closes when the last subscriber leaves. ⚠️ A FAILURE IS BROADCAST THEN THE STREAMS CLOSE, so a client can tell a dead watcher from a dropped connection. Logging alone would leave every open page looking healthy while nothing could ever refresh it — DEC-0022's rule, and the reason this is an event rather than a console line.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly. ⚠️ SERVER HALF BUILT 2026-08-28 BY TSK-0011. ACC-0028 and ACC-0031 pass. ACC-0029 (a stopped heartbeat produces a visibly stale page) and ACC-0030 (reconnect reloads and recovers a missed change) stay `not-evaluated` — they are about the CLIENT, and TSK-0017 owns it. ⚠️ IT IS A SERVICE, NOT AN IMPORT-TIME SIDE EFFECT. Nothing starts until the first subscription, chokidar is imported dynamically inside the factory, and `close()` is explicit so the service and its tests can end it deterministically. `next build` imports every route module to collect page data, and a watcher started at import would run during the build and outlive it. ⚠️ THE WATCHER IS SHARED AND THE SUBSCRIBERS ARE NOT. One tab closing clears its own timer and leaves every other page refreshing; the watcher closes when the last subscriber leaves. ⚠️ A FAILURE IS BROADCAST THEN THE STREAMS CLOSE, so a client can tell a dead watcher from a dropped connection. Logging alone would leave every open page looking healthy while nothing could ever refresh it — DEC-0022's rule, and the reason this is an event rather than a console line. ⚠️ CLIENT HALF BUILT 2026-08-28 BY TSK-0017 (EVD-0070). ACC-0029 and ACC-0030 STAY `not-evaluated`: no browser was available, and both are about what a page does, not about what the logic would do. The logic behind them is tested; the behaviour is not observed, and marking them would claim a measurement nobody took. ⚠️ IT IS THE APPLICATION'S ONLY CLIENT COMPONENT, and it holds nothing a reload would lose — DEC-0023's rule as corrected. `location.reload()` rather than an assignment, so the URL and with it both selections survive every refresh this component causes. ⚠️ STATE IS TEXT FIRST, icon second, colour last. AST-0034 measured an idle stream and a dead one as byte-identical: this indicator is the only thing between the operator and a page that looks fine while nothing can refresh it, so it must not depend on colour to be read. ⚠️ CORRECTED 2026-08-29: an earlier note here said `close()` was 'explicit for TSK-0013's launcher to own'. It is not and cannot be — the launcher is a parent process and this service is an in-process singleton inside its child. `close()` is a SERVICE AND TEST lifecycle operation: the service calls it when its last subscriber leaves, and tests call it to end a stream deterministically. What the launcher contributes is terminating the child, after which process teardown releases anything still open. ⚠️ ACC-0029 AND ACC-0030 EVALUATED 2026-08-29 IN A REAL BROWSER (EVD-0075); both pass, and the first run of that evaluation FAILED and found a defect that made this component inert in every shipped page. `timers = { setTimeout, clearTimeout }` throws `Illegal invocation` in a browser (AST-0040); the watchdog never armed, and the indicator reported a healthy stream forever. Thirteen unit tests passed throughout, because every one of them injected timers and none called the default. ⚠️ `test/stream-watchdog.test.mjs` NOW CALLS THE DEFAULT with `globalThis.setTimeout` wrapped in the same brand check a browser applies, so the defect is catchable in Node from now on. It was falsified against the original code before being trusted.",
       "responsibility": "Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -421,35 +482,5 @@
     }
   ],
   "role": "frontend",
-  "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0029",
-        "ACC-0030"
-      ],
-      "dependsOn": [
-        "TSK-0011"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 2
-      },
-      "fulfils": [
-        "REQ-0018"
-      ],
-      "id": "TSK-0017",
-      "implements": [
-        "CMP-0017"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ Split from TSK-0011 on 2026-08-27. This is the half REQ-0018's second clause actually lands on. AST-0034 measured the skeleton's idle and dead streams as byte-identical and no client-side cleverness recovers a difference that was never transmitted — but equally, a heartbeat nothing listens for is not visibility either, so neither half is sufficient alone. ⚠️ Reload on reconnection is what removes the work: events are hints and never deltas (#73), so a reconnecting client that reloads is exactly caught up and no replay machinery is needed.",
-      "reviewStatus": "approved",
-      "role": "frontend",
-      "schemaVersion": 2,
-      "statement": "Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.",
-      "title": "Build the change-stream client: listener, watchdog, stale state, reload on reconnect",
-      "type": "task"
-    }
-  ]
+  "tasks": []
 }

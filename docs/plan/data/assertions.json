@@ -1590,5 +1590,36 @@
     },
     "title": "A refused stage document reaches the browser as a 200 and an opaque digest",
     "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0075"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0040",
+    "lifecycle": "active",
+    "notes": "⚠️ MEASURED IN HEADLESS CHROME, NOT REASONED ABOUT. In the page: `(() => { const t = { setTimeout }; try { t.setTimeout(()=>{},10) } catch (e) { return e.message } })()` returned `Illegal invocation`, while the same call wrapped as `(...a) => setTimeout(...a)` returned an id. Two `Illegal invocation` exceptions were recorded per page load. ⚠️ THE CONSEQUENCE IS SILENT BECAUSE THE THROW HAPPENS INSIDE AN EVENT LISTENER, which swallows it. The handler had already set the visible state before arming the timer, so the page showed its healthy state and simply never left it. ⚠️ NARROWED 2026-08-29, AND THE ORIGINAL WORDING IS WHY THIS NOTE EXISTS. It said the hazard was general — that `{ fetch }`, `{ addEventListener }` and `{ requestAnimationFrame }` 'all behave the same way'. NONE of those was measured. Two functions were. Reaching from one measured brand check to every browser global is the same move DEC-0020's fallback made about the compiler and the read span made about `lintProject`: a plausible cause stated with the confidence of an observed one, in an artifact whose whole purpose is to keep those apart. ⚠️ WHAT THE EVIDENCE DOES ESTABLISH: a receiver-sensitive browser function can fail when copied into a collaborator object and invoked as its method. Which functions are receiver-sensitive is a question this measurement does not answer. ⚠️ NO LINT RULE, BY PM DECISION. The default-path regression test in `test/stream-watchdog.test.mjs` protects the actual defect — it calls the shipped default with `globalThis.setTimeout` wrapped in a browser's brand check, and fails against the original code. A shared browser-adapter rule becomes worth building if a SECOND receiver-sensitive API is introduced, or if this defect recurs. Until then a rule would generalise from one instance, which is the error this note was written to record.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A receiver-sensitive browser function can fail when copied into a collaborator object and later invoked as that object's method. MEASURED CASE: `const timers = { setTimeout, clearTimeout }` followed by `timers.setTimeout(fn, ms)` throws `TypeError: Illegal invocation`, because `Window.setTimeout`'s WebIDL brand check requires `this` to be the Window and the method call passes the containing object instead. Node applies no such check, so the identical code works there and every Node test of it passes. This claim covers `setTimeout` and `clearTimeout`; it does NOT assert that any other browser global behaves this way.",
+    "supportedBy": [
+      "EVD-0075"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "browser": "Google Chrome, headless=new, driven over CDP with no automation library"
+      }
+    },
+    "title": "A receiver-sensitive browser function can fail when copied into a collaborator object",
+    "type": "assertion"
   }
 ]

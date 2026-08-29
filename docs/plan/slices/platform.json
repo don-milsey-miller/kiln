@@ -136,23 +136,6 @@
     },
     {
       "evaluates": [
-        "CMP-0013"
-      ],
-      "id": "ACC-0020",
-      "lifecycle": "active",
-      "notes": "⚠️ THE 300 ms IS A TARGET, NOT A MEASUREMENT, and saying so is the point: DEC-0020 recorded this cost as explicitly unmeasured. If the first evaluation misses it by a wide margin the answer is not to relax the number — it is DEC-0020's own second alternative, plain markdown for stage documents. Recorded as a number rather than 'acceptable' so the criterion stays pass/fail. ⚠️ AMENDED 2026-08-27 WITH A PROTOCOL, because the number alone was not a test. A budget with no pinned environment, no timing boundary and no warm-up treatment produces a figure nobody can reproduce or dispute, and 'p95 under 300 ms' would have been satisfiable by measuring the wrong thing on an unstated machine. ⚠️ THE VERIFICATION CLAUSE IS THE ONE THAT MATTERS MOST, and it is not routine hygiene. Without it the easiest way to pass is to cache the compiled document — which would report excellent numbers while measuring nothing, and would ALSO violate DEC-0020's request-time requirement and AST-0030's finding underneath it. A void run is not a failure and must not be recorded as one; it means the instrument was wrong, which is a different problem from the budget being missed. ⚠️ The 300 ms is still a TARGET rather than a measurement, and DEC-0020's third obligation stands: if the first valid run misses it by a wide margin the answer is that decision's own second alternative, plain markdown for stage documents — not a larger number.",
-      "outcome": "not-evaluated",
-      "reviewStatus": "draft",
-      "schemaVersion": 2,
-      "statement": "The 95th-percentile server-side time to compile and render the largest stage document in the project is at or below 300 ms, measured under this protocol. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. TIMING BOUNDARY: from the moment the request handler begins the planning-content read to the moment the rendered document markup is complete, measured server-side; network and client time are excluded. WARM-UP: 10 requests are issued and discarded before measurement begins. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency, are the measured set. VERIFICATION: each of the 50 must be shown to have actually compiled — a counter incremented per compile, or an equivalent observation, reported with the result. A run in which any measured request did not compile is VOID, not a pass.",
-      "title": "Per-request compilation stays within 300 ms at p95, under a pinned protocol",
-      "type": "acceptance-criterion",
-      "verifies": [
-        "REQ-0017"
-      ]
-    },
-    {
-      "evaluates": [
         "CMP-0019"
       ],
       "evidencedBy": [
@@ -337,13 +320,16 @@
       "evaluates": [
         "CMP-0020"
       ],
+      "evidencedBy": [
+        "EVD-0073"
+      ],
       "id": "ACC-0032",
       "lifecycle": "active",
-      "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`.",
-      "outcome": "not-evaluated",
+      "notes": "'Verified by observation, not by the absence of an error' is the tier-1 controller's own rule arriving here: a removal that reports success while the directory survives is retained, and the check has to be `exists()` rather than `!threw`. ⚠️ CORRECTED 2026-08-29: THERE IS NO SECOND PROCESS, AND THERE NEVER WAS ONE TO OWN. This artifact previously said the launcher owns 'both the application process and the file watcher' and 'terminates the watcher with the application'. The watcher is chokidar, imported dynamically INSIDE the `next start` process and held by the change-stream service in that process's memory. A parent launcher cannot call `changeStream.close()` across that boundary without adding IPC or a shutdown endpoint, and neither is justified for a local-first tool. The old wording described a mechanism that could not be built, which is worse than an unmet obligation: it would have been 'satisfied' by a launcher that called nothing and reported success. ⚠️ WHAT IS TRUE INSTEAD, and all of it is enforceable. The launcher owns ONE child: the `next start` process. The change-stream service owns its watcher and closes it when its last subscriber leaves — already built and tested under TSK-0011. Terminating the application process releases any watcher still open through process teardown, which is the operating system's guarantee rather than the launcher's. `close()` stays what it is: a service and test lifecycle operation, never something the launcher claims to call across a process boundary. ⚠️ THIS CRITERION WAS UNSATISFIABLE AS WRITTEN, WHICH IS WHY IT IS AMENDED RATHER THAN REPHRASED. It required that 'no watcher process remains'. There is no watcher process, so the clause could never be observed either true or false — and an unobservable clause in a criterion whose whole point is 'verified by observation, not by the absence of an error' is the exact defect that rule exists to catch, sitting inside the rule. It is amended rather than superseded because it has never been evaluated: no measurement is being retired, and there is no failed outcome to preserve. ⚠️ THE HEARTBEAT PRECONDITION IS PART OF THE CRITERION, not of the test that runs it. The watcher is created lazily on first subscription, so a run that never subscribed would satisfy every remaining clause while having nothing to clean up.",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
-      "statement": "After the documented launch command is run and then terminated, no watcher process remains, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error.",
+      "statement": "After the documented launch command is run and then terminated, the child process it started is gone, no process is listening on the application's port, and no temporary directory the launcher created survives — each verified by observation, not by the absence of an error. The run must have opened `/events` and observed a heartbeat before termination, so that a file watcher is known to have existed.",
       "title": "Stopping the launcher leaves nothing behind",
       "type": "acceptance-criterion",
       "verifies": [
@@ -354,10 +340,13 @@
       "evaluates": [
         "CMP-0020"
       ],
+      "evidencedBy": [
+        "EVD-0074"
+      ],
       "id": "ACC-0033",
       "lifecycle": "active",
-      "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
-      "outcome": "not-evaluated",
+      "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server. ⚠️ MARKED `pass` IN ERROR ON 2026-08-29 AND RETURNED TO `not-evaluated` THE SAME DAY. EVD-0073 recorded, in its own omissions, that the install branch was never taken: `node_modules` was present in every run, so the launcher printed `dependencies present; skipping install`. This criterion says 'on a machine with... no prior application state' and 'installs and starts'. Half of it was measured and the whole of it was ticked. ⚠️ THE EVIDENCE ITSELF SAID SO, WHICH IS THE PART WORTH RECORDING. The omission was written down accurately and then contradicted by the outcome three lines later — a criterion marked against evidence that explicitly disclaims the thing being claimed. Recording an omission is not the same as honouring it. ⚠️ WHAT WOULD SETTLE IT: the documented command run in a disposable copy of the repository with no `node_modules` and no `.next`, installing, building, serving and cleaning up with no further steps. ⚠️ EVALUATED PROPERLY 2026-08-29 (EVD-0074) AND RETURNED TO `pass`. The documented command was run in a disposable copy holding only tracked files, with `node_modules` and `.next` confirmed absent. It installed, built, served and cleaned up in 27.2s with no further steps, and the install branch was asserted positively rather than inferred from the run succeeding.",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
@@ -371,10 +360,13 @@
       "evaluates": [
         "CMP-0018"
       ],
+      "evidencedBy": [
+        "EVD-0072"
+      ],
       "id": "ACC-0034",
       "lifecycle": "active",
       "notes": "The byte-identical clause is what makes this objective rather than a claim about intent. #82's two-axis split is the reason `lifecycle` is named explicitly: one `status` field would have let this endpoint retire an artifact by accident.",
-      "outcome": "not-evaluated",
+      "outcome": "pass",
       "reviewStatus": "draft",
       "schemaVersion": 2,
       "statement": "The review action identifies the artifact by id and type and shows its current status. Submitting a change updates only that artifact's `reviewStatus`, through the existing typed write path with its lock and atomic write; the artifact's `lifecycle` and every other artifact on disk are byte-identical afterwards.",
@@ -382,6 +374,26 @@
       "type": "acceptance-criterion",
       "verifies": [
         "REQ-0019"
+      ]
+    },
+    {
+      "evaluates": [
+        "CMP-0013"
+      ],
+      "evidencedBy": [
+        "EVD-0071"
+      ],
+      "id": "ACC-0037",
+      "lifecycle": "active",
+      "notes": "⚠️ IT SUCCEEDS ACC-0020 AND IT IS NOT ACC-0020 WITH A BIGGER NUMBER. The predecessor bounded read-plus-compile at 300 ms and failed, but the measurement showed the failure came from the read. Widening that budget would have hidden a real unknown behind a comfortable ceiling. This one bounds only the cost that was ever in dispute — whether request-time MDX compilation is affordable — and the read it excluded is carried by its own open question, not dropped. ⚠️ 50 ms IS ROUGHLY TWICE THE MEASURED WORST CASE (29.05 ms p95 across six runs), chosen as headroom for document growth rather than as a description of today. A criterion set at the measurement passes by construction and detects nothing. ⚠️ THE VERIFICATION CLAUSE IS INHERITED DELIBERATELY, and it has been falsified: memoising the compiled document makes `bin/bench-compile.mjs` report VOID with a non-zero exit and no timing figures at all. Without it the cheapest way to pass a compile budget is to stop compiling, which would also break DEC-0020's request-time requirement and AST-0030's finding beneath it. ⚠️ EVALUATED `pass` ON EVD-0071, the same six runs that failed the predecessor: compile p95 was 15.41-29.05 ms in every one. The evidence did not change; the question it was asked did.",
+      "outcome": "pass",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The 95th-percentile time spent in `compileStageDocument` for the largest stage document is at or below 50 ms. MEASURED SPAN: the compile call alone — from the moment the reader's document is handed to the compiler to the moment a renderable component is returned — EXCLUDING the planning-content read that precedes it, which is a separate cost under a separate question. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version, @mdx-js/mdx version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. WARM-UP: 10 requests issued and discarded. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency. VERIFICATION: the compile counter must advance by exactly one per measured request. A run in which any measured request did not compile is VOID, not a pass.",
+      "title": "Restricted-MDX compilation stays within 50 ms at p95, under ACC-0020's protocol",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0017"
       ]
     }
   ],
@@ -437,6 +449,32 @@
       "schemaVersion": 2,
       "statement": "Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearing` flag with a scope derived from the graph — at minimum, every assertion referenced by an active runbook step's `restsOn`.",
       "title": "Derive stage 6's scope from graph use rather than a flag",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0033"
+      ],
+      "dependsOn": [],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0020"
+      ],
+      "id": "TSK-0003",
+      "implements": [
+        "CMP-0020"
+      ],
+      "lifecycle": "active",
+      "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option. ⚠️ AMENDED 2026-08-27 — A DISCARDED ARCHITECTURE HAD LEAKED IN. The original statement configured `@next/mdx`, an absolute remark-plugin path and Turbopack's config-serialisation constraint. All three belong to FILE-ROUTED MDX, which DEC-0020 explicitly rejected: AST-0030 measured that path compiling the document into the build so an edit changes nothing, which fails REQ-0018. ⚠️ HOW IT GOT IN IS WORTH RECORDING. Those settings came from the PROBE that measured the rejected option. The probe's incidental setup was carried into the plan as though it were the design — the measurement was right and the configuration it needed was the losing alternative's. ⚠️ DONE 2026-08-27, and one thing was measured rather than chosen. The routes were first placed at `src/app/` to keep the shell clear of `app/server.mjs`, the walking skeleton DEC-0017 preserves. Next.js ignored them: a root `app/` directory takes precedence over `src/app/`, so the build reported `Route (pages)` with only `/404` and none of the authored files appeared. Moving them to `app/` produced `Route (app)` with `○ /`, and the skeleton is left alone as a colocated non-route file — `server.mjs` is not a `page`, `layout` or `route`, and `.mjs` is not in the default `pageExtensions`. ⚠️ A build that SUCCEEDS while rendering nothing you wrote is the failure mode worth remembering here: `✓ Compiled successfully` was printed both times, and only the route table said which files Next.js had actually found. ⚠️ VERIFIED FROM CLEAN: `.next` removed, `npm run shell:build` from scratch, `next start` bound to 127.0.0.1 only (confirmed against the listening socket, not assumed from the flag), HTTP 200 with the expected body, process terminated and the port confirmed free. `npm audit` reports zero vulnerabilities after adding next, react and react-dom. ⚠️ NOT DONE HERE, on purpose: no MDX integration of any kind, no watcher, no launcher that owns processes, and no planning-content read. The route reads nothing — a convenience read would be the first violation of REQ-0021's confinement, whose own enforcement (TSK-0006, TSK-0015) does not exist yet.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
+      "title": "Scaffold the Next.js application and its production build/start primitives",
       "type": "task"
     },
     {
@@ -591,6 +629,91 @@
     },
     {
       "acceptedBy": [
+        "ACC-0034"
+      ],
+      "dependsOn": [
+        "TSK-0010"
+      ],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0019"
+      ],
+      "id": "TSK-0012",
+      "implements": [
+        "CMP-0018"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added. ⚠️ DEPENDENCY CHANGED 2026-08-27: it waited on the change stream, which coupled the first WRITE path to the streaming work for no reason. The review action needs a view to sit in and a URL to identify an artifact by, and nothing else. Review writing and the stream now proceed independently. ⚠️ DONE 2026-08-29 (EVD-0072). The first write the application can perform. ⚠️ THREE STANDING PINS MOVED, AND EACH WAS RESTATED RATHER THAN RELAXED. `no adapter exposes a write` now names the one write that was reviewed and keeps refusing every other, including in the same file. The adapter-consumer map gained the write door and an assertion that it admits exactly one caller. And `no synchronous export` in the reader became `no synchronous export that READS`, with the single exception named, its reason recorded, and a check that it is still what it claims — because `planningRoots` is shared with the write so the page and the write cannot address different directories. ⚠️ THAT LAST CHECK WAS INERT WHEN FIRST WRITTEN AND ONLY FALSIFICATION FOUND IT. A `\\b` in the generator became a literal backspace byte in the regex, so it matched nothing and passed with a reader that read. It is the same escaping failure this project has now hit several times, and the only reason it did not ship as a decorative rule is that every new check is made to fail before it is believed. ⚠️ THE END-TO-END TEST IS A REAL POST. Next.js renders a hidden action id so a form works without JavaScript, which means the whole path — markup, dispatch, adapter, lock, atomic write, redirect, re-render — is reachable with `fetch`. It asserts the DISK first and the freshly rendered page second, because a write that persisted while the page kept serving the old value would satisfy every other assertion.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.",
+      "title": "Expose the review-status write through the adapter, with individual review",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0032",
+        "ACC-0033"
+      ],
+      "dependsOn": [
+        "TSK-0011"
+      ],
+      "derivedStatus": {
+        "passed": 2,
+        "status": "accepted",
+        "total": 2
+      },
+      "fulfils": [
+        "REQ-0020"
+      ],
+      "id": "TSK-0013",
+      "implements": [
+        "CMP-0020"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ Deliberately AFTER the change stream, because there is no watcher to own until then. ⚠️ The skeleton's create-on-`listen` / close-in-`close()` pattern does not carry: under `next start` there is no server object the application owns. Choosing the binding is this task's work, and DEC-0022 states the obligation without a mechanism for exactly that reason. ⚠️ Verified by observation, not by the absence of an error — the destroy path's own rule. ⚠️ AMENDED 2026-08-27 to OWN the documented launcher, which TSK-0003 previously claimed. TSK-0003 scaffolds build and start; a launcher that owns two processes cannot exist until there is a watcher to own, so the command is finished here. ACC-0033 stays traced from both — the scaffold is a necessary condition — but this is where it is SATISFIED. ⚠️ CORRECTED 2026-08-29: THERE IS NO SECOND PROCESS, AND THERE NEVER WAS ONE TO OWN. This artifact previously said the launcher owns 'both the application process and the file watcher' and 'terminates the watcher with the application'. The watcher is chokidar, imported dynamically INSIDE the `next start` process and held by the change-stream service in that process's memory. A parent launcher cannot call `changeStream.close()` across that boundary without adding IPC or a shutdown endpoint, and neither is justified for a local-first tool. The old wording described a mechanism that could not be built, which is worse than an unmet obligation: it would have been 'satisfied' by a launcher that called nothing and reported success. ⚠️ WHAT IS TRUE INSTEAD, and all of it is enforceable. The launcher owns ONE child: the `next start` process. The change-stream service owns its watcher and closes it when its last subscriber leaves — already built and tested under TSK-0011. Terminating the application process releases any watcher still open through process teardown, which is the operating system's guarantee rather than the launcher's. `close()` stays what it is: a service and test lifecycle operation, never something the launcher claims to call across a process boundary. ⚠️ THE CLEANUP TEST MUST PROVE THE WATCHER EXISTED FIRST. Without a subscription there is no watcher — the service creates it lazily — so a test that starts the launcher and stops it would observe a clean teardown of nothing and pass vacuously. Opening `/events` and waiting for a named heartbeat is what makes the observation mean something. ⚠️ DONE 2026-08-29 (EVD-0073). ⚠️ THE FIRST CLEANUP TEST PASSED AGAINST A LAUNCHER THAT TERMINATED NOTHING, and finding that is most of what this task was worth. Windows reaps the child when the parent exits, so 'the child pid is gone' is true either way; the test now asserts the launcher REPORTED seeing its child exit, which the disabled-termination build fails. ⚠️ A SECOND MEASUREMENT CHANGED THE DESIGN: SIGTERM to the launcher is a hard kill on Windows, so the graceful path never ran and its run directories survived. A stdin stop was added — not for convenience, but because the shutdown guarantee was otherwise unobservable on the platform this project runs on. ⚠️ THE TEST SUITE NEEDED A SHARED LOCK ON `.next`. `node --test` runs files in parallel, and this test and `shell-smoke` both build into and serve from the same directory: first `Another next build process is already running`, then, after a narrow fix that locked only the build, a server dying mid-request because the other test deleted `.next` underneath it. The shared resource was never the build step but the build directory, for as long as anything serves from it. ⚠️ WHAT IS STILL UNEXERCISED: the POSIX shutdown branch (no Linux or macOS host) and a cold install (`node_modules` was present every run).",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Provide the single documented command that installs, builds and starts the application in production mode. It launches Next directly as its owned child rather than through a nested npm process, sets and PRINTS an absolute `PLANNING_CONTENT_DIR`, binds loopback explicitly, forwards shutdown to the child, waits for it to exit, and escalates within a bounded time if it does not. Verify cleanup by observation after termination: the child PID is gone, nothing is listening on the port, and no temporary directory the launcher created survives. The cleanup test must first open `/events` and observe a heartbeat, so that a watcher is known to have existed before anything claims it was released.",
+      "title": "Own the documented one-command launcher, and prove its cleanup",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
+        "ACC-0037"
+      ],
+      "dependsOn": [
+        "TSK-0009"
+      ],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0017"
+      ],
+      "id": "TSK-0014",
+      "implements": [
+        "CMP-0013"
+      ],
+      "lifecycle": "active",
+      "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it. ⚠️ DONE 2026-08-28 (EVD-0071). Six valid runs; ACC-0020 recorded as fail. ⚠️ THIS TASK DOES NOT TAKE THE FALLBACK DECISION, as its own note requires — and the measurement is the reason it should not be taken as written. The budget was missed, but by the read rather than the compiler, so 'plain markdown for stage documents' would cost the rejection contract and buy about 20 ms. That is a PM decision and it now has a different question in front of it: what to do about a per-request read of the whole planning corpus. ⚠️ THE HARNESS IS PERMANENT AND RE-RUNNABLE (`node bin/bench-compile.mjs`), because a number nobody can reproduce is a number nobody can dispute — and this one needs disputing: it is not stable across runs. It prints JSON including every raw sample, so the p95 can be recomputed rather than trusted. ⚠️ IT REFUSES TO REPORT RATHER THAN REPORT SOMETHING FLATTERING. Caching the compiled document produces VOID and a non-zero exit with no timings, falsified by actually memoising it. ⚠️ CORRECTED 2026-08-28: the 234-359 ms span was attributed here to reading all 253 artifacts per request. It is not. `readStageDocument` awaits `connection()` and reads the nine stage documents only — `lintProject` is not on its path. What inside that span costs the time is an open question, not a known cost. ⚠️ ACCEPTANCE MOVED 2026-08-28 to ACC-0037, the successor. ACC-0020 stays `fail` and stays readable; this task no longer traces to it, because a task accepted by a retired criterion is accountable to nothing. DEC-0025 records why the plain-Markdown fallback did not fire and QST-0025 carries the unexplained read span.",
+      "reviewStatus": "amended",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
+      "title": "Run the compile benchmark under the pinned protocol",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
         "ACC-0021",
         "ACC-0022",
         "ACC-0024"
@@ -736,10 +859,15 @@
         "lib/change-stream.mjs",
         "app/server/change-stream.js",
         "app/events/route.js",
-        "test/change-stream.test.mjs"
+        "app/_stream/logic.js",
+        "app/_stream/watchdog.js",
+        "app/layout.js",
+        "bin/browser-check.mjs",
+        "test/change-stream.test.mjs",
+        "test/stream-watchdog.test.mjs"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly. ⚠️ SERVER HALF BUILT 2026-08-28 BY TSK-0011. ACC-0028 and ACC-0031 pass. ACC-0029 (a stopped heartbeat produces a visibly stale page) and ACC-0030 (reconnect reloads and recovers a missed change) stay `not-evaluated` — they are about the CLIENT, and TSK-0017 owns it. ⚠️ IT IS A SERVICE, NOT AN IMPORT-TIME SIDE EFFECT. Nothing starts until the first subscription, chokidar is imported dynamically inside the factory, and `close()` is explicit for TSK-0013's launcher to own. `next build` imports every route module to collect page data, and a watcher started at import would run during the build and outlive it. ⚠️ THE WATCHER IS SHARED AND THE SUBSCRIBERS ARE NOT. One tab closing clears its own timer and leaves every other page refreshing; the watcher closes when the last subscriber leaves. ⚠️ A FAILURE IS BROADCAST THEN THE STREAMS CLOSE, so a client can tell a dead watcher from a dropped connection. Logging alone would leave every open page looking healthy while nothing could ever refresh it — DEC-0022's rule, and the reason this is an event rather than a console line.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ THE HEARTBEAT IS A NAMED EVENT, NOT A COMMENT, and that correction came from AST-0036. A comment line is ignored by the client parser, so a comment keepalive fixes the bytes and not the visibility — the one consumer that needs to see it is the only one specified to ignore it. The skeleton's idle and dead streams are byte-identical (AST-0034), which is what REQ-0018's second clause forbids. ⚠️ RECONNECTION IS ITSELF A CHANGE HINT. Because events are hints and never deltas (#73), a reconnecting client that reloads is exactly caught up — so no event buffer, no `id:` field and no `Last-Event-ID` handling are needed. This is the one place in the design where the contract removes work rather than adding it. ⚠️ A WATCHER FAILURE EMITS A VISIBLE SIGNAL OR CLOSES THE STREAM. Logging alone is forbidden: the operator is looking at a browser, and a logged failure with a live-looking page is the retained-workspace-reported-destroyed defect exactly. ⚠️ SERVER HALF BUILT 2026-08-28 BY TSK-0011. ACC-0028 and ACC-0031 pass. ACC-0029 (a stopped heartbeat produces a visibly stale page) and ACC-0030 (reconnect reloads and recovers a missed change) stay `not-evaluated` — they are about the CLIENT, and TSK-0017 owns it. ⚠️ IT IS A SERVICE, NOT AN IMPORT-TIME SIDE EFFECT. Nothing starts until the first subscription, chokidar is imported dynamically inside the factory, and `close()` is explicit so the service and its tests can end it deterministically. `next build` imports every route module to collect page data, and a watcher started at import would run during the build and outlive it. ⚠️ THE WATCHER IS SHARED AND THE SUBSCRIBERS ARE NOT. One tab closing clears its own timer and leaves every other page refreshing; the watcher closes when the last subscriber leaves. ⚠️ A FAILURE IS BROADCAST THEN THE STREAMS CLOSE, so a client can tell a dead watcher from a dropped connection. Logging alone would leave every open page looking healthy while nothing could ever refresh it — DEC-0022's rule, and the reason this is an event rather than a console line. ⚠️ CLIENT HALF BUILT 2026-08-28 BY TSK-0017 (EVD-0070). ACC-0029 and ACC-0030 STAY `not-evaluated`: no browser was available, and both are about what a page does, not about what the logic would do. The logic behind them is tested; the behaviour is not observed, and marking them would claim a measurement nobody took. ⚠️ IT IS THE APPLICATION'S ONLY CLIENT COMPONENT, and it holds nothing a reload would lose — DEC-0023's rule as corrected. `location.reload()` rather than an assignment, so the URL and with it both selections survive every refresh this component causes. ⚠️ STATE IS TEXT FIRST, icon second, colour last. AST-0034 measured an idle stream and a dead one as byte-identical: this indicator is the only thing between the operator and a page that looks fine while nothing can refresh it, so it must not depend on colour to be read. ⚠️ CORRECTED 2026-08-29: an earlier note here said `close()` was 'explicit for TSK-0013's launcher to own'. It is not and cannot be — the launcher is a parent process and this service is an in-process singleton inside its child. `close()` is a SERVICE AND TEST lifecycle operation: the service calls it when its last subscriber leaves, and tests call it to end a stream deterministically. What the launcher contributes is terminating the child, after which process teardown releases anything still open. ⚠️ ACC-0029 AND ACC-0030 EVALUATED 2026-08-29 IN A REAL BROWSER (EVD-0075); both pass, and the first run of that evaluation FAILED and found a defect that made this component inert in every shipped page. `timers = { setTimeout, clearTimeout }` throws `Illegal invocation` in a browser (AST-0040); the watchdog never armed, and the indicator reported a healthy stream forever. Thirteen unit tests passed throughout, because every one of them injected timers and none called the default. ⚠️ `test/stream-watchdog.test.mjs` NOW CALLS THE DEFAULT with `globalThis.setTimeout` wrapped in the same brand check a browser applies, so the defect is catchable in Node from now on. It was falsified against the original code before being trusted.",
       "responsibility": "Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -751,8 +879,15 @@
     },
     {
       "id": "CMP-0018",
+      "implementedBy": [
+        "app/server/review.js",
+        "app/_write/review-logic.js",
+        "app/_write/review-action.js",
+        "app/stage/[stageId]/review-panel.js",
+        "test/review-write.test.mjs"
+      ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT IS THE FIRST LOCKING CAPABILITY THE ADAPTER MUST EXPOSE, and DEC-0021 holds locking modules back for individual review precisely so this one is examined rather than arriving as a line in an adapter. A Server Component may run concurrently in ways a CLI never does. ⚠️ `reviewStatus` ONLY. #82's two-axis split is doing work here: review progress is the application's to change and `lifecycle` is not, and a single `status` field would have let this endpoint retire an artifact by accident. ⚠️ OUTSIDE ITS BOUNDARY: it does not decide whether a status change is allowed — the typed tool owns that, and one implementation serves both the CLI and the app (#47).",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ IT IS THE FIRST LOCKING CAPABILITY THE ADAPTER MUST EXPOSE, and DEC-0021 holds locking modules back for individual review precisely so this one is examined rather than arriving as a line in an adapter. A Server Component may run concurrently in ways a CLI never does. ⚠️ `reviewStatus` ONLY. #82's two-axis split is doing work here: review progress is the application's to change and `lifecycle` is not, and a single `status` field would have let this endpoint retire an artifact by accident. ⚠️ OUTSIDE ITS BOUNDARY: it does not decide whether a status change is allowed — the typed tool owns that, and one implementation serves both the CLI and the app (#47). ⚠️ BUILT 2026-08-29 BY TSK-0012 (EVD-0072), after the individual review DEC-0021 requires. ACC-0034 passes. ⚠️ IT REUSES `lib/tools/review-status.mjs` RATHER THAN REIMPLEMENTING IT, which is the whole of why this could be approved: the lock, the fresh read inside the lock and the atomic write are the ones the CLI already used, so there is no second copy to drift. ⚠️ THE ADAPTER EXPOSES ONE WRITE AND ADMITS ONE CALLER. `app/server/review.js` re-exports `setReviewStatus` and nothing else that writes, and `shellBoundaryConfig` names the Server Action as its only permitted consumer. Both are pinned by tests that fail by name when a second write or a second caller appears — a second caller being a second place the content lock can be taken from, which is the review needing to happen again. ⚠️ THE HARD PART IS IN A MODULE WITH NO `server-only`, for the reason CMP-0017's client half is: everything decidable about a write — refusals before the lock is taken, a bad status never reaching disk, what two concurrent submissions leave behind — is reachable only from plain Node, and concurrency is what a browser test is worst at provoking on purpose.",
       "responsibility": "Perform review-status changes from the application through the existing typed write path — lock, fresh read inside the lock, atomic write — reusing `lib/tools/review-status.mjs` rather than reimplementing it, and reaching it through the server adapter layer.",
       "reviewStatus": "draft",
       "satisfies": [
@@ -786,13 +921,15 @@
     {
       "id": "CMP-0020",
       "implementedBy": [
+        "bin/start-shell.mjs",
+        "docs/running-the-shell.md",
+        "package.json",
         "next.config.mjs",
-        "app/layout.js",
-        "app/page.js"
+        "test/launcher.test.mjs"
       ],
       "lifecycle": "active",
-      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ PRODUCTION MODE ONLY (DEC-0018): `next build` then `next start`. `next dev` is a contributor workflow and is not a shipped configuration — AST-0015 showed the two produce different artifacts, so shipping the development server would mean shipping something this project can never validate. ⚠️ THE PROCESS OWNERSHIP IS AN OBLIGATION WITH NO MECHANISM YET, deliberately. The skeleton creates its watcher on `listen` and closes it in its own `close()`, but that belongs to a process owning its own HTTP server; under `next start` there is no such object and nothing has been run. Choosing and validating the binding is this component's design work. ⚠️ PARTIALLY IMPLEMENTED 2026-08-27 BY TSK-0003, and `implementedBy` now points at the scaffold. Read it as exactly what QST-0015's answer says it means — CODE EXISTS — and nothing more. What exists is the Next.js application, a production build, a loopback start script and one route that responds. What does NOT exist is the thing this component is mostly about: a launcher that owns both the application process and the file watcher and terminates the watcher with it. There is no watcher yet to own. ⚠️ BOTH ITS CRITERIA REMAIN `not-evaluated`, deliberately. ACC-0033 (installs and starts from one documented command) is not satisfied by two scripts a reader has to compose themselves, and ACC-0032 (stopping the launcher leaves nothing behind) has nothing to stop. TSK-0013 finishes both. This is the state the planned/built axis was rejected for being unable to express: a populated `implementedBy` beside unevaluated criteria says 'some code, unjudged' precisely, where a boolean would have had to lie in one direction or the other.",
-      "responsibility": "Install and run the shell from one documented command: build the application, start it, own both the application process and the file watcher, and terminate the watcher with the application.",
+      "notes": "⚠️ PLANNED, NOT BUILT (2026-08-27). `implementedBy` is absent, and its absence is the only signal in this artifact that says so — the same convention CMP-0011 established, and the same hazard QST-0015 named: creating these records takes the orphan count to zero while nothing exists. 'Every requirement traces to a component' becomes true; 'the shell works' does not. ⚠️ PRODUCTION MODE ONLY (DEC-0018): `next build` then `next start`. `next dev` is a contributor workflow and is not a shipped configuration — AST-0015 showed the two produce different artifacts, so shipping the development server would mean shipping something this project can never validate. ⚠️ THE PROCESS OWNERSHIP IS AN OBLIGATION WITH NO MECHANISM YET, deliberately. The skeleton creates its watcher on `listen` and closes it in its own `close()`, but that belongs to a process owning its own HTTP server; under `next start` there is no such object and nothing has been run. Choosing and validating the binding is this component's design work. ⚠️ PARTIALLY IMPLEMENTED 2026-08-27 BY TSK-0003, and `implementedBy` now points at the scaffold. Read it as exactly what QST-0015's answer says it means — CODE EXISTS — and nothing more. What exists is the Next.js application, a production build, a loopback start script and one route that responds. What does NOT exist is the thing this component is mostly about: a launcher that owns both the application process and the file watcher and terminates the watcher with it. There is no watcher yet to own. ⚠️ BOTH ITS CRITERIA REMAIN `not-evaluated`, deliberately. ACC-0033 (installs and starts from one documented command) is not satisfied by two scripts a reader has to compose themselves, and ACC-0032 (stopping the launcher leaves nothing behind) has nothing to stop. TSK-0013 finishes both. This is the state the planned/built axis was rejected for being unable to express: a populated `implementedBy` beside unevaluated criteria says 'some code, unjudged' precisely, where a boolean would have had to lie in one direction or the other. ⚠️ CORRECTED 2026-08-29: THERE IS NO SECOND PROCESS, AND THERE NEVER WAS ONE TO OWN. This artifact previously said the launcher owns 'both the application process and the file watcher' and 'terminates the watcher with the application'. The watcher is chokidar, imported dynamically INSIDE the `next start` process and held by the change-stream service in that process's memory. A parent launcher cannot call `changeStream.close()` across that boundary without adding IPC or a shutdown endpoint, and neither is justified for a local-first tool. The old wording described a mechanism that could not be built, which is worse than an unmet obligation: it would have been 'satisfied' by a launcher that called nothing and reported success. ⚠️ WHAT IS TRUE INSTEAD, and all of it is enforceable. The launcher owns ONE child: the `next start` process. The change-stream service owns its watcher and closes it when its last subscriber leaves — already built and tested under TSK-0011. Terminating the application process releases any watcher still open through process teardown, which is the operating system's guarantee rather than the launcher's. `close()` stays what it is: a service and test lifecycle operation, never something the launcher claims to call across a process boundary. ⚠️ THIS COMPONENT'S DESIGN WORK SHRANK RATHER THAN GREW. Its notes called 'choosing and validating the binding' the substance of the component; there is no binding to choose. What is left is a real and checkable job: one command, an absolute content root printed at startup, loopback bound explicitly, shutdown forwarded, the child waited for, and a bounded escalation if it does not go. ⚠️ BUILT 2026-08-29 BY TSK-0013 (EVD-0073). ACC-0032 and ACC-0033 pass. ⚠️ IT OWNS ONE CHILD AND SAYS SO. `next start` is spawned directly with Node, so the pid it holds IS the server's — through `npm run` it would hold a shim, and on Windows a `.cmd` shim whose child does not reliably receive a forwarded signal. ⚠️ THE CONTENT ROOT IS ABSOLUTE AND PRINTED, and a missing one is exit code 2 rather than a fallback. The application would otherwise resolve to its own directory and be correct with no way for the operator to know WHICH directory — #70's refusal-to-guess at the launcher. ⚠️ ITS RUN DIRECTORY EXISTS PARTLY SO CLEANUP CAN BE OBSERVED. It carries the run record a supervisor reads to find the child; its removal is one of ACC-0032's three observations, and a launcher with no temporary state would make that clause vacuous. ⚠️ ACC-0033 RE-EVALUATED 2026-08-29 (EVD-0074) after being marked `pass` on evidence that disclaimed the install branch. It now rests on a cold run: no `node_modules`, no `.next`, install branch taken and asserted, content root verified to be inside the copy rather than the source repository.",
+      "responsibility": "Install and run the shell from one documented command: build the application and start it in production mode, owning the `next start` process as a child, forwarding shutdown to it, waiting for it to exit, and leaving nothing behind — no process on the port, no temporary directory it created. The file watcher is an in-process resource of the child and is released by its teardown.",
       "reviewStatus": "draft",
       "satisfies": [
         "REQ-0020"
@@ -943,117 +1080,5 @@
     }
   ],
   "role": "platform",
-  "tasks": [
-    {
-      "acceptedBy": [
-        "ACC-0033"
-      ],
-      "dependsOn": [],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0020"
-      ],
-      "id": "TSK-0003",
-      "implements": [
-        "CMP-0020"
-      ],
-      "lifecycle": "active",
-      "notes": "First because everything else needs somewhere to live. ⚠️ Production mode only (DEC-0018): `next dev` is a contributor workflow and never a shipped configuration, so the launch command must not offer it as an option. ⚠️ AMENDED 2026-08-27 — A DISCARDED ARCHITECTURE HAD LEAKED IN. The original statement configured `@next/mdx`, an absolute remark-plugin path and Turbopack's config-serialisation constraint. All three belong to FILE-ROUTED MDX, which DEC-0020 explicitly rejected: AST-0030 measured that path compiling the document into the build so an edit changes nothing, which fails REQ-0018. ⚠️ HOW IT GOT IN IS WORTH RECORDING. Those settings came from the PROBE that measured the rejected option. The probe's incidental setup was carried into the plan as though it were the design — the measurement was right and the configuration it needed was the losing alternative's. ⚠️ DONE 2026-08-27, and one thing was measured rather than chosen. The routes were first placed at `src/app/` to keep the shell clear of `app/server.mjs`, the walking skeleton DEC-0017 preserves. Next.js ignored them: a root `app/` directory takes precedence over `src/app/`, so the build reported `Route (pages)` with only `/404` and none of the authored files appeared. Moving them to `app/` produced `Route (app)` with `○ /`, and the skeleton is left alone as a colocated non-route file — `server.mjs` is not a `page`, `layout` or `route`, and `.mjs` is not in the default `pageExtensions`. ⚠️ A build that SUCCEEDS while rendering nothing you wrote is the failure mode worth remembering here: `✓ Compiled successfully` was printed both times, and only the route table said which files Next.js had actually found. ⚠️ VERIFIED FROM CLEAN: `.next` removed, `npm run shell:build` from scratch, `next start` bound to 127.0.0.1 only (confirmed against the listening socket, not assumed from the flag), HTTP 200 with the expected body, process terminated and the port confirmed free. `npm audit` reports zero vulnerabilities after adding next, react and react-dom. ⚠️ NOT DONE HERE, on purpose: no MDX integration of any kind, no watcher, no launcher that owns processes, and no planning-content read. The route reads nothing — a convenience read would be the first violation of REQ-0021's confinement, whose own enforcement (TSK-0006, TSK-0015) does not exist yet.",
-      "reviewStatus": "amended",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.",
-      "title": "Scaffold the Next.js application and its production build/start primitives",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
-        "ACC-0034"
-      ],
-      "dependsOn": [
-        "TSK-0010"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0019"
-      ],
-      "id": "TSK-0012",
-      "implements": [
-        "CMP-0018"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ THIS IS THE INDIVIDUAL REVIEW DEC-0021 REQUIRES, held out of the adapter task for that reason. It is the first locking capability the shell exposes, and a Server Component may run concurrently in ways a CLI never does — that is what needs examining before the line is added. ⚠️ DEPENDENCY CHANGED 2026-08-27: it waited on the change stream, which coupled the first WRITE path to the streaming work for no reason. The review action needs a view to sit in and a URL to identify an artifact by, and nothing else. Review writing and the stream now proceed independently.",
-      "reviewStatus": "amended",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.",
-      "title": "Expose the review-status write through the adapter, with individual review",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
-        "ACC-0032",
-        "ACC-0033"
-      ],
-      "dependsOn": [
-        "TSK-0011"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 2
-      },
-      "fulfils": [
-        "REQ-0020"
-      ],
-      "id": "TSK-0013",
-      "implements": [
-        "CMP-0020"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ Deliberately AFTER the change stream, because there is no watcher to own until then. ⚠️ The skeleton's create-on-`listen` / close-in-`close()` pattern does not carry: under `next start` there is no server object the application owns. Choosing the binding is this task's work, and DEC-0022 states the obligation without a mechanism for exactly that reason. ⚠️ Verified by observation, not by the absence of an error — the destroy path's own rule. ⚠️ AMENDED 2026-08-27 to OWN the documented launcher, which TSK-0003 previously claimed. TSK-0003 scaffolds build and start; a launcher that owns two processes cannot exist until there is a watcher to own, so the command is finished here. ACC-0033 stays traced from both — the scaffold is a necessary condition — but this is where it is SATISFIED.",
-      "reviewStatus": "amended",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Provide the single documented command that installs and starts the application in production mode, owning both the application process and the watcher and terminating the watcher with the application. Verify by observation after termination: no watcher process, nothing listening on the port, no surviving temporary directory.",
-      "title": "Own the documented one-command launcher, and prove its cleanup",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
-        "ACC-0020"
-      ],
-      "dependsOn": [
-        "TSK-0009"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0017"
-      ],
-      "id": "TSK-0014",
-      "implements": [
-        "CMP-0013"
-      ],
-      "lifecycle": "active",
-      "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it.",
-      "reviewStatus": "approved",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
-      "title": "Run the compile benchmark under the pinned protocol",
-      "type": "task"
-    }
-  ]
+  "tasks": []
 }

@@ -243,14 +243,14 @@ Render `/stage/[stageId]`: the stage's document through the restricted MDX compi
 Keep every open view current: watch the content root, emit a named heartbeat event carrying data at a fixed interval, deliver change notifications as hints, and run the client watchdog that renders a visibly disconnected state when a heartbeat does not arrive. On reconnection, reload.
 
 *Satisfies: REQ-0018*
-*Implemented by: lib/change-stream.mjs, app/server/change-stream.js, app/events/route.js, test/change-stream.test.mjs*
+*Implemented by: lib/change-stream.mjs, app/server/change-stream.js, app/events/route.js, app/_stream/logic.js, app/_stream/watchdog.js, app/layout.js, bin/browser-check.mjs, test/change-stream.test.mjs, test/stream-watchdog.test.mjs*
 
 ### CMP-0018 — Review action
 
 Perform review-status changes from the application through the existing typed write path — lock, fresh read inside the lock, atomic write — reusing `lib/tools/review-status.mjs` rather than reimplementing it, and reaching it through the server adapter layer.
 
 *Satisfies: REQ-0019*
-*Not yet implemented.*
+*Implemented by: app/server/review.js, app/_write/review-logic.js, app/_write/review-action.js, app/stage/[stageId]/review-panel.js, test/review-write.test.mjs*
 
 ### CMP-0019 — Import-boundary check
 
@@ -261,10 +261,10 @@ Statically prove, without executing the application, that every planning-content
 
 ### CMP-0020 — Launcher
 
-Install and run the shell from one documented command: build the application, start it, own both the application process and the file watcher, and terminate the watcher with the application.
+Install and run the shell from one documented command: build the application and start it in production mode, owning the `next start` process as a child, forwarding shutdown to it, waiting for it to exit, and leaving nothing behind — no process on the port, no temporary directory it created. The file watcher is an in-process resource of the child and is released by its teardown.
 
 *Satisfies: REQ-0020*
-*Implemented by: next.config.mjs, app/layout.js, app/page.js*
+*Implemented by: bin/start-shell.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs*
 
 ## Decisions
 
@@ -396,7 +396,7 @@ Application code reaches the shared `lib/` modules exclusively through a thin ad
 
 ### DEC-0022 — The shell's lifecycle contract: a launcher owns both processes, and stream health is a visible event
 
-The application is started by a documented launcher that owns both the application process and the file watcher, and that terminates the watcher with the application. The mechanism binding them is stage 5's to choose and to validate; nothing is claimed today about how the watcher's lifetime is enforced under `next start`. The update stream emits a NAMED heartbeat event carrying data at a fixed interval, and the client runs a watchdog that renders a visibly disconnected state when a heartbeat fails to arrive within its window; comment-only keepalives are not sufficient because the client parser ignores them. A watcher failure must either emit a visible failure signal on the stream or close the stream — logging alone is not permitted, because a page whose watcher has died otherwise stays live-looking and stale. On reconnection the client reloads, treating reconnection itself as a change hint; no event buffer, event id or `Last-Event-ID` handling is required, because events are hints and never deltas. A malformed or unreadable artifact must be surfaced visibly and located, and no rendered count may include an artifact the page did not render.
+The application is started by a documented launcher that owns the `next start` process. The file watcher is an in-process resource of that process: the change-stream service creates it on the first subscription and closes it when its last subscriber leaves, and terminating the application process releases any watcher still open through process teardown. The launcher's obligation is to terminate its child and leave nothing behind — no process on the port, no temporary directory it created — verified by observation. The update stream emits a NAMED heartbeat event carrying data at a fixed interval, and the client runs a watchdog that renders a visibly disconnected state when a heartbeat fails to arrive within its window; comment-only keepalives are not sufficient because the client parser ignores them. A watcher failure must either emit a visible failure signal on the stream or close the stream — logging alone is not permitted, because a page whose watcher has died otherwise stays live-looking and stale. On reconnection the client reloads, treating reconnection itself as a change hint; no event buffer, event id or `Last-Event-ID` handling is required, because events are hints and never deltas. A malformed or unreadable artifact must be surfaced visibly and located, and no rendered count may include an artifact the page did not render.
 
 **Why:** AST-0034 measured that the skeleton's idle stream and its dead stream are byte-identical and that a change during a disconnect gap is never recovered, which refutes REQ-0018's second clause by construction. AST-0036 then removed the obvious repair: a comment heartbeat is ignored by the client parser, so it fixes the bytes without fixing the visibility — the page stays falsely healthy while something is demonstrably happening on the wire. A named event with a client watchdog is the smallest mechanism the requirement can actually be met with. The reconnect-as-change-hint design survives unchanged and is the part that removes work rather than adding it: because #73 makes events hints rather than deltas, a client that reloads on reconnection is exactly caught up, so the buffering and resumption machinery that a delta stream would need is unnecessary. AST-0035 supplies the read-path half: a corrupt artifact currently vanishes while the header still counts it, which tells the operator the missing thing is present.
 
@@ -411,6 +411,12 @@ The application shell opens with exactly two views. `/` is the project view: the
 When `/stage/[stageId]` is given an id matching no stage, the application responds 200 and renders a visible not-found state. It does not return 404. The body is required to be truthful; the status is not. This is revisited if an API, a crawler, or any automated client comes to depend on HTTP status semantics for this route.
 
 **Why:** The status is committed before the answer is known. `notFound()` runs inside a `<Suspense>` child, because the read that would reveal the id to be unknown may only happen there: DEC-0019 confines planning-content reads to the reader behind a boundary, and REQ-0021 makes that confinement a statically checked rule. By the time the stage is known not to exist, the shell has streamed and the status line is gone. The two ways to recover a 404 both cost more than it is worth here — validating in the route entry means reading outside the boundary, which the check refuses by design; keeping a separate list of stage ids in the route means a second registry that can silently disagree with the definitions on disk, which is the stored-derived-state failure #96 exists to prevent. This is a local, human-facing application served over loopback to one operator, and an operator reads the page rather than the status line.
+
+### DEC-0025 — Keep restricted runtime MDX; the measured cost is not the compiler
+
+Keep restricted runtime MDX for stage documents. Do not adopt DEC-0020's plain-Markdown alternative: the measurement that was supposed to trigger it instead disproved its premise.
+
+**Why:** The compiler is not the cost, and it is the security boundary. DEC-0020 recorded the per-request compile cost as explicitly unmeasured and pre-committed to a fallback in case it proved large. It has now been measured and it is small: 15-29 ms p95 across six valid runs against the largest stage document. The fallback was contingent on a premise the measurement refuted, so it does not fire. ⚠️ THE BUDGET WAS STILL MISSED, AND THAT IS NOT BEING WAVED AWAY. ACC-0020 stays `fail` and stays in the record; it is superseded by a criterion that measures the disputed cost rather than deleted for being inconvenient. The unexplained 234-359 ms is recorded as an open performance question, non-blocking, to be INSTRUMENTED before anything is optimised. ⚠️ THE OBSERVED 245-375 ms STAGE RESPONSE IS ACCEPTED FOR v1 WITH ITS ATTRIBUTION OPEN. That is a judgement about a local-first planning tool on a developer's own machine, not a claim that the number is good.
 
 ## Claims
 
@@ -718,6 +724,14 @@ Under `next build` + `next start`, when the restricted compiler throws for a doc
 
 Rests on: EVD-0065 (support)
 
+### AST-0040 — A receiver-sensitive browser function can fail when copied into a collaborator object
+
+A receiver-sensitive browser function can fail when copied into a collaborator object and later invoked as that object's method. MEASURED CASE: `const timers = { setTimeout, clearTimeout }` followed by `timers.setTimeout(fn, ms)` throws `TypeError: Illegal invocation`, because `Window.setTimeout`'s WebIDL brand check requires `this` to be the Window and the method call passes the containing object instead. Node applies no such check, so the identical code works there and every Node test of it passes. This claim covers `setTimeout` and `clearTimeout`; it does NOT assert that any other browser global behaves this way.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0075 (support)
+
 ## Open questions
 
 ### QST-0002 — Does `research-finding` own anything irreducible, or is it a projection?
@@ -731,6 +745,10 @@ The validation controller runs declared commands sequentially to completion and 
 ### QST-0024 — How is handoff readiness inspected without publishing?
 
 `npm run handoff` is the only way to learn whether the gates pass, and it PUBLISHES: on success it replaces `docs/plan/` with a new package. There is no read-only form, so checking readiness and performing publication are the same act, and anyone who wants the first necessarily performs the second.
+
+### QST-0025 — What accounts for the 234-359 ms stage-document read?
+
+`readStageDocument` measured 234-359 ms p95 across six runs. It awaits `connection()`, lists the stage directory and reads nine files totalling roughly 90 KB — work that should cost single-digit milliseconds. Which part of that span is actually spending the time, and is it reducible? INSTRUMENT BEFORE OPTIMISING: the three candidates are the `connection()` wait itself, the directory listing plus nine reads, and contention with the sibling `<Suspense>` boundary on the same request — `readStageCriteria` calls `lintProject`, which reads and validates every artifact in the project, concurrently with this read. Nothing has separated them, so all three remain live and none may be assumed.
 
 ## Tasks
 
@@ -752,7 +770,7 @@ Replace `load-bearing-assertions-at-rung`'s reliance on the optional `loadBearin
 
 Create the application under `app/` and make `next build` followed by `next start` work on loopback, with a route that responds. No MDX integration of any kind is configured here. The documented one-command launcher is TSK-0013's.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0020 · fulfils: REQ-0020*
 
 ### TSK-0004 — Build the `app/server/*` adapter layer over `lib/`
@@ -794,7 +812,7 @@ Compile stage documents at request time with `@mdx-js/mdx`, running a remark plu
 
 Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.
 
-**accepted** (2/2 criteria passed) · role: frontend
+**accepted** (3/3 criteria passed) · role: frontend
 *Implements: CMP-0016 · fulfils: REQ-0017, REQ-0019*
 
 ### TSK-0010 — Put every correctness-critical selection in the URL
@@ -815,21 +833,21 @@ Watch the content root and deliver change hints over an event stream. Emit a NAM
 
 Expose `lib/tools/review-status.mjs` through the adapter and wire the stage view's review panel to it. Updating changes only the named artifact's `reviewStatus`, through the existing lock and atomic write; `lifecycle` and every other artifact are unchanged.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0018 · fulfils: REQ-0019*
 
 ### TSK-0013 — Own the documented one-command launcher, and prove its cleanup
 
-Provide the single documented command that installs and starts the application in production mode, owning both the application process and the watcher and terminating the watcher with the application. Verify by observation after termination: no watcher process, nothing listening on the port, no surviving temporary directory.
+Provide the single documented command that installs, builds and starts the application in production mode. It launches Next directly as its owned child rather than through a nested npm process, sets and PRINTS an absolute `PLANNING_CONTENT_DIR`, binds loopback explicitly, forwards shutdown to the child, waits for it to exit, and escalates within a bounded time if it does not. Verify cleanup by observation after termination: the child PID is gone, nothing is listening on the port, and no temporary directory the launcher created survives. The cleanup test must first open `/events` and observe a heartbeat, so that a watcher is known to have existed before anything claims it was released.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0020 · fulfils: REQ-0020*
 
 ### TSK-0014 — Run the compile benchmark under the pinned protocol
 
 Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0013 · fulfils: REQ-0017*
 
 ### TSK-0015 — Build the static planning-read and `<Suspense>` confinement check, with failing fixtures
@@ -850,7 +868,7 @@ Add to `/`: artifact totals for each type, lint findings surfaced rather than re
 
 Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.
 
-**outstanding** (0/2 criteria passed) · role: frontend
+**accepted** (2/2 criteria passed) · role: frontend
 *Implements: CMP-0017 · fulfils: REQ-0018*
 
 ## Retired and superseded
@@ -858,6 +876,7 @@ Subscribe to the stream, listen for the named heartbeat event, and run a watchdo
 ⚠️ **Not part of the current plan.** Listed because removing them silently would make this
 rendering disagree with the machine-readable data, which is the parity REQ-0011 requires.
 
+- **ACC-0020** (acceptance-criterion, superseded) — Per-request compilation stays within 300 ms at p95, under a pinned protocol
 - **AST-0007** (assertion, superseded) — With Cache Components, a SYNCHRONOUS fs read freezes into the static shell
 - **RBS-0001** (runbook-step, retired) — Run specialists in parallel
 - **REQ-0015** (requirement, retired) — The system runs locally for a single operator

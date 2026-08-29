@@ -2022,5 +2022,309 @@
     "summary": "Nine tests against the shipping service with the watcher and timers injected, so failure, heartbeat, disconnect and cleanup are decided rather than waited for. Measured: nothing starts until the first subscription (no watcher, no timer); a heartbeat is a NAMED event carrying `{ok:true}`; two subscribers both receive a change hint and a late subscriber receives no replay; one subscriber leaving clears its own timer and leaves the shared watcher running for the other; the last one leaving closes it; a watcher `error` broadcasts a named `failure` event with the reason AND closes every stream, leaving no timer; a subscriber whose send throws is dropped without affecting the rest; and `close()` ends every stream, releases the watcher and refuses further subscriptions. IN PRODUCTION, against a real build serving a temporary content root, an event-stream client read `/events` incrementally and observed `event: heartbeat` with `data: {\"ok\":true}`, then `event: change` after a real file write, with no `id:` field anywhere.",
     "title": "Experiment: the change-stream server, deterministic under injection and live in production",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "eventSource": "a fake driven by the test; no browser was involved",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "react": "19.2.8"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "browser-behaviour",
+          "reason": "No browser was available in this environment. What a real EventSource does on reconnect — its own backoff, whether it fires `open` again rather than constructing afresh, how quickly it notices a dropped connection — was NOT measured. ACC-0029 and ACC-0030 are about what a PAGE does and remain not-evaluated.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "hydration",
+          "reason": "The check proves the component's code is inside a script the page loads. That the script then executes, hydrates and opens a connection follows from it but was not watched happening.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0070",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE HARD PART IS TIMING, AND TIMING IS NOT TESTABLE INSIDE A HOOK. The logic lives in `app/_stream/logic.js` taking EventSource and its timers as arguments; the component is the thin part around it. Every distinction that could be got wrong — connection versus reconnection, a deadline that must reset, a reload that must not cause another — is decided by a test rather than waited for. ⚠️ IT LIVES IN `app/`, NOT `lib/`, BECAUSE THE BOUNDARY CHECK SAID SO. The first draft put it beside the server half in `lib/` and `lint:shell` refused the import immediately. It could not have gone through `app/server/*` either: those carry `server-only`, which throws in a client component by design. REQ-0021's check located a real design mistake rather than an inconvenience. ⚠️ FALSIFIED: a static stand-in in the layout — the same markup and the same words, with no client component behind it — passes both HTML assertions and fails only the script assertion, which is the exact failure the check exists for: an indicator that renders once and then reassures permanently while nothing can refresh the page.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Thirteen tests against the shipping watchdog logic with EventSource and timers injected, so timing is decided rather than waited for. Measured: the FIRST open goes live and does NOT reload, a reconnection after trouble DOES; an open with nothing wrong in between does not, so the rule is not merely 'reload on every open after the first'; each named heartbeat resets the deadline and restores live; expiry goes stale while the socket is still open; a watcher failure goes stale at once and stops waiting; three change hints reload once; start() twice makes one EventSource; stop() closes it, clears the timer and refuses to restart, and a hint arriving afterwards does not navigate. IN PRODUCTION, against a real build, the served page carries the indicator markup AND a script the page loads that contains the component's own state text.",
+    "title": "Experiment: the change-stream client, deterministic under injection and shipped to the browser",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "cpu": "AMD Ryzen AI MAX+ 395 w/ Radeon 8060S, 32 cores",
+        "document": "02-intent-decomposition.md, 21047 bytes, the largest at time of evaluation",
+        "framework": "Next.js 16.3.2",
+        "harness": "bin/bench-compile.mjs",
+        "mdx": "@mdx-js/mdx 3.1.1",
+        "memory": "27.6 GB",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11, win32 x64",
+        "protocol": "10 warm-up discarded, 50 serial measured, concurrency 1, p95 nearest-rank"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "ambient-load",
+          "reason": "The protocol pins the host, the document, the warm-up and the sample, but says only 'no other significant load'. Nothing measured what else the machine was doing, and the runs were taken back to back with a full production build immediately before each. That is the most likely source of a 50% spread, and it is NOT controlled by the protocol as written.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "read-cost-attribution",
+          "reason": "The read was measured as one span. Which part of it dominates — reading the artifact files, validating them against schemas, or the lint pass over them — was not separated, so the obvious optimisation is not yet identified, only its location.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "other-documents",
+          "reason": "Only the largest document was measured, as the protocol specifies. The read cost is per-request and appears independent of document size, so smaller documents likely cost nearly the same — but that was not measured.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0071",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PRESCRIBED REMEDY DOES NOT ADDRESS THE MEASURED COST, AND THIS IS THE FINDING. DEC-0020 and ACC-0020 both record that if the budget is missed by a wide margin the answer is that decision's second alternative — plain markdown for stage documents — rather than a larger number. The measurement says that would remove 15-29 ms from a 245-375 ms span. The restricted MDX contract would be given up, its rejection guarantee with it, and the budget would still be missed in the same three runs. The cost is in `readStageDocument`, and WHAT inside it is not yet known. ⚠️ AN EARLIER VERSION OF THIS RECORD MISATTRIBUTED THAT SPAN TO A PER-REQUEST READ OF ALL 253 ARTIFACTS. That is wrong and the correction matters, because it was the wrong answer to the right question. `readStageDocument` awaits `connection()`, lists the stage directory and reads the nine stage documents; it does NOT call `lintProject`. The 234-359 ms therefore combines the `connection()` wait with that directory listing and those nine reads, and nothing here separates them. The cause is UNKNOWN, not merely unoptimised. ⚠️ THE VERDICT IS NOT STABLE, SO A SINGLE RUN IS NOT A RESULT. Three passes and three misses from an identical protocol on an idle-looking host, spread 245-375 ms. Reporting the first run alone would have recorded a pass; reporting the fourth alone would have recorded a 25% miss. Both would have been true of that run and useless as a judgement. ⚠️ VOID WAS FALSIFIED, NOT ASSUMED. Memoising the compiled document by name — the exact defect the verification clause exists to catch, and the change that would report the best numbers this benchmark has ever produced — makes the harness report VOID with a non-zero exit and NO timing figures at all, because the compile counter stops advancing between measured requests. ⚠️ THE COMPILE COUNTER IS NOT GATED BEHIND AN ENVIRONMENT VARIABLE. An instrument that must be switched on can be left off, and a benchmark that verifies nothing is worse than none.",
+    "observedAt": "2026-08-28",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Six valid runs of ACC-0020's protocol against the largest stage document (02-intent-decomposition.md, 21,047 bytes): production build, ten discarded warm-up requests, fifty serial measured requests, compile counter verified to advance 49/49 in every run. THREE RUNS PASSED AND THREE MISSED. Combined p95 by run: 253.72, 246.22, 314.65, 374.68, 342.18, 245.31 ms against a 300 ms budget; the upper-bound span (read start to complete markup received) tracked it at 267, 255, 327, 387, 357, 251 ms. THE SPLIT IS THE RESULT: MDX compilation was 15.41-29.05 ms p95 in every run, between 4% and 12% of the span, while the planning-content read around it was 233.87-358.89 ms p95. The variance that decides the verdict lives entirely in the read.",
+    "title": "Benchmark: request-time compile costs 16-29 ms; the read around it costs 234-359 ms",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "contentRoot": "a disposable copy; the project's own content was not touched",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "write": "lib/tools/review-status.mjs, unmodified and reused"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "cross-process-concurrency",
+          "reason": "The concurrent submissions were eight in ONE process. The lock is a file lock and is meant to hold against the CLI writing at the same time as the server, which was not exercised — a second process would have to be started and made to contend on purpose.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "browser-submission",
+          "reason": "The POST was issued by `fetch` with the action id scraped from the served HTML, which is the same request a browser makes with JavaScript disabled. Whether a real browser's form submission and its client-side navigation behave identically was not observed; no browser was available.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "lock-contention-timing",
+          "reason": "That the lock SERIALISES was established by an observable consequence — every submission saw the previous one's value — not by timing acquisition. How long a submission waits behind another was not measured.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0072",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE SAFETY ASSERTIONS WERE NOT ENOUGH, AND MEASURING SAID SO. An unlocked read-modify-write was substituted for the real one and passed every check that the file parses, keeps its fields, ends in a newline and holds one of the submitted values — because small writes do not visibly tear. Serialisation shows up somewhere else: under the lock every submission reads what the previous wrote, so eight alternating submissions all change something (8/8); without it they all read the same stale value and three report no change (6/8). Measured, stable over five runs of each, and now asserted. The weaker version of this test would have passed for the wrong reason. ⚠️ `lifecycle` IS UNREACHABLE BY CONSTRUCTION, NOT BY CARE. The adapter hands out exactly one operation and its signature has no field parameter, so there is no argument this path could pass and no string a form could post that would retire an artifact. `retired` and `lifecycle` are in the rejected-status list deliberately: they are what someone would try. ⚠️ NO `type` FIELD CROSSES THE WIRE. The form posts an id and the type is derived from it through the schema set, so a submission cannot name one artifact and have another written. ⚠️ FALSIFIED FOUR WAYS, each failing only its own check: adding `setLifecycle` to the review adapter; opening a second write door in the content adapter; making the action report success without calling the write (the end-to-end disk assertion fails, and nothing else does); and giving the permitted synchronous reader export a real read.",
+    "observedAt": "2026-08-29",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Fourteen tests against the shipping write path with the REAL locking operation injected over a temporary content root, plus a genuine end-to-end POST to the Server Action in a production build. Measured: a successful submission changes `reviewStatus` on disk and leaves the artifact's `lifecycle`, its other fields and every other file byte-identical (verified by hashing the whole content root before and after — exactly one file differs); an invalid status, an unknown artifact, a malformed id and an approval with no reviewer are each refused with nothing written; concurrent conflicting submissions leave one valid artifact with no lost fields; and the redirect target is matched against a literal shape, so `//evil.example`, `javascript:` and `/stage/../../etc/passwd` all fall back to the site root. IN PRODUCTION, against a real build serving a temporary content copy, a form POST carrying the action id Next.js renders for no-JavaScript submission returned 303 to the same stage URL with the same artifact selected, the artifact on disk had changed, and a FRESH request rendered the new status; a refused submission came back as `?reviewError=bad-status`, rendered its sentence, left the artifact untouched and left the rest of the page intact.",
+    "title": "Experiment: the review-status write, from a real form POST to the persisted artifact",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "command": "npm start (node bin/start-shell.mjs)",
+        "framework": "Next.js 16.3.2",
+        "mode": "next build + next start, spawned directly",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "port": "4413 in the test; 3000 by default"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "posix-signal-path",
+          "reason": "The graceful stop was exercised through stdin, not through SIGTERM, because on Windows `process.kill` is `TerminateProcess` and no handler runs. The POSIX branch of the shutdown code (`child.kill('SIGTERM')` then `SIGKILL`) has never been executed — no Linux or macOS host was available.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "clean-machine-install",
+          "reason": "The install branch was not exercised: `node_modules` was present in every run, so the launcher took the `skipping install` path. ACC-0033's 'no prior application state' therefore rests on the build-and-start half, not on a genuinely cold install.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "who-killed-the-child",
+          "reason": "See the notes. On this platform the child dies when its parent exits regardless of whether the launcher terminated it, so the pid observation cannot attribute the kill. The launcher's own report of having SEEN its child exit is what distinguishes the two, and that is what is asserted.",
+          "state": "not-observable"
+        }
+      ]
+    },
+    "id": "EVD-0073",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE THREE CLEANUP OBSERVATIONS ARE NECESSARY AND NOT SUFFICIENT, AND THAT WAS MEASURED RATHER THAN REASONED. With child termination and its escalation commented out of the launcher entirely, the child was STILL gone 500ms after the launcher exited — Windows reaps it when its parent goes — so the first version of this test passed against a launcher that terminated nothing. Exactly the defect the review-write concurrency test had, found the same way. ⚠️ WHAT DISTINGUISHES THEM IS WHETHER THE LAUNCHER SAW ITS CHILD EXIT. Terminating it, the launcher observes the exit and reports `stopped.`; not terminating it, it waits out the grace period, escalates, and reports `stopped, but the child did not report exiting`. The message and the elapsed time are both asserted, and with termination disabled the test now fails on the message. ⚠️ A GRACEFUL SIGNAL IS NOT DELIVERABLE ON WINDOWS, WHICH THE FIRST RUN DEMONSTRATED. `process.kill(pid, 'SIGTERM')` is `TerminateProcess`: the launcher died instantly, no handler ran, cleanup never happened, and two run directories survived in the temp root. Ctrl+C reaches the process everywhere and is the operator's path; a supervising process writes `stop` to stdin or closes it. The affordance exists because the guarantee was otherwise unprovable on the platform this project runs on. ⚠️ THE HEARTBEAT PRECONDITION IS LOAD-BEARING. The watcher is created on first subscription, so a test that started the launcher and stopped it would observe the flawless teardown of something that never existed, and would keep passing if the watcher were never released.",
+    "observedAt": "2026-08-29",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Three tests against the shipping launcher. Measured: `npm start` installs if needed, builds for production, starts, and the project view responds with its reading panel resolved and no further steps; the content root is printed and is absolute; a content root that does not exist is a refusal with exit code 2 naming the path and the variable; Next is spawned directly, so the recorded pid is the server's rather than an npm shim's. Then, after subscribing to `/events` and observing a NAMED heartbeat — proving a watcher existed, since the service creates it lazily on first subscription — the launcher was stopped and observed: the child pid is gone, the port binds again, its run directory is removed, and no `vpw-launch-*` directory survives anywhere in the temp root.",
+    "title": "Experiment: the launcher's cleanup, and what a cleanup observation cannot prove on Windows",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "command": "npm start, in a copy holding only git-tracked files",
+        "framework": "Next.js 16.3.2",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "port": "4415",
+        "readyIn": "27.2s from nothing to serving",
+        "stoppedIn": "413ms"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "cold-npm-cache",
+          "reason": "The repository copy had no prior application state, which is what ACC-0033 asks. The MACHINE's npm cache was warm, which is why install took seconds rather than minutes. A host that had never fetched these packages would be slower; nothing here measures that, and no clause of the criterion depends on it.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "different-machine",
+          "reason": "'A machine with the repository and Node present' was approximated by a directory on this machine holding only tracked files. A genuinely different host — another OS, another Node minor, no global toolchain — was not available.",
+          "state": "not-observable"
+        },
+        {
+          "fact": "posix-shutdown",
+          "reason": "As in EVD-0073: the stop went through stdin because Windows cannot deliver a graceful signal. The POSIX branch of the launcher's shutdown has still never executed.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0074",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS RUN EXISTS BECAUSE THE CRITERION WAS TICKED WITHOUT IT. ACC-0033 was marked `pass` on EVD-0073, whose own omissions said the install branch had never been taken — `node_modules` was present in every run, so the launcher printed `skipping install` each time. Half the criterion was measured and the whole of it was claimed. The omission was recorded accurately and then contradicted three lines later by the outcome, which is worse than not recording it: it produces a document that disproves its own conclusion to anyone who reads both halves. ⚠️ THE INSTALL BRANCH IS ASSERTED POSITIVELY, not inferred from success. The run checks for `installing dependencies…` AND for the absence of `skipping install`, because a launcher that silently skipped would still have built, served and cleaned up perfectly — and would have produced output indistinguishable from this one at every other point. ⚠️ THE CONTENT ROOT WAS CHECKED TO BE INSIDE THE COPY. A launcher resolving back to the source repository would serve the same pages from the same content and look entirely correct, while proving nothing about a fresh checkout.",
+    "observedAt": "2026-08-29",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "`npm start` run in a disposable copy of the repository containing only the 512 git-tracked files — no `node_modules`, no `.next` — confirmed absent before starting. Measured: the launcher took the INSTALL branch (`installing dependencies…`, not `skipping install`), built for production, and was ready in 27.2s with no further steps. It printed a content root that is absolute and inside the cold copy rather than the source repository. The project view served its route marker with the reading panel and diagnostics resolved; `/events` produced a named heartbeat, so a watcher existed. Stopped via stdin: the launcher confirmed it saw its child exit in 413ms with no degraded message, the child pid was gone, the port bound again, its run directory was removed, and no `vpw-launch-*` directory was left anywhere in the temp root.",
+    "title": "Experiment: the documented command in a cold copy — install, build, serve, clean up",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "browser": "Google Chrome, headless=new, driven over CDP with no automation library",
+        "contentRoot": "a disposable copy; the project's own content was not touched",
+        "framework": "Next.js 16.3.2",
+        "harness": "bin/browser-check.mjs",
+        "mode": "next build + next start",
+        "node": "v24.18.0",
+        "os": "Windows 11",
+        "recoveredAfter": "783ms from the server returning",
+        "staleAfter": "12.7s from the moment it was observed live",
+        "watchdogWindow": "15s, the shipped default"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "other-engines",
+          "reason": "Chrome only. Firefox and WebKit have their own EventSource reconnection behaviour and their own brand checks; neither was available on this host. The defect found here is a WebIDL requirement all of them share, but that is an argument, not a measurement.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "headed-browser",
+          "reason": "Headless. `document.visibilityState` reported `visible` and timers were shown to run at full speed, so the two behaviours under test were not affected — but a headed window was never opened, and nothing here observes what a person would actually see.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "long-disconnection",
+          "reason": "The server was down for roughly three seconds. EventSource's own backoff after repeated failures, and what the page does across a much longer outage, were not exercised.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0075",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THIRTEEN PASSING UNIT TESTS DESCRIBED A COMPONENT THAT DID NOT WORK AT ALL. Every one of them injected timers, so not one of them ever called the default — and the default was the broken part. The shipped page went live and stayed live forever: not a degraded indicator, but the exact failure the component exists to prevent, and the most reassuring possible form of it. This is what 'inject the collaborators' costs when nothing ever exercises the real ones. ⚠️ THE PM'S CONSTRAINT IS WHAT FOUND IT. 'Do not inject EventSource or fake timers for this evidence' was the whole reason the run could fail. Any harness that supplied its own timers — which is to say, any faster or more convenient harness — would have reported both criteria passing. ⚠️ THE STALE CASE WAS PROVOKED WITHOUT BREAKING ANYTHING. The heartbeat interval was pushed past the client's window while the connection stayed open, and CDP network events confirm the `/events` request received a response and never finished or failed. Had the socket dropped, the page would have gone stale down the ERROR path and the watchdog would never have been the thing under test. ⚠️ COLOUR IS NOT DOING THE WORK. The text changed from `Receiving updates` to `Not receiving updates` and the icon changed from a tick to a warning triangle. The colour changed too, and the assertion does not depend on it.",
+    "observedAt": "2026-08-29",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Headless Chrome driven over the DevTools protocol against the real production build, with no injected EventSource and no injected timers. THE FIRST RUN FAILED ACC-0029: with the server's heartbeat interval set to 600s and the socket confirmed still open, the page stayed `Receiving updates` for the whole 40s budget. Diagnosis, measured rather than assumed: `document.visibilityState` was `visible` and an in-page 15000ms `setTimeout` returned in 15014ms, so timer throttling was excluded; a raw-socket read of `/events` showed exactly one heartbeat at 32ms then silence with the socket open, so the server was correct. The cause was `timers = { setTimeout, clearTimeout }` throwing `Illegal invocation` inside the open handler (AST-0040). AFTER WRAPPING THE DEFAULTS, both criteria pass: the indicator went from live to `Not receiving updates` while the stream was still open, changing its TEXT and its ICON and its colour; and after the server was dropped, an attestation changed, and the SAME build restarted, the page reconnected on its own, reloaded, and showed the changed stage 783ms later with its URL preserved.",
+    "title": "Experiment: ACC-0029 and ACC-0030 in a real browser — and the defect that only a browser could find",
+    "type": "evidence"
   }
 ]
