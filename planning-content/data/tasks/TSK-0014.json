@@ -2,7 +2,7 @@
   "id": "TSK-0014",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Run the compile benchmark under the pinned protocol",
   "statement": "Measure the 95th-percentile server-side compile-and-render time for the largest stage document under ACC-0020's protocol: pinned environment recorded with the result, timing from read to completed markup, ten discarded warm-up requests, fifty measured serial requests, and per-request verification that compilation occurred. Record the result as evidence.",
@@ -14,10 +14,10 @@
     "REQ-0017"
   ],
   "acceptedBy": [
-    "ACC-0020"
+    "ACC-0037"
   ],
   "dependsOn": [
     "TSK-0009"
   ],
-  "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it. ⚠️ DONE 2026-08-28 (EVD-0071). Six valid runs; ACC-0020 recorded as fail. ⚠️ THIS TASK DOES NOT TAKE THE FALLBACK DECISION, as its own note requires — and the measurement is the reason it should not be taken as written. The budget was missed, but by the read rather than the compiler, so 'plain markdown for stage documents' would cost the rejection contract and buy about 20 ms. That is a PM decision and it now has a different question in front of it: what to do about a per-request read of the whole planning corpus. ⚠️ THE HARNESS IS PERMANENT AND RE-RUNNABLE (`node bin/bench-compile.mjs`), because a number nobody can reproduce is a number nobody can dispute — and this one needs disputing: it is not stable across runs. It prints JSON including every raw sample, so the p95 can be recomputed rather than trusted. ⚠️ IT REFUSES TO REPORT RATHER THAN REPORT SOMETHING FLATTERING. Caching the compiled document produces VOID and a non-zero exit with no timings, falsified by actually memoising it."
+  "notes": "⚠️ A run in which any measured request did not compile is VOID rather than a pass — the easiest way to hit a compile budget is to cache the document. ⚠️ If the first valid run misses 300 ms by a wide margin, the response is DEC-0020's second alternative — plain markdown for stage documents — not a larger number. That is a PM decision and this task does not take it. ⚠️ DONE 2026-08-28 (EVD-0071). Six valid runs; ACC-0020 recorded as fail. ⚠️ THIS TASK DOES NOT TAKE THE FALLBACK DECISION, as its own note requires — and the measurement is the reason it should not be taken as written. The budget was missed, but by the read rather than the compiler, so 'plain markdown for stage documents' would cost the rejection contract and buy about 20 ms. That is a PM decision and it now has a different question in front of it: what to do about a per-request read of the whole planning corpus. ⚠️ THE HARNESS IS PERMANENT AND RE-RUNNABLE (`node bin/bench-compile.mjs`), because a number nobody can reproduce is a number nobody can dispute — and this one needs disputing: it is not stable across runs. It prints JSON including every raw sample, so the p95 can be recomputed rather than trusted. ⚠️ IT REFUSES TO REPORT RATHER THAN REPORT SOMETHING FLATTERING. Caching the compiled document produces VOID and a non-zero exit with no timings, falsified by actually memoising it. ⚠️ CORRECTED 2026-08-28: the 234-359 ms span was attributed here to reading all 253 artifacts per request. It is not. `readStageDocument` awaits `connection()` and reads the nine stage documents only — `lintProject` is not on its path. What inside that span costs the time is an open question, not a known cost. ⚠️ ACCEPTANCE MOVED 2026-08-28 to ACC-0037, the successor. ACC-0020 stays `fail` and stays readable; this task no longer traces to it, because a task accepted by a retired criterion is accountable to nothing. DEC-0025 records why the plain-Markdown fallback did not fire and QST-0025 carries the unexplained read span."
 }

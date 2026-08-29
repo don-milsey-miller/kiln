@@ -40,6 +40,38 @@
         ],
         "$comment": "A bare `fail` is an accusation with no basis. A `pass` may stand on a link or on nothing yet — see `outcome` — but a failure must at least say what was seen."
       }
+    },
+    {
+      "$comment": "The lifecycle/supersededBy invariant, the same one `decision` and `assertion` carry, and nested inside allOf for the same measured reason (#82). ⚠️ ADDED 2026-08-28 BECAUSE A FAILED CRITERION HAD NOWHERE TO GO. ACC-0020 failed, its stated fallback was disproved by the measurement rather than confirmed, and the only ways to move the project on were to flip the outcome, delete the criterion, or exempt it from the handoff tripwire — all three of which destroy the record of what was measured. A criterion is retired the way a decision is: it stays, failed, and names the successor that replaced it. `setLifecycle` already wrote this field for every type; only this schema refused it.",
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "const": "superseded"
+          }
+        },
+        "required": [
+          "lifecycle"
+        ]
+      },
+      "then": {
+        "required": [
+          "supersededBy"
+        ],
+        "properties": {
+          "supersededBy": {
+            "minItems": 1
+          }
+        },
+        "$comment": "A superseded criterion must name what replaced it. A retired criterion with no successor is how a failed measurement becomes a gap nobody can see: the tick disappears and so does the obligation."
+      },
+      "else": {
+        "properties": {
+          "supersededBy": {
+            "maxItems": 0
+          }
+        },
+        "$comment": "Nothing that still stands has been replaced. Structural, so it belongs here rather than in the lint — every consumer would otherwise have to re-learn it."
+      }
     }
   ],
   "properties": {
@@ -93,6 +125,11 @@
     "notes": {
       "type": "string",
       "x-materiality": "cosmetic"
+    },
+    "supersededBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "The criterion that replaced this one. Required when lifecycle is `superseded` and forbidden otherwise — enforced by the conditional in allOf, not left to the lint. ⚠️ This is how a FAILED criterion leaves the active set without its failure leaving the record. The successor must measure the disputed cost, not a relabelled version of the same claim; a successor that quietly widens the budget is the failure being edited rather than answered.",
+      "x-materiality": "semantic"
     },
     "tags": {
       "type": "array",

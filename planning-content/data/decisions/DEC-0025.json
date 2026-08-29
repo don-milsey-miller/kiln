@@ -1,0 +1,32 @@
+{
+  "id": "DEC-0025",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Keep restricted runtime MDX; the measured cost is not the compiler",
+  "statement": "Keep restricted runtime MDX for stage documents. Do not adopt DEC-0020's plain-Markdown alternative: the measurement that was supposed to trigger it instead disproved its premise.",
+  "alternatives": [
+    {
+      "option": "Adopt DEC-0020's second alternative — plain Markdown for stage documents",
+      "whyNot": "It was written as the response to missing the compile budget, on the assumption that the compiler was the cost. EVD-0071 measured the compiler at 15-29 ms p95, 4-12% of the span. Adopting it would surrender the rejection contract — the security boundary that makes agent-authored documents safe to render — to remove roughly 20 ms from a 245-375 ms span, and would still miss 300 ms in the same three runs. It is a real cost paid for no measured benefit."
+    },
+    {
+      "option": "Raise the 300 ms budget until the current numbers fit",
+      "whyNot": "ACC-0020's own note forbids exactly this, and it is right to: a ceiling moved to match the measurement records nothing. The budget is not being raised — it is being replaced by one that measures the cost actually in dispute, and the unexplained span is being recorded as an open question rather than absorbed into a bigger number."
+    },
+    {
+      "option": "Optimise the stage read now",
+      "whyNot": "Its cause is unknown. The span combines a `connection()` wait with a directory listing and nine file reads, and nothing has separated them. Optimising before instrumenting would be guessing at which of three things to change, and a guess that happened to work would teach nothing about which one mattered."
+    }
+  ],
+  "rationale": "The compiler is not the cost, and it is the security boundary. DEC-0020 recorded the per-request compile cost as explicitly unmeasured and pre-committed to a fallback in case it proved large. It has now been measured and it is small: 15-29 ms p95 across six valid runs against the largest stage document. The fallback was contingent on a premise the measurement refuted, so it does not fire. ⚠️ THE BUDGET WAS STILL MISSED, AND THAT IS NOT BEING WAVED AWAY. ACC-0020 stays `fail` and stays in the record; it is superseded by a criterion that measures the disputed cost rather than deleted for being inconvenient. The unexplained 234-359 ms is recorded as an open performance question, non-blocking, to be INSTRUMENTED before anything is optimised. ⚠️ THE OBSERVED 245-375 ms STAGE RESPONSE IS ACCEPTED FOR v1 WITH ITS ATTRIBUTION OPEN. That is a judgement about a local-first planning tool on a developer's own machine, not a claim that the number is good.",
+  "decidedAt": "2026-08-28",
+  "evidencedBy": [
+    "EVD-0071"
+  ],
+  "notes": "⚠️ THIS IS A PRE-COMMITTED FALLBACK NOT FIRING, WHICH IS THE HARDER CASE. DEC-0020 said 'if the budget is missed by a wide margin, switch to plain Markdown'. The budget was missed. Firing the fallback on that sentence alone would have been the disciplined-looking move and the wrong one: the fallback was reasoning from an assumed cause, the measurement identified a different one, and a rule applied past the evidence that motivated it is just a rule. ⚠️ WHAT WOULD REOPEN THIS: the successor criterion failing — compile p95 above 50 ms — which would mean the compiler HAS become the cost and DEC-0020's alternative is back on the table on its original merits.",
+  "addresses": [
+    "ACC-0020"
+  ]
+}

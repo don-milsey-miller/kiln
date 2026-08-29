@@ -87,11 +87,12 @@
     },
     "addresses": {
       "$ref": "common.schema.json#/$defs/traceLinks",
-      "description": "What this decision resolves — the requirements it settles and the open questions it closes.",
+      "description": "What this decision resolves — the requirements it settles, the open questions it closes, and the failed acceptance criteria it answers. ⚠️ `acceptance-criterion` was added 2026-08-28, when ACC-0020 failed and the plain-Markdown fallback it pre-committed to was disproved by the same measurement that triggered it. A failed criterion may leave the active set only when a decision says what was concluded, and that sentence is worth nothing if it cannot be checked — so the edge is real rather than prose in a note. It is the existing meaning of `addresses` (the thing this decision responds to) widened by one target, not a new relation.",
       "x-materiality": "structural",
       "x-traceTarget": [
         "requirement",
-        "question"
+        "question",
+        "acceptance-criterion"
       ]
     },
     "derivedFrom": {

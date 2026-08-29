@@ -156,7 +156,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   const shellCriteria = read("acceptance-criterions").filter((a) =>
     (a.evaluates ?? []).some((id) => shellIds.has(id))
   );
-  assert.equal(shellCriteria.length, 24, "every run-2 criterion, plus ACC-0036");
+  assert.equal(shellCriteria.length, 25, "every run-2 criterion, plus ACC-0036 and ACC-0037");
 
   // INVARIANT 1: a criterion may only be `pass` if every component it evaluates has code. Accepted
   // work that nothing implements is the sharpest form of the QST-0015 hazard — it would put a tick
@@ -165,12 +165,62 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
     for (const id of a.evaluates.filter((i) => shellIds.has(i)))
       assert.ok(withCode.has(id), `${a.id} passes but ${id} has no implementedBy`);
 
-  // INVARIANT 2: a `fail` is never shipped quietly. If one is ever recorded, this stops and someone
-  // decides what the package should say about it.
+  // INVARIANT 2: a `fail` is never shipped QUIETLY — which is not the same as never shipped.
+  //
+  // ⚠️ THIS CHECK WAS REWRITTEN 2026-08-28, THE FIRST TIME IT FIRED, AND THAT IS THE INTERESTING
+  // PART. It used to demand the failed list be empty, so the only ways past it were to flip the
+  // outcome, delete the criterion, or add an exemption here — three different ways of erasing a
+  // measurement, all of which would have looked like housekeeping in a diff. ACC-0020 failed, its
+  // pre-committed fallback was disproved by the same measurement that triggered it, and none of the
+  // three was the right answer.
+  //
+  // So the rule is now what it always meant: a failure may ship once it has been RESOLVED. Retired
+  // rather than still standing, naming a successor that exists and is active, and addressed by a
+  // decision that says what was concluded. Deleting the criterion still fails this — a missing
+  // criterion is not a resolved one — and so does a successor that is itself unresolved.
+  const decisions = read("decisions");
+  const criteriaById = new Map(read("acceptance-criterions").map((a) => [a.id, a]));
+
+  for (const a of shellCriteria.filter((x) => x.outcome === "fail")) {
+    assert.notEqual(
+      a.lifecycle,
+      "active",
+      `${a.id} is failed and still stands. A criterion that is active and failing is an obligation ` +
+        `the package would ship as met.`
+    );
+
+    const successors = a.supersededBy ?? [];
+    assert.ok(
+      successors.length > 0,
+      `${a.id} is failed and retired but names no successor. That is how a failed measurement ` +
+        `becomes a gap nobody can see: the tick disappears and so does the obligation.`
+    );
+
+    for (const s of successors) {
+      const next = criteriaById.get(s);
+      assert.ok(next, `${a.id} names successor ${s}, which does not exist`);
+      assert.equal(next.lifecycle, "active", `${a.id}'s successor ${s} does not itself stand`);
+      assert.notEqual(
+        next.outcome,
+        "fail",
+        `${a.id} was superseded by ${s}, which is ALSO failing — a chain of retirements is not a resolution`
+      );
+    }
+
+    assert.ok(
+      decisions.some((d) => (d.addresses ?? []).includes(a.id)),
+      `${a.id} is failed and retired, and no decision addresses it. Someone has to have written down ` +
+        `what was concluded; a supersession with no reasoning is a record of the outcome changing ` +
+        `and not of anybody deciding anything.`
+    );
+  }
+
+  // Today's state, kept explicit so a second failure is a visible edit rather than a silent pass
+  // through the rule above.
   assert.deepEqual(
     shellCriteria.filter((a) => a.outcome === "fail").map((a) => a.id),
-    [],
-    "a failing application criterion is in the package"
+    ["ACC-0020"],
+    "the failed criteria in the package — each one resolved by the rule above"
   );
 
   // Today's state — two lines to edit as implementation lands.
@@ -196,6 +246,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       "ACC-0031",
       "ACC-0035",
       "ACC-0036",
+      "ACC-0037",
     ],
     "criteria evaluated so far — all three are the adapter door's"
   );

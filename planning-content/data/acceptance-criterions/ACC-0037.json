@@ -1,0 +1,20 @@
+{
+  "id": "ACC-0037",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Restricted-MDX compilation stays within 50 ms at p95, under ACC-0020's protocol",
+  "statement": "The 95th-percentile time spent in `compileStageDocument` for the largest stage document is at or below 50 ms. MEASURED SPAN: the compile call alone — from the moment the reader's document is handed to the compiler to the moment a renderable component is returned — EXCLUDING the planning-content read that precedes it, which is a separate cost under a separate question. ENVIRONMENT: the reference host, with its OS, Node version, Next.js version, @mdx-js/mdx version and CPU model recorded alongside the result; no other significant load. DOCUMENT: the largest stage document by byte count at the time of evaluation, named in the result. WARM-UP: 10 requests issued and discarded. SAMPLE: the next 50 consecutive requests, issued one at a time with no concurrency. VERIFICATION: the compile counter must advance by exactly one per measured request. A run in which any measured request did not compile is VOID, not a pass.",
+  "evaluates": [
+    "CMP-0013"
+  ],
+  "verifies": [
+    "REQ-0017"
+  ],
+  "evidencedBy": [
+    "EVD-0071"
+  ],
+  "notes": "⚠️ IT SUCCEEDS ACC-0020 AND IT IS NOT ACC-0020 WITH A BIGGER NUMBER. The predecessor bounded read-plus-compile at 300 ms and failed, but the measurement showed the failure came from the read. Widening that budget would have hidden a real unknown behind a comfortable ceiling. This one bounds only the cost that was ever in dispute — whether request-time MDX compilation is affordable — and the read it excluded is carried by its own open question, not dropped. ⚠️ 50 ms IS ROUGHLY TWICE THE MEASURED WORST CASE (29.05 ms p95 across six runs), chosen as headroom for document growth rather than as a description of today. A criterion set at the measurement passes by construction and detects nothing. ⚠️ THE VERIFICATION CLAUSE IS INHERITED DELIBERATELY, and it has been falsified: memoising the compiled document makes `bin/bench-compile.mjs` report VOID with a non-zero exit and no timing figures at all. Without it the cheapest way to pass a compile budget is to stop compiling, which would also break DEC-0020's request-time requirement and AST-0030's finding beneath it. ⚠️ EVALUATED `pass` ON EVD-0071, the same six runs that failed the predecessor: compile p95 was 15.41-29.05 ms in every one. The evidence did not change; the question it was asked did."
+}

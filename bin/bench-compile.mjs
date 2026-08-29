@@ -41,7 +41,12 @@ const PORT = 4411;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WARMUP = 10;
 const SAMPLE = 50;
-const BUDGET_MS = 300;
+// ⚠️ THE VERDICT IS ACC-0037's, NOT ACC-0020's. The predecessor bounded read-plus-compile at
+// 300 ms and was superseded once this harness showed the read dominates and the compiler does not
+// (DEC-0025). What this now decides is the compile alone. The read is still measured and still
+// printed — QST-0025 is open on exactly that span — but it does not decide a pass, because no
+// criterion currently bounds it.
+const COMPILE_BUDGET_MS = 50;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const nextBin = join(ROOT, "node_modules", "next", "dist", "bin", "next");
@@ -204,7 +209,7 @@ async function main() {
 
     if (problems.length) {
       console.log(
-        JSON.stringify({ verdict: "VOID", reason: problems, document: doc, environment, protocol: { WARMUP, SAMPLE, BUDGET_MS } }, null, 2)
+        JSON.stringify({ verdict: "VOID", reason: problems, document: doc, environment, protocol: { WARMUP, SAMPLE, COMPILE_BUDGET_MS } }, null, 2)
       );
       process.exitCode = 1;
       return;
@@ -220,8 +225,9 @@ async function main() {
     const toMarkup = samples.map((s, i) => s.endWall - measured[i].startWall);
 
     const result = {
-      verdict: p95(readAndCompile) <= BUDGET_MS && p95(toMarkup) <= BUDGET_MS ? "PASS" : "OVER BUDGET",
-      budgetMs: BUDGET_MS,
+      verdict: p95(compileOnly) <= COMPILE_BUDGET_MS ? "PASS" : "OVER BUDGET",
+      criterion: "ACC-0037",
+      compileBudgetMs: COMPILE_BUDGET_MS,
       document: doc,
       protocol: { warmupDiscarded: WARMUP, measured: SAMPLE, concurrency: 1, p95Method: "nearest-rank" },
       environment,
@@ -232,8 +238,11 @@ async function main() {
         expected: SAMPLE - 1,
       },
       readAndCompileMs: { ...stat(readAndCompile), note: "server-side, monotonic clock; a LOWER bound on the protocol's span" },
-      readMs: { ...stat(readOnly), note: "planning-content read alone — NOT affected by DEC-0020's markdown fallback" },
-      compileMs: { ...stat(compileOnly), note: "restricted-MDX compile alone — the only part the markdown fallback would remove" },
+      readMs: {
+        ...stat(readOnly),
+        note: "connection() plus the stage-directory listing and nine document reads. NOT bounded by any criterion — QST-0025 is open on what inside this span costs the time. Reported, never used to decide the verdict.",
+      },
+      compileMs: { ...stat(compileOnly), note: "restricted-MDX compile alone — ACC-0037's measured span, and what the verdict turns on" },
       readToMarkupCompleteMs: {
         ...stat(toMarkup),
         note: "read start (server wall clock) to response body complete (harness wall clock); an UPPER bound, includes loopback and the rest of the page",

@@ -2,7 +2,7 @@
   "id": "TSK-0009",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build the stage view: criteria above the document, artifact-scoped review",
   "statement": "Render `/stage/[stageId]`: the stage's exit criteria with their recorded attestations, then the compiled document, then a review panel identifying the artifact under review by id, type, title and current status. Long criterion identifiers wrap rather than overflow.",
@@ -16,7 +16,8 @@
   ],
   "acceptedBy": [
     "ACC-0016",
-    "ACC-0018"
+    "ACC-0018",
+    "ACC-0036"
   ],
   "dependsOn": [
     "TSK-0008",
