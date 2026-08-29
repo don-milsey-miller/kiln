@@ -1,0 +1,51 @@
+{
+  "id": "EVD-0074",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the documented command in a cold copy — install, build, serve, clean up",
+  "kind": "experiment",
+  "summary": "`npm start` run in a disposable copy of the repository containing only the 512 git-tracked files — no `node_modules`, no `.next` — confirmed absent before starting. Measured: the launcher took the INSTALL branch (`installing dependencies…`, not `skipping install`), built for production, and was ready in 27.2s with no further steps. It printed a content root that is absolute and inside the cold copy rather than the source repository. The project view served its route marker with the reading panel and diagnostics resolved; `/events` produced a named heartbeat, so a watcher existed. Stopped via stdin: the launcher confirmed it saw its child exit in 413ms with no degraded message, the child pid was gone, the port bound again, its run directory was removed, and no `vpw-launch-*` directory was left anywhere in the temp root.",
+  "outcome": "success",
+  "observedAt": "2026-08-29",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "command": "npm start, in a copy holding only git-tracked files",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "framework": "Next.js 16.3.2",
+      "port": "4415",
+      "readyIn": "27.2s from nothing to serving",
+      "stoppedIn": "413ms"
+    },
+    "omissions": [
+      {
+        "fact": "cold-npm-cache",
+        "state": "not-captured",
+        "reason": "The repository copy had no prior application state, which is what ACC-0033 asks. The MACHINE's npm cache was warm, which is why install took seconds rather than minutes. A host that had never fetched these packages would be slower; nothing here measures that, and no clause of the criterion depends on it."
+      },
+      {
+        "fact": "different-machine",
+        "state": "not-observable",
+        "reason": "'A machine with the repository and Node present' was approximated by a directory on this machine holding only tracked files. A genuinely different host — another OS, another Node minor, no global toolchain — was not available."
+      },
+      {
+        "fact": "posix-shutdown",
+        "state": "not-captured",
+        "reason": "As in EVD-0073: the stop went through stdin because Windows cannot deliver a graceful signal. The POSIX branch of the launcher's shutdown has still never executed."
+      }
+    ]
+  },
+  "notes": "⚠️ THIS RUN EXISTS BECAUSE THE CRITERION WAS TICKED WITHOUT IT. ACC-0033 was marked `pass` on EVD-0073, whose own omissions said the install branch had never been taken — `node_modules` was present in every run, so the launcher printed `skipping install` each time. Half the criterion was measured and the whole of it was claimed. The omission was recorded accurately and then contradicted three lines later by the outcome, which is worse than not recording it: it produces a document that disproves its own conclusion to anyone who reads both halves. ⚠️ THE INSTALL BRANCH IS ASSERTED POSITIVELY, not inferred from success. The run checks for `installing dependencies…` AND for the absence of `skipping install`, because a launcher that silently skipped would still have built, served and cleaned up perfectly — and would have produced output indistinguishable from this one at every other point. ⚠️ THE CONTENT ROOT WAS CHECKED TO BE INSIDE THE COPY. A launcher resolving back to the source repository would serve the same pages from the same content and look entirely correct, while proving nothing about a fresh checkout."
+}

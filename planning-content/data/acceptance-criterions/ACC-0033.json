@@ -13,8 +13,8 @@
   "verifies": [
     "REQ-0020"
   ],
-  "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server.",
+  "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server. ⚠️ MARKED `pass` IN ERROR ON 2026-08-29 AND RETURNED TO `not-evaluated` THE SAME DAY. EVD-0073 recorded, in its own omissions, that the install branch was never taken: `node_modules` was present in every run, so the launcher printed `dependencies present; skipping install`. This criterion says 'on a machine with... no prior application state' and 'installs and starts'. Half of it was measured and the whole of it was ticked. ⚠️ THE EVIDENCE ITSELF SAID SO, WHICH IS THE PART WORTH RECORDING. The omission was written down accurately and then contradicted by the outcome three lines later — a criterion marked against evidence that explicitly disclaims the thing being claimed. Recording an omission is not the same as honouring it. ⚠️ WHAT WOULD SETTLE IT: the documented command run in a disposable copy of the repository with no `node_modules` and no `.next`, installing, building, serving and cleaning up with no further steps. ⚠️ EVALUATED PROPERLY 2026-08-29 (EVD-0074) AND RETURNED TO `pass`. The documented command was run in a disposable copy holding only tracked files, with `node_modules` and `.next` confirmed absent. It installed, built, served and cleaned up in 27.2s with no further steps, and the install branch was asserted positively rather than inferred from the run succeeding.",
   "evidencedBy": [
-    "EVD-0073"
+    "EVD-0074"
   ]
 }
