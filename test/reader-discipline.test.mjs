@@ -72,12 +72,46 @@ test("⚠️ every exported reader awaits `connection()` before anything else", 
   }
 });
 
-test("no synchronous export offers a way around the contract", () => {
+test("⚠️ no synchronous export offers a way around the contract", () => {
+  // ⚠️ THE RULE IS ABOUT READS, AND IT USED TO BE STATED AS "no synchronous export". That was the
+  // same claim while the reader exported nothing but reads. TSK-0012 needed the WRITE to address the
+  // same content root the page reads from — two resolutions that agreed today and drifted later
+  // would have the operator approving an artifact in one directory while the page rendered another,
+  // with nothing to say which half was wrong — so one function here returns WHERE content lives.
+  //
+  // It returns paths and reads nothing, so `connection()` has nothing to protect. The exception is
+  // named rather than inferred, and the list is pinned, so a second one is a visible act.
+  const PERMITTED = {
+    planningRoots:
+      "returns the project and content roots; touches no content. Shared with the review write so " +
+      "the page and the write cannot address different directories (TSK-0012).",
+  };
+  // Anything that would actually READ. A synchronous export calling one of these is the defect the
+  // original rule was written against, and it stays refused however the export is named.
+  const READS = /(lintProject|loadStageDefinitions|loadStageAttestations|evaluateStageGate|readStageDocs|readActivatedTypes|createValidators|loadSchemaSet)\s*\(/;
+
   for (const f of files()) {
     const src = readFileSync(f, "utf-8");
     const sync = [...src.matchAll(/export\s+function\s+(\w+)/g)].map((m) => m[1]);
-    assert.deepEqual(sync, [], `${f} exports a synchronous reader, which cannot await connection()`);
+    assert.deepEqual(
+      sync.filter((n) => !PERMITTED[n]),
+      [],
+      `${f} exports a synchronous reader, which cannot await connection()`
+    );
+
+    // ⚠️ AND THE PERMITTED ONE MUST STILL BE WHAT IT CLAIMS. Without this the exception is a
+    // hole: `planningRoots` could grow a `lintProject` call tomorrow and read the whole project
+    // outside the freshness contract under a name this list already trusts.
+    for (const n of sync) {
+      const at = src.indexOf(`export function ${n}`);
+      const end = src.indexOf("\n}", at);
+      const body = src.slice(at, end === -1 ? undefined : end);
+      assert.ok(!READS.test(body), `${n} is a permitted synchronous export but it READS — that is the thing the rule forbids`);
+      assert.ok(!/await\s/.test(body), `${n} awaits, so it is not the synchronous path this exception was granted for`);
+    }
   }
+
+  assert.deepEqual(Object.keys(PERMITTED).sort(), ["planningRoots"], "the exception list itself is pinned");
 });
 
 test("the criteria and document reads are separate exports", () => {

@@ -170,7 +170,16 @@ test("⚠️ every adapter's permitted consumers are DECLARED, and the list is s
     adapter.split(sep).slice(-2).join("/"),
     consumers.map((c) => c.split(sep).slice(-2).join("/")),
   ]);
-  assert.deepEqual(declared, [["server/change-stream.js", ["events/route.js"]]]);
+  assert.deepEqual(declared, [
+    ["server/change-stream.js", ["events/route.js"]],
+    ["server/review.js", ["_write/review-action.js"]],
+  ]);
+
+  // ⚠️ THE WRITE DOOR HAS EXACTLY ONE CONSUMER, and that is the property DEC-0021's individual
+  // review turns on. A second caller of the write adapter is a second place the content lock can be
+  // taken from, which is the review happening again — so it fails here rather than passing quietly.
+  const write = declared.find(([a]) => a.endsWith("review.js"));
+  assert.deepEqual(write?.[1], ["_write/review-action.js"], "the write adapter admits the Server Action alone");
 
   // ...and the content adapters are NOT in it, so they still admit only the reader.
   for (const name of ["content.js", "stages.js"])

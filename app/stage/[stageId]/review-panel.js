@@ -1,19 +1,29 @@
 import { readArtifactSummary } from "../../_read/planning.js";
+import { submitReviewStatus } from "../../_write/review-action.js";
+import { REVIEW_MESSAGE } from "../../_write/review-logic.js";
 
 /**
  * The artifact-scoped review panel — identity and current status only.
  *
- * ⚠️ NO WRITE CAPABILITY, DELIBERATELY. DEC-0021 holds locking capabilities back for individual
- * review before the adapter exposes them, and the review-status write is the first of them: a Server
- * Component may run concurrently in ways a CLI never does, and that is what needs examining before
- * the line is added. TSK-0012 does that. Until then the control is inert and says so, rather than
- * being absent — an operator should be able to see what the action will be.
+ * ⚠️ THE WRITE WAS ADDED BY TSK-0012, AFTER THE INDIVIDUAL REVIEW DEC-0021 REQUIRES. It is the
+ * only write in the application, it goes through `app/server/review.js` — an adapter exposing
+ * exactly one locking operation — and that operation cannot express anything but a `reviewStatus`
+ * change. `lifecycle` is unreachable from here by construction rather than by care.
+ *
+ * ⚠️ A PLAIN `<form action={...}>`, NO CLIENT COMPONENT. The submission needs no interactivity the
+ * platform does not already give it, and the outcome comes back as a fresh render of the page rather
+ * than as a message about one. A failure returns in the URL as a CODE, mapped to its sentence here —
+ * never as text carried in the query string, which would let a crafted link render an arbitrary
+ * sentence inside the application's own error styling.
  *
  * ⚠️ IT IS ARTIFACT-SCOPED, NOT DOCUMENT-SCOPED. `reviewStatus` is a property of an artifact and a
  * stage document is not one, so the panel names the artifact's id, type, title and current status.
  * Which artifact is selected comes from the URL, so the selection survives the reload DEC-0022 will
  * perform without warning.
  */
+
+/** The four statuses, in the order a review moves through them. */
+const STATUSES = ["draft", "in-review", "approved", "amended"];
 
 const STATUS_TONE = {
   draft: { bg: "#fdfaf2", border: "#d8cfa8", fg: "#6b5410" },
@@ -22,7 +32,7 @@ const STATUS_TONE = {
   amended: { bg: "#f7f4fb", border: "#cfc2e0", fg: "#5b4380" },
 };
 
-export default async function ReviewPanel({ artifactId }) {
+export default async function ReviewPanel({ artifactId, stageId, reviewError }) {
   const artifact = artifactId ? await readArtifactSummary(artifactId) : null;
 
   if (!artifactId)
@@ -40,6 +50,8 @@ export default async function ReviewPanel({ artifactId }) {
     );
 
   const tone = STATUS_TONE[artifact.reviewStatus] ?? STATUS_TONE.draft;
+  // ⚠️ Looked up, never interpolated: an unrecognised code renders nothing rather than itself.
+  const message = REVIEW_MESSAGE[reviewError] ?? null;
 
   return (
     <section
@@ -77,11 +89,62 @@ export default async function ReviewPanel({ artifactId }) {
         </span>
       </div>
 
-      <div style={{ borderTop: "1px solid #eee", paddingTop: "10px", color: "#888", fontSize: ".8rem" }}>
-        Changing review status is not available yet. The write goes through the typed path — lock,
-        fresh read inside the lock, atomic write — and that capability is reviewed on its own before
-        it is exposed.
-      </div>
+      {message ? (
+        <div
+          data-vpw-review-error={reviewError}
+          role="alert"
+          style={{
+            border: "1px solid #d9a3a3",
+            borderLeft: "5px solid #c62828",
+            background: "#fdf6f6",
+            borderRadius: "4px",
+            padding: "9px 12px",
+            color: "#7a2020",
+            fontSize: ".82rem",
+          }}
+        >
+          {message}
+        </div>
+      ) : null}
+
+      <form
+        action={submitReviewStatus}
+        style={{ borderTop: "1px solid #eee", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}
+      >
+        {/* The artifact and the page to come back to. No `type` field: it is derived from the id. */}
+        <input type="hidden" name="id" value={artifact.id} />
+        <input type="hidden" name="path" value={`/stage/${stageId}`} />
+
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: ".82rem", flexWrap: "wrap" }}>
+          <span style={{ color: "#666" }}>change to</span>
+          <select name="status" defaultValue={artifact.reviewStatus} style={{ padding: ".2rem .3rem", fontSize: ".82rem" }}>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: ".82rem", flexWrap: "wrap" }}>
+          <span style={{ color: "#666" }}>reviewed by</span>
+          <input
+            name="reviewedBy"
+            type="text"
+            placeholder="required to approve"
+            style={{ padding: ".2rem .35rem", fontSize: ".82rem", minWidth: "12rem" }}
+          />
+        </label>
+
+        <button type="submit" style={{ alignSelf: "flex-start", padding: ".3rem .8rem", fontSize: ".82rem", cursor: "pointer" }}>
+          Update review status
+        </button>
+
+        <span style={{ color: "#888", fontSize: ".78rem" }}>
+          Changes this artifact&rsquo;s review status only, through the typed path — lock, fresh read
+          inside the lock, atomic write.
+        </span>
+      </form>
     </section>
   );
 }

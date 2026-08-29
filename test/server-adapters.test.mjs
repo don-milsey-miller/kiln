@@ -64,7 +64,7 @@ test("no adapter uses `export *`", () => {
   }
 });
 
-test("⚠️ no adapter exposes a locking, writing or spawning capability", () => {
+test("⚠️ no adapter exposes a locking, writing or spawning capability except the one that was reviewed", () => {
   // The concrete case DEC-0021 was written around: `loadStageAttestations` and
   // `writeStageAttestation` are exports of the SAME module, and only one of them is a read.
   const FORBIDDEN = [
@@ -87,12 +87,18 @@ test("⚠️ no adapter exposes a locking, writing or spawning capability", () =
       .flatMap((m) => m[1].split(","))
       .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
       .filter(Boolean);
-    for (const bad of FORBIDDEN)
+    for (const bad of FORBIDDEN) {
+      // ⚠️ ONE EXCEPTION, AND IT IS THE WHOLE OF WHAT DEC-0021's INDIVIDUAL REVIEW APPROVED:
+      // `setReviewStatus`, in `review.js`, and nowhere else. The rule did not weaken when the first
+      // write landed — it named the write and kept refusing every other one, including in that
+      // same file. `test/review-write.test.mjs` pins the file's whole surface from the other side.
+      if (bad === "setReviewStatus" && name === "review.js") continue;
       assert.ok(
         !exported.includes(bad),
         `app/server/${name} exports ${bad}. Locking and writing capabilities are reviewed one at a ` +
-          `time (DEC-0021); the review-status write is TSK-0012's and is the first of them`
+          `time (DEC-0021); ${bad === "setReviewStatus" ? "the review write belongs in review.js alone" : "this one has not been reviewed"}`
       );
+    }
   }
 });
 

@@ -224,7 +224,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   );
 
   // Today's state — two lines to edit as implementation lands.
-  assert.deepEqual([...withCode].sort(), ["CMP-0012", "CMP-0013", "CMP-0014", "CMP-0015", "CMP-0016", "CMP-0017", "CMP-0019", "CMP-0020"], "components with code");
+  assert.deepEqual([...withCode].sort(), ["CMP-0012", "CMP-0013", "CMP-0014", "CMP-0015", "CMP-0016", "CMP-0017", "CMP-0018", "CMP-0019", "CMP-0020"], "components with code");
   assert.deepEqual(
     shellCriteria.filter((a) => a.outcome === "pass").map((a) => a.id).sort(),
     [
@@ -244,6 +244,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       "ACC-0027",
       "ACC-0028",
       "ACC-0031",
+      "ACC-0034",
       "ACC-0035",
       "ACC-0036",
       "ACC-0037",

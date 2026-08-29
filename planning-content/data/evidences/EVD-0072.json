@@ -1,0 +1,50 @@
+{
+  "id": "EVD-0072",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the review-status write, from a real form POST to the persisted artifact",
+  "kind": "experiment",
+  "summary": "Fourteen tests against the shipping write path with the REAL locking operation injected over a temporary content root, plus a genuine end-to-end POST to the Server Action in a production build. Measured: a successful submission changes `reviewStatus` on disk and leaves the artifact's `lifecycle`, its other fields and every other file byte-identical (verified by hashing the whole content root before and after — exactly one file differs); an invalid status, an unknown artifact, a malformed id and an approval with no reviewer are each refused with nothing written; concurrent conflicting submissions leave one valid artifact with no lost fields; and the redirect target is matched against a literal shape, so `//evil.example`, `javascript:` and `/stage/../../etc/passwd` all fall back to the site root. IN PRODUCTION, against a real build serving a temporary content copy, a form POST carrying the action id Next.js renders for no-JavaScript submission returned 303 to the same stage URL with the same artifact selected, the artifact on disk had changed, and a FRESH request rendered the new status; a refused submission came back as `?reviewError=bad-status`, rendered its sentence, left the artifact untouched and left the rest of the page intact.",
+  "outcome": "success",
+  "observedAt": "2026-08-29",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "framework": "Next.js 16.3.2",
+      "node": "v24.18.0",
+      "os": "Windows 11",
+      "mode": "next build + next start",
+      "contentRoot": "a disposable copy; the project's own content was not touched",
+      "write": "lib/tools/review-status.mjs, unmodified and reused"
+    },
+    "omissions": [
+      {
+        "fact": "cross-process-concurrency",
+        "state": "not-captured",
+        "reason": "The concurrent submissions were eight in ONE process. The lock is a file lock and is meant to hold against the CLI writing at the same time as the server, which was not exercised — a second process would have to be started and made to contend on purpose."
+      },
+      {
+        "fact": "browser-submission",
+        "state": "not-observable",
+        "reason": "The POST was issued by `fetch` with the action id scraped from the served HTML, which is the same request a browser makes with JavaScript disabled. Whether a real browser's form submission and its client-side navigation behave identically was not observed; no browser was available."
+      },
+      {
+        "fact": "lock-contention-timing",
+        "state": "not-captured",
+        "reason": "That the lock SERIALISES was established by an observable consequence — every submission saw the previous one's value — not by timing acquisition. How long a submission waits behind another was not measured."
+      }
+    ]
+  },
+  "notes": "⚠️ THE SAFETY ASSERTIONS WERE NOT ENOUGH, AND MEASURING SAID SO. An unlocked read-modify-write was substituted for the real one and passed every check that the file parses, keeps its fields, ends in a newline and holds one of the submitted values — because small writes do not visibly tear. Serialisation shows up somewhere else: under the lock every submission reads what the previous wrote, so eight alternating submissions all change something (8/8); without it they all read the same stale value and three report no change (6/8). Measured, stable over five runs of each, and now asserted. The weaker version of this test would have passed for the wrong reason. ⚠️ `lifecycle` IS UNREACHABLE BY CONSTRUCTION, NOT BY CARE. The adapter hands out exactly one operation and its signature has no field parameter, so there is no argument this path could pass and no string a form could post that would retire an artifact. `retired` and `lifecycle` are in the rejected-status list deliberately: they are what someone would try. ⚠️ NO `type` FIELD CROSSES THE WIRE. The form posts an id and the type is derived from it through the schema set, so a submission cannot name one artifact and have another written. ⚠️ FALSIFIED FOUR WAYS, each failing only its own check: adding `setLifecycle` to the review adapter; opening a second write door in the content adapter; making the action report success without calling the write (the end-to-end disk assertion fails, and nothing else does); and giving the permitted synchronous reader export a real read."
+}

@@ -329,6 +329,86 @@ test("every required route is built and served, proven by an application-owned m
     assert.match(bogus, /NOPE-9999/, "the id the operator asked for is echoed back so the typo is findable");
     assert.match(bogus, new RegExp(`data-vpw-criteria="${STAGE}"`), "the rest of the page still renders");
 
+    /* ------------------------------------------------- the review write, end to end (ACC-0034) */
+
+    // ⚠️ A REAL POST TO THE REAL SERVER ACTION, not a call to the logic behind it. Next.js renders
+    // the form with a hidden `$ACTION_ID_…` field so it works without JavaScript, which means the
+    // whole path — form markup, action dispatch, adapter, lock, atomic write, redirect, re-render —
+    // can be exercised with `fetch`. `test/review-write.test.mjs` proves what the write does; this
+    // proves the write is actually WIRED, which is the half a unit test cannot see.
+    const reviewTarget = join(contentCopy, "planning-content", "data", "assertions", "AST-0021.json");
+    const otherArtifact = join(contentCopy, "planning-content", "data", "assertions", "AST-0022.json");
+    const reviewUrl = `/stage/${STAGE}?artifact=AST-0021`;
+
+    const formPage = await (await fetch(`http://127.0.0.1:${PORT}${reviewUrl}`, { signal: AbortSignal.timeout(15_000) })).text();
+    const actionId = (formPage.match(/name="(\$ACTION_ID_[a-f0-9]+)"/) ?? [])[1];
+    assert.ok(actionId, "the form must be served with an action id, or it cannot submit without JavaScript");
+    assert.match(formPage, /<form[^>]*method="POST"/i, "the review control must be a real form");
+    assert.ok(
+      !/name="type"/.test(formPage),
+      "the form must not carry a type field — the type is derived from the id, never taken from the browser"
+    );
+
+    const submit = async (fields) => {
+      const fd = new FormData();
+      fd.set(actionId, "");
+      for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+      const res = await fetch(`http://127.0.0.1:${PORT}${reviewUrl}`, {
+        method: "POST",
+        body: fd,
+        redirect: "manual",
+        signal: AbortSignal.timeout(20_000),
+      });
+      return { status: res.status, location: res.headers.get("location") };
+    };
+
+    const startDoc = JSON.parse(readFileSync(reviewTarget, "utf-8"));
+    const otherBefore = readFileSync(otherArtifact, "utf-8");
+
+    // ---- a successful change
+    const ok = await submit({ id: "AST-0021", path: `/stage/${STAGE}`, status: "in-review", reviewedBy: "" });
+    assert.equal(ok.status, 303, "a Server Action redirect, so the outcome survives in the URL");
+    assert.equal(ok.location, reviewUrl, "back to the same page with the same artifact selected");
+
+    // The DISK first, exactly as the unit tests do.
+    const written = JSON.parse(readFileSync(reviewTarget, "utf-8"));
+    assert.equal(written.reviewStatus, "in-review", "the artifact on disk must actually have changed");
+    assert.equal(written.lifecycle, startDoc.lifecycle, "lifecycle must be untouched (ACC-0034)");
+    assert.equal(written.statement, startDoc.statement, "and nothing else about the artifact moved");
+    assert.equal(readFileSync(otherArtifact, "utf-8"), otherBefore, "no other artifact may change");
+
+    // ...then the FRESHLY RENDERED page. A write that persisted while the page kept serving the old
+    // value would satisfy every assertion above and still be broken for the operator.
+    const afterWrite = await (await fetch(`http://127.0.0.1:${PORT}${reviewUrl}`, { signal: AbortSignal.timeout(15_000) })).text();
+    assert.match(afterWrite, /data-vpw-review-status="in-review"/, "the page must render the value that was written");
+    assert.ok(!/data-vpw-review-error=/.test(afterWrite), "and report no error");
+
+    // ---- a refused change: visible, and the page is not discarded
+    const bad = await submit({ id: "AST-0021", path: `/stage/${STAGE}`, status: "retired", reviewedBy: "" });
+    assert.equal(bad.location, `${reviewUrl}&reviewError=bad-status`, "the failure comes back in the URL as a code");
+    assert.equal(
+      JSON.parse(readFileSync(reviewTarget, "utf-8")).reviewStatus,
+      "in-review",
+      "a refused submission must not change anything — `retired` is a LIFECYCLE value and unreachable here"
+    );
+
+    const errorPage = await (
+      await fetch(`http://127.0.0.1:${PORT}${reviewUrl}&reviewError=bad-status`, { signal: AbortSignal.timeout(15_000) })
+    ).text();
+    assert.match(errorPage, /data-vpw-review-error="bad-status"/, "the failure must be visible on the page");
+    assert.match(errorPage, /not a review status/, "in words, not just an attribute");
+    assert.match(errorPage, /data-vpw-review-status="in-review"/, "and the panel still shows the artifact");
+    assert.match(errorPage, new RegExp(`data-vpw-criteria="${STAGE}"`), "the rest of the page survives the failure");
+
+    // ---- approving with nobody attached
+    const unattributed = await submit({ id: "AST-0021", path: `/stage/${STAGE}`, status: "approved", reviewedBy: "" });
+    assert.match(unattributed.location, /reviewError=needs-reviewer/, "an approval nobody is attached to is refused");
+    assert.equal(JSON.parse(readFileSync(reviewTarget, "utf-8")).reviewStatus, "in-review", "and does not land");
+
+    // ---- restore, so the rest of this test sees the content it expects
+    writeFileSync(reviewTarget, JSON.stringify(startDoc, null, 2) + "\n");
+    await sleep(800);
+
     /* ------------------------------------------------- a permitted component renders (ACC-0018) */
 
     const stageDocForComponent = join(contentCopy, "planning-content", "stages", `${STAGE}.md`);

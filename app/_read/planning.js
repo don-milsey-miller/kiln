@@ -55,7 +55,7 @@ import {
  * — that refusal is about the TOOL resolving against some other project's content, and an
  * application serving from its own directory is the case that cannot be confused.
  */
-function roots() {
+export function planningRoots() {
   const projectRoot = process.cwd();
   const contentRoot = resolveContentRoot({
     PLANNING_CONTENT_DIR: process.env.PLANNING_CONTENT_DIR ?? `${projectRoot}/planning-content`,
@@ -63,7 +63,19 @@ function roots() {
   return { projectRoot, contentRoot };
 }
 
-/** The lint context. Not exported: nothing outside this module should be assembling one. */
+/**
+ * ⚠️ EXPORTED SINCE TSK-0012, and the export is the point rather than a convenience. The review
+ * WRITE has to reach the same content root this file reads from, and two independent resolutions
+ * that agreed today would drift silently: the page would read one directory while the write went to
+ * another, so an approval would appear not to take effect with nothing to say which half was wrong.
+ * One definition, both callers.
+ *
+ * ⚠️ It is deliberately SYNCHRONOUS and awaits no `connection()`, because it touches no content —
+ * it only says where content is. That is also what keeps its callers out of the `<Suspense>`
+ * enclosure rule, which fires on awaiting a reader export rather than on importing one.
+ */
+// (the lint context below is NOT exported: nothing outside this module should be assembling one)
+
 function context(projectRoot, contentRoot) {
   return {
     contentRoot,
@@ -87,7 +99,7 @@ function context(projectRoot, contentRoot) {
  */
 export async function readProjectOverview() {
   await connection();
-  const { projectRoot, contentRoot } = roots();
+  const { projectRoot, contentRoot } = planningRoots();
   const ctx = context(projectRoot, contentRoot);
 
   const lint = lintProject(ctx);
@@ -150,7 +162,7 @@ export async function readProjectOverview() {
  */
 export async function readStageCriteria(stageId) {
   await connection();
-  const { projectRoot, contentRoot } = roots();
+  const { projectRoot, contentRoot } = planningRoots();
   const ctx = context(projectRoot, contentRoot);
 
   const defs = loadStageDefinitions(projectRoot) ?? {};
@@ -187,7 +199,7 @@ export async function readStageCriteria(stageId) {
  */
 export async function readStageDocument(stageId) {
   await connection();
-  const { contentRoot } = roots();
+  const { contentRoot } = planningRoots();
   const docs = readStageDocs(contentRoot);
   for (const [name, text] of docs) if (name.replace(/\.mdx?$/, "") === stageId) return { name, text };
   return null;
@@ -214,7 +226,7 @@ export async function readKnownStageIds() {
  */
 export async function readArtifactSummary(id) {
   await connection();
-  const { projectRoot, contentRoot } = roots();
+  const { projectRoot, contentRoot } = planningRoots();
   const { records } = lintProject(context(projectRoot, contentRoot));
   const doc = records.map((r) => r.doc).find((d) => d?.id === id);
   if (!doc) return null;

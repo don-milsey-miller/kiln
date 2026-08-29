@@ -24,8 +24,12 @@ import ReviewPanel from "./review-panel.js";
  */
 export default async function StagePage({ params, searchParams }) {
   const { stageId } = await params;
-  const { artifact } = (await searchParams) ?? {};
+  const { artifact, reviewError } = (await searchParams) ?? {};
   const artifactId = typeof artifact === "string" ? artifact : null;
+  // ⚠️ The outcome of a write comes back as a CODE in the URL, looked up in the panel rather than
+  // rendered. A message carried in the query string would let a crafted link put an arbitrary
+  // sentence inside the application's own error styling.
+  const reviewErrorCode = typeof reviewError === "string" ? reviewError : null;
 
   return (
     <main data-vpw-route="/stage" style={{ maxWidth: "60rem", margin: "2rem auto", padding: "0 1.5rem" }}>
@@ -56,7 +60,7 @@ export default async function StagePage({ params, searchParams }) {
         </div>
 
         <Suspense fallback={<p data-vpw-loading="review" style={{ color: "#666" }}>Reading the artifact…</p>}>
-          <ReviewPanel artifactId={artifactId} />
+          <ReviewPanel artifactId={artifactId} stageId={stageId} reviewError={reviewErrorCode} />
         </Suspense>
       </div>
     </main>
