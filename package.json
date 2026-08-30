@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A clonable, local-first planning system. This repo becomes a consumer's .planning/ directory (#1, #20, #32, #69).",
+  "license": "MIT",
   "engines": {
     "node": ">=22"
   },
