@@ -34,6 +34,13 @@ yarn-error.log*
 .env*.local
 *.pem
 
+# --- Agent-local settings -------------------------------------------------
+#
+# Per-machine tool permissions, not project configuration. It was ignored here
+# only by a machine-global excludes file, which is not a property of the repo:
+# on anyone else's clone it would have been offered up for commit.
+.claude/settings.local.json
+
 # --- OS -------------------------------------------------------------------
 .DS_Store
 Thumbs.db

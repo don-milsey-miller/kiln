@@ -6,9 +6,13 @@
  * writes nothing; this command publishes. Keeping them apart is what lets the gate be run to ASK a
  * question — a gate that generated as a side effect could not be.
  *
- * ⚠️ **It refuses this project today**, and that is the point rather than a limitation: stage 5's
- * `requirements-traced-to-components` is attested `not-satisfied`, because REQ-0010 traces only to a
- * component nothing has built. **A clean lint is not readiness.**
+ * ⚠️ **A clean lint is not readiness**, and the gate is what enforces the difference. This header
+ * used to say "**It refuses this project today**... stage 5's `requirements-traced-to-components` is
+ * attested `not-satisfied`, because REQ-0010 traces only to a component nothing has built." That was
+ * true when it was written and stopped being true on 2026-08-29, when the application-shell cycle
+ * closed: every stage gate is now attested and the package publishes — 261 artifacts, snapshot
+ * 5f53af492e35bf24. The refusal was never a limitation to be removed; it was satisfied by building
+ * the component, which is the only way it was ever meant to clear.
  */
 
 import { join, dirname } from "node:path";

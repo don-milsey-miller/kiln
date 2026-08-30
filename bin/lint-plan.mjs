@@ -7,9 +7,13 @@
  * layer own that policy, because #47's three callers must not become three enforcement
  * models.
  *
- * The other two callers cannot exist yet: the app is not built, and `pi-package/` is not
- * written. Both will import the SAME entry points from lib/lint.mjs — that is the whole
- * point of the row — and neither gets its own rules.
+ * Caller 2 is the application, and it arrived as the row predicted: `app/server/content.js`
+ * re-exports `lintProject` from lib/lint.mjs by name and `app/_read/planning.js` calls it, so
+ * the app renders findings it did not re-judge and has no rules of its own. Caller 3,
+ * `pi-package/`, is still not written and imports the same entry points when it is.
+ *
+ * (This said "the app is not built" until 2026-08-29. The claim it was making — one rule set,
+ * three callers — is the part that survived, and it is now demonstrated rather than intended.)
  *
  * Usage:
  *   node bin/lint-plan.mjs                      report everything, exit 0
