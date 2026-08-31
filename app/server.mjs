@@ -219,21 +219,42 @@ export function startServer({ contentRoot, port = 0 } = {}) {
     res.end(render(buildViewModel(ctx), root));
   });
 
-  return new Promise((resolve) => {
-    server.listen(port, "127.0.0.1", () =>
-      resolve({
-        server,
-        watcher,
-        port: server.address().port,
-        url: `http://127.0.0.1:${server.address().port}/`,
-        async close() {
-          for (const c of clients) c.end();
-          await watcher.close();
-          await new Promise((r) => server.close(r));
-        },
-      })
-    );
+  const watcherReady = new Promise((resolve, reject) => {
+    const onReady = () => {
+      watcher.off("error", onError);
+      resolve();
+    };
+    const onError = (error) => {
+      watcher.off("ready", onReady);
+      reject(error);
+    };
+    watcher.once("ready", onReady);
+    watcher.once("error", onError);
   });
+  return watcherReady
+    .then(() => new Promise((resolve, reject) => {
+      const onError = (error) => reject(error);
+      server.once("error", onError);
+      server.listen(port, "127.0.0.1", () => {
+        server.off("error", onError);
+        resolve({
+          server,
+          watcher,
+          port: server.address().port,
+          url: `http://127.0.0.1:${server.address().port}/`,
+          async close() {
+            for (const c of clients) c.end();
+            await watcher.close();
+            await new Promise((r) => server.close(r));
+          },
+        });
+      });
+    }))
+    .catch(async (error) => {
+      await watcher.close().catch(() => {});
+      if (server.listening) await new Promise((r) => server.close(r));
+      throw error;
+    });
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("server.mjs")) {

@@ -181,7 +181,6 @@ test("5b/5: a change to an assertion OR its evidence notifies the page", async (
         pump();
       });
 
-      await new Promise((r) => setTimeout(r, 250)); // let chokidar settle before touching anything
       await act();
 
       const got = await Promise.race([heard, new Promise((r) => setTimeout(() => r("timeout"), 8000))]);

@@ -41,6 +41,7 @@ installReaper();
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const NEXT_CLI = join(ROOT, "node_modules", "next", "dist", "bin", "next");
 const PORT = 4410;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -90,11 +91,10 @@ test("every required route is built and served, proven by an application-owned m
 
 async function runSmokeCheck(t) {
   rmSync(join(ROOT, ".next"), { recursive: true, force: true });
-  const build = await execFileP("npx", ["next", "build"], {
+  const build = await execFileP(process.execPath, [NEXT_CLI, "build"], {
     cwd: ROOT,
     timeout: 6 * 60 * 1000,
     maxBuffer: 16 << 20,
-    shell: process.platform === "win32",
   });
   // The build's own words are NOT the assertion. They are kept only to report with a failure.
   const buildOut = `${build.stdout ?? ""}${build.stderr ?? ""}`;
@@ -105,9 +105,8 @@ async function runSmokeCheck(t) {
 
   let server = null;
   try {
-    server = spawn("npx", ["next", "start", "--hostname", "127.0.0.1", "--port", String(PORT)], {
+    server = spawn(process.execPath, [NEXT_CLI, "start", "--hostname", "127.0.0.1", "--port", String(PORT)], {
       cwd: ROOT,
-      shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PLANNING_CONTENT_DIR: join(contentCopy, "planning-content") },
     });
