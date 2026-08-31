@@ -56,10 +56,13 @@ const JOB = (over = {}) => ({
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const WINDOWS_CWD_LOCK = process.platform === "win32"
+  ? {}
+  : { skip: "POSIX permits deleting a directory while another process uses it as cwd" };
 
 /* ------------------------------------------------- 2, 3, 4: destroy reports what was observed */
 
-test("FORCED cleanup failure: a locked workspace is retained, never reported destroyed", async () => {
+test("FORCED cleanup failure: a locked workspace is retained, never reported destroyed", WINDOWS_CWD_LOCK, async () => {
   const ws = reapLater(mkdtempSync(join(tmpdir(), "vpw-forced-")));
   // Windows will not delete a directory that is a live process's current directory. This is a real
   // refusal by the filesystem, not a stubbed error.
@@ -79,7 +82,7 @@ test("FORCED cleanup failure: a locked workspace is retained, never reported des
   }
 });
 
-test("...and the same workspace destroys cleanly once the holder releases it", async () => {
+test("...and the same workspace destroys cleanly once the holder releases it", WINDOWS_CWD_LOCK, async () => {
   const ws = reapLater(mkdtempSync(join(tmpdir(), "vpw-forced2-")));
   const holder = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { cwd: ws, stdio: "ignore" });
   await sleep(400);

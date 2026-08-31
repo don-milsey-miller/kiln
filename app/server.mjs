@@ -185,6 +185,10 @@ export function startServer({ contentRoot, port = 0 } = {}) {
   // temp file never looks like a content change.
   const watcher = chokidar.watch(join(root, DATA_DIR), {
     ignoreInitial: true,
+    // Node 24.19's Windows fs-event backend can abort the process while Chokidar observes rapid
+    // atomic renames in a temporary content tree. Polling keeps the standalone skeleton reliable
+    // on Windows; the production Next.js change stream remains separately owned and tested.
+    usePolling: process.platform === "win32",
     ignored: (p) => p.includes(TEMP_SUFFIX) || p.endsWith(LOCK_FILE),
   });
   const notify = () => {
