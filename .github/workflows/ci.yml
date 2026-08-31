@@ -1,0 +1,84 @@
+# --- Continuous integration -------------------------------------------------
+#
+# The clean-machine half of this project's verification. Everything below runs
+# on a runner that has never seen this repository before, which is the one
+# thing a development machine cannot honestly simulate.
+#
+# ⚠️ IT EXISTS BECAUSE A WARM MACHINE PROVES THE WRONG THING. `EVD-0073` marked
+# `ACC-0033` a pass on runs where `node_modules` was already present, so the
+# launcher printed `skipping install` every time and half the criterion was
+# claimed on evidence that disclaimed it. `EVD-0074` re-ran it cold by hand —
+# and a hand-made cold run is a thing someone has to remember to do. This does
+# it on every push, and a regression that only appears when dependencies have
+# not been installed yet fails a job instead of waiting for the next audit.
+#
+# ⚠️ IT ALSO CHECKS WHAT IS IN GIT, not what is on the author's disk. The
+# runner has only the checked-out commit plus what `npm ci` fetches, so a file
+# that exists locally and was never committed takes the build down here rather
+# than on a stranger's first clone.
+#
+# ⚠️ AND UBUNTU IS NOT DECORATION. `TSK-0013` recorded the POSIX shutdown
+# branch as UNEXERCISED — "no Linux or macOS host" — while the Windows-specific
+# process semantics in `launcher.test.mjs` and `reap.test.mjs` were the only
+# ones ever observed. Two platforms in the matrix is what closes that gap: the
+# Windows jobs keep measuring the signal behaviour this project actually runs
+# on, and the Ubuntu jobs run the branch nobody here has a host for.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  # A manual "Run workflow" button, for re-checking a green commit against a
+  # runner image or a Node release that has moved since it last ran.
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+
+    # ⚠️ NOT A PERFORMANCE BUDGET — A LEASH ON A WEDGED CHILD. The suite is 407
+    # tests in about eighty seconds on a warm developer machine, and a cold
+    # runner adds a full `npm ci` and an uncached production `next build` on
+    # top of that. What the ceiling is sized against is the failure mode, not
+    # the runtime: `launcher.test.mjs` and `shell-smoke.test.mjs` start real
+    # servers behind a shared `.next` lock that itself waits fifteen minutes,
+    # so a child that never dies HANGS rather than fails. Forty-five minutes
+    # sits far above any honest run and far below the six-hour default.
+    timeout-minutes: 45
+
+    strategy:
+      # ⚠️ Every combination reports for itself. With fail-fast the first
+      # failure would cancel the other three, and "did this break on Windows,
+      # on 24, or on both" is precisely the question the matrix is here to
+      # answer.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ["22", "24"]
+
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@v5
+
+      # `package.json` sets `engines.node` to >=22; the matrix is that range's
+      # current LTS and current release, tested rather than assumed.
+      - name: Install Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+
+      # ⚠️ NO DEPENDENCY CACHE HERE, DELIBERATELY. `setup-node` will restore
+      # the npm cache across runs for a step or two of wall-clock, and a warm
+      # cache is exactly the state `EVD-0074` had to disclaim. On a public
+      # repository the minutes are free; the cold install is the measurement.
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm test` is `node --test`, which discovers `test/**` itself and exits
+      # non-zero on any failing file. A non-zero exit fails the step and the
+      # job on both shells — bash and, on Windows, pwsh — so there is nothing
+      # to parse and nothing to interpret.
+      - name: Run the test suite
+        run: npm test
