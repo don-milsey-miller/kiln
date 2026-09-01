@@ -10,15 +10,42 @@ a working example of its output.
 
 ## Project status
 
-Kiln is pre-1.0 (`0.0.0`). The application, schemas, validation rules, research tools, and handoff
-publisher are implemented and tested. Two pieces of the intended product are still missing:
+Kiln is pre-1.0 (`0.0.0`). The application, schemas, validation rules, research tools, project
+initializer, and handoff publisher are implemented and tested. One piece of the intended product is
+still missing:
 
-- There is no command to scaffold a fresh project's `planning-content/` directory.
 - The packaged planning-agent roster has not been built yet. The specialist contracts in
   `lib/specialists/` are present, but they are not a runnable agent package.
 
-You can run and develop Kiln today, inspect its own completed plan, and point it at another valid
-Kiln content directory. Starting a brand-new planning workspace is still a manual process.
+You can start a new planning workspace, run and develop Kiln, and inspect its own completed plan.
+What you cannot do yet is hand the planning work to a packaged agent roster.
+
+## Start a new project
+
+From an empty project directory:
+
+```sh
+git init
+git clone https://github.com/don-milsey-miller/kiln.git .planning
+
+node .planning/bin/init-project.mjs \
+  --project-root . \
+  --name "My Project" \
+  --description "What this project is intended to accomplish"
+
+npm --prefix .planning start
+```
+
+That creates your project's `planning-content/` directory beside the tool, adds `.planning/` to your
+`.gitignore`, and opens the workspace at <http://127.0.0.1:3000>.
+
+The initializer needs only Node's built-in modules, so it runs before Kiln's dependencies have been
+installed. It creates structure and nothing else — no planning artifacts, no stage approvals, no
+decisions — and it is safe to run again: a completed project is left untouched, and it will not
+overwrite anything you have written.
+
+For options, exit codes, what gets created, and how reruns and refusals behave, see
+[`docs/initializing-a-project.md`](docs/initializing-a-project.md).
 
 ## Requirements
 
@@ -29,7 +56,7 @@ Kiln content directory. Starting a brand-new planning workspace is still a manua
 Kiln runs locally and does not need a database or hosted service. Research is optional and may
 require credentials for the configured search provider.
 
-## Initialize a local checkout
+## Work on Kiln itself
 
 Clone the repository and install the locked dependency versions:
 
@@ -45,25 +72,30 @@ Run the test suite once to confirm the checkout works on your machine:
 npm test
 ```
 
-Then start Kiln:
+Kiln finds a project's content at `.planning/../planning-content` — the sibling of the tool
+directory. **This repository is its own consumer**, so its content is *inside* the checkout rather
+than beside it, and the rule does not reach it. Development commands therefore name the content
+directory explicitly.
+
+PowerShell:
+
+```powershell
+$env:PLANNING_CONTENT_DIR = (Resolve-Path .\planning-content).Path
+npm start
+```
+
+macOS or Linux:
 
 ```sh
-npm start
+PLANNING_CONTENT_DIR="$PWD/planning-content" npm start
 ```
 
 Open <http://127.0.0.1:3000>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop the server.
 
-`npm start` builds and runs the production application. If `node_modules/` is missing or older than
-`package-lock.json`, it installs dependencies first, so this shorter first-run sequence also works:
-
-```sh
-git clone https://github.com/don-milsey-miller/kiln.git
-cd kiln
-npm start
-```
-
-The launcher prints the absolute path of the planning content it opened. In a normal checkout it
-opens this repository's `planning-content/` directory.
+`npm start` builds and runs the production application, installing dependencies first if
+`node_modules/` is missing or older than `package-lock.json`. It prints the absolute path of the
+planning content it opened, and it refuses to start rather than guessing at one — running it here
+without the variable set will tell you exactly this and exit.
 
 ## Open a different planning workspace
 
@@ -92,8 +124,9 @@ your-project/
 ```
 
 This keeps tool updates separate from project documents. Update the tool with `git pull` inside
-`.planning/`; commit `planning-content/` in the containing project. Until the scaffold command is
-implemented, Kiln does not create a valid empty `planning-content/` tree for you.
+`.planning/`; commit `planning-content/` in the containing project. In that layout Kiln finds the
+content directory on its own — `PLANNING_CONTENT_DIR` is only needed to open a workspace that is not
+the tool's sibling, such as this repository's own.
 
 For launcher options and shutdown behavior, see
 [`docs/running-the-shell.md`](docs/running-the-shell.md).
@@ -102,6 +135,7 @@ For launcher options and shutdown behavior, see
 
 | Command | Purpose |
 | --- | --- |
+| `npm run init:project -- --project-root <path> --name <name>` | Create a new project's `planning-content/`. |
 | `npm start` | Install if needed, build the production app, and start it on loopback. |
 | `npm test` | Run the full Node.js test suite. |
 | `npm run shell:build` | Build the Next.js application without starting it. |

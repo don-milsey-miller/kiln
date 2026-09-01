@@ -8,8 +8,18 @@ clones into `.planning/` (gitignored, `git pull` to update); your content lives
 here and is committed to your project repo.
 
 If you have just cloned a project and found this directory sitting here, the tool
-is missing — clone it beside this directory as `.planning/` and run the setup
-script.
+is missing. Clone it beside this directory and start it:
+
+```sh
+git clone https://github.com/don-milsey-miller/kiln.git .planning
+npm --prefix .planning start
+```
+
+There is nothing to initialize in that case — this directory *is* the content, and
+the tool resolves it as its own sibling. `node .planning/bin/init-project.mjs` is
+for a project that has no `planning-content/` yet; it refuses a directory it did
+not write, so it cannot be the thing that damages this one. See
+[`docs/initializing-a-project.md`](../docs/initializing-a-project.md) in the tool.
 
 ## What lives here
 
