@@ -172,6 +172,12 @@ test("⚠️ every adapter's permitted consumers are DECLARED, and the list is s
   ]);
   assert.deepEqual(declared, [
     ["server/change-stream.js", ["events/route.js"]],
+    // ⚠️ THE ONLY ADAPTER WITH TWO CONSUMERS, and it earns that by holding nothing that reads. It
+    // re-exports the content-root RESOLVERS and nothing else, so the reason the content adapters
+    // admit the reader alone — a second importer of `lintProject` is a second read outside
+    // `connection()` — does not reach it. Splitting it out of `content.js` is what kept the widening
+    // proportionate: the events route needed a directory name, not a linter.
+    ["server/paths.js", ["_read/planning.js", "events/route.js"]],
     ["server/review.js", ["_write/review-action.js"]],
   ]);
 

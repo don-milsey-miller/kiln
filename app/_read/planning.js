@@ -1,8 +1,8 @@
 import "server-only";
 import { connection } from "next/server";
 
+import { resolveContentRoot } from "../server/paths.js";
 import {
-  resolveContentRoot,
   loadSchemaSet,
   createValidators,
   readActivatedTypes,
@@ -50,16 +50,25 @@ import {
  * from `toolRoot()` would then be wrong SILENTLY — pointing at a real directory that is not the
  * project. `process.cwd()` is the project root under `next start` and says so out loud.
  *
- * ⚠️ The content root still honours `PLANNING_CONTENT_DIR` first, so #70's override keeps working.
- * The fallback is the running project's own `planning-content/`, which is not the guess #70 refuses
- * — that refusal is about the TOOL resolving against some other project's content, and an
- * application serving from its own directory is the case that cannot be confused.
+ * ⚠️ THE CONTENT ROOT IS THE SHARED RESOLVER'S ANSWER, WITH NO FALLBACK OF ITS OWN, AND THE FALLBACK
+ * THAT USED TO BE HERE WAS WRONG IN THE ONLY LAYOUT THAT MATTERS. It substituted
+ * `<cwd>/planning-content` when `PLANNING_CONTENT_DIR` was unset, on the reasoning that "an
+ * application serving from its own directory is the case that cannot be confused". In a consumer
+ * install it is precisely the confused case: `next start` runs with its cwd inside `.planning/`, so
+ * `<cwd>/planning-content` is the TOOL's own shipped content — a complete, valid, parseable planning
+ * project belonging to somebody else. That is #70's failure verbatim, and the reader would have
+ * rendered it without a single finding.
+ *
+ * The one rule is `<toolRoot>/../planning-content`, honouring `PLANNING_CONTENT_DIR` first, and the
+ * launcher always sets that variable. An unset variable and a missing sibling now REFUSES, which is
+ * a visible failure rather than a plausible wrong answer.
+ *
+ * `projectRoot` keeps coming from `process.cwd()`: it locates `schemas/` and `stages/`, which are
+ * TOOL-side, and under `next start` the cwd is the tool root — the thing being served.
  */
 export function planningRoots() {
   const projectRoot = process.cwd();
-  const contentRoot = resolveContentRoot({
-    PLANNING_CONTENT_DIR: process.env.PLANNING_CONTENT_DIR ?? `${projectRoot}/planning-content`,
-  });
+  const contentRoot = resolveContentRoot(process.env);
   return { projectRoot, contentRoot };
 }
 

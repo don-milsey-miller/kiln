@@ -9,8 +9,12 @@ import "server-only";
  * by wildcard would not be.
  *
  * ⚠️ Everything below is a READ. Nothing here takes the content lock or writes.
+ *
+ * ⚠️ THE PATH RESOLVERS MOVED TO `paths.js`, and the move is the reason this file still admits the
+ * reader alone. `/events` needs to know where content lives so its watcher and the reader cannot
+ * disagree; letting it through THIS door to get that would also have handed it `lintProject`. A
+ * module that answers "where" without reading anything can have two consumers; this one cannot.
  */
-export { resolveContentRoot, resolveInContentRoot } from "../../lib/content-root.mjs";
 export { loadSchemaSet } from "../../lib/schema-resolver.mjs";
 export { createValidators } from "../../lib/validate.mjs";
 export { readActivatedTypes } from "../../lib/activation.mjs";

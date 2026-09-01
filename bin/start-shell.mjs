@@ -19,11 +19,14 @@
  * child does not reliably receive a forwarded signal. The pid this launcher holds must BE the
  * server's, or "terminate the child" means terminating something that merely started the server.
  *
- * ⚠️ THE CONTENT ROOT IS ABSOLUTE AND PRINTED. `resolveContentRoot` refuses to guess (#70) and the
- * application falls back to the running project's own directory, so an operator who never sets the
- * variable still gets a correct answer — and would have no way to know WHICH answer. A tool that
- * reads one directory while the operator believes it reads another is the failure this line exists
- * to prevent, and it costs one `console.log`.
+ * ⚠️ THE CONTENT ROOT IS RESOLVED BY THE SHARED RESOLVER, ABSOLUTE, AND PRINTED BEFORE THE BUILD.
+ * `resolveContentRoot` refuses to guess (#70), and this file used to carry a private fallback that
+ * disagreed with it — `<toolRoot>/planning-content` rather than the sibling `<toolRoot>/../planning-content`
+ * — which is the same directory in this repository and a DIFFERENT project's content in every consumer
+ * install. A tool that reads one directory while the operator believes it reads another is the failure
+ * the printed line exists to prevent, and a second resolution rule is how it happens. It is printed
+ * before install and build rather than after, because the operator should not have to wait out a
+ * production build to find out which project was opened.
  *
  * ⚠️ INSTALL IS CONDITIONAL AND SAYS WHICH BRANCH IT TOOK. ACC-0033 asks that the command work on a
  * machine with "no prior application state"; running `npm install` on every start would also satisfy
@@ -36,6 +39,8 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, statSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { contentRootCandidate, resolveContentRoot, ContentRootError } from "../lib/content-root.mjs";
 
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const NEXT = join(ROOT, "node_modules", "next", "dist", "bin", "next");
@@ -51,16 +56,40 @@ const say = (msg) => console.log(`[vpw] ${msg}`);
  * ⚠️ ABSOLUTE, ALWAYS. A relative content root would resolve against whatever directory the child
  * happened to start in, which is the class of bug #70's refusal-to-guess exists to prevent — and
  * the launcher is exactly where a wrong answer would be invisible.
+ *
+ * ⚠️ IT ASKS THE SHARED RESOLVER, AND THE PRIVATE FALLBACK IT REPLACED WAS THE BUG. This used to
+ * default to `<toolRoot>/planning-content` — the tool's OWN content — while #70's single rule is
+ * `<toolRoot>/../planning-content`, the SIBLING directory. In this repository those two happen to
+ * name the same real directory, which is why the disagreement survived: every dev run was correct
+ * and every consumer install opened Kiln's own 261-artifact history under the consumer's project
+ * name, silently, having printed a path that looked right. A second definition of where content
+ * lives is #70's exact failure, and the launcher is the worst place to keep one.
+ *
+ * For this repository, `PLANNING_CONTENT_DIR` is how the dev commands say which project they mean.
  */
 function contentRoot() {
-  const raw = process.env.PLANNING_CONTENT_DIR ?? join(ROOT, "planning-content");
-  const abs = resolve(raw);
-  if (!existsSync(abs)) {
-    console.error(`[vpw] no planning content at ${abs}`);
+  try {
+    return resolveContentRoot();
+  } catch (e) {
+    if (!(e instanceof ContentRootError)) throw e;
+    console.error(`[vpw] no planning content at ${contentRootCandidate().path}`);
     console.error(`[vpw] set PLANNING_CONTENT_DIR to the project's planning-content directory.`);
+    for (const line of e.message.split("\n")) console.error(`[vpw]   ${line}`);
+
+    // ⚠️ A HINT, NOT A FALLBACK, AND THE DISTINCTION IS THE WHOLE POINT OF #70. This repository is its
+    // own consumer, so the sibling rule does not reach its content and `npm start` here refuses. The
+    // useful thing to do about that is SAY which directory the operator probably meant; the harmful
+    // thing is to open it, which is what the removed fallback did in every consumer install too.
+    const own = join(ROOT, "planning-content");
+    if (existsSync(own)) {
+      console.error(`[vpw]`);
+      console.error(`[vpw] This looks like the Kiln repository itself, which is its own consumer.`);
+      console.error(`[vpw] Its content is at ${own} — name it explicitly:`);
+      console.error(`[vpw]   PowerShell   $env:PLANNING_CONTENT_DIR = (Resolve-Path .\\planning-content).Path`);
+      console.error(`[vpw]   sh           PLANNING_CONTENT_DIR="$PWD/planning-content" npm start`);
+    }
     process.exit(2);
   }
-  return abs;
 }
 
 /** Run a build-time step to completion, inheriting stdio so the operator sees it. */
@@ -124,11 +153,7 @@ async function waitForListening(deadlineMs) {
 
 async function main() {
   const root = contentRoot();
-
-  // ⚠️ The launcher's own scratch directory, removed on the way out. It holds the run record, which
-  // is what a cleanup test reads to learn which pid to look for — and its survival is one of the
-  // three things ACC-0032 observes.
-  const runDir = mkdtempSync(join(tmpdir(), "vpw-launch-"));
+  say(`planning content root: ${root}`);
 
   const env = { ...process.env, NODE_ENV: "production", PLANNING_CONTENT_DIR: root };
 
@@ -137,8 +162,17 @@ async function main() {
 
   runToCompletion("building (production)…", [NEXT, "build"], env);
 
-  say(`planning content root: ${root}`);
   say(`starting on http://${HOST}:${PORT}`);
+
+  // ⚠️ CREATED AFTER THE BUILD, AND THAT ORDER IS A FIX RATHER THAN A TIDY-UP. It used to be the first
+  // thing `main` did, so every install or build failure leaked one: `runToCompletion` reports and
+  // calls `process.exit`, which runs no cleanup, and there is no child yet for the exit handler to be
+  // attached to. Measured by `consumer-flow.test.mjs`, which runs this launcher in a tool copy that
+  // deliberately has no dependencies — two `vpw-launch-*` directories survived a green suite.
+  //
+  // The record describes a RUNNING SERVER, so there is nothing to record until there is one. It holds
+  // the pid a cleanup test reads, and its removal is one of the three things ACC-0032 observes.
+  const runDir = mkdtempSync(join(tmpdir(), "vpw-launch-"));
 
   // ⚠️ DIRECTLY, so the pid held here IS the server's. `stdio: inherit` keeps the child's output the
   // operator's output; there is nothing this launcher needs to parse out of it.

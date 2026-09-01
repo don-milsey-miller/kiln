@@ -29,12 +29,32 @@ import { summariseBlockers } from "../lib/handoff/completeness.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const toolVersion = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8")).version ?? "0.0.0";
 
+/**
+ * ⚠️ **THE PACKAGE IS PUBLISHED BESIDE THE CONTENT, NOT INSIDE THE TOOL.** This used to be
+ * `join(ROOT, "docs", "plan")` — the TOOL's own `docs/plan/`. In this repository the two are the same
+ * directory, which is why it went unnoticed; in a consumer install it wrote the project's handoff
+ * package into `.planning/docs/plan/`, a gitignored clone that `git pull` is entitled to overwrite.
+ * The one derivation that is right in both layouts is the content root's parent:
+ *
+ *     Kiln repository:  <repo>/planning-content        ->  <repo>/docs/plan
+ *     Consumer project: <project>/planning-content     ->  <project>/docs/plan
+ *
+ * It is derived rather than configured because the handoff package is a VIEW of the content, and a
+ * view that can be pointed somewhere else is a view that eventually is.
+ */
+const outDirFor = (root) => join(dirname(root), "docs", "plan");
+
 let contentRoot;
 try {
   contentRoot = resolveContentRoot();
 } catch (e) {
   console.error(e.message);
-  console.error('\nThis repo is its own consumer. Set:\n  $env:PLANNING_CONTENT_DIR = "D:\\visual-project-workflow\\planning-content"');
+  console.error(
+    "\nIf this is the Kiln repository itself, it is its own consumer and the sibling rule does not\n" +
+      "apply to it — name its content directory explicitly:\n" +
+      "  PowerShell   $env:PLANNING_CONTENT_DIR = (Resolve-Path .\\planning-content).Path\n" +
+      '  sh           PLANNING_CONTENT_DIR="$PWD/planning-content"'
+  );
   process.exitCode = 2;
 }
 
@@ -47,7 +67,7 @@ if (contentRoot) {
   };
 
   try {
-    const result = await publishHandoff(ctx, { outDir: join(ROOT, "docs", "plan"), toolRoot: ROOT, toolVersion });
+    const result = await publishHandoff(ctx, { outDir: outDirFor(contentRoot), toolRoot: ROOT, toolVersion });
     console.log(`published   ${result.fileCount} file(s) to ${result.outDir}`);
     console.log(`snapshot    ${result.snapshot}`);
     console.log(`from        ${result.artifactCount} artifact(s)`);
@@ -55,6 +75,7 @@ if (contentRoot) {
   } catch (e) {
     if (!(e instanceof HandoffRefused)) throw e;
     console.error(`REFUSED     ${e.message}\n`);
+    console.error(`target      ${outDirFor(contentRoot)} (unchanged)\n`);
     for (const group of summariseBlockers(e.blockers)) {
       console.error(`  ${group.reason}  (${group.count})`);
       for (const item of group.items.slice(0, 8)) console.error(`    - ${item.detail}`);

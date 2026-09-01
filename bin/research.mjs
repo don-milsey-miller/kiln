@@ -104,8 +104,12 @@ async function record() {
     contentRoot = resolveContentRoot();
   } catch (e) {
     console.error(e.message);
-    console.error("\nThis repo is its own consumer, so the default rule does not apply to it. Set:");
-    console.error('  $env:PLANNING_CONTENT_DIR = "D:\\visual-project-workflow\\planning-content"');
+    console.error(
+      "\nIf this is the Kiln repository itself, it is its own consumer and the sibling rule does not\n" +
+        "apply to it — name its content directory explicitly:\n" +
+        "  PowerShell   $env:PLANNING_CONTENT_DIR = (Resolve-Path .\\planning-content).Path\n" +
+        '  sh           PLANNING_CONTENT_DIR="$PWD/planning-content"'
+    );
     return 2;
   }
 

@@ -17,7 +17,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { specifiersIn } from "../lib/shell-boundary.mjs";
+import { specifiersIn, stripComments } from "../lib/shell-boundary.mjs";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -100,6 +100,30 @@ test("⚠️ no adapter exposes a locking, writing or spawning capability except
       );
     }
   }
+});
+
+test("⚠️ the two-consumer adapter's export surface is PINNED to the one name that earned it", () => {
+  // ⚠️ EVERY OTHER ADAPTER ADMITS ONE CONSUMER; `paths.js` admits two, and the only argument for
+  // that is that it holds nothing but a path calculation — no read, so nothing can escape
+  // DEC-0019's freshness contract through it. That argument is a property of its CONTENTS, not of
+  // its name, so it stops being true the moment a second export arrives.
+  //
+  // It already had one it did not need: `resolveInContentRoot` came along when these moved out of
+  // `content.js`, and neither permitted consumer calls it. #86's containment boundary still lives
+  // in `lib/content-root.mjs` and is reached from there by every typed tool; an app module that
+  // genuinely needs it adds the name here, which is a diff a reviewer sees next to the widened
+  // consumer list in `shellBoundaryConfig`.
+  const src = readFileSync(join(SERVER_DIR, "paths.js"), "utf-8");
+  const exported = [...stripComments(src).matchAll(/^\s*export\s*\{([^}]*)\}/gm)]
+    .flatMap((m) => m[1].split(","))
+    .map((s) => s.trim().split(/\s+as\s+/).pop().trim())
+    .filter(Boolean);
+
+  assert.deepEqual(
+    exported.sort(),
+    ["resolveContentRoot"],
+    "paths.js is the adapter with two consumers; a second export means the reason it has two needs re-arguing"
+  );
 });
 
 test("`lib/` carries no `server-only` marker, so the CLI and this suite keep working", () => {
