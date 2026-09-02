@@ -41,6 +41,13 @@ yarn-error.log*
 # on anyone else's clone it would have been offered up for commit.
 .claude/settings.local.json
 
+# Pi's project settings are reproducible configuration and remain trackable.
+# These two directories contain local transcripts and launch state. They are
+# inert in the normal consumer layout, where this checkout is `.planning/`,
+# and become live only when a contributor explicitly runs `--self-host`.
+.pi/sessions/
+.pi/runtime/
+
 # --- OS -------------------------------------------------------------------
 .DS_Store
 Thumbs.db
