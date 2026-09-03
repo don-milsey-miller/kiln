@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0098",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "A merge that would produce the current bytes writes nothing",
+  "statement": "When the content a merge would produce is byte-identical to what is already on disk, the transaction performs no write. The evidence is the file's modification time, not the merge's reported status.",
+  "verifies": [
+    "REQ-0022"
+  ],
+  "evaluates": [
+    "CMP-0022"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0099",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "The journal is a planned target whose lifecycle is never silent",
+  "statement": "The journal is a planned, contained target validated against its schema before each write, and it records the whole ordered phase plan up front, marking a phase running before that phase's work begins. On failure it survives, naming the last completed phase and an exact recovery command, and nothing already written is rolled back. On success it is deleted, and a deletion that fails for any reason other than the file already being absent is reported rather than swallowed.",
+  "verifies": [
+    "REQ-0022",
+    "REQ-0027"
+  ],
+  "evaluates": [
+    "CMP-0022"
+  ]
+}

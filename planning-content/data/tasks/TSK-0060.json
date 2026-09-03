@@ -2,7 +2,7 @@
   "id": "TSK-0060",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Compose the ordered setup command over the existing primitives",
   "statement": "Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.",
@@ -15,6 +15,8 @@
     "REQ-0027"
   ],
   "acceptedBy": [
+    "ACC-0043",
+    "ACC-0045",
     "ACC-0083",
     "ACC-0085"
   ],

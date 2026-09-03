@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A file edited between plan and merge refuses rather than overwriting",
   "statement": "When a file the transaction recorded is modified after the plan is built and before the merge runs, the transaction detects the changed identity under the lock and refuses, leaving the operator's edit intact. A malformed or unknown-schema-version file likewise refuses rather than being replaced.",
   "evaluates": [

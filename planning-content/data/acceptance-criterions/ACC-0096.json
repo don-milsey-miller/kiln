@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0096",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Every write target is identified by resolution, not by spelling",
+  "statement": "Every file the transaction may write is resolved through its deepest existing ancestor and proved to lie beneath a root the caller explicitly authorised, and the same proof is repeated under the lock immediately before each write. A junction or symbolic link on a target's path refuses and nothing is written through it, including a probe, even when the path spells as one inside the project. A root the caller did not pass is not a root the transaction can write to, and the transaction lock is not a writable target. Each target's plan key is derived from its resolved path, so two entries that reach the same physical file refuse whether they differ only in spelling or arrive through two authorised roots that overlap, and one file merged under any of its spellings reaches the single entry planned for it.",
+  "verifies": [
+    "REQ-0027"
+  ],
+  "evaluates": [
+    "CMP-0022"
+  ]
+}

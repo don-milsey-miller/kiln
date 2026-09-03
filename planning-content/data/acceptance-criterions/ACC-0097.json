@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0097",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Planning holds the lock, and a refused plan leaves the project unchanged",
+  "statement": "The write plan is built while this process demonstrably holds the transaction lock, and planning refuses when it is not held. A plan that refuses leaves the project as it was found, directories included: every probe file and every directory created in order to probe is removed on every exit path. Where a removal cannot be completed, the transaction refuses and names each path it left behind, retaining alongside it whatever refusal caused the attempt — a cleanup failure is never reported as success. Absence is confirmed by observing the path, not by trusting the removal call's error code.",
+  "verifies": [
+    "REQ-0022"
+  ],
+  "evaluates": [
+    "CMP-0022"
+  ]
+}
