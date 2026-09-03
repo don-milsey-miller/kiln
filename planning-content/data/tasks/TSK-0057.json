@@ -2,7 +2,7 @@
   "id": "TSK-0057",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build the supervisor's start sequence and identity handshake",
   "statement": "Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.",
@@ -16,6 +16,7 @@
     "REQ-0022"
   ],
   "acceptedBy": [
+    "ACC-0078",
     "ACC-0079",
     "ACC-0080"
   ],

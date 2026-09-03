@@ -4,8 +4,8 @@
   "schemaVersion": 2,
   "reviewStatus": "approved",
   "lifecycle": "active",
-  "title": "Give the launcher a private stdin and emit run identity",
-  "statement": "Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.",
+  "title": "Isolate application stdin and support supervised launcher control",
+  "statement": "Change `bin/start-shell.mjs` to validate the run identifier, project identifier and port it is given, propagate the identity to the application it starts, keep its own stdin as its control channel while giving the application none, and stop on both the stop message and stdin close — preserving its existing interactive standalone behaviour and its current cleanup tests. On a piped stdin, standalone or supervised, closing the pipe stops the launcher; that is intended rather than preserved. Whether terminal input reaches Pi rather than the launcher is the supervisor's to establish and belongs to TSK-0057.",
   "role": "platform",
   "implements": [
     "CMP-0020"
@@ -14,7 +14,7 @@
     "REQ-0022"
   ],
   "acceptedBy": [
-    "ACC-0078"
+    "ACC-0101"
   ],
   "dependsOn": [
     "TSK-0055"
