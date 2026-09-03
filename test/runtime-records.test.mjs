@@ -153,8 +153,8 @@ test("the journal records the whole plan, file identities, and an exact resume c
     ...JOURNAL,
     lastCompletedPhase: "initialize-content",
     fileIdentities: [
-      { path: ".pi/settings.json", state: "present", digest: "sha256:" + "b".repeat(64) },
-      { path: ".pi/kiln.json", state: "absent" },
+      { root: "project", path: ".pi/settings.json", state: "present", digest: "sha256:" + "b".repeat(64) },
+      { root: "state", path: "runtime/consent.json", state: "absent" },
     ],
     recovery: { command: "node .planning/bin/setup.mjs --project-root . --resume", reason: "interrupted during install" },
   });
@@ -162,14 +162,23 @@ test("the journal records the whole plan, file identities, and an exact resume c
   // ⚠️ PRESENT-WITH-DIGEST AND ABSENT-WITHOUT ARE PAIRED IN THE SCHEMA. Either half alone makes the
   // comparison meaningless: a present file with no digest cannot be compared, and an absent one
   // with a digest is claiming to have hashed nothing.
-  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ path: ".pi/settings.json", state: "present" }] },
+  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ root: "project", path: ".pi/settings.json", state: "present" }] },
     "a present file must carry the digest it will be compared against");
-  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ path: "x", state: "absent", digest: "sha256:" + "c".repeat(64) }] },
+  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ root: "project", path: "x", state: "absent", digest: "sha256:" + "c".repeat(64) }] },
     "an absent file cannot have a digest");
+
+  // ⚠️ THE ROOT IS REQUIRED, NOT INFERRED. With `--local-state user` the state root sits under
+  // %LOCALAPPDATA% or $XDG_STATE_HOME, outside the project entirely — so a bare relative path is
+  // ambiguous, and resolving it against the wrong root compares a file to another file's identity.
+  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ path: ".pi/kiln.json", state: "absent" }] },
+    "an identity with no root cannot be resolved back to a file");
+  rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ root: "home", path: "x", state: "absent" }] },
+    "the root vocabulary is fixed at the two roots a transaction can authorize");
 
   // Absolute and traversing paths are refused by the schema, not by a reviewer.
   for (const bad of ["C:/Users/someone/.pi/settings.json", "/home/someone/x", "\\\\server\\share\\x", "../outside", "a/../../b"])
-    rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ path: bad, state: "absent" }] }, `path must be refused: ${bad}`);
+    rejects("setup-transaction", { ...JOURNAL, fileIdentities: [{ root: "project", path: bad, state: "absent" }] },
+      `path must be refused: ${bad}`);
 
   rejects("setup-transaction", { ...JOURNAL, phases: [] }, "a journal with no plan cannot say what was meant to happen next");
   rejects("setup-transaction", { ...JOURNAL, phases: [{ name: "x", status: "half" }] }, "an unknown phase status");

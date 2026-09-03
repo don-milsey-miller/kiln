@@ -1030,29 +1030,65 @@ Implement `bin/setup.mjs` as a composition layer over existing primitives, not a
 
 Setup has one project-wide transaction owner in `lib/setup-transaction.mjs`. It reuses the existing
 canonical `<project>/.planning-init.lock`; the initializer and `.gitignore` helper must accept the
-already-held transaction rather than acquire competing nested locks. Before the first lasting write,
-the transaction owner:
+already-held transaction rather than acquire competing nested locks.
+
+**The lock is acquired before the plan is built, not after.** Planning is not a read-only survey: it
+probes each parent by creating and renaming a real file, so two unlocked planners create and delete
+the same directories concurrently. Planning therefore refuses unless the calling process
+demonstrably owns the lockfile. Holding the lock, and before the first lasting write, the
+transaction owner:
 
 1. canonicalizes and prints every tool, project, content, settings, session, runtime, and temporary
-   target;
+   target, and proves each one resolves beneath a root the caller **explicitly authorized** —
+   `project` always, `state` only when a state root was passed. The proof resolves through the
+   deepest existing ancestor and compares canonical prefixes, because `relative()` and `resolve()`
+   compare the spelling of a path and a junction is not a spelling. A relative path that reads as
+   `.pi/settings.json` and resolves outside the project is a refusal, as is the lock file itself.
+   **Each target's plan key is derived from the resolved path**, because a canonical location is not
+   a canonical identity: `.pi/settings.json` and `.pi/a/../settings.json` are one file, and two
+   entries for one file are two recorded identities whose second write is compared against a digest
+   taken before the first. The plan is additionally indexed by physical location, which is the only
+   thing that catches the overlapping-roots case — project-local state lives at `<project>/.pi`, so
+   `project:.pi/runtime/x.json` and `state:runtime/x.json` name one file with keys sharing no
+   characters;
 2. parses and schema-validates every existing Kiln/Pi file it may read or merge, including setup and
    consent schema versions;
-3. rejects the tool/content root relationships already forbidden by the shared resolver;
+3. rejects the tool/content root relationships already forbidden by the shared resolver, using that
+   resolver's canonicalization rather than a second implementation of it;
 4. probes same-directory temporary-file creation and atomic rename in each parent it will mutate,
-   then removes the probe without touching a user file;
+   then restores the directory to what it found — every probe file **and every directory created in
+   order to probe**, removed on every exit path, with `rmdir` so a directory something else
+   populated survives. A plan that refuses must leave the project unchanged; one that creates `.pi/`
+   and then refuses has still changed it. A removal that cannot be completed is a refusal naming
+   every path left behind, retaining alongside it whatever refusal caused the attempt — never a
+   silent success, since a suppressed cleanup error is exactly a plan reporting that it changed
+   nothing while a probe file remains. Absence is confirmed by observing the path rather than by
+   trusting the removal call: measured on Windows, `rmdir` against a file throws `ENOENT` and leaves
+   the file in place;
 5. records hashes of every existing file it may merge; and
 6. constructs the complete owned-field/write plan before applying it.
 
-Under the lock, re-read and compare those hashes immediately before each merge. A concurrent edit is
+Under the lock, re-read and compare those hashes immediately before each merge, and re-prove the
+target still resolves where the plan said it did — a junction can appear after planning as easily as
+an edit can. A concurrent edit is
 a refusal/retry, not a stale write. Use same-directory temporary files and atomic replacement for
 settings and records; append `.gitignore` only through its existing re-read-under-lock owner. Merge
 only Kiln-owned fields, preserve unrelated settings and authored planning content, and refuse malformed
 or unknown schema versions. There is no general `--force`.
 
 After the initializer establishes safe local-state handling, maintain a non-secret
-`setup-transaction.json` journal in the selected runtime directory. It records the planned operation,
-last completed phase, file identities rather than credential/config values, and recovery status. On
-success remove it; on interruption or later failure retain it and print an exact resume/recovery
+`setup-transaction.json` journal in the selected runtime directory. **It is a planned target like any
+other** — canonicalized, contained under an authorized root and probed at plan time, never a path
+handed to a writer at write time; the one file written on the failure path must not be the one file
+that skipped every check. Only *when* the first record lands is deferred to the coverage decision.
+It records the planned operation,
+last completed phase, file identities rather than credential/config values, and recovery status.
+Each identity names the root it is relative to, since with `--local-state user` the two roots are not
+nested. On
+success remove it, and report a removal that fails for any reason other than the file already being
+absent: the journal's presence is the interruption signal, so a run that reports success while
+leaving one behind has published a false account of its own state. On interruption or later failure
+retain it and print an exact resume/recovery
 command. Never roll back or delete a valid planning scaffold merely because a later agent phase failed.
 
 Project-local state is the default and requires the exact Kiln `.gitignore` coverage for

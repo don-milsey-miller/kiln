@@ -46,9 +46,13 @@
       "description": "The identity of each file the transaction may merge, recorded before the plan is applied and re-compared under the lock immediately before each merge.",
       "items": {
         "type": "object",
-        "required": ["path", "state"],
+        "required": ["root", "path", "state"],
         "additionalProperties": false,
         "properties": {
+          "root": {
+            "enum": ["project", "state"],
+            "description": "Which authorized root `path` is relative to. ⚠️ REQUIRED RATHER THAN ASSUMED, because the two roots are not always nested: with `--local-state user` the state root lives under `%LOCALAPPDATA%` or `$XDG_STATE_HOME`, outside the project entirely. A bare relative path would then be ambiguous — and resolving it against the wrong root is how a recovery compares a file against an identity recorded for a different file. ⚠️ Naming the root is also what keeps the ABSOLUTE path out of this record: REQ-0024 forbids a user-home path in anything Kiln writes, and the external state root is exactly one."
+          },
           "path": { "$ref": "runtime-common.schema.json#/$defs/relativePath" },
           "state": {
             "enum": ["absent", "present"],
