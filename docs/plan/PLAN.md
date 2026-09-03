@@ -124,6 +124,48 @@ Every read of planning content in the application goes through a single reading 
 
 *Priority: must*
 
+### REQ-0022 — One documented command carries a clean project to a running planning conversation
+
+From a machine that has Git and the supported Node version and nothing else of Kiln's, one documented command must initialise the planning workspace, install the pinned agent runtime, obtain every decision it needs from the operator, and end with the planning agent conversing about this project — or refuse, naming the phase that stopped and an exact command that resumes it. Starting the browser application alone does not satisfy this requirement.
+
+*Priority: must*
+
+### REQ-0023 — Existing configuration is inspected, and then used, only under separately granted permission
+
+The system must not read the operator's provider authentication store, custom-model registry, or the presence of credential environment variables before the operator has permitted that inspection. Having detected a usable configuration must never by itself authorise adopting or using it. Permission to inspect, confirmation of an exact provider and model, and permission to validate and use an optional external service are three decisions, each granted separately and each recorded where a different operator on a different machine does not inherit it.
+
+*Priority: must*
+
+### REQ-0024 — Credential material never enters project files, logs, process arguments, or planning content
+
+No committed project file, emitted log line, error message, generated artifact, test fixture, or constructed process argument may contain a credential value or a value derived from one. A credential reaches a subprocess only through an audited contract that names, for one selected provider, the exact environment-variable names required; a provider with no such recorded mapping is refused rather than granted a wider inheritance of the operator's environment.
+
+*Priority: must*
+
+### REQ-0025 — Agent work runs on an explicitly selected and proven model, or it does not run
+
+The provider and exact model used for planning work must be chosen by the operator from what discovery reports, recorded as reproducible non-secret project configuration naming exact identifiers rather than a mutable alias, and proven able to perform the tool calls the system depends on before the system describes the agent as ready. When the recorded selection cannot be resolved or authenticated, the system must refuse to begin or resume planning work rather than substituting another model, another provider, or its own memory.
+
+*Priority: must*
+
+### REQ-0026 — A delegated result is used only when the child that produced it is proven to have had its tools
+
+Before any part of a specialist's substantive answer is read or acted on, the system must observe that the child ran with the capability signature and tool set its role contract requires. A child that exited cleanly, emitted a well-formed transcript, and did not have those tools must fail the delegation loudly; its prose must not be accepted as the answer to the delegated task.
+
+*Priority: must*
+
+### REQ-0027 — Runtime state survives a tool update and never enters version control
+
+Session transcripts, launch state, consent records, compatibility results and setup journals must be written where updating the tool clone cannot destroy them and where ordinary version control does not track them, while reproducible non-secret project configuration remains committed and reviewable. The system must not write runtime state into a location before the ignore coverage protecting that location is in place.
+
+*Priority: must*
+
+### REQ-0028 — A readiness claim names what answered
+
+Before reporting a component ready, the system must confirm the identity of whatever responded: that the HTTP service answering the port is the process this invocation started and is serving this project, that the loaded package is the one it installed, and that the model answering is the one recorded. A response that merely arrives, from an unidentified source, is not readiness and must not be reported as such.
+
+*Priority: must*
+
 ## Components
 
 ### CMP-0001 — Stage definitions and the gate
@@ -145,7 +187,7 @@ Checks storage identity, trace integrity, content completeness, lifecycle and in
 Persists one artifact per file, resolves the content root, and serialises every read-modify-write so concurrent writers cannot destroy each other.
 
 *Satisfies: REQ-0002*
-*Implemented by: lib/layout.mjs, lib/content-root.mjs, lib/atomic-write.mjs, lib/lock.mjs, lib/id-allocator.mjs*
+*Implemented by: lib/layout.mjs, lib/content-root.mjs, lib/atomic-write.mjs, lib/lock.mjs, lib/id-allocator.mjs, test/content-root.test.mjs*
 
 ### CMP-0004 — Schema layer
 
@@ -159,7 +201,7 @@ Owns the artifact schemas, their composition through one envelope, and the effec
 The only way an artifact is created or mutated (#88), including the guards that make each transition refusable.
 
 *Satisfies: REQ-0013, REQ-0014*
-*Implemented by: lib/tools/*
+*Implemented by: lib/tools/, test/link-trace.test.mjs, test/evidence-tools.test.mjs*
 
 ### CMP-0006 — Research capability
 
@@ -265,6 +307,153 @@ Install and run the shell from one documented command: build the application and
 
 *Satisfies: REQ-0020*
 *Implemented by: bin/start-shell.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs*
+
+### CMP-0021 — Pinned Pi runtime
+
+Be the only route by which any Pi process is started. Resolve the exact pinned CLI from the tool's own node_modules, report its version, refuse a version that does not match the pin, and hand every caller — setup, the user-facing session, and every specialist child — the same executable invoked through the current Node binary with shell interpolation disabled. Discovering Pi on PATH is outside this component and outside the product.
+
+*Satisfies: REQ-0022, REQ-0028*
+*Not yet implemented.*
+
+### CMP-0022 — Setup transaction
+
+Own one project-wide lock for the whole of setup, and make every lasting write happen under a plan rather than in sequence: canonicalise and print each target before mutating, schema-validate every file it may read or merge, probe same-directory temporary-file creation and atomic rename in each parent it will write to, record the identity of each existing file, re-compare that identity immediately before each merge, and maintain a non-secret journal that names the last completed phase so an interruption resumes rather than restarts.
+
+*Satisfies: REQ-0027, REQ-0022*
+*Not yet implemented.*
+
+### CMP-0023 — Project ignore owner
+
+Be the single owner of every Kiln edit to the consumer's `.gitignore`: plan the change without writing, append rather than rewrite, take the line ending from the file, record what it did, migrate an exact unmodified legacy block to the extended block under the same lock and atomic-write discipline, and never restore a block the operator deliberately removed or edited.
+
+*Satisfies: REQ-0027*
+*Not yet implemented.*
+
+### CMP-0024 — Pi settings merge
+
+Merge only Kiln's owned fields into the project's `.pi/settings.json` — the local package entry, the skill-override path, the selected default provider, model and thinking level, and the project-local session directory when that mode is chosen — preserving every unrelated key and package entry, refusing a malformed or unknown-schema-version file rather than replacing it, and changing no bytes when the desired state is already present.
+
+*Satisfies: REQ-0024, REQ-0025*
+*Not yet implemented.*
+
+### CMP-0025 — Local-state policy
+
+Decide and enforce where session transcripts, consent records, compatibility results and setup journals live: by default under the outer project's ignored `.pi/sessions/` and `.pi/runtime/`, or, when explicitly selected, under an external per-user root derived from the committed non-secret project ID. Refuse to write any runtime data before the chosen location's protection is in place, and never commit an absolute user path in order to reach it.
+
+*Satisfies: REQ-0027, REQ-0023*
+*Implemented by: schemas/runtime/, lib/runtime-records.mjs, test/runtime-records.test.mjs*
+
+### CMP-0026 — Project trust integration
+
+Obtain, verify and report the operator's trust decision for this project's Pi resources through Pi's own supported mechanism, display the canonical project path the decision applies to, treat a denial as a first-class outcome that stops agent launch without touching the planning scaffold, and refuse a non-interactive run that has no pre-existing decision rather than defaulting one.
+
+*Satisfies: REQ-0023, REQ-0026*
+*Not yet implemented.*
+
+### CMP-0027 — Connection inspection and consent
+
+Ask before looking, and record what was granted. Obtain explicit permission before reading Pi's user authentication store, its custom-model registry, or the presence of any credential environment variable; then report sanitised availability only — provider display names, model identifiers, and present-or-absent for the research credential — contacting no external service. Persist the operator's grant where a clone does not carry it to another machine, and reopen the prompt when the provider or research choice changes.
+
+*Satisfies: REQ-0023, REQ-0024*
+*Not yet implemented.*
+
+### CMP-0028 — Model binding
+
+Turn discovery into a recorded decision and hold it: present available providers and exact model identifiers, require confirmation even when exactly one is available, persist the exact non-alias identifiers as project configuration, state plainly that subsequent work on this model may be billed, and at every later launch resolve that recorded selection and refuse the run if it is unavailable rather than falling back.
+
+*Satisfies: REQ-0025, REQ-0023*
+*Not yet implemented.*
+
+### CMP-0029 — Provider credential contracts
+
+Be the single audited statement of which environment-variable NAMES each supported provider needs on the model plane, holding no values; separate those from tool-plane names that belong to one role; construct each child's environment from the measured base runtime variables, the selected provider's model-plane names and that role's tool-plane names, adding nothing else; and classify a provider with no safe known mapping as unsupported rather than granting it a wider inheritance.
+
+*Satisfies: REQ-0024, REQ-0026*
+*Not yet implemented.*
+
+### CMP-0030 — Live model and tool canary
+
+Prove, with one separately authorised request, that the selected provider and model actually answer and actually emit the shape of tool call Kiln depends on: expose a single read-only setup-only tool, require the model to call it with a random challenge against the declared schema, send no planning content, permit no mutation, cap the token budget, and record success only against the exact provider, model, thinking level, runtime version, package capability signature and non-secret endpoint identity that produced it.
+
+*Satisfies: REQ-0025, REQ-0023, REQ-0028*
+*Not yet implemented.*
+
+### CMP-0031 — Kiln Pi package
+
+Be the installable unit Pi loads for this project: a declared package manifest naming its extensions, skills and prompts; a registration entry point; and a machine-readable capability signature that any consumer — the supervisor, the canary, a delegation verifier — can compare against what it expected to be loaded.
+
+*Satisfies: REQ-0022, REQ-0026, REQ-0028*
+*Not yet implemented.*
+
+### CMP-0032 — Pi tool registration
+
+Expose the existing typed libraries to the agent as validated Pi tools and nothing more: project status and lint reads, artifact creation and mutation through the existing registries, project-type activation, stage attestation reads and writes, the research and validation capability adapters, and delegation. Own the tool schemas and result rendering; leave every business rule in `lib/`. Launch the session with Pi's built-in filesystem and shell mutation tools disabled.
+
+*Satisfies: REQ-0022, REQ-0024*
+*Not yet implemented.*
+
+### CMP-0033 — Stage skill generation and overrides
+
+Generate one packaged skill per canonical stage definition so that stage purpose, outputs and exit criteria are never hand-maintained twice, fail a check when the packaged skills are stale relative to `stages/`, and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.
+
+*Satisfies: REQ-0022*
+*Not yet implemented.*
+
+### CMP-0034 — User-facing orchestrator
+
+Be the single persistent planning session: resolve the canonical sibling content root and refuse to operate on the tool's own planning content, derive the current stage from definitions and attestations rather than storing a duplicate status, load the matching stage skill, ask one question at a time chosen by information value, keep the operator's wording separate from its own interpretation, mutate only through registered typed tools, show material changes before making them, and resume from files and attestations when the transcript is gone.
+
+*Satisfies: REQ-0022*
+*Not yet implemented.*
+
+### CMP-0035 — Specialist roster
+
+Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a lint error.
+
+*Satisfies: REQ-0026*
+*Not yet implemented.*
+
+### CMP-0036 — Delegation runtime
+
+Run a specialist as an isolated Pi child and decide whether its answer may be used: build a task-scoped context rather than forwarding the conversation, bind the role prompt and the task through a private file with restrictive permissions and closed stdin, pass the orchestrator's exact provider, model and thinking level, pass the intersection of the role's allowlist and the measured host registry, enforce a bounded timeout, delete temporary material on every exit path, and verify the child's capability signature before reading its substantive output.
+
+*Satisfies: REQ-0026, REQ-0024, REQ-0025*
+*Not yet implemented.*
+
+### CMP-0037 — Combined runtime supervisor
+
+Own the lifecycle of the two processes that make up a running Kiln: validate the project and settings, choose and prove a port, start the browser launcher with a private stdin pipe so it cannot consume the operator's typing, wait for identity-confirmed readiness, start Pi in the outer project root with the terminal inherited, begin or resume the recorded planning session, and on exit or signal stop both process trees within bounded grace periods and remove only what this invocation created.
+
+*Satisfies: REQ-0022, REQ-0028*
+*Not yet implemented.*
+
+### CMP-0038 — Run-identity health endpoint
+
+Answer the supervisor's readiness question with an identity rather than a status: the service name, a versioned health protocol, the ephemeral run identifier of this invocation, the non-secret stable project identifier, and the build version — and nothing else, in particular no absolute path, no credential, and no session or planning content.
+
+*Satisfies: REQ-0028*
+*Not yet implemented.*
+
+### CMP-0039 — Setup command
+
+Compose the whole first run in one ordered, resumable, idempotent command over the existing primitives: resolve and print every path before mutating, validate the runtime, run the existing initializer under the shared transaction, establish state protection, install and register the package, obtain each consent in its own step, bind and prove the model, read back everything it wrote, and either launch the combined runtime or explain exactly what remains. Use a distinct exit code per refusal class and publish the mapping.
+
+*Satisfies: REQ-0022, REQ-0023, REQ-0027*
+*Not yet implemented.*
+
+### CMP-0040 — Clean-consumer agent-delivery verification
+
+Prove the documented journey from an empty directory on both supported platforms: initialise a repository with no commits, take a tracked-file-only copy of the tool as the clone, run the documented setup against a deterministic non-billable provider, drive a Stage 1 exchange, observe the intake document change through the browser's change stream, attempt an unauthorised stage advance and see it refused, shut down and prove nothing is left running, then rerun and prove resumption and idempotency.
+
+*Satisfies: REQ-0022, REQ-0028*
+*Not yet implemented.*
+
+### CMP-0041 — Pi compatibility evidence suite
+
+Establish, against the exact pinned runtime and on each supported platform, what Pi actually does where the agent-delivery design depends on it — local resolution from a consumer's own install and version match; trust grant, denial and revocation through the public API; saved API-key discovery and provider auth status; configuration-directory resolution under default and overridden settings; the literal package entry `pi install -l` writes and its canonical equivalence to the committed form; extension, skill and prompt loading; skill-override precedence; session relocation; task binding with closed stdin; the default and allowlisted tool sets; and provider-scoped environment authentication reaching a child — each with a negative control and redaction assertions, retained as tests in the normal suite so a later version bump must re-prove the contract rather than inherit it.
+
+*Satisfies: REQ-0022, REQ-0024, REQ-0026, REQ-0027*
+*Implemented by: tools/pi-compat/lib/consumer.mjs, tools/pi-compat/lib/spike.mjs, tools/pi-compat/lib/probe.mjs, tools/pi-compat/lib/redact.mjs, tools/pi-compat/fake-provider.mjs, tools/pi-compat/run-all.mjs, tools/pi-compat/posix-bootstrap.sh, tools/pi-compat/runs/windows.json, tools/pi-compat/runs/linux.json, test/pi-compat.test.mjs, .github/workflows/ci.yml*
 
 ## Decisions
 
@@ -417,6 +606,54 @@ When `/stage/[stageId]` is given an id matching no stage, the application respon
 Keep restricted runtime MDX for stage documents. Do not adopt DEC-0020's plain-Markdown alternative: the measurement that was supposed to trigger it instead disproved its premise.
 
 **Why:** The compiler is not the cost, and it is the security boundary. DEC-0020 recorded the per-request compile cost as explicitly unmeasured and pre-committed to a fallback in case it proved large. It has now been measured and it is small: 15-29 ms p95 across six valid runs against the largest stage document. The fallback was contingent on a premise the measurement refuted, so it does not fire. ⚠️ THE BUDGET WAS STILL MISSED, AND THAT IS NOT BEING WAVED AWAY. ACC-0020 stays `fail` and stays in the record; it is superseded by a criterion that measures the disputed cost rather than deleted for being inconvenient. The unexplained 234-359 ms is recorded as an open performance question, non-blocking, to be INSTRUMENTED before anything is optimised. ⚠️ THE OBSERVED 245-375 ms STAGE RESPONSE IS ACCEPTED FOR v1 WITH ITS ATTRIBUTION OPEN. That is a judgement about a local-first planning tool on a developer's own machine, not a claim that the number is good.
+
+### DEC-0026 — Pin @earendil-works/pi-coding-agent 0.84.4 and raise the Node floor to 22.19.0
+
+Kiln declares an exact dependency on @earendil-works/pi-coding-agent 0.84.4 — the version npm publishes as latest on 2026-09-02 — and raises engines.node from >=22 to >=22.19.0 to match what that release requires. Every Pi invocation resolves that dependency from the tool's own node_modules. Changing the pin is an intentional, tested dependency update that re-runs the compatibility suite; it is never a range that floats.
+
+**Why:** The compatibility spike has to run against something, and it is cheaper to run it once against the version consumers will actually receive than to run it against 0.80.6 and inherit four minor versions of skew on the first release. The Node floor is not a preference: 0.84.4 declares engines.node >=22.19.0, and Kiln's >=22 would let a 22.0 install resolve a runtime that cannot start.
+
+### DEC-0027 — Project trust is granted through a supported Pi mechanism, not by writing Pi's trust file
+
+Kiln does not write Pi's user-scoped trust store directly. Interactive setup obtains the decision through Pi's own trust flow or a supported public API; non-interactive setup accepts a pre-existing decision or refuses. If the pinned version exposes no supported route to record a decision programmatically, the proposed `--trust approve` option is removed or deferred rather than implemented by writing the file. This withdraws the mechanism half of decision #67(a); the detection half, #67(b), is unaffected and still owed.
+
+**Why:** Writing another tool's undocumented user-scoped security file is brittle — its shape is unversioned and may change under any release — and it crosses a boundary that belongs to the operator rather than to Kiln. The argument that carried #67(a) was that a recorded decision keeps the grant where the operator can read and delete it, which remains right; what changed is the judgement that Kiln should not be the one writing it.
+
+### DEC-0028 — The project's provider and model selection is committed configuration, with no local-only mode
+
+The selected provider, exact model identifier and thinking level are written to the project's `.pi/settings.json` and committed. There is no local-only override mode in which the selection is kept out of version control. What is never committed is anything host-specific or secret: credentials, the operator's consent to use this machine's connections, session transcripts, and compatibility records.
+
+**Why:** The selection is the answer to which model produced this project's content, and that answer belongs with the content. A local-only mode was floated in an earlier draft of the proposal and specified nowhere — no flag, no storage location, no precedence rule — which is the shape of a feature that sounds accommodating and has never been designed. Removing it also keeps one rule instead of two about what a clone inherits: configuration yes, consent no.
+
+### DEC-0029 — Runtime state defaults to the outer project's ignored .pi/, with an explicit external mode
+
+Session transcripts live under `<project>/.pi/sessions/` and launch, consent, compatibility and transaction records under `<project>/.pi/runtime/`, both covered by Kiln's marked `.gitignore` block and neither written before that coverage exists. `.pi/settings.json` and `.pi/kiln.json` are deliberately not ignored: they are reproducible, non-secret project configuration and should be reviewable in a diff. An explicit external mode relocates the two ignored directories to a per-user root keyed by the committed project ID, and exists only if the pinned runtime supports it.
+
+**Why:** Two locations are excluded for different reasons. Inside the tool clone is wrong because `git pull` on `.planning/` is the update channel and may destroy anything there. Tracked inside the outer project is wrong because transcripts and consent records are host-specific and sometimes sensitive. What is left is an ignored directory in the outer project, which is also where Pi already expects project-local runtime state to live.
+
+### DEC-0030 — The compatibility spike is a hard gate on the rest of the agent-delivery implementation
+
+No agent-delivery implementation beyond the planning correction and the spike itself begins until the spike has produced reviewable evidence, on Windows and on the supported POSIX platform, for each behaviour the design depends on — each with a negative control that would fail if the claimed behaviour were absent, and with redaction assertions over command output, logs, errors and generated state. A behaviour the pinned version does not exhibit forces a design revision that is recorded before code is written against it.
+
+**Why:** Every module in the runtime foundation encodes an assumption about what Pi does: how trust is granted, where configuration resolves, what the package entry looks like, what a child inherits. Building four phases on assumptions and discovering one is wrong means unwinding work that was correct against a specification and wrong against reality. The spike costs days; the unwind costs weeks and produces code that half-works.
+
+### DEC-0031 — Repair the typed link layer in two ordered steps: unlinkTrace first, then derive the guard
+
+Both halves of QST-0032 are fixed, and the order is part of the decision. FIRST, `unlinkTrace` stops validating the target type when REMOVING a link: removal is how an invalid or stale link is repaired, so validating it is a guard that refuses exactly the operations it exists to permit. Removal keeps every other discipline — lock, fresh read inside it, atomic write — and gains a typed removal path for `answeredBy`, which `resolveQuestion` can only ever merge. SECOND, and only after that, `reviseArtifact`'s trace-field guard is derived from the schemas' `x-traceTarget` declarations instead of the hardcoded list of seventeen names, closing the bypass on `blocks`, `raisedBy`, `satisfies`, `evaluates`, `verifies`, `fulfils`, `acceptedBy`, `implementedBy` and `answeredBy`. This work is scheduled AHEAD of Phase 2's implementation work rather than behind the agent-delivery layer.
+
+**Why:** The order is not a preference. Today one defect is the only escape hatch for the other: a link that `unlinkTrace` refuses to remove can still be repaired through `reviseArtifact`, precisely because the guard's hardcoded list omits the field. Deriving the guard first would close that hatch while the links it currently repairs remain unremovable by any typed path — and #88 forbids hand-editing — leaving the graph with damage the lint reports and nothing can fix. Fixing removal first makes the guard's completion safe. As for scheduling it ahead of Phase 2: the defect was hit three times during Phase 1 alone, each from a different direction — a mistyped link while authoring, a routine supersession leaving a stale `answeredBy`, and a retarget in which `implements` was guarded while `evaluates` was not covered at all. Phase 2 edits the graph far more than Phase 1 did, so the rate rises rather than falls, and each occurrence currently requires knowingly exploiting a bug to repair.
+
+### DEC-0032 — OAuth is verified by a manual account-bound run, never by a fabricated credential
+
+Kiln supports OAuth through Pi's public interactive `/login` flow. Verification is a MANUAL, account-bound compatibility check run outside CI, and fabricated OAuth records are not an acceptable substitute. The protocol: run with an isolated Pi configuration directory and a sanitized environment; complete `/login` against a real subscription; after it exits construct a FRESH `ModelRuntime` and `ModelRegistry` and prove the chosen built-in model appears through `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential as the control and require the model to become unavailable. Retain only sanitized single-instance evidence — no tokens, headers, credential-derived values, usernames or home paths. Until that run passes, documentation may describe OAuth as a supported Pi route but must not call it verified, and no acceptance criterion may be written as though it were.
+
+**Why:** A fabricated OAuth record proves that a JSON shape written into `auth.json` is read back — an internal storage detail — and says nothing about whether a real subscription authenticates, whether the token refreshes, or whether the provider accepts the request. It would be a green check over the thing that actually matters, which is the failure mode this whole cycle exists to prevent. The API-key path was provable with a fabricated credential precisely because a stored API key IS the whole mechanism; an OAuth token is one artefact of a live flow. Making the check manual and account-bound is the honest cost: it cannot run in CI, so it is single-instance evidence recorded once and labelled as such — the treatment section 15.3 already gives live paid-provider tests. The revocation control is what makes the positive result mean anything. Without it, a model that was already available for some unrelated reason — an inherited environment variable, a stale entry — would read as a successful login.
+
+### DEC-0033 — The five runtime records are Ajv-validated contracts, and the canary key is eight determinants
+
+Kiln's five persisted runtime records are schema-validated through the existing Ajv layer, in `schemas/runtime/` with an `x-runtimeRecord` discriminator and per-record versions. The cached canary result is keyed on exactly eight determinants, nested in a `key` object so comparison is one deep equality: provider, model, thinkingLevel, piVersion, apiType, endpointIdentity (with its source), effectiveRequestProfile, and preflightContractDigest. THE REQUEST PROFILE IS BOUNDED BY CLASSIFICATION, NOT BY HASHING: scalar compat fields and the safely typed structures are persisted by value; the unbounded inputs — `chatTemplateKwargs`, `chatTemplateArgs`, non-empty `samplingParams` and non-authentication headers — are recorded only as CATEGORY NAMES and require an explicitly supplied, non-secret declared identity, without which no result is cached at all. That identity is never derived from the values it stands for. Known authentication headers are credential transport: excluded entirely, and not determinants. The Kiln capability signature remains a zero-cost launch check.
+
+**Why:** These five are Kiln-owned contracts: Kiln invents, writes, versions and reads them, so a shape nobody validates is a comment, and hand-parsing them would stand up a second informal schema implementation beside the real one. `.pi/settings.json` is deliberately NOT the precedent — Pi owns that file, an operator may hand-edit it, and Kiln merges four keys into it defensively. The key set contains only inputs capable of changing the proven model and tool behaviour, because it decides when a BILLABLE check re-runs: too wide and the operator is charged for nothing, too narrow and a proof is reused on a path nobody tested.
 
 ## Claims
 
@@ -732,6 +969,102 @@ A receiver-sensitive browser function can fail when copied into a collaborator o
 
 Rests on: EVD-0075 (support)
 
+### AST-0041 — Project trust can be granted, denied and revoked through Pi's public ProjectTrustStore API
+
+On pi 0.84.4, `ProjectTrustStore` exported from the package root records a project trust decision that a subsequent non-interactive child honours: set(cwd, true) causes project resources to load without --approve, set(cwd, false) prevents loading, and set(cwd, null) reverts to the unloaded default. The decision is keyed by canonical directory.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0077 (support), EVD-0078 (support)
+
+### AST-0042 — An untrusted non-interactive child loads no package and does not error
+
+On pi 0.84.4, a `--mode json -p` child started in a project with no applicable trust decision loads none of the project package's extensions or tools, and reports no error, warning or non-zero exit attributable to trust. Where a usable model is configured the session also completes normally — observed on Linux, emitting session, agent_start, turn_start, turn_end and agent_end with the package absent.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0077 (support), EVD-0078 (support)
+
+### AST-0043 — `pi install -l` writes a relative package entry that differs only by path separator
+
+On pi 0.84.4, installing a project-local package writes a `packages` entry in `.pi/settings.json` that is relative to that file and contains no absolute or home-directory path. The Windows form uses backslashes and the POSIX form forward slashes; the two denote the same directory, so a forward-slash literal is a canonically equivalent committed form.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0079 (support)
+
+### AST-0045 — A Node-spawned child on Windows receives home and user variables it was never passed
+
+On Windows, a child process created by Node with an explicit replacement environment nonetheless receives HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR. The same construction on Linux yields exactly the variables passed and nothing more. An environment allowlist therefore establishes a lower bound on what a child sees on Windows, and an exact set on POSIX.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0080 (support)
+
+### AST-0046 — Pi's default active tool set includes bash, edit and write
+
+On pi 0.84.4, a session started with no explicit tool allowlist has read, bash, edit and write active alongside any custom tools, while grep, find, ls and powershell are configured but inactive. An explicit `--tools` list narrows the active set to exactly the named tools, and a tool absent from that list is not offered to the model at all.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0081 (support)
+
+### AST-0047 — Pi session storage can be relocated outside the project without committing a path
+
+On pi 0.84.4 three routes relocate session transcripts, in the documented precedence order `--session-dir`, then `PI_CODING_AGENT_SESSION_DIR`, then the `sessionDir` setting. The command-line and environment routes are supplied at launch, so an external user-local state root is reachable without writing an absolute user path into committed configuration.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0081 (support)
+
+### AST-0048 — A task passed as a CLI message reaches a child whose stdin is closed
+
+On pi 0.84.4, a non-interactive child spawned with stdin closed and the task supplied as the `-p` argument receives that exact task: the text is observable in the user message sent to the provider, and the turn completes normally. Closed stdin does not prevent task delivery.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0082 (support)
+
+### AST-0049 — A model-issued tool call reaches a registered Kiln tool with its arguments intact
+
+On pi 0.84.4, a tool call emitted by the provider is delivered to a tool registered by a project package with its arguments intact, and the execution is observable inside the extension. A response without a tool call produces no execution, and a tool excluded from the active allowlist is neither offered to the model nor executed.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0082 (support)
+
+### AST-0050 — A consumer resolves the pinned Pi runtime from its own .planning/node_modules
+
+After a consumer's own `npm install` inside a tracked-file copy of the tool, the Pi CLI resolved through that copy's installed `bin.pi` reports the version this repository pins, lies within the consumer directory, and lies outside the development checkout. Verified on Windows and Linux from a generated temporary project whose git repository has no commits.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0083 (support)
+
+### AST-0051 — Saved API-key authentication is discoverable without network access, and status alone is not availability
+
+On pi 0.84.4, `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry` discovers configured models and provider authentication without contacting any external service. A stored api_key credential moves a model from configured-but-unavailable to available. `getProviderAuthStatus()` may report `configured: true` for a credential that `hasConfiguredAuth()` rejects and that leaves the model absent from `getAvailable()`, so provider auth status is not sufficient evidence that a model is usable.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0084 (support)
+
+### AST-0052 — A Pi child resolves its configuration from PI_CODING_AGENT_DIR with no HOME on POSIX
+
+On pi 0.84.4 on Linux, a child spawned with exactly PATH, TMPDIR and PI_CODING_AGENT_DIR — no HOME and no USERPROFILE, verified in the child's own report — loads the project package and completes a turn. On Windows the same construction leaves USERPROFILE present because the platform repopulates it, so the claim there is that the override is sufficient rather than that no home variable exists.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0085 (support), EVD-0086 (support)
+
+### AST-0053 — A provider authenticated only by an environment variable is available exactly where that variable is
+
+On pi 0.84.4, a `models.json` provider whose `apiKey` is `$VAR` yields a model that `--list-models` reports in a child carrying VAR and omits in a child without it, while an inline-key provider is reported in both. Environment authentication therefore travels with the variable and with nothing else, on Windows and Linux.
+
+**supported · environment-matched** (derived)
+
+Rests on: EVD-0085 (support)
+
 ## Open questions
 
 ### QST-0002 — Does `research-finding` own anything irreducible, or is it a projection?
@@ -871,6 +1204,377 @@ Subscribe to the stream, listen for the named heartbeat event, and run a watchdo
 **accepted** (2/2 criteria passed) · role: frontend
 *Implements: CMP-0017 · fulfils: REQ-0018*
 
+### TSK-0018 — Stand up the disposable clean-consumer fixture the spike runs in
+
+Build a throwaway outer project — git init with no commits, a tracked-file-only copy of the tool as `.planning`, no pre-existing Pi trust decision, and a recorded starting state for every user and host location the spike will touch — so that each observation begins from a machine state the run itself established rather than one it inherited.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0019 — Measure trust grant, denial and revocation against the pinned runtime
+
+Determine whether 0.84.4 exposes a supported API, command or non-interactive option for recording, reading and revoking a project trust decision. Observe the result through a marker written at extension load time, upstream of any model behaviour, with the 2026-08-18 control set: untrusted, granted, explicitly denied, and grant removed. Record the answer to QST-0026 and stop for review if no supported route exists.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0020 — Measure configuration and auth resolution on both platforms, default and overridden
+
+Establish which configuration-locating variables 0.84.4 consults to find its authentication store and custom-model registry, under both default directories and an explicitly overridden one, on Windows and POSIX; and confirm a restricted child carrying only those variables resolves the same store as its parent. Record the answer to QST-0029 as the measured base allowlist.
+
+**accepted** (2/2 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0021 — Measure the package entry, package loading and session relocation
+
+Record the literal entry `pi install -l` writes and whether it can be normalised to a portable relative form with canonical equivalence proved; confirm the installed package loads its extensions, tools, skills, prompts and capability signature; and determine whether session and runtime directories can be relocated outside the project through a supported option. Answers QST-0027 and QST-0028.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0022 — Measure closed-stdin task binding and re-check the carried-over 0.80.6 findings
+
+Confirm a `--mode json -p --no-session` child with closed stdin can receive its exact task through the supported non-stdin channel, with an observation taken at the child. Re-run the five behaviours recorded against 0.80.6 — silent untrusted load, trust store shape, skill override precedence, default active tool set, turn-end hooks in a non-interactive child — and record which still hold. Answers QST-0030 and QST-0031.
+
+**accepted** (2/2 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0023 — Promote the spike fixtures into the normal test suite
+
+Retain each proof, with its control and its redaction assertions, as a test that runs in CI, so that a later change to the pinned Pi version has to re-prove the contract rather than inherit it. Tests that require a real provider stay manually invoked and out of default CI.
+
+**accepted** (2/2 criteria passed) · role: platform
+*Implements: CMP-0041 · fulfils: REQ-0005, REQ-0006, REQ-0024*
+
+### TSK-0024 — Build the pinned Pi resolver and version gate
+
+Add `lib/pi-runtime.mjs`: resolve the CLI entry point from the tool root's node_modules, report the installed version, refuse a mismatch against the pin, and spawn through the current Node executable with shell interpolation disabled. Add the pinned dependency and raise engines.node per DEC-0026.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0021 · fulfils: REQ-0022, REQ-0028*
+
+### TSK-0025 — Add project-root resolution to the shared resolver
+
+Extend `lib/content-root.mjs` with `projectRootCandidate()` and `resolveProjectRoot()` so the directory that owns `.pi/`, `.gitignore`, Pi's working directory and runtime state has one authority, per decision #70's rule that no caller joins its own path.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0003 · fulfils: REQ-0022*
+
+### TSK-0026 — Build the setup transaction: one lock, preflight, write plan and journal
+
+Add `lib/setup-transaction.mjs` owning the existing `.planning-init.lock` for the whole command: canonicalise and print targets, schema-validate readable files, probe temp-create and atomic rename in each parent, hash existing files, compare under the lock before each merge, and keep a non-secret resumable journal.
+
+**outstanding** (0/3 criteria passed) · role: platform
+*Implements: CMP-0022 · fulfils: REQ-0022, REQ-0027*
+
+### TSK-0027 — Make the initializer and the ignore owner accept a held transaction
+
+Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an already-held transaction rather than acquiring their own lock, preserving their current idempotency and refusal semantics and their existing tests.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0022 · fulfils: REQ-0022, REQ-0027*
+
+### TSK-0028 — Extract the single ignore owner and add legacy block migration
+
+Move the existing planning, append-safety, line-ending and recorded-idempotency logic out of `lib/initialize-project.mjs` into `lib/project-gitignore.mjs` used by both initialization and setup, and add the exact-legacy-block migration under the same lock and atomic-write discipline.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0023 · fulfils: REQ-0027*
+
+### TSK-0029 — Build the locked atomic schema-aware settings merge
+
+Add `lib/pi-settings.mjs`: read under the transaction, validate the existing shape, merge only the package entry, skill-override path, provider/model/thinking defaults and session directory, write atomically through a same-directory temporary file, and produce identical bytes when the desired state already holds.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0024 · fulfils: REQ-0024, REQ-0025*
+
+### TSK-0030 — Normalise the package entry only after proving canonical equivalence
+
+Compare the literal entry `pi install -l` wrote against the portable `../.planning/pi-package` form, prove both canonicalise to the same directory on this platform, and rewrite only on proof. Refuse when equivalence cannot be established rather than constructing a target.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0024 · fulfils: REQ-0024, REQ-0025*
+
+### TSK-0031 — Implement the local-state policy and its two modes
+
+Derive and create the chosen state root, enforce coverage-before-data, generate and persist the stable non-secret project ID once, and pass external session and runtime locations through the route the spike proved. Withdraw the external mode if QST-0027 comes back negative.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0025 · fulfils: REQ-0027, REQ-0023*
+
+### TSK-0032 — Integrate project trust through the route the spike established
+
+Implement obtaining, reading and reporting the trust decision per DEC-0027, including the non-interactive refusal and the browser-only fallback. If QST-0026 found no supported programmatic route, remove or defer the `--trust` option and document the manual step instead.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0026 · fulfils: REQ-0023, REQ-0026*
+
+### TSK-0033 — Build permission-gated connection inspection
+
+Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. Add the presence-only check for the known provider variables and the research credential. Instrument each access point so the before-consent criterion is observable.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0027 · fulfils: REQ-0023, REQ-0024*
+
+### TSK-0034 — Build the local consent record and its invalidation rules
+
+Persist the host-specific grant in the ignored local-state root, keyed so that a provider or research change invalidates it, and read it at launch so an unchanged project does not re-prompt while a new machine does.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0027 · fulfils: REQ-0023, REQ-0024*
+
+### TSK-0035 — Implement the Tavily consent, probe and plain-English outcomes
+
+After a separate approval, run the existing `GET /usage` capability probe from `lib/research/tavily-adapter.mjs`, persist the non-secret project choice and the local approval, and map each internal state to its required user-facing wording. Declining leaves research unavailable and does not block planning.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0027 · fulfils: REQ-0003, REQ-0012*
+
+### TSK-0036 — Build model discovery, explicit selection and persistence
+
+Present available providers and exact model identifiers, validate any supplied `--provider`/`--model`/`--thinking` against the registry, require confirmation, state the billing consequence, and persist the exact identifiers through the settings merge per DEC-0028.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0028 · fulfils: REQ-0025, REQ-0012*
+
+### TSK-0037 — Build the launch-time availability checks and the refusal path
+
+At every launch resolve the recorded selection, verify an authentication source is configured, verify the package and required tools loaded, verify a matching compatibility record exists, and refuse the run with a specific reason when any check fails.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0028 · fulfils: REQ-0025, REQ-0023*
+
+### TSK-0038 — Build the audited provider credential contract table
+
+Add `lib/pi-provider-credentials.mjs` declaring, per supported provider, the id, supported auth source categories, and the exact required and optional model-plane variable names — names only, never values — plus the validated declarative shape by which a custom provider may contribute names.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
+
+### TSK-0039 — Build child environment construction and prove it with sentinels
+
+Construct each child's environment as the union of the measured base runtime and configuration variables, the selected provider's model-plane names and the role's tool-plane names, and prove the boundary with sentinel variables that must not cross it. Extend the existing `childEnv()` in `lib/specialists/contract.mjs` rather than adding a parallel builder.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
+
+### TSK-0040 — Prove the contract with a disposable restricted child before accepting it
+
+Spawn a throwaway restricted Pi child that resolves the exact provider and model and reports only availability and the auth-source category — never variable names, values, headers or credential-derived fingerprints — and refuse the contract if it cannot.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
+
+### TSK-0041 — Build the setup-only preflight tool and the bounded canary request
+
+Register `kiln_preflight` outside the orchestrator registry, accepting only the one-time challenge schema and returning a fixed acknowledgement with no access to content, mutation, research, validation, delegation or shell; issue the canary under a low token ceiling and remove the tool from the effective set before the user-facing session starts.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0030 · fulfils: REQ-0012, REQ-0023, REQ-0025, REQ-0028, REQ-0024*
+
+### TSK-0042 — Build the zero-cost preflight and the compatibility record
+
+Check configuration, auth availability, model resolution, package loading and tool signatures at no cost; store canary success keyed to its exact inputs in the local-state root; and implement every invalidation input so a changed key reopens approval.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0030 · fulfils: REQ-0012, REQ-0023, REQ-0025, REQ-0028, REQ-0024*
+
+### TSK-0043 — Create the Pi package manifest, entry point and capability signature
+
+Add `pi-package/` with a declared package manifest naming extensions, skills and prompts, a registration entry point, and a machine-readable capability signature that the supervisor, the canary and the delegation verifier can each compare against what they expected.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0031 · fulfils: REQ-0026, REQ-0028*
+
+### TSK-0044 — Register the read, mutation and attestation tools over the existing registries
+
+Wrap project status and lint reads, `TYPED_TOOLS`, `MUTATION_TOOLS`, `PROJECT_TOOLS` and the stage-attestation read and write operations as validated Pi tools, and launch the session with Pi's built-in mutation tools disabled.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0032 · fulfils: REQ-0024, REQ-0001, REQ-0002*
+
+### TSK-0045 — Register the research, validation and delegation adapters
+
+Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0032 · fulfils: REQ-0003*
+
+### TSK-0046 — Build the stage-skill generator and its check mode
+
+Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0033 · fulfils: REQ-0001*
+
+### TSK-0047 — Register the consumer override path and test all four override states
+
+Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0033 · fulfils: REQ-0001*
+
+### TSK-0048 — Implement the orchestrator context, policy and the /kiln-start entry
+
+Build the persistent session behaviour: resolve and guard the content root, derive the current stage from definitions and attestations, load the matching skill, and register the start prompt that begins Stage 1 on a fresh project or summarises stage, blockers and the single recommended next action on an existing one.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
+
+### TSK-0049 — Implement adaptive question selection and continuous intake capture
+
+Choose each next question by information value and blocking impact rather than from a fixed list, keep the operator's wording separate from interpretation, update the intake document continuously through typed tools, and run lint after material mutations without paraphrasing findings away.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
+
+### TSK-0050 — Implement the approval and attestation boundary
+
+Make the orchestrator show material proposed changes before making them, require the operator's decision where the stage says the decision is theirs, and refuse to approve an artifact or satisfy a user-owned exit criterion under any prompting.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
+
+### TSK-0051 — Author the three role definitions and the roster lint
+
+Write `research.md`, `planning.md` and `validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, deriving write boundaries from `lib/specialists/contract.mjs`; add the lint that fails a role with no declared tools.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0035 · fulfils: REQ-0026, REQ-0025*
+
+### TSK-0052 — Replace stdinDelivered with an observed task-binding result
+
+Change `verifyChild()` in `lib/specialists/contract.mjs` from `stdinDelivered` to an independently observed task-binding outcome, rename `CHILD_REFUSED.NO_STDIN` and its detail text to describe a missing task binding, and update the existing tests so both facts are asserted together.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0009 · fulfils: REQ-0026*
+
+### TSK-0053 — Build the delegation extension: launch, binding, inheritance and cleanup
+
+Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0036 · fulfils: REQ-0026, REQ-0025, REQ-0024*
+
+### TSK-0054 — Build capability-signature verification and the refusal matrix
+
+Verify the child's Kiln capability signature before reading its substantive answer, and cover each refusal cause with a test, including the fake child that returns plausible prose with none of Kiln's tools. This is the detection half of decision #67 that has never been built.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0036 · fulfils: REQ-0026, REQ-0025, REQ-0024*
+
+### TSK-0055 — Add the run-identity health route
+
+Add the Kiln health endpoint to the application, taking the run and project identifiers supplied by the supervisor at start, and returning only the identity fields.
+
+**outstanding** (0/1 criteria passed) · role: frontend
+*Implements: CMP-0038 · fulfils: REQ-0028*
+
+### TSK-0056 — Give the launcher a private stdin and emit run identity
+
+Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0020 · fulfils: REQ-0022*
+
+### TSK-0057 — Build the supervisor's start sequence and identity handshake
+
+Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
+
+### TSK-0058 — Build session resumption and bounded shutdown
+
+Send the start prompt on a first session and resume the recorded Kiln session afterwards, recovering by presenting available sessions when the record is missing or corrupt rather than resuming an unrelated generic session; stop both trees on Pi exit and on signals with bounded escalation, on Windows and POSIX.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
+
+### TSK-0059 — Implement the self-host refusal and its explicit opt-in
+
+Refuse the consumer command when the tool root and project root coincide, and implement the two-part opt-in with agreement verified before start, covered separately so it can never weaken the consumer-root checks.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
+
+### TSK-0060 — Compose the ordered setup command over the existing primitives
+
+Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.
+
+**outstanding** (0/2 criteria passed) · role: platform
+*Implements: CMP-0039 · fulfils: REQ-0022, REQ-0027*
+
+### TSK-0061 — Implement the argument surface, refusal codes and non-interactive contract
+
+Implement the documented flags including the explicit consent options, reject API keys as arguments, refuse on any missing decision in non-interactive mode, and publish the exit-code mapping in `--help` and in tests.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0039 · fulfils: REQ-0022, REQ-0027*
+
+### TSK-0062 — Build the deterministic non-billable provider fixture
+
+Stand up a local provider the pinned runtime can resolve as a custom model, answering deterministically and able to emit a correctly shaped tool call, so the canary and the Stage 1 exchange are testable in CI without a paid account or a network dependency.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
+
+### TSK-0063 — Build the clean-consumer end-to-end journey test
+
+Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform.
+
+**outstanding** (0/3 criteria passed) · role: platform
+*Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
+
+### TSK-0064 — Build the negative-control suite
+
+Automate each enumerated wrong state as its own case asserting the specific refusal, so that a regression which turns any of them into an apparent success fails a named test.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
+
+### TSK-0065 — Observe Pi's authentication-only TUI behaviour, including the no-TTY case
+
+Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive `/login` step does: whether it can be launched with exclusive terminal ownership, what its exit conveys and whether authentication must be rediscovered afterwards rather than inferred from the exit code, and what happens when it is invoked with no TTY — refusal, error, or an indefinite wait. Record it as a manually invoked check with its transcript retained, because it needs a real terminal and cannot run in the default suite.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0027 · fulfils: REQ-0022, REQ-0025*
+
+### TSK-0066 — Run the manual, account-bound OAuth compatibility check
+
+Against a real subscription and outside CI: run Pi's interactive `/login` with an isolated configuration directory and a sanitized environment; after it exits, construct a fresh `ModelRuntime` and `ModelRegistry` and record whether the chosen built-in model appears in `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential and record that the model becomes unavailable. Retain a sanitized single-instance evidence record — no token, header, credential-derived value, username or home path — and label it as manual and account-bound so it is never mistaken for a suite result.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0027 · fulfils: REQ-0022, REQ-0025*
+
+### TSK-0067 — Prove the Kiln capability signature loads and can be compared
+
+Once the Kiln Pi package exists, extend the compatibility suite to observe that its machine-readable capability signature is present in a loaded session and that a deliberate change to a measured tool signature is detected by a comparing consumer. Until then the suite proves extension, skill and prompt loading only.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0031 · fulfils: REQ-0022, REQ-0025*
+
+### TSK-0068 — Implement setup's TTY precondition and its two recovery routes
+
+Before setup launches the authentication-only login step, check for a real TTY. With no TTY and no usable authentication already present, refuse without spawning the login process and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.
+
+**outstanding** (0/1 criteria passed) · role: platform
+*Implements: CMP-0039 · fulfils: REQ-0022*
+
+### TSK-0069 — Make unlinkTrace able to remove an invalid or stale link
+
+Stop validating the target type when removing a link, so a wrong-target, dangling or superseded reference can be withdrawn through the typed path, and give `answeredBy` a removal route it has never had. Keep the unknown-field refusal, and keep the lock, fresh read inside it, and atomic write. Cover the wrong-target, dangling and superseded cases with tests, each asserting the lint finding it clears.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0005 · fulfils: REQ-0014*
+
+### TSK-0070 — Derive reviseArtifact's trace-field guard from the schemas
+
+Replace the hardcoded array of seventeen trace-like field names with a derivation over the schema set's `x-traceTarget` declarations, using the existing effective-schema resolver rather than re-reading schemas independently. Every declared trace field is then refused by construction, and adding one to a schema needs no code change.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0005 · fulfils: REQ-0013, REQ-0014*
+
 ## Retired and superseded
 
 ⚠️ **Not part of the current plan.** Listed because removing them silently would make this
@@ -878,5 +1582,6 @@ rendering disagree with the machine-readable data, which is the parity REQ-0011 
 
 - **ACC-0020** (acceptance-criterion, superseded) — Per-request compilation stays within 300 ms at p95, under a pinned protocol
 - **AST-0007** (assertion, superseded) — With Cache Components, a SYNCHRONOUS fs read freezes into the static shell
+- **AST-0044** (assertion, superseded) — A Pi child resolves its configuration from PI_CODING_AGENT_DIR alone, with no HOME
 - **RBS-0001** (runbook-step, retired) — Run specialists in parallel
 - **REQ-0015** (requirement, retired) — The system runs locally for a single operator

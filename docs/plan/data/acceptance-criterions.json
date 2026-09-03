@@ -711,5 +711,965 @@
     "verifies": [
       "REQ-0017"
     ]
+  },
+  {
+    "evaluates": [
+      "CMP-0041"
+    ],
+    "id": "ACC-0038",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03. Mechanised in test/pi-compat.test.mjs inside `assertContract()`, which is applied to the retained record AND to the live run: trust rows 4 and 5 revert the grant, the sentinel control shows secrets crossing under inheritance, the prose and exclusion controls show no tool executing, the override-removal control restores the packaged skill, the no-credential control leaves the model unavailable, the without-variable control leaves the env-authenticated model unavailable while an inline-key provider is listed in both, and the default-directory control shows the override actually moved something. ⚠️ TWO GAPS WERE FOUND IN THIS CRITERION'S OWN ENFORCEMENT AND BOTH ARE CLOSED. The packaged prompt proof had only a successful expansion: `literalSlashStringReachedProvider: false` in the SAME run is the other half of one observation, not a control, and would read identically if the template had expanded for a reason unrelated to package loading. There is now a separate run with trust revoked in which the package does not load, the body marker does not arrive, and the literal slash string survives. ⚠️ AND `reachedObservationPoint()` ACCEPTED ANY TERMINATED PROCESS THAT EMITTED ANY OUTPUT — so a CLI dying on a bad argument would have had its missing marker read as a trust result. It now requires a `session` event in the transcript, which is emitted after the point where the load-time marker would have been written. An absent marker beside a session event is a real negative; an absent marker beside no session event is a void run, and the test refuses it.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For each behaviour the compatibility suite establishes, the recorded evidence contains both the observation and a control run in which the claimed behaviour is absent and the observation does not appear. A claim recorded with only a positive run fails this criterion, and so does a negative result whose transcript does not show the process reaching the point where the observation would have been made.",
+    "title": "Every spike claim carries a negative control that would have failed",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0005",
+      "REQ-0006"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0041"
+    ],
+    "id": "ACC-0039",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03. Retained results exist for both platforms and each names its platform, Node version and the pinned Pi version. ⚠️ THE TEST ALSO FAILS ON A PIN BUMP: it compares the pin in package.json against the pin the evidence was taken under and refuses a mismatch, naming the command to re-run. That is what stops a version change inheriting the previous version's evidence. POSIX was measured on Ubuntu 24.04 under WSL2 and the live tier re-runs on ubuntu-latest in CI. ⚠️ 'RECORDS WHICH PLATFORM' NOW MEANS SOMETHING TO THE DERIVATION ENGINE, which it did not before: the environment facts were written as prose — `platform: 'windows and linux'`, `piVersion: '0.84.4, installed by...'` — and the engine compares facts by exact equality, so every supporting record was excluded and ten of twelve spike assertions derived as unverified while reading as proved. Facts are scalars now, prose lives in summaries, and the one observation whose RESULT differs by platform has a single-platform record of its own.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each recorded observation names the platform, the exact pinned Pi version, and the Node version it was taken on, and the suite has been executed to completion on both Windows and the project's supported POSIX CI platform. A behaviour observed on one platform only is recorded as single-platform rather than as the contract.",
+    "title": "The suite runs on Windows and on the supported POSIX platform and records which",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0006"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0041"
+    ],
+    "id": "ACC-0040",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03, AND IT FAILED THREE TIMES FIRST — the sequence is the point. (1) The initial result set was saved unredacted and was full of absolute home paths. (2) The second version redacted the summary while npm's output went straight to the terminal and was captured nowhere, so the test scanned a summary while the criterion said 'command output'. (3) The third still omitted `pi install -l`, the fake provider's streams, and every generated file, and the DETECTOR could not see a Windows home path once JSON-escaped — `C:\\\\Users\\\\alice` in serialised bytes returned an empty violation list while the raw string was flagged. ⚠️ NARROWED TO WHAT IS ACTUALLY COVERED, AND THE COVERAGE WIDENED TO MEET IT. The scope is now RETAINED bytes, enumerated; streamed-and-discarded output is explicitly out, because a criterion nothing can check is worse than a narrower one. ⚠️ THE DETECTOR AND THE REDACTOR ARE TESTED AGAINST EACH OTHER, in both directions: every forbidden shape must be SEEN by the detector before the redactor is asked to remove it, and both must handle the JSON-escaped form. They disagreed twice — once with the redactor weaker, once with the detector weaker — and the second is the dangerous direction.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every byte the suite RETAINS is asserted to contain no API key, OAuth token, authorisation header, credential-derived fingerprint, username, or absolute user-home path. What is retained is enumerated and complete: the result summary; the captured stdout and stderr of every subprocess the suite starts, including the consumer's `npm install`, `pi install -l`, every Pi child, the model-registry probes and the fake provider; and the generated state the suite produced — the provider request log, the project settings file and the trust store. The assertion runs over those captured bytes rather than over a summary of them; redaction happens at write time and the runner refuses to save a file that still violates the rule. Output that is streamed and discarded is out of scope, because nothing can scan it.",
+    "title": "No spike artefact contains credential material",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0021"
+    ],
+    "id": "ACC-0041",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With a different Pi version installed globally and earlier on PATH, every Pi process Kiln starts reports the pinned version. A test that removes the local dependency causes a refusal naming the expected version and the resolved path, rather than falling through to the global binary.",
+    "title": "Pi is resolved from the tool's node_modules and never from PATH",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0003"
+    ],
+    "id": "ACC-0042",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03, mechanised in `test/content-root.test.mjs`. ⚠️ THE TESTS ARE WRITTEN AROUND THE DIVERGENCE, NOT THE AGREEMENT. `dirname(contentRoot)` and `<toolRoot>/..` name the same directory in an ordinary consumer install, so a resolver that took the wrong one would pass every test that did not set the override. The override case therefore asserts BOTH that the answer is the owner of the overridden directory AND that it is not the tool's parent — which is a real directory and a plausible wrong answer. ⚠️ CANONICAL COMPARISON IS PART OF THE CRITERION because without it the refusal misfires: a correct setup invocation arriving by a symlinked path would read as a disagreement, and a refusal that fires on correct input is worse than none. Covered with a junction, skipped rather than failed where symlink creation is privileged. ⚠️ SCOPE: THIS IS THE RESOLVER, AND ONLY THE RESOLVER. The obligation that SETUP calls it — printing every canonicalised path before the first lasting write, and refusing on disagreement — is ACC-0085 against CMP-0039, and is correctly still not-evaluated because setup does not exist. The third clause here previously read as though it were about setup; it is about the thing that does the refusing, which is what can be evaluated now.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With PLANNING_CONTENT_DIR unset, the resolved project root is the parent of the content root derived from the tool location; with it set, it is the canonical parent of that explicit directory and NOT the tool's parent, asserted as a distinct value rather than merely as the right one. Given an explicit project root that disagrees with the resolved content owner, the resolver refuses and its message names both paths, the rule that produced the resolved one, and the override — rather than choosing between them. Comparison is canonical, so two spellings of one directory do not read as a disagreement.",
+    "title": "The project root is derived from the resolved content root, and a mismatch refuses",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0043",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Running setup twice with the same inputs against the same project leaves every file it owns byte-identical, including the settings file, the ignore block, the project identity file and the generated skills. The comparison is over file bytes, not over a reported status.",
+    "title": "A rerun with unchanged choices changes no bytes",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0044",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When a file the transaction recorded is modified after the plan is built and before the merge runs, the transaction detects the changed identity under the lock and refuses, leaving the operator's edit intact. A malformed or unknown-schema-version file likewise refuses rather than being replaced.",
+    "title": "A file edited between plan and merge refuses rather than overwriting",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0045",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Killing setup partway through leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
+    "title": "An interrupted setup resumes from its journal and never deletes valid content",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0023"
+    ],
+    "id": "ACC-0046",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A fresh project receives exactly one Kiln-marked block containing `.planning/`, `.pi/sessions/` and `.pi/runtime/`. An exact unmodified legacy block containing only `.planning/` is migrated to the extended block with every byte outside the markers preserved, and the migration is recorded and byte-stable on rerun. A block the operator removed or edited is reported and requires an explicit choice; it is never silently rewritten.",
+    "title": "One owner writes the ignore block, and a removed block is not restored",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0024"
+    ],
+    "id": "ACC-0047",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A settings file carrying third-party packages, unrelated keys and a custom key order is merged with Kiln's four owned fields and every unrelated entry is preserved and not reordered gratuitously. A malformed file, or one declaring an unknown schema version, is refused with the file left unchanged.",
+    "title": "Unrelated settings and package entries survive the merge untouched",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0024"
+    ],
+    "id": "ACC-0048",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
+    "title": "The committed settings file contains no secret and no absolute home path",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0025"
+    ],
+    "id": "ACC-0049",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the Kiln ignore block absent or edited, project-local mode writes no session, consent, compatibility or journal file: interactive setup offers the exact block, external state, or stopping, and non-interactive setup refuses. The check is that the paths do not exist after the refusal, not that a warning was printed.",
+    "title": "No runtime data is written before its protection exists",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0025"
+    ],
+    "id": "ACC-0050",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "In external mode the state root derives from the platform convention and the committed non-secret project ID; two projects on one machine occupy separate roots; and no committed file contains an absolute user path. The mode is available only if the pinned runtime supports relocation.",
+    "title": "External state derives from the committed project ID with no path committed",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027",
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0026"
+    ],
+    "id": "ACC-0051",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Interactive setup displays the canonical project path and obtains the decision through Pi's own supported mechanism. A denial leaves the planning scaffold intact and valid, does not describe the agent as ready, and still permits an explicit browser-only start. Non-interactive setup with no pre-existing decision refuses rather than defaulting to approval.",
+    "title": "Trust is obtained through a supported route, and a denial stops the agent cleanly",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0023",
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0027"
+    ],
+    "id": "ACC-0052",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before the inspection prompt is answered, no read of Pi's authentication store, no load of the custom-model registry and no credential-variable presence check has occurred — observed by instrumenting those access points, not by reading the code. A declined inspection performs none of them, contacts nothing, and leaves setup honestly partial rather than reporting that nothing is configured.",
+    "title": "Nothing is read before permission, and a decline reads nothing at all",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0027"
+    ],
+    "id": "ACC-0053",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The presented result contains provider display names, exact model identifiers and present-or-absent for the research credential, and is asserted to contain no key, token, header, environment value or credential-derived fingerprint. No external service is contacted during the inspection.",
+    "title": "Inspection results report availability and never credential material",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0027"
+    ],
+    "id": "ACC-0054",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A project carrying a committed research choice, opened on a machine with no local consent record, reopens the prompt and does not use that host's credential until it is answered. Changing the provider or the research choice likewise reopens the relevant prompt.",
+    "title": "A clone does not inherit the first operator's consent",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0028"
+    ],
+    "id": "ACC-0055",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When discovery returns exactly one usable model, setup displays its provider display name and exact identifier and requires confirmation before assigning it. Pi's global default and the first entry in discovery order are never adopted implicitly, and a mutable alias is never selected on the operator's behalf.",
+    "title": "A single available model still requires confirmation, and no default is adopted",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025",
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0028"
+    ],
+    "id": "ACC-0056",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the recorded model removed from the registry, or its authentication absent, launch refuses and names the recorded provider and model, offering a setup rerun or an explicit one-run override. No other model, provider, or answer from model memory is substituted.",
+    "title": "An unavailable recorded selection refuses instead of falling back",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0029"
+    ],
+    "id": "ACC-0057",
+    "lifecycle": "active",
+    "notes": "⚠️ THE CONTROL IS PART OF THE CRITERION, not a nicety. A sentinel test with no control passes identically whether the boundary works or the sentinels were never set. ⚠️ IT IS DELIBERATELY NOT WRITTEN AS 'the child sees only the union', which was the first phrasing and is not achievable: Windows injects nine home and user variables into every child regardless of the environment supplied (AST-0045). What is provable on both platforms is that no secret Kiln did not choose to pass is among what the child receives.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With unrelated secrets present in the parent environment under names a naive implementation would match, a spawned specialist child's observed environment contains none of them, while a control child spawned with the environment inherited observes all of them. Kiln adds to the child only the measured base variables, the selected provider's declared model-plane names and that role's tool-plane names. The assertion is made over what the child observed, not over what the parent intended.",
+    "title": "A sentinel host secret never reaches a child, against a control that shows one crossing",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0029"
+    ],
+    "id": "ACC-0058",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A provider whose credential contract is neither built in nor declared through the validated custom shape yields an `unsupported-credential-contract` refusal naming the provider. No additional variables are inherited, and no variable name is inferred from the provider id or discovered by scanning the environment.",
+    "title": "An unknown environment-only provider is refused, not widened",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0029"
+    ],
+    "id": "ACC-0059",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The research child receives the research credential when research is enabled and not otherwise; planning and validation children never receive it in any configuration.",
+    "title": "Research holds the only tool-plane credential, and only while enabled",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0030"
+    ],
+    "id": "ACC-0060",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The prompt names the exact provider and model and states that the provider may charge. Declining leaves a valid content and browser setup, does not mark the agent ready, does not begin intake, and is reported as a choice rather than a failure. Non-interactive runs require an explicit approval flag when no matching record exists.",
+    "title": "The canary is separately approved, names the cost, and declining is not an error",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0012",
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0030"
+    ],
+    "id": "ACC-0061",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The canary passes only when the model invokes the setup-only tool with the exact random challenge against the declared schema, observed through the real pinned runtime and provider path. A response that merely claims tool support, or that calls the tool with a malformed argument, fails.",
+    "title": "Success requires an observed tool call with the right challenge and schema",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025",
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0030"
+    ],
+    "id": "ACC-0062",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, package capability signature or endpoint identity invalidates it and reopens approval.",
+    "title": "The canary cannot see or change planning content, and its record invalidates correctly",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0031"
+    ],
+    "id": "ACC-0063",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the project trusted, a real Pi run loads the package's extensions, tools, skills and start prompt and exposes a capability signature. With trust absent the package does not load — and that state is detected and reported rather than passing silently, which is the control that makes the positive result meaningful.",
+    "title": "The package loads under trust, does not load without it, and reports its signature",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026",
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0032"
+    ],
+    "id": "ACC-0064",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The user-facing session's measured active tool set contains the registered Kiln tools and does not contain Pi's built-in shell, write or edit tools. The measurement is of the session's reported registry, not of what the launch options requested.",
+    "title": "The orchestrator holds Kiln's typed tools and none of Pi's built-in mutation tools",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0032"
+    ],
+    "id": "ACC-0065",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each registered mutation tool writes through the existing locked, atomic, validated path with the content root resolved by the shared resolver, returns structured success or refusal, and leaks no credential or absolute home path in its result. Business rules stay in `lib/`; the wrapper adds schema and rendering only.",
+    "title": "Every wrapper resolves the canonical content root and preserves the write discipline",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0002"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0033"
+    ],
+    "id": "ACC-0066",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each packaged stage skill carries the purpose, outputs and exit criteria of its canonical definition, produced by a generator rather than hand-maintained. Editing a stage definition without regenerating makes the check mode fail in CI, naming the stale skill.",
+    "title": "Packaged skills are generated, and staleness fails a check",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0033"
+    ],
+    "id": "ACC-0067",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With the consumer's override directory registered after the packaged set, a real Pi resource load resolves the override file for a skill of the same identity; editing the override changes what loads; removing it reverts to the packaged skill. Provenance is read from the loaded file path, not from model behaviour.",
+    "title": "An override with the same identity wins, and removing it reverts",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "id": "ACC-0068",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On a fresh project the orchestrator reads the name, description and starter document and responds with a single relevant question. It proposes no architecture, no requirement set and no solution, and the answer it receives is written into the intake document through the typed path rather than by editing the file.",
+    "title": "The first Stage 1 turn asks one question and invents no solution",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "id": "ACC-0069",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After the intake document changes, the next question differs according to what the answer supplied — demonstrated by driving two different first answers from the same starting state and observing two different second questions.",
+    "title": "The second question is chosen from updated state, not from a list",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "id": "ACC-0070",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "An attempt to advance or attest Stage 1 without explicit operator authorisation is refused by the orchestrator, and no attestation file changes. The refusal is observable in the recorded state, not only in the transcript.",
+    "title": "The orchestrator cannot cross a user-owned gate",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "id": "ACC-0071",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root; given a state in which the tool's own bundled content would resolve instead, it refuses and names both paths rather than authoring into the tool's plan.",
+    "title": "It refuses to operate on the tool's own planning content",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0035"
+    ],
+    "id": "ACC-0072",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A real Pi run of each specialist reports an active tool set equal to the intersection of that role's declared allowlist and the measured host registry. A role definition with no declared tool list fails the roster lint rather than inheriting Pi's default active set.",
+    "title": "Each role has exactly its contract's tools, and a missing allowlist is a lint error",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0035"
+    ],
+    "id": "ACC-0073",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "No shipped role definition contains a model declaration, and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it.",
+    "title": "No role declares a model",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0009"
+    ],
+    "id": "ACC-0074",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "One test asserts both facts about the same child: its stdin was closed, and the exact delegated task reached it through the supported non-stdin channel, observed at the child. The verifier's field and its refusal reason describe task binding rather than stdin.",
+    "title": "Stdin is closed and the exact task still arrived",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0036"
+    ],
+    "id": "ACC-0075",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A child that exits zero, emits a well-formed transcript and returns plausible prose without Kiln's tools causes the delegation to fail loudly; none of its substantive output is used. The same holds for signature drift, an out-of-role write, a nonzero exit, a timeout, malformed JSON events, a missing task binding and a provider or model mismatch.",
+    "title": "A child without the Kiln capability signature is refused, not read",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0036"
+    ],
+    "id": "ACC-0076",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The child's reported provider, model and thinking level equal the orchestrator's, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
+    "title": "The child inherits the orchestrator's exact selection and a scoped context",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025",
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0038"
+    ],
+    "id": "ACC-0077",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The endpoint returns the service name, a versioned health protocol, the ephemeral run identifier, the non-secret project identifier and the build version, and is asserted to contain no absolute path, credential, session content or planning content.",
+    "title": "The health response carries run and project identity and nothing sensitive",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0020"
+    ],
+    "id": "ACC-0078",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Under the supervisor the application launcher's stdin is a private pipe: input typed at the terminal during authentication and during the first planning turn reaches Pi and never the launcher, and the launcher still stops on the existing stop control message and on stdin close.",
+    "title": "The background launcher never reads the terminal",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0037"
+    ],
+    "id": "ACC-0079",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With an unrelated server already answering on the chosen port, launch refuses rather than reporting the browser ready. A response carrying a wrong run identifier, a wrong project identifier, or arriving while the expected child is not alive, likewise fails readiness.",
+    "title": "An unrelated healthy HTTP service does not satisfy readiness",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0037"
+    ],
+    "id": "ACC-0080",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A port outside 1..65535 or a non-integer value is refused. When the default is occupied, interactive mode offers another available port for that invocation only and non-interactive mode refuses with an exact PORT recovery command. An automatically chosen port is never written into project configuration.",
+    "title": "Port handling refuses out-of-range values and never silently persists a choice",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0028",
+      "REQ-0020"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0037"
+    ],
+    "id": "ACC-0081",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After Pi exits, or after an interrupt, both process trees are stopped within their grace periods, the port is free, and only files created by that invocation were removed. Verified on Windows and on the supported POSIX platform.",
+    "title": "Shutdown leaves nothing running on either platform",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0037"
+    ],
+    "id": "ACC-0082",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Run where the tool root and project root are the same directory, the normal command refuses rather than writing `.pi/` into the tool repository. The opt-in requires both the explicit content-directory override and the self-host flag, and the supervisor verifies the two agree before starting.",
+    "title": "The self-hosting checkout is refused unless explicitly opted into",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "id": "ACC-0083",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A static check of the setup command's import graph, up to and including the dependency-install step, finds no import of any installed dependency. Adding a top-level import of the Pi runtime or the validator makes that check fail.",
+    "title": "The pre-install import graph uses Node built-ins only",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "id": "ACC-0084",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Invalid arguments, content conflict, filesystem or settings refusal, missing runtime, trust denial, interactive authentication required, provider or credential-contract failure, live compatibility refusal, package or capability failure, and launch failure each exit with their own code, and the mapping in `--help` matches the codes the tests observe.",
+    "title": "Each refusal class has a distinct published exit code",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "id": "ACC-0085",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before the first lasting write, the command has printed the canonicalised tool root, project root, content root, settings path and runtime state path. A disagreement between the explicit project root and the resolved content owner refuses and prints both.",
+    "title": "Setup prints every path before it mutates anything",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0040"
+    ],
+    "id": "ACC-0086",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "From a temporary empty directory the documented sequence — including `git init` into a repository with no commits, before any commit exists — initialises, installs, registers, binds a deterministic non-billable model, starts both processes with identity-confirmed readiness, and reaches a Stage 1 question. Verified on Windows and the supported POSIX CI platform.",
+    "title": "The documented journey completes from an empty directory on both platforms",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0020"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0040"
+    ],
+    "id": "ACC-0087",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A deterministic Stage 1 answer is written through the typed path, observed arriving in the browser through the change stream, and an attempted unauthorised stage advance is refused with no attestation changed.",
+    "title": "A Stage 1 exchange reaches the browser and cannot cross the gate",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0040"
+    ],
+    "id": "ACC-0088",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes.",
+    "title": "Shutdown is clean and a rerun resumes rather than restarting",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0040"
+    ],
+    "id": "ACC-0089",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each of the enumerated wrong states produces a refusal rather than an apparent success: wrong working directory, inspection denied, a configuration read attempted before consent, implicit adoption of a sole or default model, missing model authentication, an overbroad environment-only provider, a TTY-less login attempt, live-check denial and a malformed canary tool call, Tavily contacted before approval, a committed research choice with no local consent, trust denial, corrupt settings, untracked-state exposure, an interrupted transaction, an occupied port, an unrelated healthy HTTP service, tool signature drift, and a fake child returning plausible prose without Kiln tools.",
+    "title": "Every negative control refuses",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0028",
+      "REQ-0023"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0027"
+    ],
+    "id": "ACC-0090",
+    "lifecycle": "active",
+    "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A manually invoked check records, against the pinned runtime alone: that the authentication-only step launches with exclusive terminal ownership; that a successful exit is distinguished from proven authentication by rediscovering auth afterwards rather than trusting the exit code; and what the same invocation does with no TTY, stated as the observed outcome — clean refusal, error, or indefinite wait — rather than as a required one. The transcript is retained. No claim is made here about Kiln's own refusal or its recovery messaging.",
+    "title": "Pi's login step is observed owning the terminal, and its no-TTY behaviour is recorded",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0027"
+    ],
+    "id": "ACC-0091",
+    "lifecycle": "active",
+    "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A manual run against a real subscription records, with an isolated Pi configuration directory and a sanitized environment: that after Pi's interactive `/login` exits, a FRESHLY constructed `ModelRuntime` and `ModelRegistry` report the chosen built-in model in `getAvailable()` and return true from `hasConfiguredAuth()`; and that after the stored credential is removed or revoked, the same construction reports the model unavailable. The retained record is sanitized — asserted to contain no token, authorisation header, credential-derived value, username or absolute home path — and is labelled manual, account-bound and single-instance. A fabricated OAuth credential does not satisfy this criterion in any form.",
+    "title": "OAuth is proved by a real login and its revocation, or it is not called verified",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0031"
+    ],
+    "id": "ACC-0092",
+    "lifecycle": "active",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Once the Kiln package exists, a real Pi run reports its capability signature in the loaded session, and a deliberate change to a measured tool signature causes a comparing consumer to refuse. Both halves are required: presence alone does not show that a consumer would notice its absence.",
+    "title": "The capability signature is observed in a loaded session, and drift is detected",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "id": "ACC-0093",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PROCESS-NEVER-SPAWNED HALF IS THE ONE THAT MATTERS. A refusal message printed just before launching the TUI anyway would satisfy a text assertion and still hang a CI job, which is the failure this exists to prevent — a hang is indistinguishable from work until a timeout. ⚠️ AND THE SECOND ROW IS A CONTROL: if the non-TTY path refused unconditionally, the refusal would prove nothing about TTY detection.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With stdin not a TTY and no usable authentication already present, setup refuses BEFORE starting the interactive login step — verified by the login process never being spawned, not merely by the message printed — and prints both supported recovery routes: run setup from a local interactive terminal, or configure authentication on the target host outside Kiln and rerun with the required non-interactive decisions. With usable authentication already present, the same non-TTY invocation proceeds instead of refusing.",
+    "title": "Setup refuses before launching login when there is no terminal, and names the way out",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0005"
+    ],
+    "id": "ACC-0094",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03, mechanised in `test/link-trace.test.mjs`. Each repair case asserts BOTH that the link is gone and that the lint finding it produced has cleared — `trace/wrong-target-type` for a wrong-type target, `trace/target-missing` for a deleted one, `lifecycle/trace-to-inactive` for a superseded one — because 'the array is shorter' was never the claim; 'the graph is repaired' is. Each fixture first asserts the finding EXISTS, so a case that stopped producing damage could not pass by repairing nothing. ⚠️ THE FIX IS AN ASYMMETRY AND BOTH HALVES ARE TESTED IN THE SAME FILE. Removal now inspects nothing about the target; addition still refuses a wrong type, a dangling reference and a malformed id. A later simplification that made them share one validation path would repair nothing and would pass a file that only tested removal. ⚠️ `answeredBy` OPENED FOR REMOVAL ONLY, and it is the only field that did. `supportedBy` and `refutedBy` still route to `unlinkEvidence` and `supersededBy` to `setLifecycle`, because those removal operations genuinely exist; `answeredBy` had none, which is what forced the deliberate exploitation of the companion defect during Phase 1. Adding an answer link still routes through `resolveQuestion`. ⚠️ THE WRITE DISCIPLINE IS ASSERTED RATHER THAN ASSUMED: the fresh-read-inside-the-lock is proved by editing the file between the artifact's creation and the unlink and requiring the edit to survive; the atomic write by requiring no temporary file beside the artifact; and the lock by requiring it released. #16's amend-on-change is covered, including that a no-op does not amend.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`unlinkTrace` removes a link whose target is of the wrong type, whose target does not exist, and whose target has been superseded — each verified by the link being gone and the lint finding it clears. It removes `answeredBy` entries, which no operation could previously withdraw. It continues to refuse an unknown FIELD, and it preserves the lock, fresh-read and atomic-write discipline. Adding a link is unaffected and still validates the target type.",
+    "title": "An invalid or stale link can be removed through the typed path",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0014"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0005"
+    ],
+    "id": "ACC-0095",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-03. The guard is now `Array.isArray(effectiveSchema(schemas, type).properties[k]['x-traceTarget'])`, asked PER TYPE rather than as a union, because a name that is a link on one type need not be one on another. It is the same source `linkTrace` validates against, so the two cannot drift. ⚠️ THE COUNT WAS EIGHT, NOT NINE, AND MY EARLIER ACCOUNTS OF THIS DEFECT SAID NINE. They included `implementedBy`, which is deliberately NOT a trace field — the component schema says so explicitly: 'Paths rather than a trace field on purpose: code is not an artifact, and pretending it is would put the repository inside the planning model.' It declares no `x-traceTarget`, the derived guard leaves it alone, and a test asserts that it stays revisable. Enumerating from the schemas is what surfaced the miscount; a hand-written list would have carried it. ⚠️ THE SCHEMAS DECLARE 25 TRACE FIELDS AND THE OLD LIST HELD 17. Every name in the old list was a real trace field, so the defect was never a wrong entry — it was the eight that were never added, which is the failure mode of any guard maintained by hand beside a declaration that already exists. `reviseArtifact` already resolved the effective schema a few lines later, for materiality, under a comment reading 'never from a hardcoded field list'. The rule was in the file; it just had not been applied to the guard above it.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "`reviseArtifact` refuses every field the schemas declare with `x-traceTarget`, established by enumerating those fields from the schema set at test time and asserting a refusal for each — not by comparing against a second list written in the test. Adding a trace field to a schema therefore extends the guard with no code change, proved by introducing one in a copied schema set and requiring the refusal. The eight fields that were previously reachable — `acceptedBy`, `answeredBy`, `blocks`, `evaluates`, `fulfils`, `raisedBy`, `satisfies` and `verifies` — are refused, while a non-trace field on the same type stays revisable so the guard is discriminating rather than simply refusing everything.",
+    "title": "The trace-field guard is derived from the schemas, and covers every declared trace field",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0013",
+      "REQ-0014"
+    ]
   }
 ]

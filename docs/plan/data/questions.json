@@ -440,5 +440,178 @@
     "statement": "`readStageDocument` measured 234-359 ms p95 across six runs. It awaits `connection()`, lists the stage directory and reads nine files totalling roughly 90 KB — work that should cost single-digit milliseconds. Which part of that span is actually spending the time, and is it reducible? INSTRUMENT BEFORE OPTIMISING: the three candidates are the `connection()` wait itself, the directory listing plus nine reads, and contention with the sibling `<Suspense>` boundary on the same request — `readStageCriteria` calls `lintProject`, which reads and validates every artifact in the project, concurrently with this read. Nothing has separated them, so all three remain live and none may be assumed.",
     "title": "What accounts for the 234-359 ms stage-document read?",
     "type": "question"
+  },
+  {
+    "answer": "YES. `ProjectTrustStore` is exported from the package root of pi 0.84.4 with a typed declaration — constructor(agentDir), get(cwd), getEntry(cwd), set(cwd, decision), setMany(updates) — alongside getProjectTrustOptions, getProjectTrustParentPath and hasTrustRequiringProjectResources. Measured causal on Windows and Linux with the full control set: a grant loads the package without --approve, an explicit denial prevents loading, and revocation reverts. DEC-0027 is satisfiable exactly as written and the `--trust approve` option can ship. Kiln depends on the exported class; it never writes the trust.json shape.",
+    "answeredBy": [
+      "AST-0041",
+      "EVD-0077",
+      "EVD-0078"
+    ],
+    "blocks": [
+      "REQ-0022",
+      "REQ-0026"
+    ],
+    "id": "QST-0026",
+    "lifecycle": "active",
+    "notes": "⚠️ ITS ANSWER CHANGES A PUBLISHED COMMAND CONTRACT, which is what makes it blocking rather than interesting. If no supported route exists, interactive setup uses Pi's native trust flow, non-interactive setup must require a pre-existing decision or refuse, and the proposed `--trust approve` option is removed or deferred. ⚠️ THE FALLBACK IS EXPLICITLY CLOSED BY PM DIRECTION: a negative answer stops Phase 1 for review and does not authorise reverting to writing the trust file. ⚠️ THE MEASUREMENT NEEDS THE 2026-08-18 CONTROLS — grant, revoke, and explicit denial each observed through a marker written at extension load time, upstream of anything the model says.",
+    "raisedBy": [
+      "CMP-0026"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Kiln must obtain a project trust decision, because a non-interactive child launched against an untrusted project loads no package and therefore none of Kiln's typed tools, silently. The mechanism is now open. Decision #67(a) chose writing Pi's user trust file directly and proved that causal; the PM withdrew that on 2026-09-02 in favour of a supported public API or native flow. So: does @earendil-works/pi-coding-agent 0.84.4 expose a documented API, command, or non-interactive option through which a caller can record, read, and revoke a project trust decision?",
+    "title": "Does the pinned Pi version offer a supported route to grant project trust?",
+    "type": "question"
+  },
+  {
+    "answer": "YES, by three routes with a documented precedence: `--session-dir`, then `PI_CODING_AGENT_SESSION_DIR`, then the `sessionDir` setting. All three were exercised on both platforms and each put the transcript where it was told to. Because the first two are supplied at launch by the supervisor, external user-local state needs no absolute path in committed configuration. The external mode survives and DEC-0029's conditional clause is discharged.",
+    "answeredBy": [
+      "AST-0047",
+      "EVD-0081"
+    ],
+    "blocks": [
+      "REQ-0027"
+    ],
+    "id": "QST-0027",
+    "lifecycle": "active",
+    "notes": "⚠️ A NEGATIVE ANSWER DELETES A FEATURE RATHER THAN DEGRADING IT. If Pi cannot relocate session state, the external mode is withdrawn and `--local-state user` does not ship; the one thing that must not happen is substituting a committed absolute home path, which would leak the operator's username into the repository and break on every other machine.",
+    "raisedBy": [
+      "CMP-0025"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The default state mode writes transcripts under the outer project's ignored `.pi/sessions/`. The explicit external mode places them under a per-user root outside the project entirely, keyed by the committed non-secret project ID. That mode exists only if the pinned Pi version can be told where to put session state through a supported option or API, without Kiln committing an absolute user path to reach it. Does 0.84.4 support that, and through what?",
+    "title": "Can Pi's session and runtime locations be moved outside the project without committing a path?",
+    "type": "question"
+  },
+  {
+    "answer": "A RELATIVE entry, differing only by separator: `..\\.planning\\pi-package` on Windows and `../.planning/pi-package` on Linux, both relative to `.pi/settings.json` and neither containing an absolute or home path. Normalising the Windows form to forward slashes is therefore a separator-only rewrite between two spellings of one directory, and canonical equivalence is provable by resolving both — which is precisely the proof the design required before permitting the rewrite.",
+    "answeredBy": [
+      "AST-0043",
+      "EVD-0079"
+    ],
+    "id": "QST-0028",
+    "lifecycle": "active",
+    "notes": "⚠️ NORMALISING WITHOUT PROVING EQUIVALENCE IS THE FAILURE MODE. Rewriting Pi's entry to a literal that looks right and resolves elsewhere produces a project whose package silently does not load — the same silent class as the untrusted child. If equivalence cannot be proved, setup refuses rather than constructing a target of its own.",
+    "raisedBy": [
+      "CMP-0031",
+      "CMP-0024"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Setup installs Kiln's package project-locally and then commits the resulting settings file. The entry Pi writes must therefore resolve to the same directory on another operator's machine and on the other platform. What does 0.84.4 actually write — a relative literal, an absolute path, platform separators — and can that be normalised to the portable `../.planning/pi-package` form after proving canonical equivalence, or does normalisation change which directory Pi resolves?",
+    "title": "What literal package entry does `pi install -l` write, and can it be normalised portably?",
+    "type": "question"
+  },
+  {
+    "answer": "On Linux, PI_CODING_AGENT_DIR alone suffices: a child given exactly PATH, TMPDIR and that variable — HOME absent, and the child's own report confirming HOME false and USERPROFILE false — loads the package and completes a turn. ⚠️ THE FIRST ANSWER TO THIS QUESTION WAS RIGHT AND ITS EVIDENCE WAS NOT. AST-0044 made this claim from a harness that supplied HOME unconditionally, and the retained Linux report recorded HOME: true beside the assertion that said otherwise. It is superseded by AST-0052, taken from a dedicated exact-environment cell that names its whole environment and asserts the child's own observation. On Windows the question is partly moot: the platform injects HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR into every child whatever the allowlist says — isolated with a bare Node child, which excludes Pi but does not separate the OS from Node or libuv, so only the observable is claimed. An allowlist is a floor there, not a ceiling, and the honest Windows statement is that the override is sufficient rather than that the child had no home. The credential claim holds on both: sentinel secrets did not cross, against a control that showed them crossing under inheritance, and provider-scoped environment authentication is now measured directly — a $VAR-authenticated provider is available exactly in the child carrying that variable. The design language must be \"no unrelated secret crosses\", because only that is provable.",
+    "answeredBy": [
+      "AST-0045",
+      "AST-0052",
+      "EVD-0080",
+      "EVD-0085"
+    ],
+    "blocks": [
+      "REQ-0024"
+    ],
+    "id": "QST-0029",
+    "lifecycle": "active",
+    "notes": "⚠️ MEASURE IT RATHER THAN ALLOWLISTING THE UNION. Passing all six because one of them is needed is the cheap answer and it widens the boundary this component exists to narrow. ⚠️ ABSENCE IS PRESERVED AS ABSENCE: where a variable is unset in the parent, setup must not invent a value for the child.",
+    "raisedBy": [
+      "CMP-0029"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A specialist child runs with an allowlisted environment, not an inherited one. For it to find the same authentication store and custom-model registry as its parent, some set of configuration-locating variables must be in that allowlist — candidates are HOME, USERPROFILE, APPDATA, LOCALAPPDATA, XDG_CONFIG_HOME and PI_CODING_AGENT_DIR. Which does 0.84.4 actually consult, on Windows and on POSIX, under both default and explicitly overridden configuration directories?",
+    "title": "Which variables must reach a restricted child for it to resolve the same Pi configuration?",
+    "type": "question"
+  },
+  {
+    "answer": "As the `-p` CLI message. A child spawned with stdin set to ignore received the exact task text, observed in the user message at the provider boundary rather than taken from anything the model reported, and completed with exit 0 on both platforms. That is the observation the revised verifier should make: the parent's intent to deliver is not evidence; the task appearing downstream is.",
+    "answeredBy": [
+      "AST-0048",
+      "EVD-0082"
+    ],
+    "id": "QST-0030",
+    "lifecycle": "active",
+    "notes": "⚠️ THE OBSERVATION IS THE HARD HALF, and it is what the existing verifier gets wrong. `stdinDelivered` is a field the parent sets about what it intended, not a fact about what the child received. The replacement has to be observed at the child, and the test must assert both halves at once: stdin closed, and the exact task present.",
+    "raisedBy": [
+      "CMP-0036"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The approved child contract closes stdin so a non-interactive process cannot wait forever for input, which leaves the task to arrive as a CLI message or through a private prompt file. Which of those does 0.84.4 actually support for a `--mode json -p --no-session` child, what are the size and quoting limits, and what observation proves at the child end that the exact delegated task arrived rather than an empty or truncated one?",
+    "title": "How is a delegated task bound to a child whose stdin is closed?",
+    "type": "question"
+  },
+  {
+    "answer": "Four of the five carry over unchanged and one was not re-tested. HOLDS: an untrusted non-interactive child loads no package and does not error. HOLDS: the trust store is a canonical-directory map, though Kiln now reaches it through the public class rather than the file. HOLDS: a settings `skills` entry overrides a packaged skill of the same identity, with the packaged file returning when the override is removed. HOLDS: the default active set is read, bash, edit and write plus custom tools, with grep, find, ls and powershell configured but inactive. NOT RE-TESTED: turn-end hooks in a non-interactive child, which nothing in Phase 1 depends on. No carried-over behaviour was found to have changed between 0.80.6 and 0.84.4.",
+    "answeredBy": [
+      "AST-0042",
+      "AST-0046",
+      "EVD-0077",
+      "EVD-0078",
+      "EVD-0081"
+    ],
+    "blocks": [
+      "REQ-0026"
+    ],
+    "id": "QST-0031",
+    "lifecycle": "active",
+    "notes": "⚠️ THE POINT IS NOT THAT THEY ARE PROBABLY FINE. Four minor versions separate the measurements from the pin, and each of these findings is load-bearing for a different component. The PM's direction of 2026-09-02 is explicit: treat the 0.80.6 results as historical evidence, not transferable proof. ⚠️ A CHANGED BEHAVIOUR IS A FINDING, NOT A BLOCKER — it is recorded, the affected design position is revised, and the revision goes on the Phase 2 change list.",
+    "raisedBy": [
+      "CMP-0041"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Every empirical Pi finding this project holds was measured on 0.80.6: that an untrusted non-interactive child loads no package and does not error; that the user trust file is a canonical-directory-to-boolean map read closest-path-first; that a settings `skills` entry overrides a packaged skill of the same identity; that the default active tool set with no allowlist is read, bash, edit and write plus custom tools; that turn-end hooks fire in a non-interactive child. Which of these still hold on 0.84.4, and which changed?",
+    "title": "Which recorded 0.80.6 Pi behaviours still hold on the pinned 0.84.4?",
+    "type": "question"
+  },
+  {
+    "answer": "BOTH defects are fixed, in a fixed order, and the work is scheduled ahead of Phase 2's implementation rather than behind the agent-delivery layer. FIRST `unlinkTrace` stops validating the target type on removal — validating it there refuses precisely the operations that repair an unsound graph, and it also gives `answeredBy` the removal route `resolveQuestion` cannot provide. SECOND, and only then, `reviseArtifact`'s guard is derived from the schemas' `x-traceTarget` declarations instead of a hardcoded list of seventeen names. The order matters because today one defect is the only escape hatch for the other: closing the guard first would leave invalid links unremovable by any typed path while #88 forbids hand editing. Recorded as DEC-0031, with TSK-0069 then TSK-0070, and Phase 2's entry task depends on both so the ordering lives in the graph rather than in a note.",
+    "answeredBy": [
+      "DEC-0031"
+    ],
+    "id": "QST-0032",
+    "lifecycle": "active",
+    "notes": "⚠️ THE SECOND HALF IS THE ONE WITH NO WORKAROUND. A wrong-target link makes the lint block, and the operation that exists to remove links refuses to remove exactly the links that need removing. The only route today is reviseArtifact, which works solely because of the first defect — one bug is currently the escape hatch for the other. ⚠️ SEQUENCE THE FIX: `unlinkTrace` FIRST, then derive the trace-field guard from the schemas' `x-traceTarget` declarations. Doing the guard first would close the escape hatch while the links it currently repairs are still unremovable by any typed path, with hand-editing forbidden by #88 — which would leave the graph with damage the lint reports and nothing can fix. ⚠️ SCHEDULED AHEAD OF PHASE 2 GRAPH WORK, DECIDED 2026-09-03. It was previously parked behind the agent-delivery layer on the grounds that the lint catches every consequence. That is still true and is no longer sufficient: the lint detects the damage and offers no valid repair, and the defect has now been hit three times in ordinary work — a mistyped link during authoring, a routine supersession leaving a stale `answeredBy`, and a retarget where `implements` was guarded while `evaluates` was not covered by the hardcoded list at all. Phase 2 begins with far more graph editing than Phase 1 did, so the rate will rise rather than fall. ⚠️ THREE INSTANCES, EACH FROM A DIFFERENT DIRECTION: authoring error, lifecycle event, and deliberate restructuring. That spread is the argument — this is not one careless edit, it is a guard whose coverage and whose inverse operation were both derived by hand.",
+    "raisedBy": [
+      "EVD-0076"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Two related defects in the typed mutation layer, both measured on 2026-09-02. FIRST: reviseArtifact blocks trace fields by testing against a hardcoded array of seventeen names, and at least nine trace fields in the current schema set are missing from it — blocks, raisedBy, satisfies, evaluates, verifies, fulfils, acceptedBy, implementedBy and answeredBy. Writes to those bypass the link operations' guards, including resolveQuestion's existence and non-dangling checks. The schemas already declare which fields are trace links through x-traceTarget, and the effective-schema resolver already reads them, so the list is a second hand-maintained model of something the schema states. SECOND: unlinkTrace validates the target type before removing, so a link that is invalid — however it got there — cannot be removed through the typed path at all. What is the right shape: derive the guard from x-traceTarget, let unlinkTrace remove unconditionally, or both?",
+    "title": "Why is the trace-field guard a hardcoded list, and how is an invalid link removed?",
+    "type": "question"
+  },
+  {
+    "answer": "By decision rather than by measurement, because what was missing was a choice about what would count as evidence. Kiln supports OAuth through Pi's public interactive `/login` flow, and verification is a MANUAL, account-bound run outside CI: isolated Pi directory, sanitized environment, `/login` against a real subscription, then a FRESH `ModelRuntime`/`ModelRegistry` proving the chosen built-in model is in `getAvailable()` and passes `hasConfiguredAuth()`, then removal or revocation of the credential as the control requiring the model to become unavailable. Only sanitized single-instance evidence is retained. FABRICATED OAUTH RECORDS ARE EXCLUDED: they validate an internal storage shape, not usable authentication — which is why the spike's negative result on a fabricated credential said something about provider composition and nothing about OAuth. Until that run passes, documentation may describe OAuth as a supported Pi route but must not call it verified; DEC-0032 records the disposition, TSK-0066 carries the run and ACC-0091 its acceptance, and both remain outstanding. API-key and local-provider work is unblocked.",
+    "answeredBy": [
+      "DEC-0032"
+    ],
+    "blocks": [
+      "REQ-0025"
+    ],
+    "id": "QST-0033",
+    "lifecycle": "active",
+    "notes": "⚠️ RAISED SO THE GAP IS NOT MISTAKEN FOR A PROOF. The api_key half is measured with a control; the OAuth half is not, and the spike's own negative result is expected rather than informative. ⚠️ IT IS NOT BLOCKING PHASE 2's FIRST STEPS. Model binding, the credential contract and the canary are all provable on the api_key path. What it blocks is any claim that the OAuth route is verified, and any acceptance criterion written as though it were. ⚠️ CHEAPEST HONEST RESOLUTION if no fabricated proof is possible: record a manual run against a real subscription as single-instance evidence, label it as such, and keep it out of CI — the same treatment section 15.3 already gives live paid-provider tests.",
+    "raisedBy": [
+      "EVD-0084"
+    ],
+    "resolution": "answered",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Section 6.2 lists subscription OAuth as a supported route, and the compatibility spike could not prove it. A provider declared in `models.json` is composed with apiKey auth only, so a stored OAuth credential for one never resolves and the negative result says nothing about the OAuth path. Proving discovery for a BUILT-IN provider needs a real `/login` against a real subscription, which is account-bound, interactive, and cannot run in CI. So: can OAuth discovery be proved with a fabricated credential against a built-in provider, or does Kiln ship the OAuth route on documentation plus a manually recorded one-off run?",
+    "title": "Is saved OAuth authentication discoverable for a built-in provider without an account?",
+    "type": "question"
   }
 ]

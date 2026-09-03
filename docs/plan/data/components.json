@@ -42,9 +42,11 @@
       "lib/content-root.mjs",
       "lib/atomic-write.mjs",
       "lib/lock.mjs",
-      "lib/id-allocator.mjs"
+      "lib/id-allocator.mjs",
+      "test/content-root.test.mjs"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ IT NOW OWNS THE PROJECT ROOT AS WELL AS THE CONTENT ROOT (TSK-0025). `projectRootCandidate()` and `resolveProjectRoot()` sit beside their content-root counterparts because the project root is DERIVED from the content root — `dirname(contentRoot)`, never `<toolRoot>/..` — and putting the derivation anywhere else would create the second path rule #70 exists to prevent. The two candidates agree in a normal consumer install and diverge under PLANNING_CONTENT_DIR, which is exactly where a caller joining its own path would go wrong quietly.",
     "responsibility": "Persists one artifact per file, resolves the content root, and serialises every read-modify-write so concurrent writers cannot destroy each other.",
     "reviewStatus": "draft",
     "satisfies": [
@@ -76,7 +78,9 @@
   {
     "id": "CMP-0005",
     "implementedBy": [
-      "lib/tools/"
+      "lib/tools/",
+      "test/link-trace.test.mjs",
+      "test/evidence-tools.test.mjs"
     ],
     "lifecycle": "active",
     "responsibility": "The only way an artifact is created or mutated (#88), including the guards that make each transition refusable.",
@@ -374,6 +378,319 @@
     ],
     "schemaVersion": 2,
     "title": "Launcher",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0021",
+    "lifecycle": "active",
+    "notes": "⚠️ THE BOUNDARY IS 'NEVER PATH', and it is a correctness rule rather than a preference. A globally installed Pi may exist at any version; if a specialist child resolves a different binary from the orchestrator, the capability signature the delegation verifier compares was measured against a runtime that is not the one that answered.",
+    "responsibility": "Be the only route by which any Pi process is started. Resolve the exact pinned CLI from the tool's own node_modules, report its version, refuse a version that does not match the pin, and hand every caller — setup, the user-facing session, and every specialist child — the same executable invoked through the current Node binary with shell interpolation disabled. Discovering Pi on PATH is outside this component and outside the product.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Pinned Pi runtime",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0022",
+    "lifecycle": "active",
+    "notes": "⚠️ IT REUSES THE EXISTING LOCK RATHER THAN ADDING ONE. The initializer already owns `<project>/.planning-init.lock`; a second lock beside it would let setup and initialization interleave on the same files while each believed it held the project. The initializer and the ignore owner must therefore accept an already-held transaction instead of acquiring their own. ⚠️ THERE IS NO --force. A malformed file is a refusal, because the only thing --force could mean here is overwriting something the operator wrote and setup could not parse.",
+    "responsibility": "Own one project-wide lock for the whole of setup, and make every lasting write happen under a plan rather than in sequence: canonicalise and print each target before mutating, schema-validate every file it may read or merge, probe same-directory temporary-file creation and atomic rename in each parent it will write to, record the identity of each existing file, re-compare that identity immediately before each merge, and maintain a non-secret journal that names the last completed phase so an interruption resumes rather than restarts.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0027",
+      "REQ-0022"
+    ],
+    "schemaVersion": 2,
+    "title": "Setup transaction",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0023",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS IS A REFACTOR OF WORKING CODE, NOT A NEW CAPABILITY. `lib/initialize-project.mjs` already owns planning, append safety, recorded idempotency and the deliberately-deleted-block rule. The failure this component prevents is a second appender in setup with different idempotency rules — which is how a file people edit by hand acquires two Kiln blocks.",
+    "responsibility": "Be the single owner of every Kiln edit to the consumer's `.gitignore`: plan the change without writing, append rather than rewrite, take the line ending from the file, record what it did, migrate an exact unmodified legacy block to the extended block under the same lock and atomic-write discipline, and never restore a block the operator deliberately removed or edited.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0027"
+    ],
+    "schemaVersion": 2,
+    "title": "Project ignore owner",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0024",
+    "lifecycle": "active",
+    "notes": "⚠️ THE FILE HAS TWO AUTHORS. `pi install -l` writes it and so does Kiln, and it is also a file the operator may hand-edit. Every one of those is a legitimate writer, so the merge is the boundary: Kiln owns four keys and must be able to prove it touched nothing else. ⚠️ NO SECRET EVER LANDS HERE. This file is committed on purpose, which is exactly why an API key, an OAuth token or an absolute home path reaching it is a disclosure rather than an untidiness.",
+    "responsibility": "Merge only Kiln's owned fields into the project's `.pi/settings.json` — the local package entry, the skill-override path, the selected default provider, model and thinking level, and the project-local session directory when that mode is chosen — preserving every unrelated key and package entry, refusing a malformed or unknown-schema-version file rather than replacing it, and changing no bytes when the desired state is already present.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0024",
+      "REQ-0025"
+    ],
+    "schemaVersion": 2,
+    "title": "Pi settings merge",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0025",
+    "implementedBy": [
+      "schemas/runtime/",
+      "lib/runtime-records.mjs",
+      "test/runtime-records.test.mjs"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ THE EXTERNAL MODE IS NO LONGER CONDITIONAL — three relocation routes were proved on both platforms (AST-0047), so `--session-dir` supplied at launch reaches an external root without committing an absolute path. ⚠️ THE FIVE PERSISTED SHAPES ARE NOW SPECIFIED AND VALIDATED (DEC-0033), which is what stage 5's data-model criterion was waiting on: each has a schema, a per-record version, a declared location, a committed/ignored classification, and refusals for the credential material and absolute home paths REQ-0024 forbids. What is specified is the SHAPE; the code that writes them is still the setup transaction's work.",
+    "responsibility": "Decide and enforce where session transcripts, consent records, compatibility results and setup journals live: by default under the outer project's ignored `.pi/sessions/` and `.pi/runtime/`, or, when explicitly selected, under an external per-user root derived from the committed non-secret project ID. Refuse to write any runtime data before the chosen location's protection is in place, and never commit an absolute user path in order to reach it.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0027",
+      "REQ-0023"
+    ],
+    "schemaVersion": 2,
+    "title": "Local-state policy",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0026",
+    "lifecycle": "active",
+    "notes": "⚠️ THE MECHANISM IS OPEN AND IS BEING MEASURED. Decision #67(a) chose writing Pi's user trust file directly and proved that causal on 0.80.6; the PM amended that on 2026-09-02 in favour of a supported public API or native flow, because writing another tool's undocumented user-scoped security file is brittle and crosses a boundary that belongs to the operator. What the pinned version actually offers decides whether a non-interactive trust option can exist at all.",
+    "responsibility": "Obtain, verify and report the operator's trust decision for this project's Pi resources through Pi's own supported mechanism, display the canonical project path the decision applies to, treat a denial as a first-class outcome that stops agent launch without touching the planning scaffold, and refuse a non-interactive run that has no pre-existing decision rather than defaulting one.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0023",
+      "REQ-0026"
+    ],
+    "schemaVersion": 2,
+    "title": "Project trust integration",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0027",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PROMPT'S WORDING IS PART OF THE COMPONENT. 'Check this computer for existing AI-provider and web-research connections' is what is happening; 'search for credentials' describes the same act in a way that is both more alarming and less accurate, since nothing is displayed or copied. ⚠️ A DECLINED INSPECTION PERFORMS NO READS AT ALL — not a presence check, not a registry load — and leaves setup honestly partial rather than reporting that nothing is configured.",
+    "responsibility": "Ask before looking, and record what was granted. Obtain explicit permission before reading Pi's user authentication store, its custom-model registry, or the presence of any credential environment variable; then report sanitised availability only — provider display names, model identifiers, and present-or-absent for the research credential — contacting no external service. Persist the operator's grant where a clone does not carry it to another machine, and reopen the prompt when the provider or research choice changes.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0023",
+      "REQ-0024"
+    ],
+    "schemaVersion": 2,
+    "title": "Connection inspection and consent",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0028",
+    "lifecycle": "active",
+    "notes": "⚠️ 'NEVER A MUTABLE ALIAS' IS A REPRODUCIBILITY RULE. A project that records `latest` records nothing: the content it produces cannot be attributed to a model, and a change of behaviour has no change of configuration to explain it.",
+    "responsibility": "Turn discovery into a recorded decision and hold it: present available providers and exact model identifiers, require confirmation even when exactly one is available, persist the exact non-alias identifiers as project configuration, state plainly that subsequent work on this model may be billed, and at every later launch resolve that recorded selection and refuse the run if it is unavailable rather than falling back.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0025",
+      "REQ-0023"
+    ],
+    "schemaVersion": 2,
+    "title": "Model binding",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0029",
+    "lifecycle": "active",
+    "notes": "⚠️ CUSTOM PROVIDERS MAY CONTRIBUTE NAMES ONLY DECLARATIVELY. Guessing a variable name from a provider id, or discovering one by enumerating the operator's environment for things that look like keys, is the failure this component exists to prevent — and both are the obvious implementation. ⚠️ PREFER PI'S AUTH STORE WHEN IT IS AVAILABLE, because then a child needs the variables that locate configuration rather than a copy of the credential itself. ⚠️ AMENDED 2026-09-02 AFTER MEASUREMENT (AST-0045): this component controls what it ADDS, not everything the child ends up seeing. Windows injects HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR into every child whatever environment it is handed, so the boundary is a lower bound there and the original wording — that the child's environment IS the union — was not achievable. The guarantee that survives, and the one worth having, is that no credential and no unrelated secret is among what Kiln adds. ⚠️ A SECOND CONSEQUENCE: because USERPROFILE is always present on Windows, a child always resolves the default agent directory, so redirecting one requires setting PI_CODING_AGENT_DIR positively and can never be done by omitting a variable.",
+    "responsibility": "Be the single audited statement of which environment-variable NAMES each supported provider needs on the model plane, holding no values; separate those from tool-plane names that belong to one role; construct each child's environment from the measured base runtime variables, the selected provider's model-plane names and that role's tool-plane names, adding nothing else; and classify a provider with no safe known mapping as unsupported rather than granting it a wider inheritance.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0024",
+      "REQ-0026"
+    ],
+    "schemaVersion": 2,
+    "title": "Provider credential contracts",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0030",
+    "lifecycle": "active",
+    "notes": "⚠️ THE APPROVAL NAMES THE COST. The provider may bill for this request, so the prompt says so and names the exact model; declining leaves a valid content and browser setup and an agent that is not described as ready. ⚠️ MODEL PROSE CLAIMING TOOL SUPPORT IS NOT EVIDENCE — the observation is the tool call arriving with the right challenge, taken upstream of anything the model says about itself.",
+    "responsibility": "Prove, with one separately authorised request, that the selected provider and model actually answer and actually emit the shape of tool call Kiln depends on: expose a single read-only setup-only tool, require the model to call it with a random challenge against the declared schema, send no planning content, permit no mutation, cap the token budget, and record success only against the exact provider, model, thinking level, runtime version, package capability signature and non-secret endpoint identity that produced it.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0025",
+      "REQ-0023",
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Live model and tool canary",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0031",
+    "lifecycle": "active",
+    "notes": "⚠️ THE COMMITTED PACKAGE ENTRY MUST BE PORTABLE. `pi install -l` writes whatever it writes; the entry that ends up in a committed settings file has to be a separator-normalised relative literal that resolves to the same directory on another operator's machine, and it may be normalised only after canonical equivalence to what Pi wrote is proved. An absolute path here breaks every clone.",
+    "responsibility": "Be the installable unit Pi loads for this project: a declared package manifest naming its extensions, skills and prompts; a registration entry point; and a machine-readable capability signature that any consumer — the supervisor, the canary, a delegation verifier — can compare against what it expected to be loaded.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0026",
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Kiln Pi package",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0032",
+    "lifecycle": "active",
+    "notes": "⚠️ DISABLING THE BUILT-INS IS THE POINT, NOT AN OPTIMISATION. Pi's default active set includes bash, write and edit — measured, not assumed. An orchestrator holding those can write planning content around the locked, validated, atomic path that decision #88 makes the only legal one, and it will, because editing a file is easier than calling a typed tool.",
+    "responsibility": "Expose the existing typed libraries to the agent as validated Pi tools and nothing more: project status and lint reads, artifact creation and mutation through the existing registries, project-type activation, stage attestation reads and writes, the research and validation capability adapters, and delegation. Own the tool schemas and result rendering; leave every business rule in `lib/`. Launch the session with Pi's built-in filesystem and shell mutation tools disabled.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0024"
+    ],
+    "schemaVersion": 2,
+    "title": "Pi tool registration",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0033",
+    "lifecycle": "active",
+    "notes": "⚠️ THE GENERATOR EXISTS TO PREVENT ONE SPECIFIC DRIFT: the agent working confidently to exit criteria the application is not checking. Two hand-maintained descriptions of one pipeline disagree, and the disagreement is invisible from either side.",
+    "responsibility": "Generate one packaged skill per canonical stage definition so that stage purpose, outputs and exit criteria are never hand-maintained twice, fail a check when the packaged skills are stale relative to `stages/`, and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022"
+    ],
+    "schemaVersion": 2,
+    "title": "Stage skill generation and overrides",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0034",
+    "lifecycle": "active",
+    "notes": "⚠️ IT MAY NOT ATTEST. Approving an artifact and satisfying a user-owned exit criterion are the operator's acts; an orchestrator that can do either can walk the project through its own gates. This is the boundary the Stage 1 vertical slice has to demonstrate by being refused.",
+    "responsibility": "Be the single persistent planning session: resolve the canonical sibling content root and refuse to operate on the tool's own planning content, derive the current stage from definitions and attestations rather than storing a duplicate status, load the matching stage skill, ask one question at a time chosen by information value, keep the operator's wording separate from its own interpretation, mutate only through registered typed tools, show material changes before making them, and resume from files and attestations when the transcript is gone.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022"
+    ],
+    "schemaVersion": 2,
+    "title": "User-facing orchestrator",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0035",
+    "lifecycle": "active",
+    "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection.",
+    "responsibility": "Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a lint error.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0026"
+    ],
+    "schemaVersion": 2,
+    "title": "Specialist roster",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0036",
+    "lifecycle": "active",
+    "notes": "⚠️ THE EXISTING VERIFIER CONTRADICTS THE SPAWN CONTRACT AND MUST BE CORRECTED. `verifyChild()` refuses unless `stdinDelivered` is true and explains failure as a task not delivered on stdin, while the approved contract closes stdin so a non-interactive child cannot wait forever for input. The observation wanted is that the task was bound through the supported non-stdin channel, and the tests must assert both facts at once — stdin closed, task arrived.",
+    "responsibility": "Run a specialist as an isolated Pi child and decide whether its answer may be used: build a task-scoped context rather than forwarding the conversation, bind the role prompt and the task through a private file with restrictive permissions and closed stdin, pass the orchestrator's exact provider, model and thinking level, pass the intersection of the role's allowlist and the measured host registry, enforce a bounded timeout, delete temporary material on every exit path, and verify the child's capability signature before reading its substantive output.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0026",
+      "REQ-0024",
+      "REQ-0025"
+    ],
+    "schemaVersion": 2,
+    "title": "Delegation runtime",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0037",
+    "lifecycle": "active",
+    "notes": "⚠️ ONE TERMINAL, TWO PROCESSES, AND ONLY ONE MAY READ IT. If the background launcher inherits stdin it will eat the authentication answer or the first planning message. ⚠️ PI'S WORKING DIRECTORY IS THE OUTER PROJECT, never the tool clone, and the self-hosting checkout — where those two are the same directory — is refused unless explicitly opted into.",
+    "responsibility": "Own the lifecycle of the two processes that make up a running Kiln: validate the project and settings, choose and prove a port, start the browser launcher with a private stdin pipe so it cannot consume the operator's typing, wait for identity-confirmed readiness, start Pi in the outer project root with the terminal inherited, begin or resume the recorded planning session, and on exit or signal stop both process trees within bounded grace periods and remove only what this invocation created.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Combined runtime supervisor",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0038",
+    "lifecycle": "active",
+    "notes": "⚠️ EVERY FIELD IS THERE TO DEFEAT A SPECIFIC LOOKALIKE. The run id defeats a previous Kiln process still holding the port; the project id defeats a Kiln serving a different project; the service name and protocol defeat an unrelated application that happens to return JSON.",
+    "responsibility": "Answer the supervisor's readiness question with an identity rather than a status: the service name, a versioned health protocol, the ephemeral run identifier of this invocation, the non-secret stable project identifier, and the build version — and nothing else, in particular no absolute path, no credential, and no session or planning content.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Run-identity health endpoint",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0039",
+    "lifecycle": "active",
+    "notes": "⚠️ ITS PRE-INSTALL IMPORT GRAPH IS BUILT-INS ONLY. Setup runs before the dependency graph it installs exists, so a top-level import of Pi, Ajv or anything else installed is not a style question — the command cannot start. Everything after the install step is loaded dynamically. ⚠️ IT IS NOT A SECOND INITIALIZER: `bin/init-project.mjs` keeps its content-only contract and its refusal semantics.",
+    "responsibility": "Compose the whole first run in one ordered, resumable, idempotent command over the existing primitives: resolve and print every path before mutating, validate the runtime, run the existing initializer under the shared transaction, establish state protection, install and register the package, obtain each consent in its own step, bind and prove the model, read back everything it wrote, and either launch the combined runtime or explain exactly what remains. Use a distinct exit code per refusal class and publish the mapping.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0023",
+      "REQ-0027"
+    ],
+    "schemaVersion": 2,
+    "title": "Setup command",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0040",
+    "lifecycle": "active",
+    "notes": "⚠️ THE NEGATIVE CONTROLS CARRY MORE WEIGHT THAN THE HAPPY PATH, because every one of them corresponds to a way this layer can appear to work while being wrong: wrong working directory, inspection denied, a read attempted before consent, a sole model adopted implicitly, a TTY-less login, a denied live check, Tavily contacted before approval, trust denied, an unrelated healthy HTTP service on the port, signature drift, and a fake child returning plausible prose with none of Kiln's tools.",
+    "responsibility": "Prove the documented journey from an empty directory on both supported platforms: initialise a repository with no commits, take a tracked-file-only copy of the tool as the clone, run the documented setup against a deterministic non-billable provider, drive a Stage 1 exchange, observe the intake document change through the browser's change stream, attempt an unauthorised stage advance and see it refused, shut down and prove nothing is left running, then rerun and prove resumption and idempotency.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0028"
+    ],
+    "schemaVersion": 2,
+    "title": "Clean-consumer agent-delivery verification",
+    "type": "component"
+  },
+  {
+    "id": "CMP-0041",
+    "implementedBy": [
+      "tools/pi-compat/lib/consumer.mjs",
+      "tools/pi-compat/lib/spike.mjs",
+      "tools/pi-compat/lib/probe.mjs",
+      "tools/pi-compat/lib/redact.mjs",
+      "tools/pi-compat/fake-provider.mjs",
+      "tools/pi-compat/run-all.mjs",
+      "tools/pi-compat/posix-bootstrap.sh",
+      "tools/pi-compat/runs/windows.json",
+      "tools/pi-compat/runs/linux.json",
+      "test/pi-compat.test.mjs",
+      ".github/workflows/ci.yml"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ IT IS A GATE, NOT A CONVENIENCE. Every design position downstream of it was an assumption carried from measurements taken on a different version. ⚠️ NEGATIVE EVIDENCE REQUIRES PROOF THAT THE OBSERVATION POINT WAS REACHED, and every run records whether it did. ⚠️ TWO TIERS: the default one asserts over the retained results and FAILS when package.json's pin no longer matches the pin the evidence was taken under; the live tier re-runs the spike against a real consumer install behind KILN_PI_COMPAT=live, on one CI cell. Both are held to the SAME assertion function, because a live tier that checks less than the record is a live tier in name only. ⚠️ NARROWED 2026-09-03 AFTER REVIEW, and the removals matter more than the additions. THREE THINGS THIS COMPONENT NO LONGER CLAIMS: the authentication-only Pi TUI and its TTY behaviour (TSK-0065); OAuth discovery, which a models.json provider structurally cannot exercise (QST-0033, TSK-0066); and the Kiln capability signature, which cannot be measured because the Kiln package it belongs to does not exist yet (TSK-0067, blocked on CMP-0031). Each is scheduled rather than quietly dropped. The earlier wording listed all three as established, which is exactly the failure — a component describing work that was not there — that this whole cycle was opened to undo.",
+    "responsibility": "Establish, against the exact pinned runtime and on each supported platform, what Pi actually does where the agent-delivery design depends on it — local resolution from a consumer's own install and version match; trust grant, denial and revocation through the public API; saved API-key discovery and provider auth status; configuration-directory resolution under default and overridden settings; the literal package entry `pi install -l` writes and its canonical equivalence to the committed form; extension, skill and prompt loading; skill-override precedence; session relocation; task binding with closed stdin; the default and allowlisted tool sets; and provider-scoped environment authentication reaching a child — each with a negative control and redaction assertions, retained as tests in the normal suite so a later version bump must re-prove the contract rather than inherit it.",
+    "reviewStatus": "draft",
+    "satisfies": [
+      "REQ-0022",
+      "REQ-0024",
+      "REQ-0026",
+      "REQ-0027"
+    ],
+    "schemaVersion": 2,
+    "title": "Pi compatibility evidence suite",
     "type": "component"
   }
 ]

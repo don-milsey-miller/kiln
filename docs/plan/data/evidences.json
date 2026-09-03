@@ -2326,5 +2326,348 @@
     "summary": "Headless Chrome driven over the DevTools protocol against the real production build, with no injected EventSource and no injected timers. THE FIRST RUN FAILED ACC-0029: with the server's heartbeat interval set to 600s and the socket confirmed still open, the page stayed `Receiving updates` for the whole 40s budget. Diagnosis, measured rather than assumed: `document.visibilityState` was `visible` and an in-page 15000ms `setTimeout` returned in 15014ms, so timer throttling was excluded; a raw-socket read of `/events` showed exactly one heartbeat at 32ms then silence with the socket open, so the server was correct. The cause was `timers = { setTimeout, clearTimeout }` throwing `Illegal invocation` inside the open handler (AST-0040). AFTER WRAPPING THE DEFAULTS, both criteria pass: the indicator went from live to `Not receiving updates` while the stream was still open, changing its TEXT and its ICON and its colour; and after the server was dropped, an attestation changed, and the SAME build restarted, the page reconnected on its own, reloaded, and showed the changed stage 783ms later with its URL preserved.",
     "title": "Experiment: ACC-0029 and ACC-0030 in a real browser — and the defect that only a browser could find",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "fixture": "throwaway content root under the system temp directory, one question artifact",
+        "module": "lib/tools/evidence-tools.mjs at commit cd4574d plus uncommitted working tree",
+        "node": "v24.18.0",
+        "os": "Windows 11 Pro 10.0.26200"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0076",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ FOUND BY DOING IT, 2026-09-02, while authoring the agent-delivery graph. Two questions were created with a `blocks` link that pointed at a component instead of a requirement — a plain authoring mistake, caught immediately by the lint's trace/wrong-target-type rule, which is the lint working exactly as intended. The finding is what happened NEXT: unlinkTrace REFUSED to remove the bad link, because it validates the target type on removal as well as on addition, so the typed path offered no way to undo a link the lint was blocking on. The repair had to go through reviseArtifact, which should also have refused and did not. ⚠️ THE LINT IS THE ONLY THING CATCHING THIS. Both dangling links written in this probe would be reported by trace/target-missing at lint time, so the graph is not silently corruptible — but the guard that decision #101 put on the tool is not the thing holding, and a bypass caught downstream is a different safety property from a bypass refused at the write.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A throwaway content root with one question, three revision attempts. POSITIVE CONTROL: reviseArtifact('question', id, {derivedFrom: [...]}) was REFUSED with the #101 message, proving the trace-field guard executes in this fixture and that a subsequent write is a real bypass rather than the guard failing to run. TEST 1: {answeredBy: ['DEC-9999']} WAS WRITTEN — a dangling link to a decision that does not exist, on a question whose resolution stayed 'unanswered'. That is precisely the state resolveQuestion refuses to produce: it validates that each answeredBy ref is an artifact ID and that the file exists, and refuses 'answered' carrying neither answer nor link. TEST 2: {blocks: ['REQ-9999']} WAS ALSO WRITTEN, a second dangling trace link. THE CAUSE IS A HARDCODED LIST: evidence-tools.mjs:206 enumerates seventeen trace-like field names, and blocks, raisedBy, satisfies, evaluates, verifies, fulfils, acceptedBy, implementedBy and answeredBy are all absent from it. The comment at evidence-tools.mjs:302 states that reviseArtifact 'refuses answeredBy — correctly, since it is a trace field (#101)'. It does not.",
+    "title": "Experiment: reviseArtifact writes two trace fields its own comment says it refuses",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "agentDir": "isolated via PI_CODING_AGENT_DIR; the operator's own ~/.pi/agent was never read or written",
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "node": "v24.18.0",
+        "os": "Windows 11 Pro 10.0.26200",
+        "piVersion": "0.84.4",
+        "platform": "windows"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0077",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PUBLIC API IS THE POINT. `ProjectTrustStore` is exported from the package root with a typed declaration — constructor(agentDir), get, getEntry, set, setMany — alongside `getProjectTrustOptions`, `getProjectTrustParentPath` and `hasTrustRequiringProjectResources`. Kiln therefore does not need to write the undocumented trust.json shape by hand, which is exactly what DEC-0027 required and what decision #67(a) did. ⚠️ THE SILENT FAILURE OF 2026-08-15 REPRODUCES ON 0.84.4 UNCHANGED: row 1 completed a well-formed session with none of the package's tools and said nothing about it.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "Five runs against a disposable consumer fixture, isolated by PI_CODING_AGENT_DIR, with defaultProjectTrust set to never. The observable is a marker file written by the extension at LOAD time, upstream of session_start and of any inference. RESULTS: (1) no decision, no override -> extension NOT loaded, session completed normally, no error mentioning trust. (2) --approve -> LOADED, which is the fixture control proving the same extension can load. (3) ProjectTrustStore.set(cwd, true) through the PUBLIC exported class, no --approve -> LOADED. (4) set(cwd, false) -> NOT loaded, so an explicit denial is honoured. (5) set(cwd, null) -> NOT loaded, so removing the decision reverts the behaviour. Rows 4 and 5 are what make row 3 causal rather than correlated. get(cwd) returned true after set(true) and null after set(null); getEntry(cwd) returned the canonical path and the boolean.",
+    "title": "Experiment: ProjectTrustStore is a public API and is causal on pi 0.84.4 (Windows)",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "agentDir": "isolated via PI_CODING_AGENT_DIR; Node and pi both self-contained under /tmp, nothing installed system-wide",
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "node": "v24.11.0",
+        "os": "Ubuntu 24.04 under WSL2, kernel 6.18.33.2-microsoft-standard-WSL2",
+        "piVersion": "0.84.4",
+        "platform": "linux"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0078",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ EVERY ROW HERE EXITED 0, WHICH SHARPENS THE FINDING RATHER THAN SOFTENING IT. On Windows the runs exited 1 because no model was configured, so a reader could wonder whether the missing extension was a consequence of the failed run. On Linux the sessions completed successfully and the extension was still absent in rows 1, 4 and 5. Untrusted is not an error state; it is a normal session with the tools quietly missing.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The identical five-row protocol on Ubuntu 24.04, with a model configured so every run exited 0 rather than failing on missing authentication. RESULTS IDENTICAL TO WINDOWS: not loaded, loaded under --approve, loaded under set(true), not loaded under set(false), not loaded after set(null). trust.json after the sequence contained the POSIX canonical path mapped to true. hasTrustRequiringProjectResources() returned true for the fixture on both platforms.",
+    "title": "Experiment: the same five trust rows on Linux, with a working model configured",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux",
+        "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0079",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE PROPOSAL'S PREDICTED LITERAL WAS RIGHT AND ITS RISK WAS REAL. `../.planning/pi-package` is what section 6.3 asked for and what POSIX produces unaided; Windows produces the same path with backslashes, which is not portable in a committed file. The normalisation the proposal guarded with a proof requirement is exactly the normalisation needed, and the proof is cheap. ⚠️ NO ABSOLUTE PATH APPEARED ON EITHER PLATFORM, which was the failure this question was most worried about.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "`pi install -l ./.planning/pi-package` run from the consumer root wrote `.pi/settings.json` containing exactly one key. On Windows the entry was `\"..\\\\.planning\\\\pi-package\"`; on Linux it was `\"../.planning/pi-package\"`. Both are RELATIVE to the settings file and both resolve to the same package directory. The two differ only in path separator, so normalising the Windows form to forward slashes is a separator-only rewrite whose canonical equivalence is directly provable rather than assumed.",
+    "title": "Experiment: the package entry `pi install -l` writes is relative on both platforms, and separator-divergent",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "agentDir": "isolated via PI_CODING_AGENT_DIR; the operator's own ~/.pi/agent was never read or written",
+        "alsoObservedOn": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "node": "v24.18.0",
+        "os": "Windows 11 Pro 10.0.26200",
+        "piVersion": "0.84.4",
+        "platform": "windows"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0080",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ AN ALLOWLIST ON WINDOWS IS A FLOOR, NOT A CEILING, and the proposal's language — that the child environment IS the union of the measured base, the provider's model-plane names and the role's tool-plane names — is not achievable exactly there. What survives is the claim that matters: no CREDENTIAL variable crosses, which the sentinel pair proves on both platforms. ⚠️ THE SECOND CONSEQUENCE IS SHARPER. Because USERPROFILE is always present on Windows, a child can always resolve the default ~/.pi/agent, so a child cannot be isolated from the operator's real Pi configuration by omitting a variable — PI_CODING_AGENT_DIR must be set positively to redirect it.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A Pi child was spawned with a replaced environment and reported, from inside the loaded extension, which configuration variables it could see and how many variables existed. LINUX: a restricted child saw 11 variables and zero sentinels; a control child with the full environment saw 35 and both sentinels, proving the sentinel test can detect leakage. A child given only PATH, TMPDIR and PI_CODING_AGENT_DIR — no HOME at all — still loaded the package and ran a complete turn. WINDOWS: the restricted child saw 25 variables and zero sentinels, control saw 75 and both sentinels. BUT a child passed only SystemRoot and PATH was still given HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR. That was isolated with a bare `node -e` child rather than pi, which excludes Pi as the source. It does NOT distinguish the operating system from Node or libuv's own process-creation path, so no attribution is claimed: what is recorded is the observable the product depends on — a Node-spawned child on Windows receives these names whatever environment it was handed.",
+    "title": "Experiment: the child environment allowlist is exact on POSIX and a floor on Windows",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux",
+        "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0081",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE DEFAULT SET IS THE HAZARD #68 NAMED AND IT HAS NOT MOVED. bash, edit and write are active by default, so a role definition with no declared tool list hands a specialist a shell on 0.84.4 exactly as it did on 0.80.6. ⚠️ THE SESSION RESULT DELETES AN OPEN RISK: external user-local state does not depend on an unproven capability, and `--session-dir` lets the supervisor supply the location at launch so no absolute path need ever be committed.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "DEFAULT ACTIVE TOOLS with no --tools: read, bash, edit, write plus the custom tool, identical on both platforms and identical to the 0.80.6 measurement. The full configured set also includes powershell, grep, find and ls, which are configured but INACTIVE — so 'active tools' is still not 'all configured tools'. ALLOWLIST: `--tools read,kiln_spike_probe` produced exactly those two, and the excluded tool was not even offered to the model in the provider request. SKILLS: with the consumer override directory registered through the settings `skills` array, the loaded file was the OVERRIDE; with the override removed, the same run loaded the PACKAGED file — provenance read from systemPromptOptions.skills[].filePath at before_agent_start, upstream of the model. SESSIONS: all three documented routes worked — `--session-dir <path>` wrote the transcript to the external directory and left .pi/sessions empty, `PI_CODING_AGENT_SESSION_DIR` did the same, and the `sessionDir` setting placed it at .pi/sessions.",
+    "title": "Experiment: default tool set, allowlist narrowing, skill override precedence and session relocation on 0.84.4",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+        "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux",
+        "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0082",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ TWO CONTROLS, BECAUSE ONE WOULD NOT DO. Without the prose control, 'the tool executed' could be an artefact of the fixture always executing it; without the exclusion control, the allowlist could be decorative. ⚠️ THE TOOL SIGNATURE IS execute(toolCallId, params, signal, onUpdate, ctx) — the parameters are the SECOND argument. Reading the first argument as the parameters silently yields the tool-call id, which is how this run first reported a null challenge against a tool that had in fact been called correctly.",
+    "observedAt": "2026-09-02",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "TASK BINDING: a `--mode json -p <task> --no-session` child spawned with stdio stdin set to ignore — stdin genuinely closed — completed a turn with exit 0, and the exact task sentinel KILN-TASK-SENTINEL-9F3A was observed in the user message the provider received. The observation is taken at the provider boundary, not from anything the model said. CANARY SHAPE: when the provider returned a tool call, the registered custom tool executed and received `{\"challenge\":\"abc123xyz\"}` — the exact value — through the real pinned runtime. CONTROL A: a provider returning prose instead produced no tool execution. CONTROL B: the same request with the tool excluded from `--tools` produced no execution and the tool was not offered to the model. Both platforms agree on every row.",
+    "title": "Experiment: a delegated task reaches a closed-stdin child and a tool call returns the exact challenge",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "inference": "local deterministic fake provider on 127.0.0.1, explicitly selected per run",
+        "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "piInstalledBy": "the consumer's own npm install into .planning/node_modules",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux",
+        "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0083",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE ENVIRONMENT IS NOW BUILT FROM AN ALLOWLIST, WHICH IS A SAFETY FIX AND NOT A TIDY-UP. The earlier scripts inherited all of `process.env` and ran Pi without naming a model. PI_CODING_AGENT_DIR isolates the stored auth file and does nothing whatever about environment authentication, so on a host carrying OPENAI_API_KEY or ANTHROPIC_API_KEY a reproduction could have reached a paid provider. Two defences now: an allowlist of OS and runtime names that contains no credential, and an explicit loopback `--model` on every run that can reach inference. ⚠️ IT ALSO STOPPED BEING ONE PERSON'S SCRIPT — the old fixture hard-coded a developer's scratch path and nobody else could run it.",
+    "observedAt": "2026-09-03",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The first fixture was not a clean consumer and this replaces it. It now generates a temporary directory, runs `git init` and leaves the repository UNBORN with no commits, copies the tool from `git ls-files` so an uncommitted local file cannot make a run pass, runs the consumer's own `npm install` inside `.planning`, and resolves the CLI through the COPIED tool's installed package metadata via its `bin.pi` field. OBSERVED ON BOTH PLATFORMS: the resolved CLI reports 0.84.4, matches the pin read from this repository's manifest, lies inside the consumer directory, and does NOT lie inside the development checkout — the last being the assertion the previous fixture could not make, because it executed this repository's own node_modules. Every earlier finding reproduced against the new fixture: the five trust rows, the default active set of read/bash/edit/write, `--tools` narrowing, the relative package entry differing only by separator, three session-relocation routes, the task sentinel reaching the provider with stdin closed, skill-override precedence with its removal control, and the canary challenge arriving intact with prose and exclusion controls both empty.",
+    "title": "Experiment: the compatibility contract re-proved from a real clean consumer, both platforms",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "credentials": "fabricated probe credentials in an isolated auth.json; no real credential involved",
+        "network": "allowModelNetwork defaults to false; no external service was contacted",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0084",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ THE DISAGREEMENT IS THE FINDING, and section 6.6 would have walked into it. That section says a launch check should 'verify some supported authentication source is configured'. `getProviderAuthStatus()` answers exactly that question and answers it TRUE for a credential the registry will not use — so a launch gate written to the section as drafted would report the agent ready to a project that cannot infer. Gate on `getAvailable()` or `hasConfiguredAuth()`, never on the status alone. ⚠️ PRESENT `getAvailable()`, NEVER `getAll()`: offering an operator 1291 models, nearly all unauthenticated, is not a selection step. ⚠️ WHAT THIS DOES NOT ESTABLISH: OAuth discovery for a BUILT-IN provider. A provider declared in models.json is composed with apiKey auth only — pi-ai's ProviderAuth notes that even keyless local servers supply apiKey auth — so a stored OAuth credential for such a provider has no flow to resolve it, and the negative result above is expected rather than informative about the OAuth path itself. Proving that needs a real interactive /login against a real account.",
+    "observedAt": "2026-09-03",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "SURFACE: `AuthStorage` is a real class at dist/core/auth-storage.js and is NOT reachable — the package's exports map publishes only '.', './rpc-entry' and './client', so a deep import is blocked. The supported route is `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` plus `ModelRegistry`, with `readStoredCredential` exported from the root for a one-off presence read. `allowModelNetwork` defaults to FALSE, which is what lets a consent-gated inspection satisfy the rule that it contacts nothing. CATALOGUE: `getAll()` returned 1291 models — the entire built-in catalogue across every provider pi knows of, usable or not — while `getAvailable()` returned 0 with no credential. DISCOVERY, with the no-credential control first: no credential -> not available, hasConfiguredAuth false, getProviderAuthStatus {configured:false}. Stored api_key -> available, hasConfiguredAuth true, {configured:true, source:'stored'}. Stored OAuth credential in pi-ai's canonical {type,refresh,access,expires} shape -> getProviderAuthStatus {configured:true, source:'stored'} BUT hasConfiguredAuth false, isUsingOAuth false, and the model absent from getAvailable().",
+    "title": "Experiment: authentication and model discovery through ModelRuntime and ModelRegistry",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "inference": "local deterministic fake provider on 127.0.0.1, explicitly selected per run",
+        "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+        "piVersion": "0.84.4",
+        "platformsObserved": "windows, linux",
+        "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0085",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ TWO HARNESS DEFECTS WERE FOUND BY THEIR OWN RECORDED CONTRADICTIONS, which is the argument for recording both halves of a condition rather than only the result. The no-HOME cell first reported `homeWasPassed: false` beside `HOME: true` — the wrapper was silently dropping the exact-environment option and falling back to the allowlist, which always carries HOME. The environment-auth cell first failed in BOTH directions because `--models` is a NAME FILTER and not a path: pointing it at a file yields `No models match pattern <path>`, and a cell that fails identically with and without its variable is not a negative result, it is a broken probe. ⚠️ THE ENTRY-EQUIVALENCE CELL IS THE ONE THE DESIGN EXPLICITLY DEMANDED. Recording that two spellings differ only by separator was never the same as showing they name one directory, and the proposal required the proof before permitting the rewrite.",
+    "observedAt": "2026-09-03",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "NO HOME: a child given exactly PATH, TMPDIR and PI_CODING_AGENT_DIR — HOME absent — loaded the package and exited 0 on Linux, with the child reporting HOME false and USERPROFILE false. On Windows the same run reports HOME false but USERPROFILE TRUE, because the platform repopulates it; the honest Windows claim is that the override is sufficient, not that the child had no home. CONFIGURATION DIRECTORY: with HOME redirected at a scratch directory and no override, the agent directory resolved under that home; with PI_CODING_AGENT_DIR set it resolved to the override, and the two differed — the control that stops 'the override wins' being vacuous. PROMPT TEMPLATES: a packaged template invoked as `/kiln-probe-prompt` expanded, and its body marker arrived in the user message at the provider while the literal slash string did not. PROVIDER-SCOPED ENVIRONMENT AUTH: a models.json provider whose key is `$KILN_PROBE_PROVIDER_KEY` was listed by `--list-models` in a child carrying that variable and absent from one without it, while the inline-key provider was listed in both — so the variable is what moved. PACKAGE ENTRY EQUIVALENCE: the raw entry and its separator-normalised form resolve to one real path, and that path is the package directory.",
+    "title": "Experiment: the proof cells the first spike was missing — no-HOME, config directory, prompts, env auth, entry equivalence",
+    "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "node": "v24.11.0",
+        "os": "Ubuntu 24.04 under WSL2",
+        "piVersion": "0.84.4",
+        "platform": "linux"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation"
+        ],
+        "isolates": []
+      }
+    },
+    "id": "EVD-0086",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "notes": "⚠️ SPLIT OUT AS A SINGLE-PLATFORM RECORD ON PURPOSE. The no-HOME observation is one of the few in this suite whose RESULT differs by platform, so a record covering both could not carry an exact `platform` fact and no POSIX-specific assertion could match it. ⚠️ IT ALSO REPLACES A MEASUREMENT THAT NEVER HAPPENED: the first version of this cell asked for an exact environment through a wrapper that silently dropped the option, so the run used the default allowlist — HOME included — and recorded `homeWasPassed: false` beside `HOME: true` without anything noticing until the two halves were read together.",
+    "observedAt": "2026-09-03",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "A dedicated exact-environment cell, recorded from the EFFECTIVE environment handed to the child rather than from the caller's intent. No configuration-locating variable was supplied — `configLocatingNamesSupplied: []`, covering HOME, USERPROFILE, APPDATA, LOCALAPPDATA, XDG_CONFIG_HOME and XDG_STATE_HOME — while PI_CODING_AGENT_DIR was. The child reported HOME false and USERPROFILE false, loaded the project package, and exited 0. The same construction on Windows leaves USERPROFILE present because the platform repopulates it, which is why that result is recorded separately and claimed differently.",
+    "title": "Experiment: a Pi child loads and completes a turn with no home variable at all (Linux)",
+    "type": "evidence"
   }
 ]

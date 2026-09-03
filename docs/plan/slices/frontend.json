@@ -182,6 +182,22 @@
       "verifies": [
         "REQ-0017"
       ]
+    },
+    {
+      "evaluates": [
+        "CMP-0038"
+      ],
+      "id": "ACC-0077",
+      "lifecycle": "active",
+      "outcome": "not-evaluated",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "The endpoint returns the service name, a versioned health protocol, the ephemeral run identifier, the non-secret project identifier and the build version, and is asserted to contain no absolute path, credential, session content or planning content.",
+      "title": "The health response carries run and project identity and nothing sensitive",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0028"
+      ]
     }
   ],
   "accepted": [
@@ -350,6 +366,10 @@
     {
       "role": "platform",
       "task": "TSK-0015"
+    },
+    {
+      "role": "platform",
+      "task": "TSK-0025"
     }
   ],
   "components": [
@@ -416,6 +436,19 @@
       "schemaVersion": 2,
       "title": "Change stream",
       "type": "component"
+    },
+    {
+      "id": "CMP-0038",
+      "lifecycle": "active",
+      "notes": "⚠️ EVERY FIELD IS THERE TO DEFEAT A SPECIFIC LOOKALIKE. The run id defeats a previous Kiln process still holding the port; the project id defeats a Kiln serving a different project; the service name and protocol defeat an unrelated application that happens to return JSON.",
+      "responsibility": "Answer the supervisor's readiness question with an identity rather than a status: the service name, a versioned health protocol, the ephemeral run identifier of this invocation, the non-secret stable project identifier, and the build version — and nothing else, in particular no absolute path, no credential, and no session or planning content.",
+      "reviewStatus": "draft",
+      "satisfies": [
+        "REQ-0028"
+      ],
+      "schemaVersion": 2,
+      "title": "Run-identity health endpoint",
+      "type": "component"
     }
   ],
   "note": "Generated as a query over the task graph, grouped by `task.role` (#19). Nothing here is authored: re-running the handoff recomputes it, so a slice cannot drift from the plan. `tasks` is work REMAINING; `accepted` is work already finished, listed so nobody repeats it. Both statuses are derived from acceptance criteria, never stored.",
@@ -479,8 +512,48 @@
       "statement": "A review-status change made in the application is written by the existing typed operation — lock, fresh read inside the lock, atomic write — and the application contains no other write path into content.",
       "title": "The application performs review-status updates through the existing typed write path",
       "type": "requirement"
+    },
+    {
+      "id": "REQ-0028",
+      "lifecycle": "active",
+      "notes": "⚠️ THE NEGATIVE CONTROL IS WHAT MAKES THIS TESTABLE, and it should be written before the check: stand up an unrelated healthy HTTP server on the port and require launch to refuse. A readiness check without that control has never been shown to check anything.",
+      "priority": "must",
+      "rationale": "The current launcher polls `GET /` on the configured port and treats any HTTP response as ready. An unrelated service already listening on port 3000 therefore satisfies it, and the operator is told the browser workspace is up while looking at somebody else's application. The same shape recurs across the layer: an extension that loaded, a model that replied, a session that resumed — each is only evidence if something distinguishes it from a lookalike.",
+      "reviewStatus": "draft",
+      "schemaVersion": 2,
+      "statement": "Before reporting a component ready, the system must confirm the identity of whatever responded: that the HTTP service answering the port is the process this invocation started and is serving this project, that the loaded package is the one it installed, and that the model answering is the one recorded. A response that merely arrives, from an unidentified source, is not readiness and must not be reported as such.",
+      "title": "A readiness claim names what answered",
+      "type": "requirement"
     }
   ],
   "role": "frontend",
-  "tasks": []
+  "tasks": [
+    {
+      "acceptedBy": [
+        "ACC-0077"
+      ],
+      "dependsOn": [
+        "TSK-0025"
+      ],
+      "derivedStatus": {
+        "passed": 0,
+        "status": "outstanding",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0028"
+      ],
+      "id": "TSK-0055",
+      "implements": [
+        "CMP-0038"
+      ],
+      "lifecycle": "active",
+      "reviewStatus": "approved",
+      "role": "frontend",
+      "schemaVersion": 2,
+      "statement": "Add the Kiln health endpoint to the application, taking the run and project identifiers supplied by the supervisor at start, and returning only the identity fields.",
+      "title": "Add the run-identity health route",
+      "type": "task"
+    }
+  ]
 }

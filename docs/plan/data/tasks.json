@@ -405,5 +405,1295 @@
     "statement": "Subscribe to the stream, listen for the named heartbeat event, and run a watchdog that renders a visibly stale state — by text or icon, not colour alone — when a heartbeat does not arrive within its window. Reload on a change hint and on reconnection. No event buffer, event id or `Last-Event-ID` handling.",
     "title": "Build the change-stream client: listener, watchdog, stale state, reload on reconnect",
     "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0039"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0018",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Build a throwaway outer project — git init with no commits, a tracked-file-only copy of the tool as `.planning`, no pre-existing Pi trust decision, and a recorded starting state for every user and host location the spike will touch — so that each observation begins from a machine state the run itself established rather than one it inherited.",
+    "title": "Stand up the disposable clean-consumer fixture the spike runs in",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0038"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0019",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Determine whether 0.84.4 exposes a supported API, command or non-interactive option for recording, reading and revoking a project trust decision. Observe the result through a marker written at extension load time, upstream of any model behaviour, with the 2026-08-18 control set: untrusted, granted, explicitly denied, and grant removed. Record the answer to QST-0026 and stop for review if no supported route exists.",
+    "title": "Measure trust grant, denial and revocation against the pinned runtime",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0038",
+      "ACC-0039"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0020",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Establish which configuration-locating variables 0.84.4 consults to find its authentication store and custom-model registry, under both default directories and an explicitly overridden one, on Windows and POSIX; and confirm a restricted child carrying only those variables resolves the same store as its parent. Record the answer to QST-0029 as the measured base allowlist.",
+    "title": "Measure configuration and auth resolution on both platforms, default and overridden",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0038"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0021",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Record the literal entry `pi install -l` writes and whether it can be normalised to a portable relative form with canonical equivalence proved; confirm the installed package loads its extensions, tools, skills, prompts and capability signature; and determine whether session and runtime directories can be relocated outside the project through a supported option. Answers QST-0027 and QST-0028.",
+    "title": "Measure the package entry, package loading and session relocation",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0038",
+      "ACC-0040"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0022",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Confirm a `--mode json -p --no-session` child with closed stdin can receive its exact task through the supported non-stdin channel, with an observation taken at the child. Re-run the five behaviours recorded against 0.80.6 — silent untrusted load, trust store shape, skill override precedence, default active tool set, turn-end hooks in a non-interactive child — and record which still hold. Answers QST-0030 and QST-0031.",
+    "title": "Measure closed-stdin task binding and re-check the carried-over 0.80.6 findings",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0038",
+      "ACC-0040"
+    ],
+    "dependsOn": [
+      "TSK-0019",
+      "TSK-0020",
+      "TSK-0021",
+      "TSK-0022"
+    ],
+    "fulfils": [
+      "REQ-0005",
+      "REQ-0006",
+      "REQ-0024"
+    ],
+    "id": "TSK-0023",
+    "implements": [
+      "CMP-0041"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Retain each proof, with its control and its redaction assertions, as a test that runs in CI, so that a later change to the pinned Pi version has to re-prove the contract rather than inherit it. Tests that require a real provider stay manually invoked and out of default CI.",
+    "title": "Promote the spike fixtures into the normal test suite",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0041"
+    ],
+    "dependsOn": [
+      "TSK-0019"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0028"
+    ],
+    "id": "TSK-0024",
+    "implements": [
+      "CMP-0021"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Add `lib/pi-runtime.mjs`: resolve the CLI entry point from the tool root's node_modules, report the installed version, refuse a mismatch against the pin, and spawn through the current Node executable with shell interpolation disabled. Add the pinned dependency and raise engines.node per DEC-0026.",
+    "title": "Build the pinned Pi resolver and version gate",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0042"
+    ],
+    "dependsOn": [
+      "TSK-0069",
+      "TSK-0070"
+    ],
+    "fulfils": [
+      "REQ-0022"
+    ],
+    "id": "TSK-0025",
+    "implements": [
+      "CMP-0003"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Extend `lib/content-root.mjs` with `projectRootCandidate()` and `resolveProjectRoot()` so the directory that owns `.pi/`, `.gitignore`, Pi's working directory and runtime state has one authority, per decision #70's rule that no caller joins its own path.",
+    "title": "Add project-root resolution to the shared resolver",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0043",
+      "ACC-0044",
+      "ACC-0045"
+    ],
+    "dependsOn": [
+      "TSK-0025"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0027"
+    ],
+    "id": "TSK-0026",
+    "implements": [
+      "CMP-0022"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Add `lib/setup-transaction.mjs` owning the existing `.planning-init.lock` for the whole command: canonicalise and print targets, schema-validate readable files, probe temp-create and atomic rename in each parent, hash existing files, compare under the lock before each merge, and keep a non-secret resumable journal.",
+    "title": "Build the setup transaction: one lock, preflight, write plan and journal",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0044"
+    ],
+    "dependsOn": [
+      "TSK-0026"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0027"
+    ],
+    "id": "TSK-0027",
+    "implements": [
+      "CMP-0022"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an already-held transaction rather than acquiring their own lock, preserving their current idempotency and refusal semantics and their existing tests.",
+    "title": "Make the initializer and the ignore owner accept a held transaction",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0046"
+    ],
+    "dependsOn": [
+      "TSK-0027"
+    ],
+    "fulfils": [
+      "REQ-0027"
+    ],
+    "id": "TSK-0028",
+    "implements": [
+      "CMP-0023"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Move the existing planning, append-safety, line-ending and recorded-idempotency logic out of `lib/initialize-project.mjs` into `lib/project-gitignore.mjs` used by both initialization and setup, and add the exact-legacy-block migration under the same lock and atomic-write discipline.",
+    "title": "Extract the single ignore owner and add legacy block migration",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0047",
+      "ACC-0048"
+    ],
+    "dependsOn": [
+      "TSK-0021",
+      "TSK-0026"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0025"
+    ],
+    "id": "TSK-0029",
+    "implements": [
+      "CMP-0024"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Add `lib/pi-settings.mjs`: read under the transaction, validate the existing shape, merge only the package entry, skill-override path, provider/model/thinking defaults and session directory, write atomically through a same-directory temporary file, and produce identical bytes when the desired state already holds.",
+    "title": "Build the locked atomic schema-aware settings merge",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0047"
+    ],
+    "dependsOn": [
+      "TSK-0021",
+      "TSK-0029"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0025"
+    ],
+    "id": "TSK-0030",
+    "implements": [
+      "CMP-0024"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Compare the literal entry `pi install -l` wrote against the portable `../.planning/pi-package` form, prove both canonicalise to the same directory on this platform, and rewrite only on proof. Refuse when equivalence cannot be established rather than constructing a target.",
+    "title": "Normalise the package entry only after proving canonical equivalence",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0049",
+      "ACC-0050"
+    ],
+    "dependsOn": [
+      "TSK-0022",
+      "TSK-0028"
+    ],
+    "fulfils": [
+      "REQ-0027",
+      "REQ-0023"
+    ],
+    "id": "TSK-0031",
+    "implements": [
+      "CMP-0025"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Derive and create the chosen state root, enforce coverage-before-data, generate and persist the stable non-secret project ID once, and pass external session and runtime locations through the route the spike proved. Withdraw the external mode if QST-0027 comes back negative.",
+    "title": "Implement the local-state policy and its two modes",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0051"
+    ],
+    "dependsOn": [
+      "TSK-0019",
+      "TSK-0024"
+    ],
+    "fulfils": [
+      "REQ-0023",
+      "REQ-0026"
+    ],
+    "id": "TSK-0032",
+    "implements": [
+      "CMP-0026"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement obtaining, reading and reporting the trust decision per DEC-0027, including the non-interactive refusal and the browser-only fallback. If QST-0026 found no supported programmatic route, remove or defer the `--trust` option and document the manual step instead.",
+    "title": "Integrate project trust through the route the spike established",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0052",
+      "ACC-0053"
+    ],
+    "dependsOn": [
+      "TSK-0024",
+      "TSK-0031",
+      "TSK-0065",
+      "TSK-0066"
+    ],
+    "fulfils": [
+      "REQ-0023",
+      "REQ-0024"
+    ],
+    "id": "TSK-0033",
+    "implements": [
+      "CMP-0027"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ THE SURFACE WAS CORRECTED 2026-09-03 AFTER MEASUREMENT. This previously said 'Pi's public auth-storage and model-registry APIs'. `AuthStorage` is a real class at `dist/core/auth-storage.js` and is NOT importable — the package's exports map publishes only `.`, `./rpc-entry` and `./client` — so an implementer following the old wording would have written code that cannot resolve. ⚠️ `allowModelNetwork: false` IS WHAT MAKES THIS STEP HONEST: the consent prompt promises the check contacts no external service, and that option (which is the default) is what keeps the promise. ⚠️ AND GATE ON AVAILABILITY, NOT ON STATUS: `getProviderAuthStatus()` reports `configured: true` for a credential the registry will not use, so anything reading it alone will report ready for a project that cannot infer.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. Add the presence-only check for the known provider variables and the research credential. Instrument each access point so the before-consent criterion is observable.",
+    "title": "Build permission-gated connection inspection",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0054"
+    ],
+    "dependsOn": [
+      "TSK-0031",
+      "TSK-0033"
+    ],
+    "fulfils": [
+      "REQ-0023",
+      "REQ-0024"
+    ],
+    "id": "TSK-0034",
+    "implements": [
+      "CMP-0027"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Persist the host-specific grant in the ignored local-state root, keyed so that a provider or research change invalidates it, and read it at launch so an unchanged project does not re-prompt while a new machine does.",
+    "title": "Build the local consent record and its invalidation rules",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0053",
+      "ACC-0054"
+    ],
+    "dependsOn": [
+      "TSK-0033"
+    ],
+    "fulfils": [
+      "REQ-0003",
+      "REQ-0012"
+    ],
+    "id": "TSK-0035",
+    "implements": [
+      "CMP-0027"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "After a separate approval, run the existing `GET /usage` capability probe from `lib/research/tavily-adapter.mjs`, persist the non-secret project choice and the local approval, and map each internal state to its required user-facing wording. Declining leaves research unavailable and does not block planning.",
+    "title": "Implement the Tavily consent, probe and plain-English outcomes",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0055"
+    ],
+    "dependsOn": [
+      "TSK-0029",
+      "TSK-0033"
+    ],
+    "fulfils": [
+      "REQ-0025",
+      "REQ-0012"
+    ],
+    "id": "TSK-0036",
+    "implements": [
+      "CMP-0028"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Present available providers and exact model identifiers, validate any supplied `--provider`/`--model`/`--thinking` against the registry, require confirmation, state the billing consequence, and persist the exact identifiers through the settings merge per DEC-0028.",
+    "title": "Build model discovery, explicit selection and persistence",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0056"
+    ],
+    "dependsOn": [
+      "TSK-0036"
+    ],
+    "fulfils": [
+      "REQ-0025",
+      "REQ-0023"
+    ],
+    "id": "TSK-0037",
+    "implements": [
+      "CMP-0028"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "At every launch resolve the recorded selection, verify an authentication source is configured, verify the package and required tools loaded, verify a matching compatibility record exists, and refuse the run with a specific reason when any check fails.",
+    "title": "Build the launch-time availability checks and the refusal path",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0058"
+    ],
+    "dependsOn": [
+      "TSK-0020"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0026"
+    ],
+    "id": "TSK-0038",
+    "implements": [
+      "CMP-0029"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Add `lib/pi-provider-credentials.mjs` declaring, per supported provider, the id, supported auth source categories, and the exact required and optional model-plane variable names — names only, never values — plus the validated declarative shape by which a custom provider may contribute names.",
+    "title": "Build the audited provider credential contract table",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0057",
+      "ACC-0059"
+    ],
+    "dependsOn": [
+      "TSK-0038"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0026"
+    ],
+    "id": "TSK-0039",
+    "implements": [
+      "CMP-0029"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Construct each child's environment as the union of the measured base runtime and configuration variables, the selected provider's model-plane names and the role's tool-plane names, and prove the boundary with sentinel variables that must not cross it. Extend the existing `childEnv()` in `lib/specialists/contract.mjs` rather than adding a parallel builder.",
+    "title": "Build child environment construction and prove it with sentinels",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0058"
+    ],
+    "dependsOn": [
+      "TSK-0024",
+      "TSK-0039"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0026"
+    ],
+    "id": "TSK-0040",
+    "implements": [
+      "CMP-0029"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Spawn a throwaway restricted Pi child that resolves the exact provider and model and reports only availability and the auth-source category — never variable names, values, headers or credential-derived fingerprints — and refuse the contract if it cannot.",
+    "title": "Prove the contract with a disposable restricted child before accepting it",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0061",
+      "ACC-0062"
+    ],
+    "dependsOn": [
+      "TSK-0036",
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0012",
+      "REQ-0023",
+      "REQ-0025",
+      "REQ-0028",
+      "REQ-0024"
+    ],
+    "id": "TSK-0041",
+    "implements": [
+      "CMP-0030"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Register `kiln_preflight` outside the orchestrator registry, accepting only the one-time challenge schema and returning a fixed acknowledgement with no access to content, mutation, research, validation, delegation or shell; issue the canary under a low token ceiling and remove the tool from the effective set before the user-facing session starts.",
+    "title": "Build the setup-only preflight tool and the bounded canary request",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0060",
+      "ACC-0062"
+    ],
+    "dependsOn": [
+      "TSK-0041"
+    ],
+    "fulfils": [
+      "REQ-0012",
+      "REQ-0023",
+      "REQ-0025",
+      "REQ-0028",
+      "REQ-0024"
+    ],
+    "id": "TSK-0042",
+    "implements": [
+      "CMP-0030"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Check configuration, auth availability, model resolution, package loading and tool signatures at no cost; store canary success keyed to its exact inputs in the local-state root; and implement every invalidation input so a changed key reopens approval.",
+    "title": "Build the zero-cost preflight and the compatibility record",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0063"
+    ],
+    "dependsOn": [
+      "TSK-0030",
+      "TSK-0032"
+    ],
+    "fulfils": [
+      "REQ-0026",
+      "REQ-0028"
+    ],
+    "id": "TSK-0043",
+    "implements": [
+      "CMP-0031"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Add `pi-package/` with a declared package manifest naming extensions, skills and prompts, a registration entry point, and a machine-readable capability signature that the supervisor, the canary and the delegation verifier can each compare against what they expected.",
+    "title": "Create the Pi package manifest, entry point and capability signature",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0064",
+      "ACC-0065"
+    ],
+    "dependsOn": [
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0024",
+      "REQ-0001",
+      "REQ-0002"
+    ],
+    "id": "TSK-0044",
+    "implements": [
+      "CMP-0032"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Wrap project status and lint reads, `TYPED_TOOLS`, `MUTATION_TOOLS`, `PROJECT_TOOLS` and the stage-attestation read and write operations as validated Pi tools, and launch the session with Pi's built-in mutation tools disabled.",
+    "title": "Register the read, mutation and attestation tools over the existing registries",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0065"
+    ],
+    "dependsOn": [
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0003"
+    ],
+    "id": "TSK-0045",
+    "implements": [
+      "CMP-0032"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.",
+    "title": "Register the research, validation and delegation adapters",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0066"
+    ],
+    "dependsOn": [
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0001"
+    ],
+    "id": "TSK-0046",
+    "implements": [
+      "CMP-0033"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.",
+    "title": "Build the stage-skill generator and its check mode",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0067"
+    ],
+    "dependsOn": [
+      "TSK-0046"
+    ],
+    "fulfils": [
+      "REQ-0001"
+    ],
+    "id": "TSK-0047",
+    "implements": [
+      "CMP-0033"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.",
+    "title": "Register the consumer override path and test all four override states",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0068",
+      "ACC-0071"
+    ],
+    "dependsOn": [
+      "TSK-0044",
+      "TSK-0046"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0001"
+    ],
+    "id": "TSK-0048",
+    "implements": [
+      "CMP-0034"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Build the persistent session behaviour: resolve and guard the content root, derive the current stage from definitions and attestations, load the matching skill, and register the start prompt that begins Stage 1 on a fresh project or summarises stage, blockers and the single recommended next action on an existing one.",
+    "title": "Implement the orchestrator context, policy and the /kiln-start entry",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0069"
+    ],
+    "dependsOn": [
+      "TSK-0048"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0001"
+    ],
+    "id": "TSK-0049",
+    "implements": [
+      "CMP-0034"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Choose each next question by information value and blocking impact rather than from a fixed list, keep the operator's wording separate from interpretation, update the intake document continuously through typed tools, and run lint after material mutations without paraphrasing findings away.",
+    "title": "Implement adaptive question selection and continuous intake capture",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0070"
+    ],
+    "dependsOn": [
+      "TSK-0048"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0001"
+    ],
+    "id": "TSK-0050",
+    "implements": [
+      "CMP-0034"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Make the orchestrator show material proposed changes before making them, require the operator's decision where the stage says the decision is theirs, and refuse to approve an artifact or satisfy a user-owned exit criterion under any prompting.",
+    "title": "Implement the approval and attestation boundary",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0072",
+      "ACC-0073"
+    ],
+    "dependsOn": [
+      "TSK-0044"
+    ],
+    "fulfils": [
+      "REQ-0026",
+      "REQ-0025"
+    ],
+    "id": "TSK-0051",
+    "implements": [
+      "CMP-0035"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Write `research.md`, `planning.md` and `validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, deriving write boundaries from `lib/specialists/contract.mjs`; add the lint that fails a role with no declared tools.",
+    "title": "Author the three role definitions and the roster lint",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0074"
+    ],
+    "dependsOn": [
+      "TSK-0051"
+    ],
+    "fulfils": [
+      "REQ-0026"
+    ],
+    "id": "TSK-0052",
+    "implements": [
+      "CMP-0009"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Change `verifyChild()` in `lib/specialists/contract.mjs` from `stdinDelivered` to an independently observed task-binding outcome, rename `CHILD_REFUSED.NO_STDIN` and its detail text to describe a missing task binding, and update the existing tests so both facts are asserted together.",
+    "title": "Replace stdinDelivered with an observed task-binding result",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0076"
+    ],
+    "dependsOn": [
+      "TSK-0039",
+      "TSK-0051",
+      "TSK-0052"
+    ],
+    "fulfils": [
+      "REQ-0026",
+      "REQ-0025",
+      "REQ-0024"
+    ],
+    "id": "TSK-0053",
+    "implements": [
+      "CMP-0036"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path.",
+    "title": "Build the delegation extension: launch, binding, inheritance and cleanup",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0075"
+    ],
+    "dependsOn": [
+      "TSK-0053"
+    ],
+    "fulfils": [
+      "REQ-0026",
+      "REQ-0025",
+      "REQ-0024"
+    ],
+    "id": "TSK-0054",
+    "implements": [
+      "CMP-0036"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Verify the child's Kiln capability signature before reading its substantive answer, and cover each refusal cause with a test, including the fake child that returns plausible prose with none of Kiln's tools. This is the detection half of decision #67 that has never been built.",
+    "title": "Build capability-signature verification and the refusal matrix",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0077"
+    ],
+    "dependsOn": [
+      "TSK-0025"
+    ],
+    "fulfils": [
+      "REQ-0028"
+    ],
+    "id": "TSK-0055",
+    "implements": [
+      "CMP-0038"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "frontend",
+    "schemaVersion": 2,
+    "statement": "Add the Kiln health endpoint to the application, taking the run and project identifiers supplied by the supervisor at start, and returning only the identity fields.",
+    "title": "Add the run-identity health route",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0078"
+    ],
+    "dependsOn": [
+      "TSK-0055"
+    ],
+    "fulfils": [
+      "REQ-0022"
+    ],
+    "id": "TSK-0056",
+    "implements": [
+      "CMP-0020"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.",
+    "title": "Give the launcher a private stdin and emit run identity",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0079",
+      "ACC-0080"
+    ],
+    "dependsOn": [
+      "TSK-0055",
+      "TSK-0056"
+    ],
+    "fulfils": [
+      "REQ-0028",
+      "REQ-0020",
+      "REQ-0022"
+    ],
+    "id": "TSK-0057",
+    "implements": [
+      "CMP-0037"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.",
+    "title": "Build the supervisor's start sequence and identity handshake",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0081"
+    ],
+    "dependsOn": [
+      "TSK-0031",
+      "TSK-0057"
+    ],
+    "fulfils": [
+      "REQ-0028",
+      "REQ-0020",
+      "REQ-0022"
+    ],
+    "id": "TSK-0058",
+    "implements": [
+      "CMP-0037"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Send the start prompt on a first session and resume the recorded Kiln session afterwards, recovering by presenting available sessions when the record is missing or corrupt rather than resuming an unrelated generic session; stop both trees on Pi exit and on signals with bounded escalation, on Windows and POSIX.",
+    "title": "Build session resumption and bounded shutdown",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0082"
+    ],
+    "dependsOn": [
+      "TSK-0057"
+    ],
+    "fulfils": [
+      "REQ-0028",
+      "REQ-0020",
+      "REQ-0022"
+    ],
+    "id": "TSK-0059",
+    "implements": [
+      "CMP-0037"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Refuse the consumer command when the tool root and project root coincide, and implement the two-part opt-in with agreement verified before start, covered separately so it can never weaken the consumer-root checks.",
+    "title": "Implement the self-host refusal and its explicit opt-in",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0083",
+      "ACC-0085"
+    ],
+    "dependsOn": [
+      "TSK-0024",
+      "TSK-0025",
+      "TSK-0026",
+      "TSK-0027",
+      "TSK-0028",
+      "TSK-0029",
+      "TSK-0031",
+      "TSK-0032",
+      "TSK-0033",
+      "TSK-0036",
+      "TSK-0038",
+      "TSK-0041",
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0027"
+    ],
+    "id": "TSK-0060",
+    "implements": [
+      "CMP-0039"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.",
+    "title": "Compose the ordered setup command over the existing primitives",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0084"
+    ],
+    "dependsOn": [
+      "TSK-0060"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0027"
+    ],
+    "id": "TSK-0061",
+    "implements": [
+      "CMP-0039"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Implement the documented flags including the explicit consent options, reject API keys as arguments, refuse on any missing decision in non-interactive mode, and publish the exit-code mapping in `--help` and in tests.",
+    "title": "Implement the argument surface, refusal codes and non-interactive contract",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0086"
+    ],
+    "dependsOn": [
+      "TSK-0023"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0020",
+      "REQ-0028",
+      "REQ-0023"
+    ],
+    "id": "TSK-0062",
+    "implements": [
+      "CMP-0040"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Stand up a local provider the pinned runtime can resolve as a custom model, answering deterministically and able to emit a correctly shaped tool call, so the canary and the Stage 1 exchange are testable in CI without a paid account or a network dependency.",
+    "title": "Build the deterministic non-billable provider fixture",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0086",
+      "ACC-0087",
+      "ACC-0088"
+    ],
+    "dependsOn": [
+      "TSK-0048",
+      "TSK-0057",
+      "TSK-0060",
+      "TSK-0062"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0020",
+      "REQ-0028",
+      "REQ-0023"
+    ],
+    "id": "TSK-0063",
+    "implements": [
+      "CMP-0040"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform.",
+    "title": "Build the clean-consumer end-to-end journey test",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0089"
+    ],
+    "dependsOn": [
+      "TSK-0063"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0020",
+      "REQ-0028",
+      "REQ-0023"
+    ],
+    "id": "TSK-0064",
+    "implements": [
+      "CMP-0040"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Automate each enumerated wrong state as its own case asserting the specific refusal, so that a regression which turns any of them into an apparent success fails a named test.",
+    "title": "Build the negative-control suite",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0090"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0025"
+    ],
+    "id": "TSK-0065",
+    "implements": [
+      "CMP-0027"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ NARROWED 2026-09-03 TO PI'S BEHAVIOUR ALONE. The original wording mixed an observation of the runtime with a requirement on Kiln's wrapper, and its criterion demanded a Kiln recovery message — which cannot exist before the setup command does. What Kiln must DO about the no-TTY case is now its own task against the setup component. ⚠️ THE OBSERVATION IS THE INPUT TO THAT DECISION: if Pi already refuses cleanly, setup's precondition is a nicety; if Pi waits indefinitely, the precondition is the only thing standing between an automated run and a hang. That is why this comes first and the wrapper follows it.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive `/login` step does: whether it can be launched with exclusive terminal ownership, what its exit conveys and whether authentication must be rediscovered afterwards rather than inferred from the exit code, and what happens when it is invoked with no TTY — refusal, error, or an indefinite wait. Record it as a manually invoked check with its transcript retained, because it needs a real terminal and cannot run in the default suite.",
+    "title": "Observe Pi's authentication-only TUI behaviour, including the no-TTY case",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0091"
+    ],
+    "dependsOn": [
+      "TSK-0018"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0025"
+    ],
+    "id": "TSK-0066",
+    "implements": [
+      "CMP-0027"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ MANUAL AND OUTSIDE CI BY DECISION, not by omission. Automating it would require a real subscription credential in CI, which REQ-0024 forbids. ⚠️ DO NOT FABRICATE THE CREDENTIAL. Writing a canonical-shaped OAuth record into `auth.json` proves the shape round-trips and nothing about whether a subscription authenticates; the spike already did exactly that and the model stayed unavailable, which was a fact about provider composition rather than about OAuth. ⚠️ THE REVOCATION CONTROL IS THE HALF THAT CARRIES THE RESULT. Without it a model that was already available for an unrelated reason reads as a successful login. ⚠️ UNTIL THIS RUNS, no criterion and no section of the specification may state the OAuth route as verified — 'supported' is what the documentation may say.",
+    "reviewStatus": "amended",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Against a real subscription and outside CI: run Pi's interactive `/login` with an isolated configuration directory and a sanitized environment; after it exits, construct a fresh `ModelRuntime` and `ModelRegistry` and record whether the chosen built-in model appears in `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential and record that the model becomes unavailable. Retain a sanitized single-instance evidence record — no token, header, credential-derived value, username or home path — and label it as manual and account-bound so it is never mistaken for a suite result.",
+    "title": "Run the manual, account-bound OAuth compatibility check",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0092"
+    ],
+    "dependsOn": [
+      "TSK-0043"
+    ],
+    "fulfils": [
+      "REQ-0022",
+      "REQ-0025"
+    ],
+    "id": "TSK-0067",
+    "implements": [
+      "CMP-0031"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ IT CANNOT BE MEASURED YET AND SAYING SO IS THE POINT. The signature belongs to a package that does not exist; a spike cannot prove a property of something unbuilt, and claiming it did is the failure this cycle exists to prevent. Blocked on CMP-0031.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Once the Kiln Pi package exists, extend the compatibility suite to observe that its machine-readable capability signature is present in a loaded session and that a deliberate change to a measured tool signature is detected by a comparing consumer. Until then the suite proves extension, skill and prompt loading only.",
+    "title": "Prove the Kiln capability signature loads and can be compared",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0093"
+    ],
+    "dependsOn": [
+      "TSK-0060",
+      "TSK-0065"
+    ],
+    "fulfils": [
+      "REQ-0022"
+    ],
+    "id": "TSK-0068",
+    "implements": [
+      "CMP-0039"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ SPLIT OUT OF TSK-0065 ON 2026-09-03, because that task's criterion demanded this behaviour while the task itself was sequenced before any setup code existed. ⚠️ IT IS DOWNSTREAM OF THE OBSERVATION, NOT INSTEAD OF IT: what Pi does with no TTY decides how much this precondition is carrying. A runtime that already refuses cleanly makes it a nicety; one that waits makes it the only thing between an automated run and a hang.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Before setup launches the authentication-only login step, check for a real TTY. With no TTY and no usable authentication already present, refuse without spawning the login process and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.",
+    "title": "Implement setup's TTY precondition and its two recovery routes",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0094"
+    ],
+    "fulfils": [
+      "REQ-0014"
+    ],
+    "id": "TSK-0069",
+    "implements": [
+      "CMP-0005"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ THIS MUST LAND BEFORE THE GUARD IS DERIVED. Until it does, `reviseArtifact` is the only way to clear a bad link, and it works solely because the guard's list is incomplete — one defect is the escape hatch for the other. See the decision this task belongs to.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Stop validating the target type when removing a link, so a wrong-target, dangling or superseded reference can be withdrawn through the typed path, and give `answeredBy` a removal route it has never had. Keep the unknown-field refusal, and keep the lock, fresh read inside it, and atomic write. Cover the wrong-target, dangling and superseded cases with tests, each asserting the lint finding it clears.",
+    "title": "Make unlinkTrace able to remove an invalid or stale link",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0095"
+    ],
+    "dependsOn": [
+      "TSK-0069"
+    ],
+    "fulfils": [
+      "REQ-0013",
+      "REQ-0014"
+    ],
+    "id": "TSK-0070",
+    "implements": [
+      "CMP-0005"
+    ],
+    "lifecycle": "active",
+    "notes": "⚠️ SECOND, NEVER FIRST. Closing this bypass before removal works would leave an invalid link unremovable by any typed path, with hand-editing forbidden by #88.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Replace the hardcoded array of seventeen trace-like field names with a derivation over the schema set's `x-traceTarget` declarations, using the existing effective-schema resolver rather than re-reading schemas independently. Every declared trace field is then refused by construction, and adding one to a schema needs no code change.",
+    "title": "Derive reviseArtifact's trace-field guard from the schemas",
+    "type": "task"
   }
 ]

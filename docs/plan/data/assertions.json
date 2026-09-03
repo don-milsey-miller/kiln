@@ -1621,5 +1621,439 @@
     },
     "title": "A receiver-sensitive browser function can fail when copied into a collaborator object",
     "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0077"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0078"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0041",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ LOAD-BEARING FOR DEC-0027 AND FOR THE SETUP CONTRACT. If this were false, interactive setup would have to rely on Pi's own prompt and the `--trust approve` option could not exist. It is true, so the option can ship. ⚠️ THE STORE STILL WRITES ~/.pi/agent/trust.json underneath. What changed is that Kiln depends on a typed exported class rather than on that file's undocumented shape, which is the whole of the difference between #67(a) and DEC-0027.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, `ProjectTrustStore` exported from the package root records a project trust decision that a subsequent non-interactive child honours: set(cwd, true) causes project resources to load without --approve, set(cwd, false) prevents loading, and set(cwd, null) reverts to the unloaded default. The decision is keyed by canonical directory.",
+    "supportedBy": [
+      "EVD-0077",
+      "EVD-0078"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "Project trust can be granted, denied and revoked through Pi's public ProjectTrustStore API",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0077"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0078"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0042",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS WHY REQ-0026 EXISTS. Every role boundary in Kiln is enforced by typed tools, so a child without them is not a degraded specialist but an unconstrained model whose output looks exactly like a specialist's. ⚠️ NARROWED 2026-09-03 AFTER REVIEW. An earlier wording said the child completed a full well-formed agent turn on both platforms. It did not: the first Windows runs exited 1 after only the session header, because no model was configured, and a reader could fairly have asked whether the missing package was a consequence of the failed run rather than of trust. The completed-turn half is now attributed to the platform that actually showed it. ⚠️ THE PART THAT HOLDS EVERYWHERE is the part that matters: the package is absent and nothing says so. Re-measured 2026-09-03 with a model configured on BOTH platforms, where every trust row exits 0 and rows 1, 4 and 5 still come up with no tools.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, a `--mode json -p` child started in a project with no applicable trust decision loads none of the project package's extensions or tools, and reports no error, warning or non-zero exit attributable to trust. Where a usable model is configured the session also completes normally — observed on Linux, emitting session, agent_start, turn_start, turn_end and agent_end with the package absent.",
+    "supportedBy": [
+      "EVD-0077",
+      "EVD-0078"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "An untrusted non-interactive child loads no package and does not error",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0079"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0043",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, installing a project-local package writes a `packages` entry in `.pi/settings.json` that is relative to that file and contains no absolute or home-directory path. The Windows form uses backslashes and the POSIX form forward slashes; the two denote the same directory, so a forward-slash literal is a canonically equivalent committed form.",
+    "supportedBy": [
+      "EVD-0079"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "`pi install -l` writes a relative package entry that differs only by path separator",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [],
+      "confidence": "unverified",
+      "excluded": [
+        {
+          "because": "environment-mismatch",
+          "ref": "EVD-0080"
+        }
+      ],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "unresolved"
+    },
+    "id": "AST-0044",
+    "lifecycle": "superseded",
+    "loadBearing": true,
+    "notes": "⚠️ KEPT RATHER THAN DELETED, because the interesting part is how it passed review the first time: the claim was true, the harness did not test it, and nothing in the record contradicted the claim until someone read the retained environment report next to the assertion. The replacement cell records the whole environment it passed AND the child's own observation, so the two can disagree visibly.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "SUPERSEDED 2026-09-03 by the assertion recorded from the dedicated exact-environment cell. This claim — that a child with only PATH, TMPDIR and PI_CODING_AGENT_DIR loads the package — was made from a run whose harness supplied HOME unconditionally, and the retained Linux report recorded `HOME: true` beside it. The behaviour turned out to hold once the cell was built properly, but this record was not evidence of it.",
+    "supersededBy": [
+      "AST-0052"
+    ],
+    "supportedBy": [
+      "EVD-0080"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4",
+        "platform": "linux"
+      }
+    },
+    "title": "A Pi child resolves its configuration from PI_CODING_AGENT_DIR alone, with no HOME",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0080"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0045",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ NARROWED 2026-09-03 AFTER REVIEW, and the narrowing is about attribution rather than about the observation. The retained control is a bare `node -e` child handed two variable names: it excludes Pi as the source, which is what the credential argument needs, but it does NOT separate the operating system from Node's own process-creation path — libuv could equally be the layer that repopulates them. The earlier wording said 'Windows injects', which claimed the attribution the control cannot support. What the product depends on is the effective observable, and that is what this now states. ⚠️ THE CONTROL IS RETAINED rather than described: `osInjection` in tools/pi-compat/runs/windows.json and linux.json records what was passed, what arrived, and the difference, on both platforms. ⚠️ IT DOES NOT WEAKEN THE CREDENTIAL CLAIM — none of the nine is a credential, and sentinel secrets were absent from the child on both platforms against a control that showed them crossing under inheritance. ⚠️ SECOND CONSEQUENCE, unchanged: because USERPROFILE is always present, a child always resolves the default agent directory, so redirecting one requires setting PI_CODING_AGENT_DIR positively and can never be done by omitting a variable.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On Windows, a child process created by Node with an explicit replacement environment nonetheless receives HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR. The same construction on Linux yields exactly the variables passed and nothing more. An environment allowlist therefore establishes a lower bound on what a child sees on Windows, and an exact set on POSIX.",
+    "supportedBy": [
+      "EVD-0080"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "os": "Windows 11 Pro 10.0.26200",
+        "platform": "windows"
+      }
+    },
+    "title": "A Node-spawned child on Windows receives home and user variables it was never passed",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0081"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0046",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, a session started with no explicit tool allowlist has read, bash, edit and write active alongside any custom tools, while grep, find, ls and powershell are configured but inactive. An explicit `--tools` list narrows the active set to exactly the named tools, and a tool absent from that list is not offered to the model at all.",
+    "supportedBy": [
+      "EVD-0081"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "Pi's default active tool set includes bash, edit and write",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0081"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0047",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4 three routes relocate session transcripts, in the documented precedence order `--session-dir`, then `PI_CODING_AGENT_SESSION_DIR`, then the `sessionDir` setting. The command-line and environment routes are supplied at launch, so an external user-local state root is reachable without writing an absolute user path into committed configuration.",
+    "supportedBy": [
+      "EVD-0081"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "Pi session storage can be relocated outside the project without committing a path",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0082"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0048",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, a non-interactive child spawned with stdin closed and the task supplied as the `-p` argument receives that exact task: the text is observable in the user message sent to the provider, and the turn completes normally. Closed stdin does not prevent task delivery.",
+    "supportedBy": [
+      "EVD-0082"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "A task passed as a CLI message reaches a child whose stdin is closed",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0082"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0049",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, a tool call emitted by the provider is delivered to a tool registered by a project package with its arguments intact, and the execution is observable inside the extension. A response without a tool call produces no execution, and a tool excluded from the active allowlist is neither offered to the model nor executed.",
+    "supportedBy": [
+      "EVD-0082"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "A model-issued tool call reaches a registered Kiln tool with its arguments intact",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0083"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0050",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE NEGATIVE HALF IS THE LOAD-BEARING ONE. 'The CLI resolved' is satisfied just as well by a fixture running the development checkout's own node_modules, which is what the first version of this spike did, and the two are indistinguishable from the outside. The assertion is only worth something because it also records that the resolved path is NOT inside this repository.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After a consumer's own `npm install` inside a tracked-file copy of the tool, the Pi CLI resolved through that copy's installed `bin.pi` reports the version this repository pins, lies within the consumer directory, and lies outside the development checkout. Verified on Windows and Linux from a generated temporary project whose git repository has no commits.",
+    "supportedBy": [
+      "EVD-0083"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "A consumer resolves the pinned Pi runtime from its own .planning/node_modules",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0084"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0051",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THE SECOND SENTENCE IS THE ONE THAT CHANGES CODE. It is a refusal criterion for section 6.6's launch checks, not a curiosity.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry` discovers configured models and provider authentication without contacting any external service. A stored api_key credential moves a model from configured-but-unavailable to available. `getProviderAuthStatus()` may report `configured: true` for a credential that `hasConfiguredAuth()` rejects and that leaves the model absent from `getAvailable()`, so provider auth status is not sufficient evidence that a model is usable.",
+    "supportedBy": [
+      "EVD-0084"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "Saved API-key authentication is discoverable without network access, and status alone is not availability",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "unknown",
+          "polarity": "support",
+          "ref": "EVD-0085"
+        },
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0086"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0052",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS REPLACES A CLAIM THE HARNESS DID NOT SUPPORT. The earlier assertion said a child with no HOME loaded the package, while the harness supplied HOME unconditionally and the retained Linux report recorded `HOME: true`. The cell now names its entire environment and the test asserts the child's own observation, per platform.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4 on Linux, a child spawned with exactly PATH, TMPDIR and PI_CODING_AGENT_DIR — no HOME and no USERPROFILE, verified in the child's own report — loads the project package and completes a turn. On Windows the same construction leaves USERPROFILE present because the platform repopulates it, so the claim there is that the override is sufficient rather than that no home variable exists.",
+    "supportedBy": [
+      "EVD-0085",
+      "EVD-0086"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4",
+        "platform": "linux"
+      }
+    },
+    "title": "A Pi child resolves its configuration from PI_CODING_AGENT_DIR with no HOME on POSIX",
+    "type": "assertion"
+  },
+  {
+    "derived": {
+      "applicable": [
+        {
+          "match": "match",
+          "polarity": "support",
+          "ref": "EVD-0085"
+        }
+      ],
+      "confidence": "environment-matched",
+      "excluded": [],
+      "note": "Derived at render time from the evidence graph (#96). Not stored on the artifact.",
+      "verdict": "supported"
+    },
+    "id": "AST-0053",
+    "lifecycle": "active",
+    "loadBearing": true,
+    "notes": "⚠️ THIS IS THE CASE SECTION 3.4's CREDENTIAL CONTRACT EXISTS FOR, and until now nothing exercised it: every earlier cell used an inline key, so a child that lost every environment variable would still have inferred. The contract's whole premise — that a provider authenticated through the environment leaves a child unable to infer unless its variable is passed deliberately — is now measured rather than reasoned.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "On pi 0.84.4, a `models.json` provider whose `apiKey` is `$VAR` yields a model that `--list-models` reports in a child carrying VAR and omits in a child without it, while an inline-key provider is reported in both. Environment authentication therefore travels with the variable and with nothing else, on Windows and Linux.",
+    "supportedBy": [
+      "EVD-0085"
+    ],
+    "targetEnvironment": {
+      "facts": {
+        "piVersion": "0.84.4"
+      }
+    },
+    "title": "A provider authenticated only by an environment variable is available exactly where that variable is",
+    "type": "assertion"
   }
 ]

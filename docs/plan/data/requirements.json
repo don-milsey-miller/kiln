@@ -307,5 +307,95 @@
     "statement": "Every read of planning content in the application goes through a single reading abstraction that applies the DEC-0019 contract. A direct filesystem read of the content root anywhere else in the application fails a check that does not depend on running the application or observing what it serves, and the same check verifies that each read site is enclosed by a `<Suspense>` boundary. Acceptance for REQ-0016, REQ-0017 and REQ-0018 may not rest on freshness behaviour alone.",
     "title": "Planning-content reads are confined to the approved abstraction, and the confinement is checked statically",
     "type": "requirement"
+  },
+  {
+    "derivedFrom": [
+      "REQ-0020"
+    ],
+    "id": "REQ-0022",
+    "lifecycle": "active",
+    "notes": "⚠️ THE REFUSAL HALF IS NOT DECORATION. Setup touches an operator's credentials, trust store, ports and money; the number of ways it can legitimately stop is larger than the number of ways it can succeed. A command that succeeds or hangs is worse than one that refuses precisely, which is why the phase and the resume command are in the statement rather than in the error-handling section of a design document.",
+    "priority": "must",
+    "rationale": "The product is a planning conversation that writes structured content and shows it in a browser. Until 2026-09-02 the documented consumer path ended at `npm --prefix .planning start`, which starts the browser and nothing else: Pi started nowhere, so the half of the product that does the planning was unreachable by any documented route. A requirement that says `installable and runnable` (REQ-0020) was satisfied by that state, which is how the gap stayed invisible.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "From a machine that has Git and the supported Node version and nothing else of Kiln's, one documented command must initialise the planning workspace, install the pinned agent runtime, obtain every decision it needs from the operator, and end with the planning agent conversing about this project — or refuse, naming the phase that stopped and an exact command that resumes it. Starting the browser application alone does not satisfy this requirement.",
+    "title": "One documented command carries a clean project to a running planning conversation",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0023",
+    "lifecycle": "active",
+    "notes": "⚠️ 'RECORDED WHERE ANOTHER OPERATOR DOES NOT INHERIT IT' IS THE HALF THAT IS EASY TO LOSE. The project selection is committed configuration and should be; the approval to use THIS host's credentials is not. If the two are stored together, cloning the repository hands a second operator the first operator's consent, and nobody ever sees the prompt.",
+    "priority": "must",
+    "rationale": "Technical access is not consent. Kiln runs on the operator's own machine and can read their Pi configuration trivially, which is exactly why the boundary has to be a decision rather than a capability check. The three permissions are genuinely different questions — a local inspection that contacts nothing, an ongoing authorisation to spend on a named model, and an external call to a third-party service — and collapsing them into one prompt would mean the operator granting the expensive one by answering the cheap one.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The system must not read the operator's provider authentication store, custom-model registry, or the presence of credential environment variables before the operator has permitted that inspection. Having detected a usable configuration must never by itself authorise adopting or using it. Permission to inspect, confirmation of an exact provider and model, and permission to validate and use an optional external service are three decisions, each granted separately and each recorded where a different operator on a different machine does not inherit it.",
+    "title": "Existing configuration is inspected, and then used, only under separately granted permission",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0024",
+    "lifecycle": "active",
+    "notes": "⚠️ PROCESS ARGUMENTS ARE IN THE LIST DELIBERATELY. Command lines are visible in process listings to other users on the same machine, so passing a key through Pi's `--api-key` option is a disclosure even though nothing is written to disk. ⚠️ SO ARE DERIVED VALUES: a hash or prefix of a key recorded as a cache identity is credential-derived, and a compatibility record keyed on one is a credential artifact wearing a different name.",
+    "priority": "must",
+    "rationale": "The specialist child environment is the concrete hazard. The existing contract passes base OS variables plus TAVILY_API_KEY for the research role, which is correct for the tool plane and insufficient for the model plane: a provider authenticated only through OPENAI_API_KEY leaves every child unable to infer. The tempting fix — inherit more of the environment — is the one that must be foreclosed by a requirement, because it works immediately and leaks everything.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "No committed project file, emitted log line, error message, generated artifact, test fixture, or constructed process argument may contain a credential value or a value derived from one. A credential reaches a subprocess only through an audited contract that names, for one selected provider, the exact environment-variable names required; a provider with no such recorded mapping is refused rather than granted a wider inheritance of the operator's environment.",
+    "title": "Credential material never enters project files, logs, process arguments, or planning content",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0025",
+    "lifecycle": "active",
+    "notes": "⚠️ 'EXPLICITLY SELECTED' BINDS EVEN WHEN DISCOVERY RETURNS EXACTLY ONE MODEL. A single available model is a discovery result, not a decision, and adopting it silently is the same class of act as adopting the global default. ⚠️ THE PROOF COSTS MONEY, which is why it is a separate authorisation and not a step: see the consent requirement.",
+    "priority": "must",
+    "rationale": "Two silent failures are being closed at once. A registry entry proves configuration and not that the endpoint answers or that the model will emit a correctly shaped tool call, so a zero-cost preflight cannot be the last word. And a fallback to a global default would mean the project's recorded content was produced by a model the project never named, which destroys the only reproducibility claim the configuration makes.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The provider and exact model used for planning work must be chosen by the operator from what discovery reports, recorded as reproducible non-secret project configuration naming exact identifiers rather than a mutable alias, and proven able to perform the tool calls the system depends on before the system describes the agent as ready. When the recorded selection cannot be resolved or authenticated, the system must refuse to begin or resume planning work rather than substituting another model, another provider, or its own memory.",
+    "title": "Agent work runs on an explicitly selected and proven model, or it does not run",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0026",
+    "lifecycle": "active",
+    "notes": "⚠️ THIS IS THE OPEN HALF OF DECISION #67. Half of that decision — recording a trust grant so children come up trusted — has been executed and measured. The detection half has never been built, and it is the half that holds when the grant is missing, revoked, or made on a different machine.",
+    "priority": "must",
+    "rationale": "Measured on 2026-08-15 and not since mitigated: a non-interactive Pi child launched against an untrusted project loads no package, therefore none of Kiln's typed tools, and DOES NOT ERROR. The session completes, turn_start and turn_end and agent_end all fire, and the model answers in freehand prose. Every role boundary in this system is enforced by typed tools, so a child without them is not a degraded specialist — it is an unconstrained model whose output looks exactly like a specialist's.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before any part of a specialist's substantive answer is read or acted on, the system must observe that the child ran with the capability signature and tool set its role contract requires. A child that exited cleanly, emitted a well-formed transcript, and did not have those tools must fail the delegation loudly; its prose must not be accepted as the answer to the delegated task.",
+    "title": "A delegated result is used only when the child that produced it is proven to have had its tools",
+    "type": "requirement"
+  },
+  {
+    "derivedFrom": [
+      "REQ-0020"
+    ],
+    "id": "REQ-0027",
+    "lifecycle": "active",
+    "notes": "⚠️ THE ORDERING IS THE OPERATIONAL HALF. A design that puts transcripts under an ignored path is correct and still leaks if the first transcript is written before the ignore rule exists, or if the operator deleted the rule and setup carried on. The safe sequence and the refusal that follows a missing rule are both part of the requirement.",
+    "priority": "must",
+    "rationale": "The tool clone at `.planning/` is updated with `git pull`, so anything runtime written inside it is state the update channel is entitled to destroy. The outer project is version-controlled by the operator, so anything runtime written there is state Git is entitled to publish. Both halves of that sentence have to hold at once, which is why the requirement names an ordering — coverage first, then data — rather than only a location.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Session transcripts, launch state, consent records, compatibility results and setup journals must be written where updating the tool clone cannot destroy them and where ordinary version control does not track them, while reproducible non-secret project configuration remains committed and reviewable. The system must not write runtime state into a location before the ignore coverage protecting that location is in place.",
+    "title": "Runtime state survives a tool update and never enters version control",
+    "type": "requirement"
+  },
+  {
+    "id": "REQ-0028",
+    "lifecycle": "active",
+    "notes": "⚠️ THE NEGATIVE CONTROL IS WHAT MAKES THIS TESTABLE, and it should be written before the check: stand up an unrelated healthy HTTP server on the port and require launch to refuse. A readiness check without that control has never been shown to check anything.",
+    "priority": "must",
+    "rationale": "The current launcher polls `GET /` on the configured port and treats any HTTP response as ready. An unrelated service already listening on port 3000 therefore satisfies it, and the operator is told the browser workspace is up while looking at somebody else's application. The same shape recurs across the layer: an extension that loaded, a model that replied, a session that resumed — each is only evidence if something distinguishes it from a lookalike.",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before reporting a component ready, the system must confirm the identity of whatever responded: that the HTTP service answering the port is the process this invocation started and is serving this project, that the loaded package is the one it installed, and that the model answering is the one recorded. A response that merely arrives, from an unidentified source, is not readiness and must not be reported as such.",
+    "title": "A readiness claim names what answered",
+    "type": "requirement"
   }
 ]
