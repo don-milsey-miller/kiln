@@ -2,10 +2,10 @@
   "id": "TSK-0066",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
-  "title": "Settle OAuth discovery for a built-in provider, or record it as documentation-only",
-  "statement": "Determine whether saved OAuth authentication can be discovered for a BUILT-IN provider using a fabricated credential, or whether it requires a real interactive `/login` against a real subscription. If the latter, run it once manually, retain the sanitised outcome as single-instance evidence labelled as such, and keep it out of CI — the treatment section 15.3 already gives live paid-provider tests. Answers QST-0033.",
+  "title": "Run the manual, account-bound OAuth compatibility check",
+  "statement": "Against a real subscription and outside CI: run Pi's interactive `/login` with an isolated configuration directory and a sanitized environment; after it exits, construct a fresh `ModelRuntime` and `ModelRegistry` and record whether the chosen built-in model appears in `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential and record that the model becomes unavailable. Retain a sanitized single-instance evidence record — no token, header, credential-derived value, username or home path — and label it as manual and account-bound so it is never mistaken for a suite result.",
   "role": "platform",
   "implements": [
     "CMP-0027"
@@ -14,7 +14,7 @@
     "REQ-0022",
     "REQ-0025"
   ],
-  "notes": "⚠️ THE SPIKE'S NEGATIVE RESULT IS NOT EVIDENCE ABOUT OAUTH. A provider declared in models.json is composed with API-key auth only, so a stored OAuth credential for one never resolves — the model being unavailable says something about provider composition and nothing about the OAuth path. ⚠️ UNTIL THIS IS SETTLED, no acceptance criterion may be written as though the OAuth route were verified, and section 6.2 must keep saying so.",
+  "notes": "⚠️ MANUAL AND OUTSIDE CI BY DECISION, not by omission. Automating it would require a real subscription credential in CI, which REQ-0024 forbids. ⚠️ DO NOT FABRICATE THE CREDENTIAL. Writing a canonical-shaped OAuth record into `auth.json` proves the shape round-trips and nothing about whether a subscription authenticates; the spike already did exactly that and the model stayed unavailable, which was a fact about provider composition rather than about OAuth. ⚠️ THE REVOCATION CONTROL IS THE HALF THAT CARRIES THE RESULT. Without it a model that was already available for an unrelated reason reads as a successful login. ⚠️ UNTIL THIS RUNS, no criterion and no section of the specification may state the OAuth route as verified — 'supported' is what the documentation may say.",
   "acceptedBy": [
     "ACC-0091"
   ],

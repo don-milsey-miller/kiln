@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/kiln-project.schema.json",
+  "x-runtimeRecord": "kiln-project",
+  "x-location": "<project>/.pi/kiln.json",
+  "x-committed": true,
+  "title": "Kiln project record",
+  "description": "The one Kiln-owned file that IS committed: a stable non-secret project identifier and the project's non-secret capability choices. ⚠️ IT IS COMMITTED, WHICH DECIDES EVERYTHING ELSE ABOUT IT. Every field here reaches every clone, so nothing host-specific and nothing secret may appear: no credential, no consent, no path, no username, no machine name. The operator's permission to use THIS machine's connections lives in the ignored consent record precisely so that cloning a project does not clone somebody's approval. ⚠️ IT DELIBERATELY CARRIES NO TIMESTAMP. When this file appeared is something version control already records, and a second copy in the file is a parallel claim that can disagree with the first.",
+  "type": "object",
+  "required": ["recordVersion", "projectId"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "projectId": {
+      "$ref": "runtime-common.schema.json#/$defs/projectId",
+      "description": "Created once and never regenerated. ⚠️ A MISSING OR CONFLICTING ID IS A RECOVERY DECISION, NOT A REGENERATION (section 7): it also keys the browser health identity and the external user-local state root, so quietly minting a new one would orphan a state directory and make a running supervisor's identity check fail against its own project."
+    },
+    "research": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "description": "The project's committed research choice. ⚠️ A CHOICE, NEVER A CREDENTIAL, AND NEVER AN AUTHORISATION. `provider: \"tavily\"` records that this project intends to use Tavily; it does not record that anyone may. Whether THIS host's credential may be used is a separate grant in the ignored consent record, which is what stops a clone inheriting one operator's approval (section 6.5).",
+      "properties": {
+        "provider": {
+          "enum": ["tavily", "none"],
+          "description": "`none` is a real recorded choice — research deliberately disabled — and is distinct from the field being absent, which means nobody has decided yet."
+        }
+      }
+    }
+  }
+}

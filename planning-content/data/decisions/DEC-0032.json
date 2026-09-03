@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0032",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "OAuth is verified by a manual account-bound run, never by a fabricated credential",
+  "statement": "Kiln supports OAuth through Pi's public interactive `/login` flow. Verification is a MANUAL, account-bound compatibility check run outside CI, and fabricated OAuth records are not an acceptable substitute. The protocol: run with an isolated Pi configuration directory and a sanitized environment; complete `/login` against a real subscription; after it exits construct a FRESH `ModelRuntime` and `ModelRegistry` and prove the chosen built-in model appears through `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential as the control and require the model to become unavailable. Retain only sanitized single-instance evidence — no tokens, headers, credential-derived values, usernames or home paths. Until that run passes, documentation may describe OAuth as a supported Pi route but must not call it verified, and no acceptance criterion may be written as though it were.",
+  "rationale": "A fabricated OAuth record proves that a JSON shape written into `auth.json` is read back — an internal storage detail — and says nothing about whether a real subscription authenticates, whether the token refreshes, or whether the provider accepts the request. It would be a green check over the thing that actually matters, which is the failure mode this whole cycle exists to prevent. The API-key path was provable with a fabricated credential precisely because a stored API key IS the whole mechanism; an OAuth token is one artefact of a live flow. Making the check manual and account-bound is the honest cost: it cannot run in CI, so it is single-instance evidence recorded once and labelled as such — the treatment section 15.3 already gives live paid-provider tests. The revocation control is what makes the positive result mean anything. Without it, a model that was already available for some unrelated reason — an inherited environment variable, a stale entry — would read as a successful login.",
+  "decidedAt": "2026-09-03",
+  "addresses": [
+    "QST-0033"
+  ],
+  "alternatives": [
+    {
+      "option": "Fabricate an OAuth credential in the canonical `{type, refresh, access, expires}` shape",
+      "whyNot": "It validates the storage shape, not usable authentication. The spike already wrote exactly such a record and the model stayed unavailable — a result about provider composition, not about OAuth. Passing it would mean teaching the fixture to satisfy the check rather than the check to detect the behaviour."
+    },
+    {
+      "option": "Ship the OAuth route on Pi's documentation alone, with no run at all",
+      "whyNot": "Section 6.2 lists it as a supported route, so it is load-bearing for a consumer who has a subscription and no API key. Documentation is a source, not an observation, and this project's own evidence ladder puts the two on different rungs."
+    },
+    {
+      "option": "Automate it in CI with a service account",
+      "whyNot": "It would put a real subscription credential into CI, which REQ-0024 forbids, and the interactive flow needs a terminal and a browser callback. The cost of automation here is a credential in a place the design says one may never be."
+    }
+  ],
+  "notes": "⚠️ THE ASYMMETRY WITH THE API-KEY PATH IS DELIBERATE AND WORTH KEEPING VISIBLE. That one is proved in the suite with a fabricated credential and a no-credential control, and it is sound because a stored API key is the entire mechanism — there is nothing behind it to be wrong about. OAuth has a live flow behind the stored artefact, so the same technique proves strictly less while looking identical in a results table. ⚠️ THIS IS ALSO WHY THE DISPOSITION IS A DECISION AND NOT A MEASUREMENT: what was missing was never an experiment nobody had run, it was a choice about what would count as evidence."
+}

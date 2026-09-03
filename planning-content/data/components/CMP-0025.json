@@ -10,5 +10,10 @@
     "REQ-0027",
     "REQ-0023"
   ],
-  "notes": "⚠️ THE EXTERNAL MODE DEPENDS ON A CAPABILITY NOBODY HAS PROVED. Relocating Pi's session directory outside the project must be achievable through a supported Pi option or API; if the pinned version cannot do it, this component's second mode does not exist and the design changes rather than substituting a committed absolute path."
+  "notes": "⚠️ THE EXTERNAL MODE IS NO LONGER CONDITIONAL — three relocation routes were proved on both platforms (AST-0047), so `--session-dir` supplied at launch reaches an external root without committing an absolute path. ⚠️ THE FIVE PERSISTED SHAPES ARE NOW SPECIFIED AND VALIDATED (DEC-0033), which is what stage 5's data-model criterion was waiting on: each has a schema, a per-record version, a declared location, a committed/ignored classification, and refusals for the credential material and absolute home paths REQ-0024 forbids. What is specified is the SHAPE; the code that writes them is still the setup transaction's work.",
+  "implementedBy": [
+    "schemas/runtime/",
+    "lib/runtime-records.mjs",
+    "test/runtime-records.test.mjs"
+  ]
 }

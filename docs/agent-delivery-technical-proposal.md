@@ -290,14 +290,50 @@ the first interview turn. The approval prompt names the exact provider/model and
 the provider may charge for the request. Declining leaves a valid content/browser setup but does not
 mark the agent ready or begin intake.
 
-Success is stored only in `<local-state>/runtime/model-compatibility.json`, keyed to the exact
-provider, model, thinking level, pinned Pi version, Kiln package capability signature, and a
-non-secret endpoint/config identity. Never store a credential value, a credential-derived fingerprint,
-or a URL containing user information. Changing any key input invalidates the record and reopens
-approval. A failure mutates no planning content, records no success, and offers retry, authentication
-repair, or explicit model
-reselection. Normal launches may reuse a matching result while still performing the zero-cost
-availability checks in section 6.6.
+Success is stored only in `<local-state>/runtime/model-compatibility.json`, keyed on **exactly eight
+determinants** (`DEC-0033`), nested in a `key` object so comparison is one deep equality and nothing
+outside it can become a determinant by accident:
+
+| # | Determinant | Note |
+| --- | --- | --- |
+| 1 | `provider` | |
+| 2 | `model` | The exact id, never a mutable alias |
+| 3 | `thinkingLevel` | Changes the request; some providers reject `reasoning_effort` outright |
+| 4 | `piVersion` | The runtime builds the request and parses the tool call |
+| 5 | `apiType` | `openai-completions` and `anthropic-messages` serialise tool calls differently |
+| 6 | `endpointIdentity` + `endpointIdentitySource` | See the normalisation rule below |
+| 7 | `effectiveRequestProfile` | Derived from the **resolved model**, not raw `models.json` — the effective `compat` values, `reasoning`, and the resolved `thinkingLevelMap` result |
+| 8 | `preflightContractDigest` | See below |
+
+⚠️ **Determinant 8 replaces what this section previously called the "Kiln package capability
+signature".** It digests the exact canary protocol as handed to Pi — tool name, description, input
+schema, normalised prompt template, and the success predicate with its version — with the random
+challenge replaced by a placeholder before hashing, or the digest would differ every run and never
+hit. Keying on the whole package signature charged the operator for a new billable check whenever an
+unrelated planning tool changed, while the canary runs with **only** the preflight tool exposed, so
+its proof was never about the rest of the package. Computing it from the *effective contract* still
+catches a change in how Kiln presents the tool.
+
+⚠️ **The package capability signature is retained — as a zero-cost integrity check at every launch**
+(section 6.6), where a mismatch means the loaded package is not the one that was installed. It does
+not by itself invalidate the paid canary.
+
+⚠️ **Determinant 6 normalises, and never silently strips.** Lowercase scheme and host, explicit port,
+and the **pathname preserved** — a path is routing, and two deployments differing only after the host
+are two endpoints. A base URL bearing **userinfo or a query is refused outright** rather than
+sanitised: stripping a query would let two differently routed endpoints share one proof, and an
+identity that is merely "non-secret after normalisation" is not a property a persisted file may rely
+on. Such an endpoint needs an explicitly **declared** non-secret identity — recorded as
+`endpointIdentitySource`, because a measured identity and an asserted one are different claims about
+the same string — or the canary simply re-runs.
+
+Never store a credential value, a credential-derived fingerprint, or a URL containing user
+information. Timestamps, paths, session ids and consent state are deliberately **outside** the key:
+each would either invalidate the cache every run or tie it to something that cannot change the
+model's behaviour. Changing any determinant invalidates the record and reopens approval. A failure
+mutates no planning content and records **no result at all** — a stored failure would be a cache of a
+refusal — and offers retry, authentication repair, or explicit model reselection. Normal launches may
+reuse a matching result while still performing the zero-cost availability checks in section 6.6.
 
 ## 4. Target consumer experience
 
@@ -470,9 +506,9 @@ supported POSIX platform that:
 - project trust can be approved, denied, detected, and revoked through Pi's supported behavior;
 - `ModelRuntime` and `ModelRegistry` discover saved **API-key** authentication and custom/local
   models without network access and without exposing credential material — ✅ proved, with a
-  no-credential control. **`AuthStorage` is not importable**, and **OAuth discovery is not proved**:
-  a `models.json` provider is composed with API-key auth only, so it cannot exercise that path
-  (`QST-0033`, `TSK-0066`);
+  no-credential control. **`AuthStorage` is not importable**, and **OAuth is supported but not yet
+  verified** — by decision it is verified only by a manual account-bound run, never by a fabricated
+  credential (`DEC-0032`, `TSK-0066`);
 - the authentication-only Pi TUI can be launched with exclusive terminal ownership, its exit outcome
   can be distinguished from proven authentication, and a non-TTY path can refuse without hanging —
   ⏳ **not proved**; it needs a real terminal and is scheduled as a manually invoked check
@@ -542,10 +578,23 @@ publishes only `.`, `./rpc-entry` and `./client`, so a deep import is blocked. `
 is exported from the root for a one-off presence read and returns the credential itself, so a caller
 must test presence and never retain or log the value.
 
-⚠️ **THE OAUTH ROUTE IS NOT PROVED** (`QST-0033`). A provider declared in `models.json` is composed
-with API-key auth only, so a stored OAuth credential for one never resolves and the negative result
-says nothing about the OAuth path itself. Discovery for a built-in provider needs a real interactive
-`/login` against a real account. Do not write an acceptance criterion as though this were verified.
+⚠️ **THE OAUTH ROUTE IS SUPPORTED AND NOT YET VERIFIED** (`DEC-0032`). Kiln supports OAuth through
+Pi's public interactive `/login` flow; what has not happened is the run that proves it. That run is
+deliberately **manual and account-bound, outside CI**: an isolated Pi configuration directory and a
+sanitized environment, `/login` against a real subscription, then a **freshly constructed**
+`ModelRuntime` and `ModelRegistry` showing the chosen built-in model in `getAvailable()` and passing
+`hasConfiguredAuth()` — and then removal or revocation of the credential as the control, requiring
+the model to become unavailable. Only sanitized single-instance evidence is retained.
+
+⚠️ **A FABRICATED OAUTH CREDENTIAL DOES NOT COUNT, in any form.** Writing a canonical-shaped record
+into `auth.json` proves that a storage shape round-trips; it says nothing about whether a
+subscription authenticates or a token refreshes. The spike wrote exactly such a record and the model
+stayed unavailable — a fact about provider composition, not about OAuth. The API-key path is provable
+that way precisely because a stored API key IS the whole mechanism; an OAuth token is one artefact of
+a live flow.
+
+Until `TSK-0066` passes, this document and every other may describe OAuth as a **supported** Pi
+route, and **no acceptance criterion may state it as verified**.
 
 The same approval permits a presence-only check for the known provider variables required by the
 selected Pi integration and for `TAVILY_API_KEY`; it never permits enumerating the environment. A
@@ -1463,12 +1512,12 @@ the model, and prove the observation point was reached before believing an absen
 
 ### 21.3b What Phase 1 could not prove
 
-- **OAuth discovery, for a built-in provider** (`QST-0033`). A `models.json` provider is composed
-  with API-key auth only, so a stored OAuth credential for one never resolves; the spike's negative
-  result is expected rather than informative. Proving it needs an interactive `/login` against a real
-  subscription, which is account-bound and cannot run in CI. The API-key path *is* proved, with a
-  control. Nothing in Phase 2's first steps depends on the OAuth half — but no acceptance criterion
-  may be written as though it were verified.
+- **OAuth, for a built-in provider.** The API-key path *is* proved, with a control. OAuth is now
+  **decided rather than open** (`DEC-0032`): it ships on Pi's public `/login` route and is verified
+  by a manual account-bound run with a revocation control, never by a fabricated credential. The run
+  is `TSK-0066` and its acceptance `ACC-0091`, both outstanding. Nothing in Phase 2's other work
+  depends on it — but until it passes, no acceptance criterion may be written as though it were
+  verified.
 - **Attribution of the Windows environment injection.** The observable is retained and reproduced on
   both platforms; which layer supplies the names is not established and `AST-0045` no longer claims
   it.
@@ -1491,7 +1540,8 @@ to undo.
 - The graph carries the whole layer: 7 requirements, 21 new components, 58 acceptance criteria and
   53 tasks — the tasks carrying 88 `dependsOn` edges over two roots and no cycles, so section 17's
   order lives in the graph the schema calls authoritative rather than in this prose. Plus 6
-  decisions and 8 questions, seven answered and one (`QST-0033`, OAuth discovery) deliberately open.
+  decisions and 8 questions, all answered — the last of them, OAuth discovery, by a decision about
+  what would count as evidence rather than by a measurement.
 - **Phase 2 does not begin with a Kiln component.** Its entry task depends on the two-step repair of
   the typed link layer (`DEC-0031`), because that defect was hit three times during Phase 1 and each
   repair required knowingly exploiting its companion bug. That ordering is an edge in the dependency

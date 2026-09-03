@@ -1,0 +1,38 @@
+{
+  "id": "DEC-0033",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The five runtime records are Ajv-validated contracts, and the canary key is eight determinants",
+  "statement": "Kiln's five persisted runtime records are schema-validated through the existing Ajv layer, in `schemas/runtime/` with an `x-runtimeRecord` discriminator and per-record versions. The cached canary result is keyed on exactly eight determinants, nested in a `key` object so comparison is one deep equality: provider, model, thinkingLevel, piVersion, apiType, endpointIdentity (with its source), effectiveRequestProfile, and preflightContractDigest. THE REQUEST PROFILE IS BOUNDED BY CLASSIFICATION, NOT BY HASHING: scalar compat fields and the safely typed structures are persisted by value; the unbounded inputs — `chatTemplateKwargs`, `chatTemplateArgs`, non-empty `samplingParams` and non-authentication headers — are recorded only as CATEGORY NAMES and require an explicitly supplied, non-secret declared identity, without which no result is cached at all. That identity is never derived from the values it stands for. Known authentication headers are credential transport: excluded entirely, and not determinants. The Kiln capability signature remains a zero-cost launch check.",
+  "rationale": "These five are Kiln-owned contracts: Kiln invents, writes, versions and reads them, so a shape nobody validates is a comment, and hand-parsing them would stand up a second informal schema implementation beside the real one. `.pi/settings.json` is deliberately NOT the precedent — Pi owns that file, an operator may hand-edit it, and Kiln merges four keys into it defensively. The key set contains only inputs capable of changing the proven model and tool behaviour, because it decides when a BILLABLE check re-runs: too wide and the operator is charged for nothing, too narrow and a proof is reused on a path nobody tested.",
+  "decidedAt": "2026-09-03",
+  "addresses": [
+    "REQ-0025",
+    "REQ-0024"
+  ],
+  "alternatives": [
+    {
+      "option": "Hand-parse the runtime records, as setup does with `.pi/settings.json`",
+      "whyNot": "Settings is Pi's file and Kiln has no standing to declare its shape; these are Kiln's own. Hand-parsing would be a second schema implementation, informal and unversioned, beside an Ajv layer the project already runs."
+    },
+    {
+      "option": "Put the runtime schemas in `schemas/` beside the artifact schemas",
+      "whyNot": "`loadSchemaSet()` refuses any `*.schema.json` there without an `x-artifactType`, so it would have broken every caller of the artifact loader. They also version on a different cadence: an artifact `schemaVersion` tracks the CONTENT model and says nothing about the shape of a consent record."
+    },
+    {
+      "option": "Key the canary on the whole Kiln package capability signature (the original section 3.12)",
+      "whyNot": "It charges the operator for a new billable check whenever any unrelated planning tool changes, while the canary runs with only the preflight tool exposed — so its proof was never about the rest of the package. Replaced by a digest of the preflight CONTRACT; the package signature is retained as a zero-cost launch check, where it belongs."
+    },
+    {
+      "option": "Normalise the endpoint by stripping userinfo and query",
+      "whyNot": "A query can carry routing, so stripping it would let two differently routed endpoints share one proof. And an identity that is only 'non-secret after normalisation' is not a property a persisted file may rely on. Both are refused outright; an endpoint whose URL cannot be used needs an explicitly declared non-secret identity, or the canary re-runs."
+    },
+    {
+      "option": "Store the request profile as a digest rather than as values",
+      "whyNot": "Comparison would work and a human could not see what changed. The values are kept, with the credential-name guard bounding the one place a runtime record accepts a vocabulary Kiln does not own."
+    }
+  ],
+  "notes": "⚠️ THE KEY IS A NESTED OBJECT RATHER THAN A CONVENTION, so a field added to `result` cannot quietly join the invalidation set and a determinant cannot quietly fall out of it. ⚠️ AMENDED TWICE ON 2026-09-03, AND THE SECOND AMENDMENT IS THE INSTRUCTIVE ONE. FIRST PASS: `effectiveRequestProfile` was an open object guarded by `propertyNames`, which constrains only immediate keys — a credential nested under `compat` validated — and `endpointIdentity` was a regex that admitted an uppercase hostname, an implicit port and a trailing slash, three spellings of one endpoint that would have re-run a billable check. SECOND PASS: the repair for the first introduced a worse defect. To keep unbounded compat members in the key without persisting them, the profile carried a SHA-256 over the whole resolved compat object — so an operator writing `chatTemplateKwargs: { innocent: 'sk-live-…' }` would have had that secret's digest written to disk. That is precisely the credential-derived fingerprint REQ-0024 and section 3.12 forbid, and `runtime-common.schema.json`'s own `digest` definition already said so in as many words: hashing a key does not make it safe to persist, it makes it an oracle for confirming a guess. HASHING HIDES CONTENT; IT DOES NOT SANITISE IT. ⚠️ TWO INVALIDATION GAPS WERE FOUND WITH IT. Pi documents that `samplingParams` overrides named request fields, so excluding it could reuse a proof after the request had changed; and a custom header can select a different backend, while an authentication header cannot change what a model does. Headers are now split by role — auth excluded, everything else treated as possible routing. ⚠️ THE PATTERN ACROSS ALL THREE DEFECTS: a declarative guard was trusted to cover more than it does. `propertyNames` covers one level, a regex describes a shape rather than canonicalising one, and a digest bounds SIZE rather than SENSITIVITY. Where a record needs a safe value, something must classify it, and the classification has to be argued rather than assumed."
+}

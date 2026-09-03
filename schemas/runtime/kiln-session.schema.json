@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/kiln-session.schema.json",
+  "x-runtimeRecord": "kiln-session",
+  "x-location": "<local-state>/runtime/kiln-session.json",
+  "x-committed": false,
+  "title": "Kiln session record",
+  "description": "Which Pi session is this project's planning conversation. ⚠️ IT EXISTS SO A RESUME CANNOT ATTACH TO A STRANGER. Pi sessions are just files in a directory; without a record naming the one Kiln started, 'resume the session' means 'resume the most recent one', which on a shared session directory is somebody else's conversation. ⚠️ MISSING OR CORRUPT IS A RECOVERABLE STATE, NOT A FATAL ONE (section 12): present the available Kiln sessions or start a new one — never silently resume an unrelated generic Pi session. ⚠️ IT STORES A MODE AND NOT A PATH. The external state root is derived from the project id, so writing the resolved directory here would put an absolute user path into a file, which REQ-0024 forbids and which would break the moment the same project was opened on another machine.",
+  "type": "object",
+  "required": ["recordVersion", "projectId", "sessionId", "stateMode"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "projectId": {
+      "$ref": "runtime-common.schema.json#/$defs/projectId",
+      "description": "⚠️ CARRIED SO THE RECORD CAN BE DISOWNED. Local state can outlive the project it belonged to — a directory reused, a project re-initialised — and a session record whose project id does not match `.pi/kiln.json` belongs to something else and must not be resumed."
+    },
+    "sessionId": {
+      "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+      "description": "Pi's own identifier for the session. Opaque here on purpose: its shape belongs to Pi and pinning a format would be Kiln asserting something about a file it does not own."
+    },
+    "stateMode": {
+      "enum": ["project", "user"],
+      "description": "Which state policy was in force when this session was recorded — project-local ignored state, or the external per-user root. ⚠️ RECORDED BECAUSE IT DECIDES WHERE TO LOOK. A record written under one mode and read under the other would send the resume at a directory that does not hold the session, and the honest outcome is to notice rather than to search both."
+    },
+    "startedAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" },
+    "lastResumedAt": {
+      "$ref": "runtime-common.schema.json#/$defs/isoTimestamp",
+      "description": "⚠️ FOR A HUMAN CHOOSING BETWEEN SESSIONS, not for the machine choosing one. Recovery presents the available sessions; it does not pick the newest, because 'most recent' is the heuristic this record exists to replace."
+    }
+  }
+}

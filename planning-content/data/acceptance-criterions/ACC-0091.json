@@ -5,12 +5,13 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "OAuth discovery is either proved or recorded as documentation-only, and never implied",
-  "statement": "Either a fabricated OAuth credential is shown to make a BUILT-IN provider model available through the supported discovery surface, or a single manual run against a real subscription is retained as sanitised single-instance evidence labelled as such. Until one of those exists, no acceptance criterion and no section of the specification states the OAuth route as verified, and QST-0033 remains open and blocking.",
+  "title": "OAuth is proved by a real login and its revocation, or it is not called verified",
+  "statement": "A manual run against a real subscription records, with an isolated Pi configuration directory and a sanitized environment: that after Pi's interactive `/login` exits, a FRESHLY constructed `ModelRuntime` and `ModelRegistry` report the chosen built-in model in `getAvailable()` and return true from `hasConfiguredAuth()`; and that after the stored credential is removed or revoked, the same construction reports the model unavailable. The retained record is sanitized — asserted to contain no token, authorisation header, credential-derived value, username or absolute home path — and is labelled manual, account-bound and single-instance. A fabricated OAuth credential does not satisfy this criterion in any form.",
   "evaluates": [
     "CMP-0027"
   ],
   "verifies": [
     "REQ-0025"
-  ]
+  ],
+  "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication."
 }

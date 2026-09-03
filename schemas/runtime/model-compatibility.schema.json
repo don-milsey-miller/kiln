@@ -1,0 +1,611 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/model-compatibility.schema.json",
+  "x-runtimeRecord": "model-compatibility",
+  "x-location": "<local-state>/runtime/model-compatibility.json",
+  "x-committed": false,
+  "title": "Live model compatibility record",
+  "description": "The cached result of the one separately authorised, potentially BILLABLE canary: that this provider and model, reached through this runtime, emitted a correctly shaped call to a tool with this contract. ⚠️ THE INVALIDATION SET IS A NESTED OBJECT RATHER THAN A CONVENTION. Everything that determines validity lives in `key` and nothing else does, so comparison is a deep equality over one object and a field added elsewhere CANNOT accidentally become a determinant — or, worse, fail to become one. A flat record would make the boundary a matter of remembering which fields to compare, and the cost of getting that wrong is either charging the operator for a check that was still valid or reusing a proof that no longer holds. ⚠️ NO TIMESTAMP, PATH, SESSION ID OR CONSENT STATE APPEARS IN `key`. Each would either invalidate the cache on every run or tie it to something that cannot change the model's behaviour. `result` carries the provenance a human needs and is deliberately outside the comparison.",
+  "type": "object",
+  "required": [
+    "recordVersion",
+    "key",
+    "result"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": {
+      "$ref": "runtime-common.schema.json#/$defs/recordVersion"
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "thinkingLevel",
+        "piVersion",
+        "apiType",
+        "endpointIdentity",
+        "endpointIdentitySource",
+        "effectiveRequestProfile",
+        "preflightContractDigest"
+      ],
+      "description": "The eight determinants. ⚠️ ALL REQUIRED, so a partial key cannot compare equal to a complete one — an absent field would otherwise silently mean 'matches anything'.",
+      "properties": {
+        "provider": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "Determinant 1. A different provider is a different endpoint, a different authentication path and a different wire format."
+        },
+        "model": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "Determinant 2. Tool-calling ability is per model, and the exact id is what the project committed — never a mutable alias."
+        },
+        "thinkingLevel": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "Determinant 3. It changes the request, and some providers reject `reasoning_effort` outright — which is a compatibility failure, not a quality difference. Retained deliberately even though it will sometimes trigger a recheck on a change that turns out to be benign: the alternative is reusing a proof taken under a request shape the provider no longer accepts."
+        },
+        "piVersion": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "Determinant 4. The runtime builds the request and parses the tool call. Between 0.80.6 and 0.84.4 the CLI entry point, the tool `execute` signature and the discovery surface all moved; a proof taken on one is not a proof about another."
+        },
+        "apiType": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "Determinant 5. `openai-completions` and `anthropic-messages` serialise tool calls differently, so the same model behind a different API type is an unproven path."
+        },
+        "endpointIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scheme",
+            "hostname",
+            "port",
+            "pathname"
+          ],
+          "description": "Determinant 6, STRUCTURED RATHER THAN A STRING, because a regex over a URL could exclude userinfo and a query and still accept three non-canonical spellings of one endpoint — an uppercase hostname, an implicit port and a trailing slash all validated against the previous pattern, so two records for the same endpoint would have compared unequal and re-run a billable check. The parts are produced by `canonicalizeEndpoint()` and there is exactly one of it. ⚠️ USERINFO, QUERY AND FRAGMENT ARE REFUSED BY THE CANONICALISER, not stripped: a query can carry routing, so removing it would let two differently routed endpoints share one proof, and an identity that is only non-secret after sanitising is not a property a persisted file may rely on.",
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9+.-]*$",
+              "description": "Lowercased. `HTTPS` and `https` are one scheme and must not be two cache keys."
+            },
+            "hostname": {
+              "type": "string",
+              "pattern": "^(?!.*[A-Z])[a-z0-9._~\\-]+$|^\\[[0-9a-f:.]+\\]$",
+              "description": "Lowercased; an IPv6 literal keeps its brackets. ⚠️ THE PATTERN REFUSES ANY UPPERCASE rather than trusting the writer to have lowered it — hostnames are case-insensitive, so an uppercase spelling is the same host and a different key."
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "ALWAYS EXPLICIT, with the scheme default filled in. ⚠️ `https://h/v1` and `https://h:443/v1` are the same endpoint; leaving the port implicit would make them different records."
+            },
+            "pathname": {
+              "type": "string",
+              "pattern": "^/$|^/(?:[^/]+/)*[^/]+$",
+              "description": "PRESERVED, because a path is routing and two deployments differing only after the host are two endpoints. Canonical form: a leading slash, no trailing slash except at the root, and no empty segments."
+            }
+          }
+        },
+        "endpointIdentitySource": {
+          "enum": [
+            "derived",
+            "declared"
+          ],
+          "description": "Part of determinant 6, not a ninth. `derived` means the identity was normalised from a base URL carrying no userinfo and no query; `declared` means a human asserted a non-secret identity for an endpoint whose URL could not be used. ⚠️ IN THE KEY BECAUSE THEY ARE DIFFERENT CLAIMS ABOUT THE SAME STRING — one measured, one asserted — and a proof cached under a measured identity should not be satisfied by a run relying on an asserted one."
+        },
+        "effectiveRequestProfile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reasoning",
+            "compat",
+            "compatStructured",
+            "unboundedInputs"
+          ],
+          "description": "Determinant 7, DERIVED FROM THE RESOLVED MODEL and recursively bounded. ⚠️ THE PREVIOUS SHAPE WAS AN OPEN OBJECT GUARDED BY PROPERTY NAME, WHICH GUARDED ALMOST NOTHING: `propertyNames` constrains only immediate keys, so `{ compat: { authorization: \"Bearer …\" } }` validated, and no name rule can catch a secret stored under an innocuous key like `{ innocent: \"sk-live-…\" }`. The projection is now closed at every level and holds scalars only. ⚠️ `Model.headers` AND `samplingParams` ARE DELIBERATELY ABSENT: both are `Record<string, …>` on Pi's model, headers is where an authorization header would live, and neither changes tool-call compatibility. ⚠️ UNKNOWN FIELDS FAIL CLOSED. A compat key this schema does not name makes the record invalid, and `projectRequestProfile()` refuses to build one — so a Pi upgrade that adds a field causes a cache miss and a schema update rather than arbitrary content entering persisted state.",
+          "properties": {
+            "reasoning": {
+              "type": "boolean",
+              "description": "Whether the resolved model reasons at all — it changes the request Pi sends."
+            },
+            "resolvedThinkingValue": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The result of applying the selected thinking level to the model's `thinkingLevelMap` — the value actually sent, not the level asked for. ⚠️ `null` IS MEANINGFUL: the map marks a level UNSUPPORTED with null, which is a different request from a level that maps to a value."
+            },
+            "compat": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The effective compatibility flags, scalars only. ⚠️ THE FIELD SET IS CHECKED AGAINST THE PINNED PACKAGE'S OWN TYPE DECLARATIONS BY A TEST, so this list cannot quietly fall behind Pi — the same move that stopped the trace-field guard being a hand-maintained list beside a declaration that already existed.",
+              "properties": {
+                "allowEmptySignature": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "cacheControlFormat": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "deferredToolsMode": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "forceAdaptiveThinking": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "maxTokensField": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "requiresAssistantAfterToolResult": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "requiresReasoningContentOnAssistantMessages": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "requiresThinkingAsText": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "requiresToolResultName": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "sendSessionAffinityHeaders": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "sessionAffinityFormat": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsAdditionalTools": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsCacheControlOnTools": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsDeveloperRole": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsEagerToolInputStreaming": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsExplicitPromptCacheMode": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsFinishReason": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsLongCacheRetention": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsOpenAIGrammarTools": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsReasoningEffort": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsStore": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsStrictMode": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsStrictTools": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsTemperature": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsThinkingTokenBudget": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsToolReferences": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsToolSearch": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "supportsUsageInStreaming": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "thinkingFormat": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "thinkingTokenBudgetField": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
+                "zaiToolStream": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "compatStructured": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The compat members that are STRUCTURES rather than scalars, persisted BY VALUE because they are safely typed by Pi and can change the request. ⚠️ THEY REPLACED A DIGEST OVER THE WHOLE COMPAT OBJECT, and the digest was the defect: it hashed operator-authored open records, so a credential nested under an innocuous key became a persisted credential-derived fingerprint — exactly what REQ-0024 and section 3.12 forbid, and exactly what this file's own `digest` definition warns about. Hashing unbounded content hides it; it does not sanitise it. Only fields whose shape Pi declares are carried by value; the unbounded ones are handled by `unboundedInputs` instead.",
+              "properties": {
+                "vercelGatewayRouting": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "only": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "order": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "openRouterRouting": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Routing preferences — they select which backend serves the request, so they are determinants.",
+                  "properties": {
+                    "allow_fallbacks": {
+                      "type": "boolean"
+                    },
+                    "require_parameters": {
+                      "type": "boolean"
+                    },
+                    "data_collection": {
+                      "enum": [
+                        "deny",
+                        "allow"
+                      ]
+                    },
+                    "zdr": {
+                      "type": "boolean"
+                    },
+                    "enforce_distillable_text": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "only": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "quantizations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sort": {
+                      "type": [
+                        "string",
+                        "object"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "by": {
+                          "type": "string"
+                        },
+                        "partition": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "max_price": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "prompt": {
+                          "type": [
+                            "number",
+                            "string"
+                          ]
+                        },
+                        "completion": {
+                          "type": [
+                            "number",
+                            "string"
+                          ]
+                        },
+                        "image": {
+                          "type": [
+                            "number",
+                            "string"
+                          ]
+                        },
+                        "audio": {
+                          "type": [
+                            "number",
+                            "string"
+                          ]
+                        },
+                        "request": {
+                          "type": [
+                            "number",
+                            "string"
+                          ]
+                        }
+                      }
+                    },
+                    "preferred_min_throughput": {
+                      "type": [
+                        "number",
+                        "object"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {}
+                    },
+                    "preferred_max_latency": {
+                      "type": [
+                        "number",
+                        "object"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {}
+                    }
+                  }
+                },
+                "allowedFallbackModels": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "provider",
+                      "model"
+                    ],
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "cost": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "input": {
+                            "type": "number"
+                          },
+                          "output": {
+                            "type": "number"
+                          },
+                          "cacheRead": {
+                            "type": "number"
+                          },
+                          "cacheWrite": {
+                            "type": "number"
+                          },
+                          "tiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "unboundedInputs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "categories"
+              ],
+              "description": "Request inputs whose CONTENT Kiln may neither persist nor hash. ⚠️ THEY STILL CHANGE THE REQUEST, so ignoring them would let a cached proof outlive the request it was taken against — Pi documents that `samplingParams` override named request fields, and a custom header can select a different backend. But their values are operator-authored and unbounded, so they cannot go in the file and cannot be digested either. ⚠️ THE RESOLUTION IS A DECLARED IDENTITY OR NO CACHE: when any category is present, an explicitly supplied non-secret label is required, and it is NEVER derived from the values it stands for. Without one, the canary result is not persisted and re-runs — which is the honest cost of configuration Kiln cannot inspect safely.",
+              "properties": {
+                "categories": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "chatTemplateKwargs",
+                      "chatTemplateArgs",
+                      "samplingParams",
+                      "customHeaders"
+                    ]
+                  },
+                  "description": "Which unbounded inputs were present. ⚠️ THE CATEGORY NAMES ONLY — never a key, a value or a count, because a key name from an operator-authored record is itself unbounded content. ⚠️ AUTHENTICATION HEADERS ARE NOT A CATEGORY: they are credential transport, they are excluded from the profile entirely, and they must not invalidate a proof — rotating a key does not change what the model can do."
+                },
+                "declaredIdentity": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:@/-]{0,127}$",
+                  "description": "An operator-supplied, non-secret label standing for the unbounded configuration — for example a template revision or a routing profile name. ⚠️ SUPPLIED, NEVER DERIVED. Deriving it from the values would reintroduce the fingerprint this whole field exists to avoid, whatever function did the deriving."
+                }
+              },
+              "allOf": [
+                {
+                  "$comment": "A declared identity is required exactly when an unbounded category is present — otherwise the record would claim a proof for a request shape nothing in the key describes.",
+                  "if": {
+                    "properties": {
+                      "categories": {
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "categories"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "declaredIdentity"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "preflightContractDigest": {
+          "$ref": "runtime-common.schema.json#/$defs/digest",
+          "description": "Determinant 8. A digest of the EXACT canary protocol as passed to Pi: the tool name, description, input schema, the normalised prompt template, and the success predicate with its version. ⚠️ THE RANDOM CHALLENGE IS REPLACED BY A PLACEHOLDER BEFORE HASHING, or the digest would differ on every run and the cache would never hit. ⚠️ IT IS THE CONTRACT, NOT THE PACKAGE. Keying on the whole Kiln capability signature would charge the operator for a new billable check every time an unrelated planning tool changed — while the canary runs with only this tool exposed, so its proof was never about the rest of the package. Computed from the effective contract handed to Pi, so a change in how Kiln PRESENTS the tool is caught even when the schema itself is untouched."
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "observedAt"
+      ],
+      "description": "What happened, for a human reading the file. ⚠️ DELIBERATELY OUTSIDE `key`: none of it can change whether the proof holds, and putting the timestamp in the comparison would invalidate the cache on every run.",
+      "properties": {
+        "outcome": {
+          "enum": [
+            "passed"
+          ],
+          "description": "⚠️ ONLY SUCCESS IS PERSISTED. A failed canary mutates nothing and records no result (section 3.12); a stored failure would be a cache of a refusal, and the next run must retry rather than inherit it."
+        },
+        "observedAt": {
+          "$ref": "runtime-common.schema.json#/$defs/isoTimestamp"
+        },
+        "challengeEchoed": {
+          "type": "boolean",
+          "description": "That the tool call carried the exact random challenge. The challenge VALUE is not stored — it is single-use, and keeping it would turn a liveness proof into a replayable one."
+        }
+      }
+    }
+  }
+}

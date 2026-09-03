@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/consent.schema.json",
+  "x-runtimeRecord": "consent",
+  "x-location": "<local-state>/runtime/consent.json",
+  "x-committed": false,
+  "title": "Host consent record",
+  "description": "What THIS operator, on THIS machine, permitted — and nothing else. ⚠️ IT IS IGNORED RATHER THAN COMMITTED, AND THAT IS THE WHOLE DESIGN. A committed consent record would mean cloning a repository handed you somebody else's permission to use your machine's credentials, and nobody would ever see the prompt again (section 3.3). ⚠️ THREE PERMISSIONS, RECORDED SEPARATELY, BECAUSE THEY ARE THREE DIFFERENT QUESTIONS: may Kiln LOOK at what is configured here; may it USE a named provider and model, which authorises ongoing billable work; may it validate and use an optional external service. Detection is not consent and one grant is not another. ⚠️ NO CREDENTIAL, NO FINGERPRINT, NO VARIABLE VALUE — the record says what was permitted, never what was found.",
+  "type": "object",
+  "required": ["recordVersion"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "inspection": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "Permission to read this host's Pi authentication store, custom-model registry, and the PRESENCE of credential environment variables. ⚠️ Declining is a recorded decision, not an absent one: `granted: false` means the operator said no and setup stays honestly partial, which is different from nobody having been asked. ⚠️ THE `allOf` + `unevaluatedProperties` SHAPE IS NOT DECORATION — a bare `$ref` here accepted any extra field, because `unevaluatedProperties` has nothing to attach to and the referenced `grant` cannot forbid what its own users legitimately add. A credential field passed validation until a test asked it to fail."
+    },
+    "modelUse": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "Permission to USE the recorded provider and model on this host, which authorises ongoing potentially billable work. ⚠️ SEPARATE FROM INSPECTION BECAUSE FINDING A USABLE MODEL IS NOT PERMISSION TO SPEND ON IT.",
+      "properties": {
+        "provider": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "The provider this grant was given for. ⚠️ RECORDED SO THE GRANT CAN EXPIRE HONESTLY: a project that switches provider has not been granted anything about the new one, and the prompt must reopen."
+        },
+        "model": {
+          "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+          "description": "The exact model the grant was given for, for the same reason."
+        }
+      },
+      "required": ["provider", "model"]
+    },
+    "research": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "Permission to validate and use the optional research service on this host. ⚠️ THE COMMITTED CHOICE IN `.pi/kiln.json` DOES NOT IMPLY THIS ONE. A clone carries the project's intent to use Tavily; it does not carry anyone's permission to spend this machine's Tavily credits (section 6.5).",
+      "properties": {
+        "provider": {
+          "enum": ["tavily"],
+          "description": "Recorded so that changing the research provider invalidates the grant rather than silently transferring it."
+        }
+      },
+      "required": ["provider"]
+    }
+  },
+  "$defs": {
+    "grant": {
+      "type": "object",
+      "required": ["granted", "decidedAt"],
+      "properties": {
+        "granted": {
+          "type": "boolean",
+          "description": "⚠️ A BOOLEAN AND NOT AN ABSENCE. `false` is a decision the operator made and it must survive a rerun; treating 'no' as 'not yet asked' is how a declined prompt becomes a prompt that asks again every launch until someone clicks through it."
+        },
+        "decidedAt": {
+          "$ref": "runtime-common.schema.json#/$defs/isoTimestamp",
+          "description": "When the operator decided. ⚠️ HERE THE TIMESTAMP IS THE CONTENT, not noise: a consent record without a time is a claim that someone agreed, with nothing saying when, and consent that cannot be dated cannot be audited or expired."
+        }
+      }
+    }
+  }
+}

@@ -40,7 +40,7 @@ apply throughout, both learned here the hard way:
 | `QST-0029` What must a child inherit? | `PI_CODING_AGENT_DIR` alone on POSIX; Windows adds nine names regardless | Sentinels absent from the child, present in the inherited-env control |
 | `QST-0030` How is a task bound with stdin closed? | The `-p` argument, seen at the provider | Read from the provider's received request, never from the model's reply |
 | `QST-0031` Do the 0.80.6 findings hold? | Four hold, one not re-tested | Each re-measured rather than assumed |
-| `QST-0033` Is OAuth discovery provable? | **Open.** api_key is proved; OAuth is not | A models.json provider has no OAuth flow, so the negative result is expected rather than informative |
+| `QST-0033` Is OAuth discovery provable? | **Decided, not open.** api_key is proved here; OAuth is verified only by a manual account-bound run (`DEC-0032`) | A fabricated OAuth record validates a storage shape, not usable authentication — so this suite deliberately does not attempt it |
 
 ### What this suite does NOT establish
 
@@ -52,7 +52,7 @@ it actually verifies — and each has an acceptance criterion there:
 | Not proved | Why | Now owned by |
 | --- | --- | --- |
 | Pi's authentication-only TUI, and what it does with no TTY | Needs a real terminal, so it is a manually invoked check rather than a suite cell | `TSK-0065` → `CMP-0027` |
-| OAuth discovery for a built-in provider | A `models.json` provider is composed with API-key auth only, so it structurally cannot exercise the OAuth path | `TSK-0066` → `CMP-0027`, `QST-0033` |
+| OAuth for a built-in provider | Verified only by a real `/login` plus a revocation control; a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
 | The Kiln capability signature | It belongs to a package that does not exist yet | `TSK-0067` → `CMP-0031` |
 
 ⚠️ **Kiln's own no-TTY refusal is a fourth thing, and it is not here either.** It was split out of the

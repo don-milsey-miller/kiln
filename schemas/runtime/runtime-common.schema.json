@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/runtime-common.schema.json",
+  "title": "Runtime record primitives",
+  "description": "Shared shapes for Kiln's five persisted runtime records. ⚠️ SEPARATE FROM THE ARTIFACT `common.schema.json` ON PURPOSE. These records are not artifacts: they carry no ID prefix, no review status, no lifecycle, no trace links, and they version on their OWN cadence — an artifact `schemaVersion` tracks the CONTENT model (#50) and says nothing about the shape of a consent record. Sharing one envelope would tie two release cycles together for the sake of a field name they happen to spell alike. ⚠️ WHAT IS SHARED WITH THE ARTIFACT LAYER IS THE MACHINERY, NOT THE VOCABULARY: the same Ajv 2020-12 construction, the same dialect check, the same error formatter and the same ValidationError. A second schema implementation is what this avoids; a second vocabulary is what it deliberately keeps.",
+  "$defs": {
+    "recordVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The shape version of THIS record. ⚠️ Per record, not per project: these five files are written by different phases, migrate independently, and a single number would force a migration on four of them because the fifth changed."
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "isoTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "An instant, where the instant is part of what the record MEANS — a consent grant, a transaction start. ⚠️ Not to be added out of habit: a timestamp recording when a committed file was written duplicates what version control already knows, and a timestamp inside a cache key is operational noise that invalidates the cache every run."
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "The generated, stable, non-secret project identifier. ⚠️ LOWERCASE HEX AND FIXED LENGTH BECAUSE IT BECOMES A DIRECTORY NAME: external user-local state lives under `<state-root>/projects/<projectId>/`, so anything needing escaping, case-folding or length negotiation would be a portability bug waiting on the first Windows/POSIX pair. ⚠️ It carries no meaning and derives from nothing — not from the project name, not from a path. A derived id would leak whatever it derived from into an ignored directory name and change when that thing was renamed."
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!\\\\\\\\)(?!/)(?!.*(^|/)\\.\\.(/|$)).*$",
+      "description": "A path relative to the project root, with `/` separators. ⚠️ ABSOLUTE PATHS ARE REJECTED BY THE SCHEMA RATHER THAN BY A REVIEWER, because REQ-0024 forbids an absolute user-home path in anything Kiln writes and these records are the files most likely to accumulate one. Drive letters, UNC prefixes, leading slashes and any `..` segment are all refused. ⚠️ This is validation and not containment — only resolution against the canonicalised root is a boundary (#86), and that lives in `lib/content-root.mjs`."
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A content digest, algorithm-prefixed so a later change of algorithm is visible in the data rather than inferred from length. ⚠️ NEVER OVER CREDENTIAL MATERIAL. Section 3.12 forbids storing a credential-derived fingerprint, and a digest is exactly that: hashing a key does not make it safe to persist, it makes it an oracle for confirming a guess."
+    }
+  }
+}

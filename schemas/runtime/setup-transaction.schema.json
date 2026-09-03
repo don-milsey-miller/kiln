@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/setup-transaction.schema.json",
+  "x-runtimeRecord": "setup-transaction",
+  "x-location": "<local-state>/runtime/setup-transaction.json",
+  "x-committed": false,
+  "title": "Setup transaction journal",
+  "description": "What setup was doing when it stopped, and what would resume it. ⚠️ IT EXISTS ONLY WHILE SETUP IS INCOMPLETE. Written before the first lasting write and REMOVED on success, so its presence is itself the signal that a run was interrupted — a journal that lingered after a clean run would make every subsequent start look like a recovery. ⚠️ IT RECORDS FILE IDENTITIES, NEVER FILE CONTENTS (section 13). The transaction re-reads and compares identities under the lock so a concurrent edit refuses rather than being overwritten; storing the content instead would put a copy of the operator's settings — and whatever they had put in them — into an ignored file nobody audits. ⚠️ AND NEVER A CONFIG VALUE: the point of the journal is which phase completed, not what it configured.",
+  "type": "object",
+  "required": ["recordVersion", "operation", "startedAt", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "operation": {
+      "enum": ["setup", "resume"],
+      "description": "Which invocation opened this journal. ⚠️ A resume that is itself interrupted must not read as a fresh setup, because the recovery advice differs."
+    },
+    "startedAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The ordered plan, with each phase's outcome. ⚠️ THE WHOLE PLAN IS WRITTEN UP FRONT, not appended as it goes: a journal that only lists what has happened cannot say what was supposed to happen next, which is the one thing a recovery needs.",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" },
+          "status": {
+            "enum": ["pending", "running", "complete", "failed", "skipped"],
+            "description": "⚠️ `running` IS A REAL PERSISTED STATE. A process killed mid-phase leaves exactly one, and that is what distinguishes 'this phase never started' from 'this phase may have half-happened' — which decides whether recovery can simply rerun it."
+          },
+          "detail": {
+            "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+            "description": "A non-secret note about the outcome. Never a credential, a variable value, or an absolute path."
+          }
+        }
+      }
+    },
+    "lastCompletedPhase": {
+      "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
+      "description": "Named rather than indexed, so inserting a phase in a later version does not silently reinterpret an old journal as having got further than it did."
+    },
+    "fileIdentities": {
+      "type": "array",
+      "description": "The identity of each file the transaction may merge, recorded before the plan is applied and re-compared under the lock immediately before each merge.",
+      "items": {
+        "type": "object",
+        "required": ["path", "state"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "$ref": "runtime-common.schema.json#/$defs/relativePath" },
+          "state": {
+            "enum": ["absent", "present"],
+            "description": "⚠️ `absent` IS RECORDED, not omitted. 'This file did not exist when I planned' and 'I did not look at this file' lead to different actions, and an omitted entry cannot tell them apart — a file that appeared between plan and merge must refuse, not merge."
+          },
+          "digest": {
+            "$ref": "runtime-common.schema.json#/$defs/digest",
+            "description": "Present exactly when `state` is `present`. Over the file's bytes — never over anything credential-bearing."
+          }
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "description": "How to continue. ⚠️ AN EXACT COMMAND, not a description of one: an operator recovering from an interrupted setup is the least well-placed person to reconstruct the invocation, and a paraphrase is how a recovery becomes a second incident.",
+      "properties": {
+        "command": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" },
+        "reason": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "A present file must carry a digest and an absent one must not — the pairing is what makes the comparison meaningful rather than a matter of remembering to fill it in.",
+      "properties": {
+        "fileIdentities": {
+          "items": {
+            "if": { "properties": { "state": { "const": "present" } } },
+            "then": { "required": ["digest"] },
+            "else": { "not": { "required": ["digest"] } }
+          }
+        }
+      }
+    }
+  ]
+}

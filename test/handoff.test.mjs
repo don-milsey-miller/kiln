@@ -151,25 +151,29 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   // EIGHTH movement: the 53 agent-delivery tasks were reviewed and approved under DEC-0015, so
   // `executable-content-not-approved` disappeared. The three red stage criteria remain the whole
   // refusal, which is the state this snapshot now records.
+  // NINTH movement: stages 4 and 9 cleared together when QST-0033 was DECIDED — not verified.
+  // DEC-0032 settles that OAuth ships on Pi's public `/login` route and is proved by a manual
+  // account-bound run with a revocation control, fabricated credentials excluded. Stage 4 asks
+  // whether the gap is decided and stage 9 whether an UNANSWERED question blocks, so both clear on
+  // the decision while `TSK-0066` keeps the verification owed.
+  //
+  // TENTH movement, and the polarity flips back to PUBLISH: stage 5's `data-model-approved` cleared
+  // when the five runtime records got schemas (DEC-0033). It had been deliberately red since
+  // 2026-09-02 — the shapes had decided locations and no schemas, and approving a data model that
+  // was five filenames would have been the failure the whole cycle was opened to undo.
+  //
+  // ⚠️ READY IS NOT BUILT, AND THE GAP IS WIDER HERE THAN IT HAS EVER BEEN. The plan is publishable
+  // with almost none of the agent-delivery layer written: no `pi-package/`, no setup command, no
+  // supervisor, no orchestrator. That is what the two checks below exist to keep saying, and it is
+  // why they are asserted separately from the gate — a publishable plan that reads as a finished
+  // system is the QST-0015 hazard leaving the repository.
   assert.deepEqual(
     notReady,
-    ["04-requirement-gaps", "05-solution-design", "09-handoff"],
-    "stage 4's undecided OAuth gap, stage 5's unapproved data model, and stage 9's critical question"
+    [],
+    "every stage gate is ready; the plan is publishable"
   );
-  assert.equal(c.ready, false, "with an unready stage the handoff must refuse");
-  assert.deepEqual(
-    [...new Set(c.blockers.map((b) => b.reason))].sort(),
-    ["criterion-not-satisfied"],
-    JSON.stringify([...new Set(c.blockers.map((b) => b.reason))], null, 2)
-  );
-  // ⚠️ EACH RED CRITERION NAMED, not merely counted. The conjunction invariant above proves every
-  // unready STAGE is named; this proves the specific criteria are, so a stage going red for a
-  // different reason than the one recorded here cannot pass unnoticed.
-  for (const criterion of ["every-blocking-gap-decided", "data-model-approved", "no-unresolved-critical-questions"])
-    assert.ok(
-      c.blockers.some((b) => b.criterion === criterion),
-      `${criterion} is not satisfied but the handoff does not name it as a blocker`
-    );
+  assert.equal(c.ready, true, "with no unready stage the handoff must be ready");
+  assert.deepEqual(c.blockers, [], JSON.stringify(c.blockers, null, 2));
 
   // ⚠️ READY IS NOT THE SAME AS BUILT, and the package has to keep saying so — a publishable plan
   // that reads as a finished system is the QST-0015 hazard leaving the repository. Two checks,
