@@ -178,6 +178,12 @@ test("⚠️ every adapter's permitted consumers are DECLARED, and the list is s
     // `connection()` — does not reach it. Splitting it out of `content.js` is what kept the widening
     // proportionate: the events route needed a directory name, not a linter.
     ["server/paths.js", ["_read/planning.js", "events/route.js"]],
+    // ⚠️ ADMITTED ON THE SAME ARGUMENT `paths.js` EARNED — it holds no read. `healthIdentity` opens
+    // no content, takes no lock and caches nothing: two environment variables and the tool's own
+    // package version. The route needs it because a readiness claim is a claim about the process
+    // that answered, and only that process can make one. (`kiln/route.js` is
+    // `app/health/kiln/route.js`, shortened by the two-segment rule above.)
+    ["server/identity.js", ["kiln/route.js"]],
     ["server/review.js", ["_write/review-action.js"]],
   ]);
 

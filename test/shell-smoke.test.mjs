@@ -89,12 +89,26 @@ test("every required route is built and served, proven by an application-owned m
   await withBuildLock(() => runSmokeCheck(t));
 });
 
+/**
+ * ⚠️ **THE BUILD IS GIVEN A DECOY RUN IDENTITY, AND THE SERVER A DIFFERENT ONE.** `/health/kiln`
+ * reports the identity of the RUNNING process; a route frozen into the build would report these.
+ * That is the direct control on the property, rather than an argument about which Next versions
+ * cache a `GET` by default — the answer to which has changed between releases and would leave the
+ * check resting on a default nobody re-verifies.
+ */
+const BUILD_DECOY_RUN = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const BUILD_DECOY_PROJECT = "cccccccccccccccccccccccccccccccc";
+const STARTED_RUN = "1a2b3c4d5e6f708192a3b4c5d6e7f809";
+const STARTED_PROJECT = "9f8e7d6c5b4a39281706f5e4d3c2b1a0";
+const HEALTH_PORT = PORT + 1;
+
 async function runSmokeCheck(t) {
   rmSync(join(ROOT, ".next"), { recursive: true, force: true });
   const build = await execFileP(process.execPath, [NEXT_CLI, "build"], {
     cwd: ROOT,
     timeout: 6 * 60 * 1000,
     maxBuffer: 16 << 20,
+    env: { ...process.env, KILN_RUN_ID: BUILD_DECOY_RUN, KILN_PROJECT_ID: BUILD_DECOY_PROJECT },
   });
   // The build's own words are NOT the assertion. They are kept only to report with a failure.
   const buildOut = `${build.stdout ?? ""}${build.stderr ?? ""}`;
@@ -137,6 +151,77 @@ async function runSmokeCheck(t) {
           `build output was:\n${buildOut.slice(-800)}`
       );
     }
+    /* ---------------------------------------------------- the health endpoint, over real HTTP */
+
+    // ⚠️ THIS SERVER WAS STARTED WITHOUT A RUN IDENTITY, so it is the unidentified case, transported
+    // for real. A process nobody supervised must say so rather than answer with gaps — and this is
+    // the assertion that a unit test of the response body cannot make, because what is under test
+    // is the status and headers the ROUTE chose, not the ones the body implied.
+    const unsupervised = await fetch(`http://127.0.0.1:${PORT}/health/kiln`, { signal: AbortSignal.timeout(15_000) });
+    assert.equal(unsupervised.status, 503, "an unsupervised process must not report itself ready");
+    assert.match(unsupervised.headers.get("content-type") ?? "", /^application\/json/);
+    assert.equal(unsupervised.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await unsupervised.json(), {
+      service: "kiln",
+      protocol: "kiln.health/1",
+      error: "no-run-identity",
+    });
+
+    // ⚠️ A SECOND SERVER FROM THE SAME BUILD, started WITH an identity that differs from the one the
+    // build saw. No rebuild: `next start` is cheap and the build lock is already held.
+    const identified = spawn(
+      process.execPath,
+      [NEXT_CLI, "start", "--hostname", "127.0.0.1", "--port", String(HEALTH_PORT)],
+      {
+        cwd: ROOT,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          PLANNING_CONTENT_DIR: join(contentCopy, "planning-content"),
+          KILN_RUN_ID: STARTED_RUN,
+          KILN_PROJECT_ID: STARTED_PROJECT,
+        },
+      }
+    );
+    try {
+      const healthBy = Date.now() + 90_000;
+      let health = null;
+      while (Date.now() < healthBy && !health) {
+        try {
+          health = await fetch(`http://127.0.0.1:${HEALTH_PORT}/health/kiln`, { signal: AbortSignal.timeout(5_000) });
+        } catch {
+          await sleep(1000);
+        }
+      }
+      assert.ok(health, `the identified server never accepted a connection on ${HEALTH_PORT}`);
+
+      assert.equal(health.status, 200);
+      assert.match(health.headers.get("content-type") ?? "", /^application\/json/);
+      assert.equal(health.headers.get("cache-control"), "no-store");
+
+      const body = await health.json();
+      const version = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8")).version;
+
+      // The exact response, over the wire. ⚠️ Key SET, not key order — JSON object order is not
+      // part of the protocol and pinning it would fail a reordering that changes nothing.
+      assert.deepEqual(Object.keys(body).sort(), ["build", "projectId", "protocol", "runId", "service"]);
+      assert.deepEqual(body, {
+        service: "kiln",
+        protocol: "kiln.health/1",
+        runId: STARTED_RUN,
+        projectId: STARTED_PROJECT,
+        build: version,
+      });
+
+      // ⚠️ AND THE CONTROL: the identity is the one this SERVER was started with, never the one the
+      // BUILD was given. A route frozen into the build would answer with the decoys, and would be
+      // indistinguishable from a correct one by every other assertion above.
+      assert.notEqual(body.runId, BUILD_DECOY_RUN, "the response carried the BUILD's identity — the route is frozen");
+      assert.notEqual(body.projectId, BUILD_DECOY_PROJECT, "the response carried the BUILD's project identity");
+    } finally {
+      await killTree(identified);
+    }
+
     /* ---------------------------------------------------------- the freshness regression */
 
     const currentOf = async () => {
