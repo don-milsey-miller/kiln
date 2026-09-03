@@ -1404,6 +1404,23 @@
         "REQ-0022",
         "REQ-0027"
       ]
+    },
+    {
+      "evaluates": [
+        "CMP-0022"
+      ],
+      "id": "ACC-0100",
+      "lifecycle": "active",
+      "outcome": "pass",
+      "reviewStatus": "approved",
+      "schemaVersion": 2,
+      "statement": "Given a transaction that already holds the project lock, the initializer runs inside it and produces content byte-identical to a standalone run, with the marked ignore block appended at most once and every pre-existing line intact; a second run inside a held transaction still reports already-initialised and does not touch the ignore file. The transaction is accepted only as an authenticated, currently live capability: an object carrying the right shape but not issued by the transaction module is refused, a genuine transaction whose run has finished is refused, and one holding a different project is refused — each without writing anything. Work runs inside a transaction only by being registered with it, so a collaborator authenticated at entry is also enrolled for its duration rather than left to run beside it. A transaction is revoked before its lock is released and every operation through a revoked transaction is refused. In-flight work is drained to quiescence before revocation, including work started by work already being drained, so nothing registered with the transaction is still running when the lock is released. Where any work was still running at the moment the body returned, that work completes under the lock and the run is reported failed. No claim is made about operations the body did not await which had already settled: they are indistinguishable from awaited ones and cannot cross the release boundary. An acquisition of a lock already held further up the same call stack is refused immediately rather than waiting out its bounded retry, that refusal expires with the lock so an acquisition from an async context descended from a released lock succeeds, and two concurrent independent acquisitions in one process still serialise.",
+      "title": "The initializer runs inside an authenticated, live transaction",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0022",
+        "REQ-0027"
+      ]
     }
   ],
   "accepted": [
@@ -1990,15 +2007,16 @@
     },
     {
       "acceptedBy": [
-        "ACC-0044"
+        "ACC-0044",
+        "ACC-0100"
       ],
       "dependsOn": [
         "TSK-0026"
       ],
       "derivedStatus": {
-        "passed": 1,
+        "passed": 2,
         "status": "accepted",
-        "total": 1
+        "total": 2
       },
       "fulfils": [
         "REQ-0022",
@@ -2346,7 +2364,9 @@
       "id": "CMP-0022",
       "implementedBy": [
         "lib/setup-transaction.mjs",
-        "test/setup-transaction.test.mjs"
+        "lib/lock.mjs",
+        "test/setup-transaction.test.mjs",
+        "test/initialize-project.test.mjs"
       ],
       "lifecycle": "active",
       "notes": "⚠️ IT REUSES THE EXISTING LOCK RATHER THAN ADDING ONE. The initializer already owns `<project>/.planning-init.lock`; a second lock beside it would let setup and initialization interleave on the same files while each believed it held the project. The initializer and the ignore owner must therefore accept an already-held transaction instead of acquiring their own. ⚠️ THERE IS NO --force. A malformed file is a refusal, because the only thing --force could mean here is overwriting something the operator wrote and setup could not parse.",

@@ -320,7 +320,7 @@ Be the only route by which any Pi process is started. Resolve the exact pinned C
 Own one project-wide lock for the whole of setup, and make every lasting write happen under a plan rather than in sequence: canonicalise and print each target before mutating, schema-validate every file it may read or merge, probe same-directory temporary-file creation and atomic rename in each parent it will write to, record the identity of each existing file, re-compare that identity immediately before each merge, and maintain a non-secret journal that names the last completed phase so an interruption resumes rather than restarts.
 
 *Satisfies: REQ-0027, REQ-0022*
-*Implemented by: lib/setup-transaction.mjs, test/setup-transaction.test.mjs*
+*Implemented by: lib/setup-transaction.mjs, lib/lock.mjs, test/setup-transaction.test.mjs, test/initialize-project.test.mjs*
 
 ### CMP-0023 — Project ignore owner
 
@@ -1271,7 +1271,7 @@ Add `lib/setup-transaction.mjs` owning the existing `.planning-init.lock` for th
 
 Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an already-held transaction rather than acquiring their own lock, preserving their current idempotency and refusal semantics and their existing tests.
 
-**accepted** (1/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0022 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0028 — Extract the single ignore owner and add legacy block migration
