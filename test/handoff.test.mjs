@@ -197,11 +197,17 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   const shellCriteria = read("acceptance-criterions").filter((a) =>
     (a.evaluates ?? []).some((id) => shellIds.has(id))
   );
-  // 26 since 2026-09-02: the twenty-five run-2 criteria plus ACC-0036 and ACC-0037, and now
-  // ACC-0078, which is the agent layer's one claim on a shell component — the launcher must receive
-  // a private stdin under the supervisor so it cannot consume the operator's typing. It evaluates
-  // CMP-0020, so it belongs to this slice even though the work that motivated it does not.
-  assert.equal(shellCriteria.length, 26, "every run-2 criterion, plus ACC-0036, ACC-0037 and ACC-0078");
+  // 27 since 2026-09-03: the twenty-five run-2 criteria plus ACC-0036 and ACC-0037, and the agent
+  // layer's two claims on a shell component. ACC-0078 says the launcher must receive a private stdin
+  // under the supervisor so it cannot consume the operator's typing; ACC-0101 says what the launcher
+  // itself can prove — validated identity propagated to the application, stop and EOF through the
+  // stdin it was given, standalone unchanged. Both evaluate CMP-0020, so both belong to this slice
+  // even though the work that motivated them does not.
+  //
+  // ⚠️ THE TWO WERE SPLIT BECAUSE ONLY ONE OF THEM IS THE LAUNCHER'S TO SATISFY. ACC-0078 requires
+  // observing that terminal input reaches Pi and not the launcher, which needs the process holding
+  // both — the supervisor. It moved to TSK-0057 for that reason, and TSK-0056 got ACC-0101.
+  assert.equal(shellCriteria.length, 27, "every run-2 criterion, plus ACC-0036, ACC-0037, ACC-0078 and ACC-0101");
 
   // INVARIANT 1: a criterion may only be `pass` if every component it evaluates has code. Accepted
   // work that nothing implements is the sharpest form of the QST-0015 hazard — it would put a tick
@@ -297,6 +303,12 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       "ACC-0035",
       "ACC-0036",
       "ACC-0037",
+      // ⚠️ THE AGENT LAYER'S FIRST PASS ON A SHELL COMPONENT. ACC-0101 evaluates CMP-0020, so it
+      // joins this slice: the launcher now validates a supplied run identity, propagates it to the
+      // application, and stops on both the stop message and stdin close. Its sibling ACC-0078 is
+      // NOT here and must not be — it needs the supervisor to observe that terminal input reaches
+      // Pi rather than the launcher, so it stays `not-evaluated` until TSK-0057 can establish it.
+      "ACC-0101",
     ],
     "criteria evaluated so far"
   );

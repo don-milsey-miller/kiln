@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  DEFAULT_PORT,
   HEALTH_PATH,
   HEALTH_PROTOCOL,
   NO_BUILD,
@@ -32,6 +33,8 @@ import {
   RUN_ID_ENV,
   SERVICE,
   healthIdentity,
+  parsePort,
+  readSuppliedIdentity,
   toolVersion,
 } from "../lib/run-identity.mjs";
 
@@ -199,4 +202,73 @@ test("the path the supervisor polls and the directory the route lives in are the
     readFileSync(join(ROOT, "app", ...HEALTH_PATH.slice(1).split("/"), "route.js"), "utf-8").length > 0,
     "the route file must live where HEALTH_PATH says it does"
   );
+});
+
+/* ============================================== what the launcher must validate ================= */
+
+test("a port is parsed, not coerced", () => {
+  // ⚠️ `Number()` ACCEPTS THINGS A PORT IS NOT. `Number("3000 ")` is 3000, `Number("0x0BB8")` is
+  // 3000, and `Number("abc")` is NaN — which the launcher used to hand to `--port` as "NaN".
+  assert.deepEqual(parsePort(undefined), { port: DEFAULT_PORT });
+  assert.deepEqual(parsePort(null), { port: DEFAULT_PORT }, "absent is absent, however it is spelled");
+
+  // ⚠️ **AN EMPTY VALUE IS A SET VALUE.** `PORT=""` used to select the default, so a supervisor
+  // whose port computation produced nothing would bind 3000 silently and then poll the port it
+  // thought it had chosen. "Nobody set a port" and "somebody set a port to nothing" want different
+  // answers, and only the first has a safe default.
+  assert.ok(parsePort("").problem, "an empty PORT is a mistake, not an omission");
+  assert.match(parsePort("").problem, /set but empty/);
+  assert.match(parsePort("").problem, /3000/, "and says what unsetting it would have given");
+  assert.deepEqual(parsePort(undefined, 4413), { port: 4413 });
+  assert.deepEqual(parsePort("3000"), { port: 3000 });
+  assert.deepEqual(parsePort("1"), { port: 1 });
+  assert.deepEqual(parsePort("65535"), { port: 65535 });
+
+  for (const bad of ["abc", "3000 ", " 3000", "0x0BB8", "3000.5", "-1", "+80", "1e3", "8080\n", 3000, [], {}])
+    assert.ok(parsePort(bad).problem, `must refuse ${JSON.stringify(bad)}`);
+  for (const outOfRange of ["0", "65536", "99999"]) assert.ok(parsePort(outOfRange).problem, outOfRange);
+
+  // ⚠️ The refusal never echoes the value: this reaches the operator's terminal, and REQ-0024 covers
+  // emitted log lines.
+  assert.ok(!parsePort("abc").problem.includes("abc"));
+});
+
+test("a partial or malformed supervisor identity refuses rather than falling back to standalone", () => {
+  assert.deepEqual(readSuppliedIdentity({}), { mode: "standalone" });
+  assert.deepEqual(readSuppliedIdentity({ PATH: "/usr/bin" }), { mode: "standalone" });
+  // Explicitly removed, as a spread with `undefined` does, is still absent.
+  assert.deepEqual(readSuppliedIdentity({ [RUN_ID_ENV]: undefined, [PROJECT_ID_ENV]: undefined }), { mode: "standalone" });
+  assert.deepEqual(readSuppliedIdentity(identified), { mode: "supervised", runId: RUN, projectId: PROJECT });
+
+  // ⚠️ **FALLING BACK TO STANDALONE IS THE WORST AVAILABLE OPTION.** The shell would start, the
+  // supervisor's health poll would never match, and the operator would be shown a readiness timeout
+  // — a symptom two processes away from its cause.
+  for (const env of [
+    { [RUN_ID_ENV]: RUN },
+    { [PROJECT_ID_ENV]: PROJECT },
+    { [RUN_ID_ENV]: RUN, [PROJECT_ID_ENV]: "nope" },
+    { [RUN_ID_ENV]: "/home/someone", [PROJECT_ID_ENV]: PROJECT },
+    { [RUN_ID_ENV]: RUN.toUpperCase(), [PROJECT_ID_ENV]: PROJECT },
+    { [RUN_ID_ENV]: [RUN], [PROJECT_ID_ENV]: PROJECT },
+    // ⚠️ **PRESENT-BUT-EMPTY IS NOT STANDALONE.** These four used to read as a deliberate
+    // unsupervised run, so a supervisor whose identity generation produced nothing reached the one
+    // route that skipped the partial-identity refusal — and started a shell it could never
+    // recognise. Once either NAME is present, both VALUES have to earn it.
+    { [RUN_ID_ENV]: "", [PROJECT_ID_ENV]: "" },
+    { [RUN_ID_ENV]: "", [PROJECT_ID_ENV]: PROJECT },
+    { [RUN_ID_ENV]: RUN, [PROJECT_ID_ENV]: "" },
+    { [RUN_ID_ENV]: "" },
+  ]) {
+    const r = readSuppliedIdentity(env);
+    assert.equal(r.mode, "invalid", `must refuse ${JSON.stringify(Object.keys(env))}`);
+    assert.match(r.problem, new RegExp(`${RUN_ID_ENV}|${PROJECT_ID_ENV}`), "and must name the variable");
+  }
+
+  // ⚠️ IT NAMES THE VARIABLE, NEVER ITS VALUE.
+  const leaky = readSuppliedIdentity({ [RUN_ID_ENV]: "/home/someone/secret", [PROJECT_ID_ENV]: PROJECT });
+  assert.ok(!leaky.problem.includes("/home/someone/secret"), "a diagnostic must not become a disclosure");
+
+  // Which variable is wrong is said, so the fix does not need a guess.
+  assert.match(readSuppliedIdentity({ [RUN_ID_ENV]: "x", [PROJECT_ID_ENV]: PROJECT }).problem, /^KILN_RUN_ID is not/);
+  assert.match(readSuppliedIdentity({ [RUN_ID_ENV]: RUN, [PROJECT_ID_ENV]: "x" }).problem, /^KILN_PROJECT_ID is not/);
 });

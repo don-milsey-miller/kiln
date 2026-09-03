@@ -72,11 +72,11 @@ const contentRootFrom = (log) => (log.match(/\[vpw\] planning content root: (.+)
  * Start the launcher, wait until it is ready, and hand back what the test needs to observe it.
  * `extraEnv` is how the falsification disables termination.
  */
-async function launch(extraEnv = {}) {
+async function launch(extraEnv = {}, port = PORT) {
   let log = "";
   const proc = spawn(process.execPath, [join(ROOT, "bin", "start-shell.mjs")], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(PORT), PLANNING_CONTENT_DIR: join(ROOT, "planning-content"), ...extraEnv },
+    env: { ...process.env, PORT: String(port), PLANNING_CONTENT_DIR: join(ROOT, "planning-content"), ...extraEnv },
     stdio: ["pipe", "pipe", "pipe"],
   });
   proc.stdout.on("data", (b) => (log += String(b)));
@@ -129,9 +129,17 @@ test("⚠️ stopping the launcher leaves nothing behind, after a watcher is kno
   await withBuildLock(() => cleanupCheck(t));
 });
 
+/**
+ * ⚠️ THE EXPENSIVE LAUNCH IS RUN SUPERVISED, so propagation is proved end to end without a second
+ * build. These are the values the supervisor would generate; the application must answer with
+ * exactly them, which is the whole of what "propagates the identity to the application" means.
+ */
+const SUP_RUN = "3f2e1d0c9b8a77665544332211009988";
+const SUP_PROJECT = "aabbccddeeff00112233445566778899";
+
 async function cleanupCheck(t) {
 
-  const { proc, log } = await launch();
+  const { proc, log } = await launch({ KILN_RUN_ID: SUP_RUN, KILN_PROJECT_ID: SUP_PROJECT });
   const runDir = runDirFrom(log());
   assert.ok(runDir, "the launcher must report its run directory");
   // ⚠️ The pid comes from the launcher's own run record rather than from its output. The record is
@@ -161,6 +169,20 @@ async function cleanupCheck(t) {
     assert.ok(childPid, "the launcher must record the pid of the child it owns");
     assert.ok(pidAlive(childPid), "the recorded child must actually be running");
     assert.equal(await portFree(PORT), false, "something must be listening while it runs");
+
+    // ---- the identity reached the APPLICATION, which is the only place it can be observed.
+    // ⚠️ ASSERTED THROUGH THE HEALTH RESPONSE, not through the launcher's log. The launcher printing
+    // a run ID proves it parsed one; only the child answering with it proves it was propagated.
+    assert.match(log(), new RegExp(`supervised run ${SUP_RUN}`), "the launcher must say which run it is serving");
+    const health = await fetch(`http://${HOST}:${PORT}/health/kiln`, { signal: AbortSignal.timeout(20_000) });
+    assert.equal(health.status, 200, "the supervised application must report an identity");
+    assert.deepEqual(await health.json(), {
+      service: "kiln",
+      protocol: "kiln.health/1",
+      runId: SUP_RUN,
+      projectId: SUP_PROJECT,
+      build: JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8")).version,
+    });
 
     // ---- ⚠️ THE PRECONDITION. Without this the cleanup below is the teardown of nothing.
     const frames = await observeHeartbeat();
@@ -238,4 +260,88 @@ test("Next is started directly, so the pid the launcher holds IS the server's", 
   assert.match(startSpawn, /"start", "--hostname", HOST/, "with loopback bound explicitly");
   assert.ok(!/npm/.test(startSpawn), "no npm process between the launcher and the server");
   assert.ok(!/shell:start|run"/.test(startSpawn), "and no npm script indirection");
+});
+
+test("⚠️ closing the supplied stdin stops the launcher, exactly as `stop` does", async (t) => {
+  t.diagnostic("a second real start; the build is warm by now");
+  // ⚠️ **EOF IS THE OTHER HALF OF THE SUPERVISOR'S SHUTDOWN, AND IT IS THE ONE THAT ALWAYS ARRIVES.**
+  // A supervisor that dies cannot send `stop`; the operating system closes its pipes regardless. A
+  // launcher that only handled the message would survive its supervisor and keep the port.
+  await withBuildLock(async () => {
+    const { proc, log } = await launch({ PORT: String(PORT + 2) }, PORT + 2);
+    const runDir = runDirFrom(log());
+    assert.ok(runDir && existsSync(runDir), "the run directory must exist before EOF proves it is removed");
+    const childPid = JSON.parse(readFileSync(join(runDir, "run.json"), "utf-8")).pid;
+
+    proc.stdin.end(); // no message at all — just the close
+
+    const until = Date.now() + 30_000;
+    while (Date.now() < until && proc.exitCode === null) await sleep(200);
+    assert.notEqual(proc.exitCode, null, "the launcher must exit when its stdin closes");
+    assert.match(log(), /stdin closed/, "and must say that is why");
+    assert.match(log(), /\[vpw\] stopped\.$/m, "having seen its own child exit");
+
+    await sleep(1500);
+    assert.equal(pidAlive(childPid), false, `the child (${childPid}) survived stdin closing`);
+    assert.equal(existsSync(runDir), false, "and the run directory went with it");
+  });
+});
+
+/* ============================================== TSK-0056: what the launcher owes a supervisor === */
+
+/**
+ * ⚠️ THESE REFUSALS COST NOTHING TO TEST, because they happen before install and build. That
+ * ordering is deliberate on both sides: a launcher that validated its inputs after a two-minute
+ * build would report a typo two minutes late.
+ */
+const refuses = async (env, why) => {
+  const r = await execFileP(process.execPath, [join(ROOT, "bin", "start-shell.mjs")], {
+    cwd: ROOT,
+    env: { ...process.env, PLANNING_CONTENT_DIR: join(ROOT, "planning-content"), ...env },
+    timeout: 60_000,
+  }).catch((e) => e);
+  assert.equal(r.code, 2, `${why}: expected a refusal, got ${r.code ?? "success"}`);
+  return String(r.stderr ?? "");
+};
+
+test("a port that is not a port is refused before anything is built", async () => {
+  // ⚠️ `Number("abc")` IS NaN, AND IT USED TO REACH `--port` AS THE STRING "NaN" — a shell that
+  // fails to start for a reason printed nowhere.
+  for (const PORT_VALUE of ["abc", "0", "65536", "3000 ", "0x0BB8", "-1"]) {
+    const err = await refuses({ PORT: PORT_VALUE }, `PORT=${JSON.stringify(PORT_VALUE)}`);
+    assert.match(err, /PORT must be/, "and must say what a port is");
+    assert.ok(!err.includes(PORT_VALUE) || /^[0-9]+$/.test(PORT_VALUE), "without echoing a non-numeric value");
+  }
+});
+
+test("⚠️ a partial or malformed supervisor identity refuses instead of starting standalone", async () => {
+  // ⚠️ STARTING ANYWAY IS THE WORST OPTION: the supervisor's health poll would never match, and the
+  // operator would be shown a readiness timeout whose cause is two processes away.
+  const cases = [
+    [{ KILN_RUN_ID: SUP_RUN }, "only the run id"],
+    [{ KILN_PROJECT_ID: SUP_PROJECT }, "only the project id"],
+    [{ KILN_RUN_ID: "nope", KILN_PROJECT_ID: SUP_PROJECT }, "a malformed run id"],
+    [{ KILN_RUN_ID: SUP_RUN, KILN_PROJECT_ID: SUP_PROJECT.toUpperCase() }, "the wrong case"],
+  ];
+  for (const [env, why] of cases) {
+    const err = await refuses(env, why);
+    assert.match(err, /KILN_RUN_ID|KILN_PROJECT_ID/, "the refusal must name the variable");
+    assert.match(err, /standalone/, "and say how to run without a supervisor");
+  }
+
+  // ⚠️ AND IT NAMES THE VARIABLE, NEVER ITS VALUE — this text is an emitted log line (REQ-0024).
+  const leaked = await refuses({ KILN_RUN_ID: "/home/someone/secret", KILN_PROJECT_ID: SUP_PROJECT }, "a path");
+  assert.ok(!leaked.includes("/home/someone/secret"), "a diagnostic must not become a disclosure");
+});
+
+test("⚠️ the application is given no stdin at all, so it cannot read the launcher's", () => {
+  // ⚠️ IT WAS `stdio: "inherit"`, which hands the child whatever this process was given: standalone
+  // that is the operator's terminal, and under the supervisor it is the private pipe the launcher's
+  // own stop control arrives on. Either way a second reader on that handle steals bytes from the
+  // reader meant to have them. The application needs no stdin, so it is given none — which makes
+  // the guarantee structural rather than a question of who reads first.
+  const src = readFileSync(join(ROOT, "bin", "start-shell.mjs"), "utf-8");
+  const startSpawn = src.slice(src.indexOf("const child = spawn("), src.indexOf("writeFileSync("));
+  assert.match(startSpawn, /stdio: \["ignore", "inherit", "inherit"\]/);
+  assert.ok(!/stdio: "inherit"/.test(startSpawn), "inheriting stdio hands the child the launcher's stdin");
 });

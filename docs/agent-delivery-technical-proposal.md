@@ -1007,7 +1007,32 @@ timeout, stop every process started by the invocation, preserve diagnostic outpu
 retry command. Never silently attach to an existing server or silently persist an automatically chosen
 port as project configuration.
 
-Never let the background application process inherit terminal stdin. Never start Pi from inside
+Never let the background application process inherit terminal stdin. **That is two hops, and each
+owns its own.** The supervisor gives the launcher a private pipe rather than the terminal; the
+launcher in turn gives the application *no* stdin at all, rather than passing on whatever it was
+handed. The second hop is not implied by the first: a launcher that inherits its stdio hands the
+application the very pipe its own stop control arrives on, so a second reader on that handle steals
+bytes from the reader meant to have them — standalone, it hands over the terminal directly. The
+application needs no stdin, so it is given none, which makes the guarantee structural rather than a
+question of who reads first.
+
+The launcher validates the run identifier, project identifier and port before using any of them, and
+propagates the identity it validated rather than whatever the environment held. A partial, malformed
+or **present-but-empty** identity is a refusal, before install and before build: starting anyway
+produces a shell the supervisor can never recognise, surfacing to the operator as a readiness timeout
+two processes away from its cause. The refusal names the offending variable and never its value.
+
+**An empty value is a set value, and the distinction is load-bearing in both places it appears.**
+Standalone means the identity variables are absent, not blank; an empty `PORT` is refused rather than
+read as unset. Both defaults are safe only for the case where nobody chose — a supervisor whose port
+or identity computation produced nothing would otherwise start a shell on a port it did not pick, or
+under no identity at all, and then poll for what it believed it had asked for.
+
+The launcher stops both on the stop control message and on its stdin closing — a supervisor that dies
+cannot send a message, but the operating system closes its pipes regardless. That EOF behaviour
+applies to any piped stdin, supervised or not; only interactive standalone operation is unchanged.
+
+Never start Pi from inside
 `.planning/`; its working directory must be the canonical outer project root.
 
 The self-hosting checkout is a distinct mode because its tool root and project root are the same.

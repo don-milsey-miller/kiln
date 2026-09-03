@@ -41,11 +41,22 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { contentRootCandidate, resolveContentRoot, ContentRootError } from "../lib/content-root.mjs";
+import { PROJECT_ID_ENV, RUN_ID_ENV, parsePort, readSuppliedIdentity } from "../lib/run-identity.mjs";
 
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const NEXT = join(ROOT, "node_modules", "next", "dist", "bin", "next");
 
-const PORT = Number(process.env.PORT ?? 3000);
+/**
+ * ⚠️ **PARSED AND REFUSED, NOT COERCED.** This was `Number(process.env.PORT ?? 3000)`, so `PORT=abc`
+ * became `NaN` and was handed to `--port` as the string "NaN" — a shell that fails to start for a
+ * reason printed nowhere. The parse is shared with the supervisor, which bind-tests the same number.
+ */
+const port = parsePort(process.env.PORT);
+if (port.problem) {
+  console.error(`[vpw] ${port.problem}`);
+  process.exit(2);
+}
+const PORT = port.port;
 const HOST = "127.0.0.1";
 /** How long a child gets to exit on its own before it is killed. */
 const GRACE_MS = Number(process.env.VPW_SHUTDOWN_GRACE_MS ?? 8000);
@@ -155,7 +166,32 @@ async function main() {
   const root = contentRoot();
   say(`planning content root: ${root}`);
 
-  const env = { ...process.env, NODE_ENV: "production", PLANNING_CONTENT_DIR: root };
+  /**
+   * ⚠️ **THE IDENTITY IS VALIDATED HERE AND PROPAGATED FROM HERE.** The application answers
+   * `/health/kiln` from its own environment, so what this passes down IS what the supervisor's
+   * handshake will compare against. A malformed value forwarded unchecked would produce a health
+   * response that never matches, reported two processes away as a readiness timeout.
+   */
+  const identity = readSuppliedIdentity(process.env);
+  if (identity.mode === "invalid") {
+    console.error(`[vpw] ${identity.problem}`);
+    process.exit(2);
+  }
+
+  const env = {
+    ...process.env,
+    NODE_ENV: "production",
+    PLANNING_CONTENT_DIR: root,
+    // ⚠️ Set from the VALIDATED values rather than inherited: `...process.env` would carry whatever
+    // was there, and "we checked it" and "we passed the thing we checked" are different claims.
+    ...(identity.mode === "supervised"
+      ? { [RUN_ID_ENV]: identity.runId, [PROJECT_ID_ENV]: identity.projectId }
+      : {}),
+  };
+
+  // ⚠️ SAID OUT LOUD, because standalone and supervised differ in how this process can be stopped
+  // and in whether anything is polling it. An operator reading the log should not have to infer it.
+  say(identity.mode === "supervised" ? `supervised run ${identity.runId}` : "standalone (no supervisor identity)");
 
   if (needsInstall()) installDependencies(env);
   else say("dependencies present; skipping install");
@@ -174,12 +210,19 @@ async function main() {
   // the pid a cleanup test reads, and its removal is one of the three things ACC-0032 observes.
   const runDir = mkdtempSync(join(tmpdir(), "vpw-launch-"));
 
-  // ⚠️ DIRECTLY, so the pid held here IS the server's. `stdio: inherit` keeps the child's output the
-  // operator's output; there is nothing this launcher needs to parse out of it.
+  // ⚠️ DIRECTLY, so the pid held here IS the server's. Output is inherited — the child's output is
+  // the operator's output and there is nothing here to parse out of it.
+  //
+  // ⚠️ **STDIN IS `ignore`, AND THAT IS THE LAUNCHER'S HALF OF "THE BACKGROUND PROCESS NEVER READS
+  // THE TERMINAL".** It was `stdio: "inherit"`, which hands the child whatever this process was
+  // given: standalone that is the operator's terminal, and under the supervisor it is the private
+  // pipe this launcher's own stop control arrives on. Either way a second reader on that handle
+  // steals bytes from the reader that was meant to have them. The application needs no stdin at all,
+  // so it is given none — which makes the guarantee structural rather than a matter of who reads first.
   const child = spawn(process.execPath, [NEXT, "start", "--hostname", HOST, "--port", String(PORT)], {
     cwd: ROOT,
     env,
-    stdio: "inherit",
+    stdio: ["ignore", "inherit", "inherit"],
   });
 
   writeFileSync(
