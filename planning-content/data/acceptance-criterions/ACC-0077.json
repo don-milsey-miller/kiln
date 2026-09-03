@@ -2,11 +2,11 @@
   "id": "ACC-0077",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
-  "title": "The health response carries run and project identity and nothing sensitive",
-  "statement": "The endpoint returns the service name, a versioned health protocol, the ephemeral run identifier, the non-secret project identifier and the build version, and is asserted to contain no absolute path, credential, session content or planning content.",
+  "outcome": "pass",
+  "title": "The health response is exactly an identity, asserted field by field",
+  "statement": "The endpoint returns exactly the keys service, protocol, runId, projectId and build — no more and no fewer, as a set rather than in a fixed order — with the service name and the versioned protocol fixed, the run and project identifiers equal to the ones supplied to this process, and the build version read from the package the running code was loaded from rather than from the environment, which could only ever match itself. A response carrying an additional key, missing a key, or carrying the two identifiers exchanged, fails; asserting only the absence of known sensitive patterns does not satisfy this, because it passes on every field nobody thought to pattern-match. Every field of a successful response is built from a validated value: both identifiers must be strings matching the fixed 32-character lowercase hexadecimal format, and the build version must match a character set containing no path separator, colon or whitespace. Nothing that fails those checks is echoed, so the absence of any absolute path, credential, session content or planning content holds by construction across the whole response rather than by scanning the output. An identity that is not whole is not an identity: a missing, unreadable or unsafe build version answers 503 exactly as a missing run identity does, never a 200 with a null field. Each failure answers with its own exact key set and a distinguishing error, never a 200 with fields missing and never an invented identifier. The status, headers and parsed body are observed over real HTTP for both the identified and the unidentified case, and the served identity is proved to come from the running process rather than the build by starting the application with an identity different from the one present when it was built.",
   "evaluates": [
     "CMP-0038"
   ],

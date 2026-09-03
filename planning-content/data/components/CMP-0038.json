@@ -9,5 +9,11 @@
   "satisfies": [
     "REQ-0028"
   ],
-  "notes": "⚠️ EVERY FIELD IS THERE TO DEFEAT A SPECIFIC LOOKALIKE. The run id defeats a previous Kiln process still holding the port; the project id defeats a Kiln serving a different project; the service name and protocol defeat an unrelated application that happens to return JSON."
+  "notes": "⚠️ EVERY FIELD IS THERE TO DEFEAT A SPECIFIC LOOKALIKE. The run id defeats a previous Kiln process still holding the port; the project id defeats a Kiln serving a different project; the service name and protocol defeat an unrelated application that happens to return JSON.",
+  "implementedBy": [
+    "lib/run-identity.mjs",
+    "app/health/kiln/route.js",
+    "app/server/identity.js",
+    "test/run-identity.test.mjs"
+  ]
 }
