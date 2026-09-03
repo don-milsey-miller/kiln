@@ -306,7 +306,7 @@ Statically prove, without executing the application, that every planning-content
 Install and run the shell from one documented command: build the application and start it in production mode, owning the `next start` process as a child, forwarding shutdown to it, waiting for it to exit, and leaving nothing behind — no process on the port, no temporary directory it created. The file watcher is an in-process resource of the child and is released by its teardown.
 
 *Satisfies: REQ-0020*
-*Implemented by: bin/start-shell.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs*
+*Implemented by: bin/start-shell.mjs, lib/run-identity.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs*
 
 ### CMP-0021 — Pinned Pi runtime
 
@@ -1470,18 +1470,18 @@ Add the Kiln health endpoint to the application, taking the run and project iden
 **accepted** (1/1 criteria passed) · role: frontend
 *Implements: CMP-0038 · fulfils: REQ-0028*
 
-### TSK-0056 — Give the launcher a private stdin and emit run identity
+### TSK-0056 — Isolate application stdin and support supervised launcher control
 
-Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.
+Change `bin/start-shell.mjs` to validate the run identifier, project identifier and port it is given, propagate the identity to the application it starts, keep its own stdin as its control channel while giving the application none, and stop on both the stop message and stdin close — preserving its existing interactive standalone behaviour and its current cleanup tests. On a piped stdin, standalone or supervised, closing the pipe stops the launcher; that is intended rather than preserved. Whether terminal input reaches Pi rather than the launcher is the supervisor's to establish and belongs to TSK-0057.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0020 · fulfils: REQ-0022*
 
 ### TSK-0057 — Build the supervisor's start sequence and identity handshake
 
 Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**outstanding** (0/3 criteria passed) · role: platform
 *Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
 
 ### TSK-0058 — Build session resumption and bounded shutdown

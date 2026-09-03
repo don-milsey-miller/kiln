@@ -1753,5 +1753,21 @@
       "REQ-0022",
       "REQ-0027"
     ]
+  },
+  {
+    "evaluates": [
+      "CMP-0020"
+    ],
+    "id": "ACC-0101",
+    "lifecycle": "active",
+    "outcome": "pass",
+    "reviewStatus": "approved",
+    "schemaVersion": 2,
+    "statement": "Started with a run identifier and a project identifier, the launcher validates both before use and the application it starts answers its health endpoint with exactly those values — observed from the application's response, not from the launcher's own output, since a launcher printing an identifier proves only that it parsed one. The port is parsed rather than coerced, and a value that is not a whole number between 1 and 65535 is refused before anything is installed or built; an empty value is refused rather than treated as unset, because a supervisor whose port computation produced nothing would otherwise bind the default and then poll the port it believed it had chosen. A partial, malformed or present-but-empty identity is refused with the offending variable named and its value not echoed, never treated as a standalone run: standalone means the variables are absent, not blank, and starting anyway would produce a shell the supervisor can never recognise, reported to the operator as a readiness timeout two processes away from its cause. The launcher stops on the stop control message arriving on the stdin it was given, and stops equally on that stdin being closed with no message — a supervisor that dies cannot send anything, but the operating system closes its pipes regardless. Both paths terminate the child, remove the run directory, and free the port. The application is given no stdin at all, so it cannot read from the handle the launcher's own control channel arrives on. Interactive standalone operation — a terminal on stdin, no identity supplied — is unchanged, and the existing content-root refusal, single-child ownership and cleanup behaviour continue to hold. Standalone operation on a PIPED stdin is deliberately not unchanged: closing that pipe stops the launcher whether or not a supervisor is present, which is the intended behaviour rather than a preserved one. This criterion makes no claim about readiness: the launcher propagates an identity, and confirming that the process answering is the one this invocation started is the supervisor's to establish.",
+    "title": "The launcher propagates a validated identity and stops through the stdin it is given",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
   }
 ]

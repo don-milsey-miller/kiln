@@ -1421,6 +1421,22 @@
         "REQ-0022",
         "REQ-0027"
       ]
+    },
+    {
+      "evaluates": [
+        "CMP-0020"
+      ],
+      "id": "ACC-0101",
+      "lifecycle": "active",
+      "outcome": "pass",
+      "reviewStatus": "approved",
+      "schemaVersion": 2,
+      "statement": "Started with a run identifier and a project identifier, the launcher validates both before use and the application it starts answers its health endpoint with exactly those values — observed from the application's response, not from the launcher's own output, since a launcher printing an identifier proves only that it parsed one. The port is parsed rather than coerced, and a value that is not a whole number between 1 and 65535 is refused before anything is installed or built; an empty value is refused rather than treated as unset, because a supervisor whose port computation produced nothing would otherwise bind the default and then poll the port it believed it had chosen. A partial, malformed or present-but-empty identity is refused with the offending variable named and its value not echoed, never treated as a standalone run: standalone means the variables are absent, not blank, and starting anyway would produce a shell the supervisor can never recognise, reported to the operator as a readiness timeout two processes away from its cause. The launcher stops on the stop control message arriving on the stdin it was given, and stops equally on that stdin being closed with no message — a supervisor that dies cannot send anything, but the operating system closes its pipes regardless. Both paths terminate the child, remove the run directory, and free the port. The application is given no stdin at all, so it cannot read from the handle the launcher's own control channel arrives on. Interactive standalone operation — a terminal on stdin, no identity supplied — is unchanged, and the existing content-root refusal, single-child ownership and cleanup behaviour continue to hold. Standalone operation on a PIPED stdin is deliberately not unchanged: closing that pipe stops the launcher whether or not a supervisor is present, which is the intended behaviour rather than a preserved one. This criterion makes no claim about readiness: the launcher propagates an identity, and confirming that the process answering is the one this invocation started is the supervisor's to establish.",
+      "title": "The launcher propagates a validated identity and stops through the stdin it is given",
+      "type": "acceptance-criterion",
+      "verifies": [
+        "REQ-0022"
+      ]
     }
   ],
   "accepted": [
@@ -2036,6 +2052,33 @@
     },
     {
       "acceptedBy": [
+        "ACC-0101"
+      ],
+      "dependsOn": [
+        "TSK-0055"
+      ],
+      "derivedStatus": {
+        "passed": 1,
+        "status": "accepted",
+        "total": 1
+      },
+      "fulfils": [
+        "REQ-0022"
+      ],
+      "id": "TSK-0056",
+      "implements": [
+        "CMP-0020"
+      ],
+      "lifecycle": "active",
+      "reviewStatus": "approved",
+      "role": "platform",
+      "schemaVersion": 2,
+      "statement": "Change `bin/start-shell.mjs` to validate the run identifier, project identifier and port it is given, propagate the identity to the application it starts, keep its own stdin as its control channel while giving the application none, and stop on both the stop message and stdin close — preserving its existing interactive standalone behaviour and its current cleanup tests. On a piped stdin, standalone or supervised, closing the pipe stops the launcher; that is intended rather than preserved. Whether terminal input reaches Pi rather than the launcher is the supervisor's to establish and belongs to TSK-0057.",
+      "title": "Isolate application stdin and support supervised launcher control",
+      "type": "task"
+    },
+    {
+      "acceptedBy": [
         "ACC-0094"
       ],
       "derivedStatus": {
@@ -2330,6 +2373,7 @@
       "id": "CMP-0020",
       "implementedBy": [
         "bin/start-shell.mjs",
+        "lib/run-identity.mjs",
         "docs/running-the-shell.md",
         "package.json",
         "next.config.mjs",
@@ -3815,33 +3859,7 @@
     },
     {
       "acceptedBy": [
-        "ACC-0078"
-      ],
-      "dependsOn": [
-        "TSK-0055"
-      ],
-      "derivedStatus": {
-        "passed": 0,
-        "status": "outstanding",
-        "total": 1
-      },
-      "fulfils": [
-        "REQ-0022"
-      ],
-      "id": "TSK-0056",
-      "implements": [
-        "CMP-0020"
-      ],
-      "lifecycle": "active",
-      "reviewStatus": "approved",
-      "role": "platform",
-      "schemaVersion": 2,
-      "statement": "Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.",
-      "title": "Give the launcher a private stdin and emit run identity",
-      "type": "task"
-    },
-    {
-      "acceptedBy": [
+        "ACC-0078",
         "ACC-0079",
         "ACC-0080"
       ],
@@ -3852,7 +3870,7 @@
       "derivedStatus": {
         "passed": 0,
         "status": "outstanding",
-        "total": 2
+        "total": 3
       },
       "fulfils": [
         "REQ-0028",
@@ -3864,7 +3882,7 @@
         "CMP-0037"
       ],
       "lifecycle": "active",
-      "reviewStatus": "approved",
+      "reviewStatus": "amended",
       "role": "platform",
       "schemaVersion": 2,
       "statement": "Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.",

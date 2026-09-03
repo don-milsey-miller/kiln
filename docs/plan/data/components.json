@@ -364,6 +364,7 @@
     "id": "CMP-0020",
     "implementedBy": [
       "bin/start-shell.mjs",
+      "lib/run-identity.mjs",
       "docs/running-the-shell.md",
       "package.json",
       "next.config.mjs",
