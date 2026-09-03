@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0060",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The canary is separately approved, names the cost, and declining is not an error",
+  "statement": "The prompt names the exact provider and model and states that the provider may charge. Declining leaves a valid content and browser setup, does not mark the agent ready, does not begin intake, and is reported as a choice rather than a failure. Non-interactive runs require an explicit approval flag when no matching record exists.",
+  "evaluates": [
+    "CMP-0030"
+  ],
+  "verifies": [
+    "REQ-0012",
+    "REQ-0023"
+  ]
+}

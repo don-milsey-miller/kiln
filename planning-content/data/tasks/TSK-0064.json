@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0064",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the negative-control suite",
+  "statement": "Automate each enumerated wrong state as its own case asserting the specific refusal, so that a regression which turns any of them into an apparent success fails a named test.",
+  "role": "platform",
+  "implements": [
+    "CMP-0040"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0020",
+    "REQ-0028",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0089"
+  ],
+  "dependsOn": [
+    "TSK-0063"
+  ]
+}

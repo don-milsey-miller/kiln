@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0067",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An override with the same identity wins, and removing it reverts",
+  "statement": "With the consumer's override directory registered after the packaged set, a real Pi resource load resolves the override file for a skill of the same identity; editing the override changes what loads; removing it reverts to the packaged skill. Provenance is read from the loaded file path, not from model behaviour.",
+  "evaluates": [
+    "CMP-0033"
+  ],
+  "verifies": [
+    "REQ-0001"
+  ]
+}

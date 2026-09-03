@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0038",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "Every spike claim carries a negative control that would have failed",
+  "statement": "For each behaviour the compatibility suite establishes, the recorded evidence contains both the observation and a control run in which the claimed behaviour is absent and the observation does not appear. A claim recorded with only a positive run fails this criterion, and so does a negative result whose transcript does not show the process reaching the point where the observation would have been made.",
+  "evaluates": [
+    "CMP-0041"
+  ],
+  "verifies": [
+    "REQ-0005",
+    "REQ-0006"
+  ],
+  "notes": "PASS 2026-09-03. Mechanised in test/pi-compat.test.mjs inside `assertContract()`, which is applied to the retained record AND to the live run: trust rows 4 and 5 revert the grant, the sentinel control shows secrets crossing under inheritance, the prose and exclusion controls show no tool executing, the override-removal control restores the packaged skill, the no-credential control leaves the model unavailable, the without-variable control leaves the env-authenticated model unavailable while an inline-key provider is listed in both, and the default-directory control shows the override actually moved something. ⚠️ TWO GAPS WERE FOUND IN THIS CRITERION'S OWN ENFORCEMENT AND BOTH ARE CLOSED. The packaged prompt proof had only a successful expansion: `literalSlashStringReachedProvider: false` in the SAME run is the other half of one observation, not a control, and would read identically if the template had expanded for a reason unrelated to package loading. There is now a separate run with trust revoked in which the package does not load, the body marker does not arrive, and the literal slash string survives. ⚠️ AND `reachedObservationPoint()` ACCEPTED ANY TERMINATED PROCESS THAT EMITTED ANY OUTPUT — so a CLI dying on a bad argument would have had its missing marker read as a trust result. It now requires a `session` event in the transcript, which is emitted after the point where the load-time marker would have been written. An absent marker beside a session event is a real negative; an absent marker beside no session event is a void run, and the test refuses it."
+}

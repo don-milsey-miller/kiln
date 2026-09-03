@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0028",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Model binding",
+  "responsibility": "Turn discovery into a recorded decision and hold it: present available providers and exact model identifiers, require confirmation even when exactly one is available, persist the exact non-alias identifiers as project configuration, state plainly that subsequent work on this model may be billed, and at every later launch resolve that recorded selection and refuse the run if it is unavailable rather than falling back.",
+  "satisfies": [
+    "REQ-0025",
+    "REQ-0023"
+  ],
+  "notes": "⚠️ 'NEVER A MUTABLE ALIAS' IS A REPRODUCIBILITY RULE. A project that records `latest` records nothing: the content it produces cannot be attributed to a model, and a change of behaviour has no change of configuration to explain it."
+}

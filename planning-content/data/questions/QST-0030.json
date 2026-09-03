@@ -1,0 +1,19 @@
+{
+  "id": "QST-0030",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "How is a delegated task bound to a child whose stdin is closed?",
+  "statement": "The approved child contract closes stdin so a non-interactive process cannot wait forever for input, which leaves the task to arrive as a CLI message or through a private prompt file. Which of those does 0.84.4 actually support for a `--mode json -p --no-session` child, what are the size and quoting limits, and what observation proves at the child end that the exact delegated task arrived rather than an empty or truncated one?",
+  "raisedBy": [
+    "CMP-0036"
+  ],
+  "notes": "⚠️ THE OBSERVATION IS THE HARD HALF, and it is what the existing verifier gets wrong. `stdinDelivered` is a field the parent sets about what it intended, not a fact about what the child received. The replacement has to be observed at the child, and the test must assert both halves at once: stdin closed, and the exact task present.",
+  "answer": "As the `-p` CLI message. A child spawned with stdin set to ignore received the exact task text, observed in the user message at the provider boundary rather than taken from anything the model reported, and completed with exit 0 on both platforms. That is the observation the revised verifier should make: the parent's intent to deliver is not evidence; the task appearing downstream is.",
+  "answeredBy": [
+    "AST-0048",
+    "EVD-0082"
+  ]
+}

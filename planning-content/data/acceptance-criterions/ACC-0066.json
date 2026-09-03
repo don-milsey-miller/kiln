@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0066",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Packaged skills are generated, and staleness fails a check",
+  "statement": "Each packaged stage skill carries the purpose, outputs and exit criteria of its canonical definition, produced by a generator rather than hand-maintained. Editing a stage definition without regenerating makes the check mode fail in CI, naming the stale skill.",
+  "evaluates": [
+    "CMP-0033"
+  ],
+  "verifies": [
+    "REQ-0001"
+  ]
+}

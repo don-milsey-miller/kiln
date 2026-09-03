@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0065",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Observe Pi's authentication-only TUI behaviour, including the no-TTY case",
+  "statement": "Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive `/login` step does: whether it can be launched with exclusive terminal ownership, what its exit conveys and whether authentication must be rediscovered afterwards rather than inferred from the exit code, and what happens when it is invoked with no TTY — refusal, error, or an indefinite wait. Record it as a manually invoked check with its transcript retained, because it needs a real terminal and cannot run in the default suite.",
+  "role": "platform",
+  "implements": [
+    "CMP-0027"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0025"
+  ],
+  "notes": "⚠️ NARROWED 2026-09-03 TO PI'S BEHAVIOUR ALONE. The original wording mixed an observation of the runtime with a requirement on Kiln's wrapper, and its criterion demanded a Kiln recovery message — which cannot exist before the setup command does. What Kiln must DO about the no-TTY case is now its own task against the setup component. ⚠️ THE OBSERVATION IS THE INPUT TO THAT DECISION: if Pi already refuses cleanly, setup's precondition is a nicety; if Pi waits indefinitely, the precondition is the only thing standing between an automated run and a hang. That is why this comes first and the wrapper follows it.",
+  "acceptedBy": [
+    "ACC-0090"
+  ],
+  "dependsOn": [
+    "TSK-0018"
+  ]
+}

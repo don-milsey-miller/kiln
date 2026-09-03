@@ -56,6 +56,32 @@ For options, exit codes, what gets created, and how reruns and refusals behave, 
 Kiln runs locally and does not need a database or hosted service. Research is optional and may
 require credentials for the configured search provider.
 
+## First-run assumptions and current boundaries
+
+Kiln's current content initializer needs only Node's built-in modules. The planned Pi agent-delivery
+setup described in [`docs/agent-delivery-technical-proposal.md`](docs/agent-delivery-technical-proposal.md)
+has additional operating assumptions:
+
+- **Internet connectivity is assumed.** A normal first run must be able to clone Kiln from GitHub,
+  install its locked npm dependencies, complete any provider authentication that requires a network,
+  and reach the selected cloud model service. Kiln does not currently promise an offline bootstrap,
+  proxy-specific setup, private-registry support, or custom-certificate setup. Tavily remains optional.
+- **Kiln itself is not version-pinned yet.** Before 1.0, the documented clone follows the repository's
+  current default branch. This remains intentional until a complete end-to-end project has been run
+  and the project manager is satisfied with the resulting project state. Kiln will then establish a
+  pinned release/version workflow for new projects; until that point, tool updates may change behavior.
+- **Local model servers are managed by the project manager.** When Pi uses llama.cpp, vLLM, Ollama,
+  LM Studio, or another local inference engine, the project manager owns its installation, model
+  files, configuration, startup, health, hardware resources, updates, and shutdown. Kiln may discover
+  and validate the Pi configuration, but it does not provision or operate the server. Managed local
+  inference is a possible later Kiln capability and is out of scope for the first agent-delivery
+  implementation.
+- **Model-provider usage may cost money.** The agent-delivery capability may be configured to use
+  services such as OpenAI or other paid model providers. Intake turns and delegated specialist work
+  can therefore consume billable tokens or provider quota. The project manager is responsible for the
+  selected account, pricing plan, limits, and charges; Kiln must disclose a potentially billable live
+  check before running one.
+
 ## Work on Kiln itself
 
 Clone the repository and install the locked dependency versions:

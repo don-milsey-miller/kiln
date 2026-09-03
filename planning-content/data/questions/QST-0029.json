@@ -1,0 +1,24 @@
+{
+  "id": "QST-0029",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "Which variables must reach a restricted child for it to resolve the same Pi configuration?",
+  "statement": "A specialist child runs with an allowlisted environment, not an inherited one. For it to find the same authentication store and custom-model registry as its parent, some set of configuration-locating variables must be in that allowlist — candidates are HOME, USERPROFILE, APPDATA, LOCALAPPDATA, XDG_CONFIG_HOME and PI_CODING_AGENT_DIR. Which does 0.84.4 actually consult, on Windows and on POSIX, under both default and explicitly overridden configuration directories?",
+  "blocks": [
+    "REQ-0024"
+  ],
+  "raisedBy": [
+    "CMP-0029"
+  ],
+  "notes": "⚠️ MEASURE IT RATHER THAN ALLOWLISTING THE UNION. Passing all six because one of them is needed is the cheap answer and it widens the boundary this component exists to narrow. ⚠️ ABSENCE IS PRESERVED AS ABSENCE: where a variable is unset in the parent, setup must not invent a value for the child.",
+  "answer": "On Linux, PI_CODING_AGENT_DIR alone suffices: a child given exactly PATH, TMPDIR and that variable — HOME absent, and the child's own report confirming HOME false and USERPROFILE false — loads the package and completes a turn. ⚠️ THE FIRST ANSWER TO THIS QUESTION WAS RIGHT AND ITS EVIDENCE WAS NOT. AST-0044 made this claim from a harness that supplied HOME unconditionally, and the retained Linux report recorded HOME: true beside the assertion that said otherwise. It is superseded by AST-0052, taken from a dedicated exact-environment cell that names its whole environment and asserts the child's own observation. On Windows the question is partly moot: the platform injects HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR into every child whatever the allowlist says — isolated with a bare Node child, which excludes Pi but does not separate the OS from Node or libuv, so only the observable is claimed. An allowlist is a floor there, not a ceiling, and the honest Windows statement is that the override is sufficient rather than that the child had no home. The credential claim holds on both: sentinel secrets did not cross, against a control that showed them crossing under inheritance, and provider-scoped environment authentication is now measured directly — a $VAR-authenticated provider is available exactly in the child carrying that variable. The design language must be \"no unrelated secret crosses\", because only that is provable.",
+  "answeredBy": [
+    "AST-0045",
+    "AST-0052",
+    "EVD-0080",
+    "EVD-0085"
+  ]
+}

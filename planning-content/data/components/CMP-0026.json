@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0026",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Project trust integration",
+  "responsibility": "Obtain, verify and report the operator's trust decision for this project's Pi resources through Pi's own supported mechanism, display the canonical project path the decision applies to, treat a denial as a first-class outcome that stops agent launch without touching the planning scaffold, and refuse a non-interactive run that has no pre-existing decision rather than defaulting one.",
+  "satisfies": [
+    "REQ-0023",
+    "REQ-0026"
+  ],
+  "notes": "⚠️ THE MECHANISM IS OPEN AND IS BEING MEASURED. Decision #67(a) chose writing Pi's user trust file directly and proved that causal on 0.80.6; the PM amended that on 2026-09-02 in favour of a supported public API or native flow, because writing another tool's undocumented user-scoped security file is brittle and crosses a boundary that belongs to the operator. What the pinned version actually offers decides whether a non-interactive trust option can exist at all."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "EVD-0081",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: default tool set, allowlist narrowing, skill override precedence and session relocation on 0.84.4",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0",
+      "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "DEFAULT ACTIVE TOOLS with no --tools: read, bash, edit, write plus the custom tool, identical on both platforms and identical to the 0.80.6 measurement. The full configured set also includes powershell, grep, find and ls, which are configured but INACTIVE — so 'active tools' is still not 'all configured tools'. ALLOWLIST: `--tools read,kiln_spike_probe` produced exactly those two, and the excluded tool was not even offered to the model in the provider request. SKILLS: with the consumer override directory registered through the settings `skills` array, the loaded file was the OVERRIDE; with the override removed, the same run loaded the PACKAGED file — provenance read from systemPromptOptions.skills[].filePath at before_agent_start, upstream of the model. SESSIONS: all three documented routes worked — `--session-dir <path>` wrote the transcript to the external directory and left .pi/sessions empty, `PI_CODING_AGENT_SESSION_DIR` did the same, and the `sessionDir` setting placed it at .pi/sessions.",
+  "notes": "⚠️ THE DEFAULT SET IS THE HAZARD #68 NAMED AND IT HAS NOT MOVED. bash, edit and write are active by default, so a role definition with no declared tool list hands a specialist a shell on 0.84.4 exactly as it did on 0.80.6. ⚠️ THE SESSION RESULT DELETES AN OPEN RISK: external user-local state does not depend on an unproven capability, and `--session-dir` lets the supervisor supply the location at launch so no absolute path need ever be committed."
+}

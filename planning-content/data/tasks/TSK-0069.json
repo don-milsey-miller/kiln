@@ -1,0 +1,20 @@
+{
+  "id": "TSK-0069",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Make unlinkTrace able to remove an invalid or stale link",
+  "statement": "Stop validating the target type when removing a link, so a wrong-target, dangling or superseded reference can be withdrawn through the typed path, and give `answeredBy` a removal route it has never had. Keep the unknown-field refusal, and keep the lock, fresh read inside it, and atomic write. Cover the wrong-target, dangling and superseded cases with tests, each asserting the lint finding it clears.",
+  "role": "platform",
+  "implements": [
+    "CMP-0005"
+  ],
+  "fulfils": [
+    "REQ-0014"
+  ],
+  "acceptedBy": [
+    "ACC-0094"
+  ],
+  "notes": "⚠️ THIS MUST LAND BEFORE THE GUARD IS DERIVED. Until it does, `reviseArtifact` is the only way to clear a bad link, and it works solely because the guard's list is incomplete — one defect is the escape hatch for the other. See the decision this task belongs to."
+}

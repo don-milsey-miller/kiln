@@ -1,0 +1,12 @@
+{
+  "id": "REQ-0025",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Agent work runs on an explicitly selected and proven model, or it does not run",
+  "statement": "The provider and exact model used for planning work must be chosen by the operator from what discovery reports, recorded as reproducible non-secret project configuration naming exact identifiers rather than a mutable alias, and proven able to perform the tool calls the system depends on before the system describes the agent as ready. When the recorded selection cannot be resolved or authenticated, the system must refuse to begin or resume planning work rather than substituting another model, another provider, or its own memory.",
+  "rationale": "Two silent failures are being closed at once. A registry entry proves configuration and not that the endpoint answers or that the model will emit a correctly shaped tool call, so a zero-cost preflight cannot be the last word. And a fallback to a global default would mean the project's recorded content was produced by a model the project never named, which destroys the only reproducibility claim the configuration makes.",
+  "priority": "must",
+  "notes": "⚠️ 'EXPLICITLY SELECTED' BINDS EVEN WHEN DISCOVERY RETURNS EXACTLY ONE MODEL. A single available model is a discovery result, not a decision, and adopting it silently is the same class of act as adopting the global default. ⚠️ THE PROOF COSTS MONEY, which is why it is a separate authorisation and not a step: see the consent requirement."
+}

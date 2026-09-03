@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0056",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An unavailable recorded selection refuses instead of falling back",
+  "statement": "With the recorded model removed from the registry, or its authentication absent, launch refuses and names the recorded provider and model, offering a setup rerun or an explicit one-run override. No other model, provider, or answer from model memory is substituted.",
+  "evaluates": [
+    "CMP-0028"
+  ],
+  "verifies": [
+    "REQ-0025"
+  ]
+}

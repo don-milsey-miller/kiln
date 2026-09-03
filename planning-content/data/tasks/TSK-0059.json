@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0059",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the self-host refusal and its explicit opt-in",
+  "statement": "Refuse the consumer command when the tool root and project root coincide, and implement the two-part opt-in with agreement verified before start, covered separately so it can never weaken the consumer-root checks.",
+  "role": "platform",
+  "implements": [
+    "CMP-0037"
+  ],
+  "fulfils": [
+    "REQ-0028",
+    "REQ-0020",
+    "REQ-0022"
+  ],
+  "acceptedBy": [
+    "ACC-0082"
+  ],
+  "dependsOn": [
+    "TSK-0057"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0077",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The health response carries run and project identity and nothing sensitive",
+  "statement": "The endpoint returns the service name, a versioned health protocol, the ephemeral run identifier, the non-secret project identifier and the build version, and is asserted to contain no absolute path, credential, session content or planning content.",
+  "evaluates": [
+    "CMP-0038"
+  ],
+  "verifies": [
+    "REQ-0028"
+  ]
+}

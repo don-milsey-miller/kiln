@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0034",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the local consent record and its invalidation rules",
+  "statement": "Persist the host-specific grant in the ignored local-state root, keyed so that a provider or research change invalidates it, and read it at launch so an unchanged project does not re-prompt while a new machine does.",
+  "role": "platform",
+  "implements": [
+    "CMP-0027"
+  ],
+  "fulfils": [
+    "REQ-0023",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0054"
+  ],
+  "dependsOn": [
+    "TSK-0031",
+    "TSK-0033"
+  ]
+}

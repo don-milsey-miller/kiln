@@ -1,0 +1,32 @@
+{
+  "id": "EVD-0083",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the compatibility contract re-proved from a real clean consumer, both platforms",
+  "kind": "experiment",
+  "observedAt": "2026-09-03",
+  "outcome": "success",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0",
+      "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+      "piInstalledBy": "the consumer's own npm install into .planning/node_modules",
+      "inference": "local deterministic fake provider on 127.0.0.1, explicitly selected per run"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "The first fixture was not a clean consumer and this replaces it. It now generates a temporary directory, runs `git init` and leaves the repository UNBORN with no commits, copies the tool from `git ls-files` so an uncommitted local file cannot make a run pass, runs the consumer's own `npm install` inside `.planning`, and resolves the CLI through the COPIED tool's installed package metadata via its `bin.pi` field. OBSERVED ON BOTH PLATFORMS: the resolved CLI reports 0.84.4, matches the pin read from this repository's manifest, lies inside the consumer directory, and does NOT lie inside the development checkout — the last being the assertion the previous fixture could not make, because it executed this repository's own node_modules. Every earlier finding reproduced against the new fixture: the five trust rows, the default active set of read/bash/edit/write, `--tools` narrowing, the relative package entry differing only by separator, three session-relocation routes, the task sentinel reaching the provider with stdin closed, skill-override precedence with its removal control, and the canary challenge arriving intact with prose and exclusion controls both empty.",
+  "notes": "⚠️ THE ENVIRONMENT IS NOW BUILT FROM AN ALLOWLIST, WHICH IS A SAFETY FIX AND NOT A TIDY-UP. The earlier scripts inherited all of `process.env` and ran Pi without naming a model. PI_CODING_AGENT_DIR isolates the stored auth file and does nothing whatever about environment authentication, so on a host carrying OPENAI_API_KEY or ANTHROPIC_API_KEY a reproduction could have reached a paid provider. Two defences now: an allowlist of OS and runtime names that contains no credential, and an explicit loopback `--model` on every run that can reach inference. ⚠️ IT ALSO STOPPED BEING ONE PERSON'S SCRIPT — the old fixture hard-coded a developer's scratch path and nobody else could run it."
+}

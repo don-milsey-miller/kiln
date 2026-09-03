@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0022",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Measure closed-stdin task binding and re-check the carried-over 0.80.6 findings",
+  "statement": "Confirm a `--mode json -p --no-session` child with closed stdin can receive its exact task through the supported non-stdin channel, with an observation taken at the child. Re-run the five behaviours recorded against 0.80.6 — silent untrusted load, trust store shape, skill override precedence, default active tool set, turn-end hooks in a non-interactive child — and record which still hold. Answers QST-0030 and QST-0031.",
+  "role": "platform",
+  "implements": [
+    "CMP-0041"
+  ],
+  "fulfils": [
+    "REQ-0005",
+    "REQ-0006",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0038",
+    "ACC-0040"
+  ],
+  "dependsOn": [
+    "TSK-0018"
+  ]
+}

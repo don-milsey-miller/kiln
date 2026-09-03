@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0036",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build model discovery, explicit selection and persistence",
+  "statement": "Present available providers and exact model identifiers, validate any supplied `--provider`/`--model`/`--thinking` against the registry, require confirmation, state the billing consequence, and persist the exact identifiers through the settings merge per DEC-0028.",
+  "role": "platform",
+  "implements": [
+    "CMP-0028"
+  ],
+  "fulfils": [
+    "REQ-0025",
+    "REQ-0012"
+  ],
+  "acceptedBy": [
+    "ACC-0055"
+  ],
+  "dependsOn": [
+    "TSK-0029",
+    "TSK-0033"
+  ]
+}

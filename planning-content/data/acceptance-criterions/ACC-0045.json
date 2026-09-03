@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0045",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An interrupted setup resumes from its journal and never deletes valid content",
+  "statement": "Killing setup partway through leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
+  "evaluates": [
+    "CMP-0022"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0027"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0070",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The orchestrator cannot cross a user-owned gate",
+  "statement": "An attempt to advance or attest Stage 1 without explicit operator authorisation is refused by the orchestrator, and no attestation file changes. The refusal is observable in the recorded state, not only in the transcript.",
+  "evaluates": [
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0001"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0029",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Provider credential contracts",
+  "responsibility": "Be the single audited statement of which environment-variable NAMES each supported provider needs on the model plane, holding no values; separate those from tool-plane names that belong to one role; construct each child's environment from the measured base runtime variables, the selected provider's model-plane names and that role's tool-plane names, adding nothing else; and classify a provider with no safe known mapping as unsupported rather than granting it a wider inheritance.",
+  "satisfies": [
+    "REQ-0024",
+    "REQ-0026"
+  ],
+  "notes": "⚠️ CUSTOM PROVIDERS MAY CONTRIBUTE NAMES ONLY DECLARATIVELY. Guessing a variable name from a provider id, or discovering one by enumerating the operator's environment for things that look like keys, is the failure this component exists to prevent — and both are the obvious implementation. ⚠️ PREFER PI'S AUTH STORE WHEN IT IS AVAILABLE, because then a child needs the variables that locate configuration rather than a copy of the credential itself. ⚠️ AMENDED 2026-09-02 AFTER MEASUREMENT (AST-0045): this component controls what it ADDS, not everything the child ends up seeing. Windows injects HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR into every child whatever environment it is handed, so the boundary is a lower bound there and the original wording — that the child's environment IS the union — was not achievable. The guarantee that survives, and the one worth having, is that no credential and no unrelated secret is among what Kiln adds. ⚠️ A SECOND CONSEQUENCE: because USERPROFILE is always present on Windows, a child always resolves the default agent directory, so redirecting one requires setting PI_CODING_AGENT_DIR positively and can never be done by omitting a variable."
+}

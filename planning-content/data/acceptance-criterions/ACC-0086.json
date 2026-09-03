@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0086",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The documented journey completes from an empty directory on both platforms",
+  "statement": "From a temporary empty directory the documented sequence — including `git init` into a repository with no commits, before any commit exists — initialises, installs, registers, binds a deterministic non-billable model, starts both processes with identity-confirmed readiness, and reaches a Stage 1 question. Verified on Windows and the supported POSIX CI platform.",
+  "evaluates": [
+    "CMP-0040"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0020"
+  ]
+}

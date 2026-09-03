@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0028",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Extract the single ignore owner and add legacy block migration",
+  "statement": "Move the existing planning, append-safety, line-ending and recorded-idempotency logic out of `lib/initialize-project.mjs` into `lib/project-gitignore.mjs` used by both initialization and setup, and add the exact-legacy-block migration under the same lock and atomic-write discipline.",
+  "role": "platform",
+  "implements": [
+    "CMP-0023"
+  ],
+  "fulfils": [
+    "REQ-0027"
+  ],
+  "acceptedBy": [
+    "ACC-0046"
+  ],
+  "dependsOn": [
+    "TSK-0027"
+  ]
+}

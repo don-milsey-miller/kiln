@@ -1,0 +1,19 @@
+{
+  "id": "AST-0053",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A provider authenticated only by an environment variable is available exactly where that variable is",
+  "statement": "On pi 0.84.4, a `models.json` provider whose `apiKey` is `$VAR` yields a model that `--list-models` reports in a child carrying VAR and omits in a child without it, while an inline-key provider is reported in both. Environment authentication therefore travels with the variable and with nothing else, on Windows and Linux.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ THIS IS THE CASE SECTION 3.4's CREDENTIAL CONTRACT EXISTS FOR, and until now nothing exercised it: every earlier cell used an inline key, so a child that lost every environment variable would still have inferred. The contract's whole premise — that a provider authenticated through the environment leaves a child unable to infer unless its variable is passed deliberately — is now measured rather than reasoned.",
+  "supportedBy": [
+    "EVD-0085"
+  ]
+}

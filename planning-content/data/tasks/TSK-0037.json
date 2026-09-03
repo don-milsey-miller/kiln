@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0037",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the launch-time availability checks and the refusal path",
+  "statement": "At every launch resolve the recorded selection, verify an authentication source is configured, verify the package and required tools loaded, verify a matching compatibility record exists, and refuse the run with a specific reason when any check fails.",
+  "role": "platform",
+  "implements": [
+    "CMP-0028"
+  ],
+  "fulfils": [
+    "REQ-0025",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0056"
+  ],
+  "dependsOn": [
+    "TSK-0036"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "DEC-0030",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The compatibility spike is a hard gate on the rest of the agent-delivery implementation",
+  "statement": "No agent-delivery implementation beyond the planning correction and the spike itself begins until the spike has produced reviewable evidence, on Windows and on the supported POSIX platform, for each behaviour the design depends on — each with a negative control that would fail if the claimed behaviour were absent, and with redaction assertions over command output, logs, errors and generated state. A behaviour the pinned version does not exhibit forces a design revision that is recorded before code is written against it.",
+  "rationale": "Every module in the runtime foundation encodes an assumption about what Pi does: how trust is granted, where configuration resolves, what the package entry looks like, what a child inherits. Building four phases on assumptions and discovering one is wrong means unwinding work that was correct against a specification and wrong against reality. The spike costs days; the unwind costs weeks and produces code that half-works.",
+  "decidedAt": "2026-09-02",
+  "addresses": [
+    "QST-0031",
+    "QST-0026",
+    "QST-0027",
+    "QST-0028",
+    "QST-0029",
+    "QST-0030"
+  ],
+  "alternatives": [
+    {
+      "option": "Build the runtime foundation and the package skeleton alongside the spike",
+      "whyNot": "Those are precisely the modules whose shape the spike determines. Writing them concurrently means writing them twice, and the second version tends to keep the first one's assumptions."
+    },
+    {
+      "option": "Spike only the trust question, since it is the one with a blocking contract change",
+      "whyNot": "It is the one whose consequence is currently visible. The state relocation question deletes a documented mode, the package entry question can produce a silently non-loading install, and the child environment question is a credential boundary. Each is capable of the same surprise."
+    }
+  ],
+  "notes": "⚠️ TWO SPIKE-DESIGN RULES CARRY OVER FROM 2026-08-18 AND ARE PART OF THIS DECISION. Take the mechanical observable upstream of the model, never downstream of its behaviour — a marker written at extension load time, not an answer the model gave. And negative evidence requires proof that the observation point was reached: an absent marker means nothing if the process died before it would have been written. Both exist because both were nearly missed here."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0049",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement adaptive question selection and continuous intake capture",
+  "statement": "Choose each next question by information value and blocking impact rather than from a fixed list, keep the operator's wording separate from interpretation, update the intake document continuously through typed tools, and run lint after material mutations without paraphrasing findings away.",
+  "role": "platform",
+  "implements": [
+    "CMP-0034"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0001"
+  ],
+  "acceptedBy": [
+    "ACC-0069"
+  ],
+  "dependsOn": [
+    "TSK-0048"
+  ]
+}

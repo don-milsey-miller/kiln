@@ -1,0 +1,32 @@
+{
+  "id": "EVD-0078",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: the same five trust rows on Linux, with a working model configured",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "platform": "linux",
+      "os": "Ubuntu 24.04 under WSL2, kernel 6.18.33.2-microsoft-standard-WSL2",
+      "node": "v24.11.0",
+      "piVersion": "0.84.4",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+      "agentDir": "isolated via PI_CODING_AGENT_DIR; Node and pi both self-contained under /tmp, nothing installed system-wide"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "The identical five-row protocol on Ubuntu 24.04, with a model configured so every run exited 0 rather than failing on missing authentication. RESULTS IDENTICAL TO WINDOWS: not loaded, loaded under --approve, loaded under set(true), not loaded under set(false), not loaded after set(null). trust.json after the sequence contained the POSIX canonical path mapped to true. hasTrustRequiringProjectResources() returned true for the fixture on both platforms.",
+  "notes": "⚠️ EVERY ROW HERE EXITED 0, WHICH SHARPENS THE FINDING RATHER THAN SOFTENING IT. On Windows the runs exited 1 because no model was configured, so a reader could wonder whether the missing extension was a consequence of the failed run. On Linux the sessions completed successfully and the extension was still absent in rows 1, 4 and 5. Untrusted is not an error state; it is a normal session with the tools quietly missing."
+}

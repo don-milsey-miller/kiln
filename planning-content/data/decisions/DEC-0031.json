@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0031",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Repair the typed link layer in two ordered steps: unlinkTrace first, then derive the guard",
+  "statement": "Both halves of QST-0032 are fixed, and the order is part of the decision. FIRST, `unlinkTrace` stops validating the target type when REMOVING a link: removal is how an invalid or stale link is repaired, so validating it is a guard that refuses exactly the operations it exists to permit. Removal keeps every other discipline — lock, fresh read inside it, atomic write — and gains a typed removal path for `answeredBy`, which `resolveQuestion` can only ever merge. SECOND, and only after that, `reviseArtifact`'s trace-field guard is derived from the schemas' `x-traceTarget` declarations instead of the hardcoded list of seventeen names, closing the bypass on `blocks`, `raisedBy`, `satisfies`, `evaluates`, `verifies`, `fulfils`, `acceptedBy`, `implementedBy` and `answeredBy`. This work is scheduled AHEAD of Phase 2's implementation work rather than behind the agent-delivery layer.",
+  "rationale": "The order is not a preference. Today one defect is the only escape hatch for the other: a link that `unlinkTrace` refuses to remove can still be repaired through `reviseArtifact`, precisely because the guard's hardcoded list omits the field. Deriving the guard first would close that hatch while the links it currently repairs remain unremovable by any typed path — and #88 forbids hand-editing — leaving the graph with damage the lint reports and nothing can fix. Fixing removal first makes the guard's completion safe. As for scheduling it ahead of Phase 2: the defect was hit three times during Phase 1 alone, each from a different direction — a mistyped link while authoring, a routine supersession leaving a stale `answeredBy`, and a retarget in which `implements` was guarded while `evaluates` was not covered at all. Phase 2 edits the graph far more than Phase 1 did, so the rate rises rather than falls, and each occurrence currently requires knowingly exploiting a bug to repair.",
+  "decidedAt": "2026-09-03",
+  "addresses": [
+    "QST-0032"
+  ],
+  "alternatives": [
+    {
+      "option": "Derive the guard from the schemas first, then fix unlinkTrace",
+      "whyNot": "It closes the only working repair path before the replacement exists. Between the two changes, an invalid or stale link could be neither removed by `unlinkTrace` nor rewritten by `reviseArtifact`, and hand-editing is forbidden — so the lint would report damage that no typed operation could clear."
+    },
+    {
+      "option": "Fix only unlinkTrace and leave the hardcoded guard",
+      "whyNot": "It restores the repair path and leaves the hole that produced the damage: nine trace fields remain writable through `reviseArtifact`, bypassing the link operations' own guards, including `resolveQuestion`'s existence and non-dangling checks."
+    },
+    {
+      "option": "Leave both behind the agent-delivery layer, as originally parked",
+      "whyNot": "The original reason — that the lint catches every consequence — is still true and is no longer sufficient. The lint detects the damage and offers no valid repair, three instances arrived in one phase from three different directions, and Phase 2 is graph-heavier than Phase 1."
+    }
+  ],
+  "notes": "⚠️ THE WORKLIST THIS IMPLIES IS BROADER THAN THE TWO FIXES, and #126 already named half of it: 'which authorised transitions have no operation'. This adds a second query — WHICH GUARDS ARE HAND-MAINTAINED LISTS OF SOMETHING A SCHEMA ALREADY DECLARES — and the trace-field guard is the instance that prompted it. Running both queries over the typed layer is cheap and is the kind of thing that finds the fourth defect before it is hit."
+}

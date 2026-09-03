@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0052",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Nothing is read before permission, and a decline reads nothing at all",
+  "statement": "Before the inspection prompt is answered, no read of Pi's authentication store, no load of the custom-model registry and no credential-variable presence check has occurred — observed by instrumenting those access points, not by reading the code. A declined inspection performs none of them, contacts nothing, and leaves setup honestly partial rather than reporting that nothing is configured.",
+  "evaluates": [
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0023"
+  ]
+}

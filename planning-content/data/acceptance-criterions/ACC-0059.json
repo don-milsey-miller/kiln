@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0059",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Research holds the only tool-plane credential, and only while enabled",
+  "statement": "The research child receives the research credential when research is enabled and not otherwise; planning and validation children never receive it in any configuration.",
+  "evaluates": [
+    "CMP-0029"
+  ],
+  "verifies": [
+    "REQ-0024"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0023",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Project ignore owner",
+  "responsibility": "Be the single owner of every Kiln edit to the consumer's `.gitignore`: plan the change without writing, append rather than rewrite, take the line ending from the file, record what it did, migrate an exact unmodified legacy block to the extended block under the same lock and atomic-write discipline, and never restore a block the operator deliberately removed or edited.",
+  "satisfies": [
+    "REQ-0027"
+  ],
+  "notes": "⚠️ THIS IS A REFACTOR OF WORKING CODE, NOT A NEW CAPABILITY. `lib/initialize-project.mjs` already owns planning, append safety, recorded idempotency and the deliberately-deleted-block rule. The failure this component prevents is a second appender in setup with different idempotency rules — which is how a file people edit by hand acquires two Kiln blocks."
+}

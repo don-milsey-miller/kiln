@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0095",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The trace-field guard is derived from the schemas, and covers every declared trace field",
+  "statement": "`reviseArtifact` refuses every field the schemas declare with `x-traceTarget`, established by enumerating those fields from the schema set at test time and asserting a refusal for each — not by comparing against a second list written in the test. Adding a trace field to a schema therefore extends the guard with no code change, and a test proves that by introducing one in a fixture. The nine fields that were previously reachable — `blocks`, `raisedBy`, `satisfies`, `evaluates`, `verifies`, `fulfils`, `acceptedBy`, `implementedBy`, `answeredBy` — are refused.",
+  "evaluates": [
+    "CMP-0005"
+  ],
+  "verifies": [
+    "REQ-0013",
+    "REQ-0014"
+  ],
+  "notes": "⚠️ 'NOT BY COMPARING AGAINST A SECOND LIST' is the load-bearing clause. A test that hardcodes the expected field names reproduces the original defect one layer up: two hand-maintained lists that must agree, and the test would pass while the guard drifted from the schemas."
+}

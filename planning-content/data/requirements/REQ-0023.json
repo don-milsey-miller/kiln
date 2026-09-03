@@ -1,0 +1,12 @@
+{
+  "id": "REQ-0023",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Existing configuration is inspected, and then used, only under separately granted permission",
+  "statement": "The system must not read the operator's provider authentication store, custom-model registry, or the presence of credential environment variables before the operator has permitted that inspection. Having detected a usable configuration must never by itself authorise adopting or using it. Permission to inspect, confirmation of an exact provider and model, and permission to validate and use an optional external service are three decisions, each granted separately and each recorded where a different operator on a different machine does not inherit it.",
+  "rationale": "Technical access is not consent. Kiln runs on the operator's own machine and can read their Pi configuration trivially, which is exactly why the boundary has to be a decision rather than a capability check. The three permissions are genuinely different questions — a local inspection that contacts nothing, an ongoing authorisation to spend on a named model, and an external call to a third-party service — and collapsing them into one prompt would mean the operator granting the expensive one by answering the cheap one.",
+  "priority": "must",
+  "notes": "⚠️ 'RECORDED WHERE ANOTHER OPERATOR DOES NOT INHERIT IT' IS THE HALF THAT IS EASY TO LOSE. The project selection is committed configuration and should be; the approval to use THIS host's credentials is not. If the two are stored together, cloning the repository hands a second operator the first operator's consent, and nobody ever sees the prompt."
+}

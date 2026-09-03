@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0021",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Measure the package entry, package loading and session relocation",
+  "statement": "Record the literal entry `pi install -l` writes and whether it can be normalised to a portable relative form with canonical equivalence proved; confirm the installed package loads its extensions, tools, skills, prompts and capability signature; and determine whether session and runtime directories can be relocated outside the project through a supported option. Answers QST-0027 and QST-0028.",
+  "role": "platform",
+  "implements": [
+    "CMP-0041"
+  ],
+  "fulfils": [
+    "REQ-0005",
+    "REQ-0006",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0038"
+  ],
+  "dependsOn": [
+    "TSK-0018"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "AST-0041",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Project trust can be granted, denied and revoked through Pi's public ProjectTrustStore API",
+  "statement": "On pi 0.84.4, `ProjectTrustStore` exported from the package root records a project trust decision that a subsequent non-interactive child honours: set(cwd, true) causes project resources to load without --approve, set(cwd, false) prevents loading, and set(cwd, null) reverts to the unloaded default. The decision is keyed by canonical directory.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ LOAD-BEARING FOR DEC-0027 AND FOR THE SETUP CONTRACT. If this were false, interactive setup would have to rely on Pi's own prompt and the `--trust approve` option could not exist. It is true, so the option can ship. ⚠️ THE STORE STILL WRITES ~/.pi/agent/trust.json underneath. What changed is that Kiln depends on a typed exported class rather than on that file's undocumented shape, which is the whole of the difference between #67(a) and DEC-0027.",
+  "supportedBy": [
+    "EVD-0077",
+    "EVD-0078"
+  ]
+}

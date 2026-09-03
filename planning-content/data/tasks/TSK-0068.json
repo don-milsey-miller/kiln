@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0068",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement setup's TTY precondition and its two recovery routes",
+  "statement": "Before setup launches the authentication-only login step, check for a real TTY. With no TTY and no usable authentication already present, refuse without spawning the login process and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.",
+  "role": "platform",
+  "implements": [
+    "CMP-0039"
+  ],
+  "fulfils": [
+    "REQ-0022"
+  ],
+  "acceptedBy": [
+    "ACC-0093"
+  ],
+  "notes": "⚠️ SPLIT OUT OF TSK-0065 ON 2026-09-03, because that task's criterion demanded this behaviour while the task itself was sequenced before any setup code existed. ⚠️ IT IS DOWNSTREAM OF THE OBSERVATION, NOT INSTEAD OF IT: what Pi does with no TTY decides how much this precondition is carrying. A runtime that already refuses cleanly makes it a nicety; one that waits makes it the only thing between an automated run and a hang.",
+  "dependsOn": [
+    "TSK-0060",
+    "TSK-0065"
+  ]
+}

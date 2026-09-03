@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0087",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A Stage 1 exchange reaches the browser and cannot cross the gate",
+  "statement": "A deterministic Stage 1 answer is written through the typed path, observed arriving in the browser through the change stream, and an attempted unauthorised stage advance is refused with no attestation changed.",
+  "evaluates": [
+    "CMP-0040"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

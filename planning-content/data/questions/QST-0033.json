@@ -1,0 +1,17 @@
+{
+  "id": "QST-0033",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "unanswered",
+  "title": "Is saved OAuth authentication discoverable for a built-in provider without an account?",
+  "statement": "Section 6.2 lists subscription OAuth as a supported route, and the compatibility spike could not prove it. A provider declared in `models.json` is composed with apiKey auth only, so a stored OAuth credential for one never resolves and the negative result says nothing about the OAuth path. Proving discovery for a BUILT-IN provider needs a real `/login` against a real subscription, which is account-bound, interactive, and cannot run in CI. So: can OAuth discovery be proved with a fabricated credential against a built-in provider, or does Kiln ship the OAuth route on documentation plus a manually recorded one-off run?",
+  "raisedBy": [
+    "EVD-0084"
+  ],
+  "notes": "⚠️ RAISED SO THE GAP IS NOT MISTAKEN FOR A PROOF. The api_key half is measured with a control; the OAuth half is not, and the spike's own negative result is expected rather than informative. ⚠️ IT IS NOT BLOCKING PHASE 2's FIRST STEPS. Model binding, the credential contract and the canary are all provable on the api_key path. What it blocks is any claim that the OAuth route is verified, and any acceptance criterion written as though it were. ⚠️ CHEAPEST HONEST RESOLUTION if no fabricated proof is possible: record a manual run against a real subscription as single-instance evidence, label it as such, and keep it out of CI — the same treatment section 15.3 already gives live paid-provider tests.",
+  "blocks": [
+    "REQ-0025"
+  ]
+}

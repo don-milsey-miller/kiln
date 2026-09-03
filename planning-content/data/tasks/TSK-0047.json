@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0047",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Register the consumer override path and test all four override states",
+  "statement": "Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.",
+  "role": "platform",
+  "implements": [
+    "CMP-0033"
+  ],
+  "fulfils": [
+    "REQ-0001"
+  ],
+  "acceptedBy": [
+    "ACC-0067"
+  ],
+  "dependsOn": [
+    "TSK-0046"
+  ]
+}

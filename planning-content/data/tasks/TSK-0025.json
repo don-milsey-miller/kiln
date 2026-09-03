@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0025",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Add project-root resolution to the shared resolver",
+  "statement": "Extend `lib/content-root.mjs` with `projectRootCandidate()` and `resolveProjectRoot()` so the directory that owns `.pi/`, `.gitignore`, Pi's working directory and runtime state has one authority, per decision #70's rule that no caller joins its own path.",
+  "role": "platform",
+  "implements": [
+    "CMP-0003"
+  ],
+  "fulfils": [
+    "REQ-0022"
+  ],
+  "acceptedBy": [
+    "ACC-0042"
+  ],
+  "dependsOn": [
+    "TSK-0069",
+    "TSK-0070"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "AST-0042",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "An untrusted non-interactive child loads no package and does not error",
+  "statement": "On pi 0.84.4, a `--mode json -p` child started in a project with no applicable trust decision loads none of the project package's extensions or tools, and reports no error, warning or non-zero exit attributable to trust. Where a usable model is configured the session also completes normally — observed on Linux, emitting session, agent_start, turn_start, turn_end and agent_end with the package absent.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ THIS IS WHY REQ-0026 EXISTS. Every role boundary in Kiln is enforced by typed tools, so a child without them is not a degraded specialist but an unconstrained model whose output looks exactly like a specialist's. ⚠️ NARROWED 2026-09-03 AFTER REVIEW. An earlier wording said the child completed a full well-formed agent turn on both platforms. It did not: the first Windows runs exited 1 after only the session header, because no model was configured, and a reader could fairly have asked whether the missing package was a consequence of the failed run rather than of trust. The completed-turn half is now attributed to the platform that actually showed it. ⚠️ THE PART THAT HOLDS EVERYWHERE is the part that matters: the package is absent and nothing says so. Re-measured 2026-09-03 with a model configured on BOTH platforms, where every trust row exits 0 and rows 1, 4 and 5 still come up with no tools.",
+  "supportedBy": [
+    "EVD-0077",
+    "EVD-0078"
+  ]
+}

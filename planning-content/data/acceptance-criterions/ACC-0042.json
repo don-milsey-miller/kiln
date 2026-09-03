@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0042",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The project root is derived from the resolved content root, and a mismatch refuses",
+  "statement": "With PLANNING_CONTENT_DIR unset, the resolved project root is the parent of the content root derived from the tool location; with it set, the project root is the canonical parent of that explicit directory and not the tool's parent. When setup is given an explicit project root that disagrees with the resolved content owner, it refuses and prints both paths and the override rather than choosing one.",
+  "evaluates": [
+    "CMP-0003"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

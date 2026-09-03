@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0085",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Setup prints every path before it mutates anything",
+  "statement": "Before the first lasting write, the command has printed the canonicalised tool root, project root, content root, settings path and runtime state path. A disagreement between the explicit project root and the resolved content owner refuses and prints both.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0027"
+  ]
+}

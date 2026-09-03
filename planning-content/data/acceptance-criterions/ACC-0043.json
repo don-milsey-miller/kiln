@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0043",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A rerun with unchanged choices changes no bytes",
+  "statement": "Running setup twice with the same inputs against the same project leaves every file it owns byte-identical, including the settings file, the ignore block, the project identity file and the generated skills. The comparison is over file bytes, not over a reported status.",
+  "evaluates": [
+    "CMP-0022"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

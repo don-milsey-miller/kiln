@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0049",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "No runtime data is written before its protection exists",
+  "statement": "With the Kiln ignore block absent or edited, project-local mode writes no session, consent, compatibility or journal file: interactive setup offers the exact block, external state, or stopping, and non-interactive setup refuses. The check is that the paths do not exist after the refusal, not that a warning was printed.",
+  "evaluates": [
+    "CMP-0025"
+  ],
+  "verifies": [
+    "REQ-0027"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0073",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "No role declares a model",
+  "statement": "No shipped role definition contains a model declaration, and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it.",
+  "evaluates": [
+    "CMP-0035"
+  ],
+  "verifies": [
+    "REQ-0025"
+  ]
+}

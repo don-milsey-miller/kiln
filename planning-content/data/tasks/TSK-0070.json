@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0070",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Derive reviseArtifact's trace-field guard from the schemas",
+  "statement": "Replace the hardcoded array of seventeen trace-like field names with a derivation over the schema set's `x-traceTarget` declarations, using the existing effective-schema resolver rather than re-reading schemas independently. Every declared trace field is then refused by construction, and adding one to a schema needs no code change.",
+  "role": "platform",
+  "implements": [
+    "CMP-0005"
+  ],
+  "fulfils": [
+    "REQ-0013",
+    "REQ-0014"
+  ],
+  "acceptedBy": [
+    "ACC-0095"
+  ],
+  "notes": "⚠️ SECOND, NEVER FIRST. Closing this bypass before removal works would leave an invalid link unremovable by any typed path, with hand-editing forbidden by #88.",
+  "dependsOn": [
+    "TSK-0069"
+  ]
+}

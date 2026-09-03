@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0092",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The capability signature is observed in a loaded session, and drift is detected",
+  "statement": "Once the Kiln package exists, a real Pi run reports its capability signature in the loaded session, and a deliberate change to a measured tool signature causes a comparing consumer to refuse. Both halves are required: presence alone does not show that a consumer would notice its absence.",
+  "evaluates": [
+    "CMP-0031"
+  ],
+  "verifies": [
+    "REQ-0026"
+  ]
+}

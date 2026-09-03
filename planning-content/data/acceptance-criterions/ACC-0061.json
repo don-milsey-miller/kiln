@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0061",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Success requires an observed tool call with the right challenge and schema",
+  "statement": "The canary passes only when the model invokes the setup-only tool with the exact random challenge against the declared schema, observed through the real pinned runtime and provider path. A response that merely claims tool support, or that calls the tool with a malformed argument, fails.",
+  "evaluates": [
+    "CMP-0030"
+  ],
+  "verifies": [
+    "REQ-0025",
+    "REQ-0028"
+  ]
+}

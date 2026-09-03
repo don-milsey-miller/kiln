@@ -1,0 +1,12 @@
+{
+  "id": "REQ-0028",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A readiness claim names what answered",
+  "statement": "Before reporting a component ready, the system must confirm the identity of whatever responded: that the HTTP service answering the port is the process this invocation started and is serving this project, that the loaded package is the one it installed, and that the model answering is the one recorded. A response that merely arrives, from an unidentified source, is not readiness and must not be reported as such.",
+  "rationale": "The current launcher polls `GET /` on the configured port and treats any HTTP response as ready. An unrelated service already listening on port 3000 therefore satisfies it, and the operator is told the browser workspace is up while looking at somebody else's application. The same shape recurs across the layer: an extension that loaded, a model that replied, a session that resumed — each is only evidence if something distinguishes it from a lookalike.",
+  "priority": "must",
+  "notes": "⚠️ THE NEGATIVE CONTROL IS WHAT MAKES THIS TESTABLE, and it should be written before the check: stand up an unrelated healthy HTTP server on the port and require launch to refuse. A readiness check without that control has never been shown to check anything."
+}

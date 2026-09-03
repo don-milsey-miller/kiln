@@ -1,0 +1,18 @@
+{
+  "id": "AST-0046",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pi's default active tool set includes bash, edit and write",
+  "statement": "On pi 0.84.4, a session started with no explicit tool allowlist has read, bash, edit and write active alongside any custom tools, while grep, find, ls and powershell are configured but inactive. An explicit `--tools` list narrows the active set to exactly the named tools, and a tool absent from that list is not offered to the model at all.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "supportedBy": [
+    "EVD-0081"
+  ]
+}

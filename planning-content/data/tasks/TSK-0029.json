@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0029",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the locked atomic schema-aware settings merge",
+  "statement": "Add `lib/pi-settings.mjs`: read under the transaction, validate the existing shape, merge only the package entry, skill-override path, provider/model/thinking defaults and session directory, write atomically through a same-directory temporary file, and produce identical bytes when the desired state already holds.",
+  "role": "platform",
+  "implements": [
+    "CMP-0024"
+  ],
+  "fulfils": [
+    "REQ-0024",
+    "REQ-0025"
+  ],
+  "acceptedBy": [
+    "ACC-0047",
+    "ACC-0048"
+  ],
+  "dependsOn": [
+    "TSK-0021",
+    "TSK-0026"
+  ]
+}

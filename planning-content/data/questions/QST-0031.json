@@ -1,0 +1,25 @@
+{
+  "id": "QST-0031",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "Which recorded 0.80.6 Pi behaviours still hold on the pinned 0.84.4?",
+  "statement": "Every empirical Pi finding this project holds was measured on 0.80.6: that an untrusted non-interactive child loads no package and does not error; that the user trust file is a canonical-directory-to-boolean map read closest-path-first; that a settings `skills` entry overrides a packaged skill of the same identity; that the default active tool set with no allowlist is read, bash, edit and write plus custom tools; that turn-end hooks fire in a non-interactive child. Which of these still hold on 0.84.4, and which changed?",
+  "blocks": [
+    "REQ-0026"
+  ],
+  "raisedBy": [
+    "CMP-0041"
+  ],
+  "notes": "⚠️ THE POINT IS NOT THAT THEY ARE PROBABLY FINE. Four minor versions separate the measurements from the pin, and each of these findings is load-bearing for a different component. The PM's direction of 2026-09-02 is explicit: treat the 0.80.6 results as historical evidence, not transferable proof. ⚠️ A CHANGED BEHAVIOUR IS A FINDING, NOT A BLOCKER — it is recorded, the affected design position is revised, and the revision goes on the Phase 2 change list.",
+  "answer": "Four of the five carry over unchanged and one was not re-tested. HOLDS: an untrusted non-interactive child loads no package and does not error. HOLDS: the trust store is a canonical-directory map, though Kiln now reaches it through the public class rather than the file. HOLDS: a settings `skills` entry overrides a packaged skill of the same identity, with the packaged file returning when the override is removed. HOLDS: the default active set is read, bash, edit and write plus custom tools, with grep, find, ls and powershell configured but inactive. NOT RE-TESTED: turn-end hooks in a non-interactive child, which nothing in Phase 1 depends on. No carried-over behaviour was found to have changed between 0.80.6 and 0.84.4.",
+  "answeredBy": [
+    "AST-0042",
+    "AST-0046",
+    "EVD-0077",
+    "EVD-0078",
+    "EVD-0081"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "CMP-0041",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pi compatibility evidence suite",
+  "responsibility": "Establish, against the exact pinned runtime and on each supported platform, what Pi actually does where the agent-delivery design depends on it — local resolution from a consumer's own install and version match; trust grant, denial and revocation through the public API; saved API-key discovery and provider auth status; configuration-directory resolution under default and overridden settings; the literal package entry `pi install -l` writes and its canonical equivalence to the committed form; extension, skill and prompt loading; skill-override precedence; session relocation; task binding with closed stdin; the default and allowlisted tool sets; and provider-scoped environment authentication reaching a child — each with a negative control and redaction assertions, retained as tests in the normal suite so a later version bump must re-prove the contract rather than inherit it.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0024",
+    "REQ-0026",
+    "REQ-0027"
+  ],
+  "notes": "⚠️ IT IS A GATE, NOT A CONVENIENCE. Every design position downstream of it was an assumption carried from measurements taken on a different version. ⚠️ NEGATIVE EVIDENCE REQUIRES PROOF THAT THE OBSERVATION POINT WAS REACHED, and every run records whether it did. ⚠️ TWO TIERS: the default one asserts over the retained results and FAILS when package.json's pin no longer matches the pin the evidence was taken under; the live tier re-runs the spike against a real consumer install behind KILN_PI_COMPAT=live, on one CI cell. Both are held to the SAME assertion function, because a live tier that checks less than the record is a live tier in name only. ⚠️ NARROWED 2026-09-03 AFTER REVIEW, and the removals matter more than the additions. THREE THINGS THIS COMPONENT NO LONGER CLAIMS: the authentication-only Pi TUI and its TTY behaviour (TSK-0065); OAuth discovery, which a models.json provider structurally cannot exercise (QST-0033, TSK-0066); and the Kiln capability signature, which cannot be measured because the Kiln package it belongs to does not exist yet (TSK-0067, blocked on CMP-0031). Each is scheduled rather than quietly dropped. The earlier wording listed all three as established, which is exactly the failure — a component describing work that was not there — that this whole cycle was opened to undo.",
+  "implementedBy": [
+    "tools/pi-compat/lib/consumer.mjs",
+    "tools/pi-compat/lib/spike.mjs",
+    "tools/pi-compat/lib/probe.mjs",
+    "tools/pi-compat/lib/redact.mjs",
+    "tools/pi-compat/fake-provider.mjs",
+    "tools/pi-compat/run-all.mjs",
+    "tools/pi-compat/posix-bootstrap.sh",
+    "tools/pi-compat/runs/windows.json",
+    "tools/pi-compat/runs/linux.json",
+    "test/pi-compat.test.mjs",
+    ".github/workflows/ci.yml"
+  ]
+}

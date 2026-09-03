@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0034",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "User-facing orchestrator",
+  "responsibility": "Be the single persistent planning session: resolve the canonical sibling content root and refuse to operate on the tool's own planning content, derive the current stage from definitions and attestations rather than storing a duplicate status, load the matching stage skill, ask one question at a time chosen by information value, keep the operator's wording separate from its own interpretation, mutate only through registered typed tools, show material changes before making them, and resume from files and attestations when the transcript is gone.",
+  "satisfies": [
+    "REQ-0022"
+  ],
+  "notes": "⚠️ IT MAY NOT ATTEST. Approving an artifact and satisfying a user-owned exit criterion are the operator's acts; an orchestrator that can do either can walk the project through its own gates. This is the boundary the Stage 1 vertical slice has to demonstrate by being refused."
+}

@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0020",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Measure configuration and auth resolution on both platforms, default and overridden",
+  "statement": "Establish which configuration-locating variables 0.84.4 consults to find its authentication store and custom-model registry, under both default directories and an explicitly overridden one, on Windows and POSIX; and confirm a restricted child carrying only those variables resolves the same store as its parent. Record the answer to QST-0029 as the measured base allowlist.",
+  "role": "platform",
+  "implements": [
+    "CMP-0041"
+  ],
+  "fulfils": [
+    "REQ-0005",
+    "REQ-0006",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0038",
+    "ACC-0039"
+  ],
+  "dependsOn": [
+    "TSK-0018"
+  ]
+}

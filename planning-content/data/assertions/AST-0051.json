@@ -1,0 +1,19 @@
+{
+  "id": "AST-0051",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Saved API-key authentication is discoverable without network access, and status alone is not availability",
+  "statement": "On pi 0.84.4, `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry` discovers configured models and provider authentication without contacting any external service. A stored api_key credential moves a model from configured-but-unavailable to available. `getProviderAuthStatus()` may report `configured: true` for a credential that `hasConfiguredAuth()` rejects and that leaves the model absent from `getAvailable()`, so provider auth status is not sufficient evidence that a model is usable.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ THE SECOND SENTENCE IS THE ONE THAT CHANGES CODE. It is a refusal criterion for section 6.6's launch checks, not a curiosity.",
+  "supportedBy": [
+    "EVD-0084"
+  ]
+}

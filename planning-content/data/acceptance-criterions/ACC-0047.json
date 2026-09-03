@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0047",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Unrelated settings and package entries survive the merge untouched",
+  "statement": "A settings file carrying third-party packages, unrelated keys and a custom key order is merged with Kiln's four owned fields and every unrelated entry is preserved and not reordered gratuitously. A malformed file, or one declaring an unknown schema version, is refused with the file left unchanged.",
+  "evaluates": [
+    "CMP-0024"
+  ],
+  "verifies": [
+    "REQ-0024",
+    "REQ-0025"
+  ]
+}

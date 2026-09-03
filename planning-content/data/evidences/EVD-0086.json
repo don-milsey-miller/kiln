@@ -1,0 +1,30 @@
+{
+  "id": "EVD-0086",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: a Pi child loads and completes a turn with no home variable at all (Linux)",
+  "kind": "experiment",
+  "observedAt": "2026-09-03",
+  "outcome": "success",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "platform": "linux",
+      "os": "Ubuntu 24.04 under WSL2",
+      "node": "v24.11.0",
+      "piVersion": "0.84.4"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "A dedicated exact-environment cell, recorded from the EFFECTIVE environment handed to the child rather than from the caller's intent. No configuration-locating variable was supplied — `configLocatingNamesSupplied: []`, covering HOME, USERPROFILE, APPDATA, LOCALAPPDATA, XDG_CONFIG_HOME and XDG_STATE_HOME — while PI_CODING_AGENT_DIR was. The child reported HOME false and USERPROFILE false, loaded the project package, and exited 0. The same construction on Windows leaves USERPROFILE present because the platform repopulates it, which is why that result is recorded separately and claimed differently.",
+  "notes": "⚠️ SPLIT OUT AS A SINGLE-PLATFORM RECORD ON PURPOSE. The no-HOME observation is one of the few in this suite whose RESULT differs by platform, so a record covering both could not carry an exact `platform` fact and no POSIX-specific assertion could match it. ⚠️ IT ALSO REPLACES A MEASUREMENT THAT NEVER HAPPENED: the first version of this cell asked for an exact environment through a wrapper that silently dropped the option, so the run used the default allowlist — HOME included — and recorded `homeWasPassed: false` beside `HOME: true` without anything noticing until the two halves were read together."
+}

@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0035",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Specialist roster",
+  "responsibility": "Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a lint error.",
+  "satisfies": [
+    "REQ-0026"
+  ],
+  "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection."
+}

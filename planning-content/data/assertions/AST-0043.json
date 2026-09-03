@@ -1,0 +1,18 @@
+{
+  "id": "AST-0043",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "`pi install -l` writes a relative package entry that differs only by path separator",
+  "statement": "On pi 0.84.4, installing a project-local package writes a `packages` entry in `.pi/settings.json` that is relative to that file and contains no absolute or home-directory path. The Windows form uses backslashes and the POSIX form forward slashes; the two denote the same directory, so a forward-slash literal is a canonically equivalent committed form.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "supportedBy": [
+    "EVD-0079"
+  ]
+}

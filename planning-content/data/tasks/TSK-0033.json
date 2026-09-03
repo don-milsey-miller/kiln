@@ -1,0 +1,28 @@
+{
+  "id": "TSK-0033",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build permission-gated connection inspection",
+  "statement": "Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. Add the presence-only check for the known provider variables and the research credential. Instrument each access point so the before-consent criterion is observable.",
+  "role": "platform",
+  "implements": [
+    "CMP-0027"
+  ],
+  "fulfils": [
+    "REQ-0023",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0052",
+    "ACC-0053"
+  ],
+  "dependsOn": [
+    "TSK-0024",
+    "TSK-0031",
+    "TSK-0065",
+    "TSK-0066"
+  ],
+  "notes": "⚠️ THE SURFACE WAS CORRECTED 2026-09-03 AFTER MEASUREMENT. This previously said 'Pi's public auth-storage and model-registry APIs'. `AuthStorage` is a real class at `dist/core/auth-storage.js` and is NOT importable — the package's exports map publishes only `.`, `./rpc-entry` and `./client` — so an implementer following the old wording would have written code that cannot resolve. ⚠️ `allowModelNetwork: false` IS WHAT MAKES THIS STEP HONEST: the consent prompt promises the check contacts no external service, and that option (which is the default) is what keeps the promise. ⚠️ AND GATE ON AVAILABILITY, NOT ON STATUS: `getProviderAuthStatus()` reports `configured: true` for a credential the registry will not use, so anything reading it alone will report ready for a project that cannot infer."
+}

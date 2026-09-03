@@ -1,0 +1,33 @@
+{
+  "id": "DEC-0026",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pin @earendil-works/pi-coding-agent 0.84.4 and raise the Node floor to 22.19.0",
+  "statement": "Kiln declares an exact dependency on @earendil-works/pi-coding-agent 0.84.4 — the version npm publishes as latest on 2026-09-02 — and raises engines.node from >=22 to >=22.19.0 to match what that release requires. Every Pi invocation resolves that dependency from the tool's own node_modules. Changing the pin is an intentional, tested dependency update that re-runs the compatibility suite; it is never a range that floats.",
+  "rationale": "The compatibility spike has to run against something, and it is cheaper to run it once against the version consumers will actually receive than to run it against 0.80.6 and inherit four minor versions of skew on the first release. The Node floor is not a preference: 0.84.4 declares engines.node >=22.19.0, and Kiln's >=22 would let a 22.0 install resolve a runtime that cannot start.",
+  "decidedAt": "2026-09-02",
+  "addresses": [
+    "QST-0031"
+  ],
+  "alternatives": [
+    {
+      "option": "Pin 0.80.6, the version every recorded measurement was taken on",
+      "whyNot": "It matches the evidence and ships four minor versions behind on day one. The spike has to re-run either way, so pinning the older version buys agreement with historical notes and pays for it in version skew that starts accumulating immediately."
+    },
+    {
+      "option": "Pin 0.84.4 but spike both versions and record the delta",
+      "whyNot": "Roughly doubles the spike's runtime to produce a comparison nothing downstream consumes. The shipped contract is what 0.84.4 does; what 0.80.6 did is already written down."
+    },
+    {
+      "option": "Depend on a caret range and take whatever Pi publishes",
+      "whyNot": "The capability signature a delegation verifier compares, the trust mechanism, the package entry literal and the child environment allowlist are all measured against one runtime. A floating range makes every one of those a claim about a version nobody tested."
+    },
+    {
+      "option": "Require a globally installed Pi on PATH",
+      "whyNot": "Leaves the consumer's behaviour dependent on an unrecorded version and an environment variable. A specialist child resolving a different binary from its orchestrator would compare a signature against a runtime that did not answer."
+    }
+  ],
+  "notes": "⚠️ IF 0.84.4 FAILS A REQUIRED CONTRACT, PHASE 1 STOPS FOR REVIEW. PM direction of 2026-09-02: there is no automatic fallback to 0.80.6, because silently reverting to the version the design was written against would hide exactly the incompatibility the spike exists to find."
+}

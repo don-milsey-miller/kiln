@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0027",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Make the initializer and the ignore owner accept a held transaction",
+  "statement": "Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an already-held transaction rather than acquiring their own lock, preserving their current idempotency and refusal semantics and their existing tests.",
+  "role": "platform",
+  "implements": [
+    "CMP-0022"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0027"
+  ],
+  "acceptedBy": [
+    "ACC-0044"
+  ],
+  "dependsOn": [
+    "TSK-0026"
+  ]
+}

@@ -81,6 +81,35 @@ present stakeholder.
   end.** This is the PM's central complaint restated as a constraint: if the output cannot tell them
   apart, the problem is unsolved.
 
+### Operating constraints added by the PM, 2026-09-02
+
+Recorded here rather than only in `README.md`, because they are constraints on the ask and not
+descriptions of the solution. They arrived with the agent-delivery work, which is the first part of
+this project that runs somebody else's runtime against somebody else's paid service.
+
+- **A first run assumes internet connectivity.** Cloning the tool, installing its locked
+  dependencies, completing provider authentication and reaching a hosted model all need the network.
+  No offline bootstrap, proxy configuration, private-registry support or custom-certificate handling
+  is promised before 1.0.
+- **Local inference engines are operated by the project manager, not by this system.** Where the
+  configured model is served by llama.cpp, vLLM, Ollama, LM Studio or anything similar, its
+  installation, model files, configuration, startup, health, hardware and shutdown belong to the
+  project manager. This system may discover and validate the configuration; it does not provision or
+  run the service.
+- **Planning work may cost money.** The configured provider can bill for intake turns and for
+  delegated specialist work. The project manager owns the account, the plan, the limits and the
+  charges — and therefore any request that may be billed must be disclosed and authorised before it
+  is sent, not merely reported afterwards.
+- **The tool is not version-pinned for consumers yet.** Before 1.0 the documented clone follows the
+  default branch, so a tool update may change behaviour under a project mid-cycle. This is
+  deliberate until one complete project has been run end to end; a pinned release workflow follows.
+
+⚠️ **The third of these is a constraint and not a preference, and it is the one that generalises.**
+`REQ-0012` already required explicit authorisation before a *validation* spends money. Inference is
+not validation, and the gap between those two words is how a planning turn could bill an account
+nobody warned. The constraint is about the class of act — anything that spends the project manager's
+money or uses their credentials — rather than about which subsystem performs it.
+
 ## Scope boundary — corrected by the PM
 
 The frozen intake does **not** put all post-runbook activity out of scope. Its core vision explicitly

@@ -39,18 +39,25 @@ test("the current stage moves when an attestation moves, and only then", () => {
   const defs = loadStageDefinitions(ROOT);
   const real = (id) => loadStageAttestations(CONTENT, id);
 
-  // Today's real state: every gate is attested through, so nothing is current.
-  assert.equal(deriveCurrent(defs, real), null, "the live project currently has no blocking stage");
+  // Today's real state, edited when the plan legitimately moves. Three criteria are deliberately
+  // not satisfied and stage 4 is the earliest of them: `every-blocking-gap-decided`, because
+  // QST-0033's OAuth question blocks active REQ-0025 and is undecided. Stage 5's data model and
+  // stage 9's critical-question criterion are the other two.
+  assert.equal(deriveCurrent(defs, real), "04-requirement-gaps", "the live project's first unready gate");
 
-  // ⚠️ The same inputs with ONE attestation changed must produce a different answer. If this did not
-  // move, the panel would be displaying something other than the attestations.
+  // ⚠️ THE MUTATION HAS TO MOVE THE ANSWER, and this is the second time that needed attention. The
+  // previous version flipped stage 4's own criterion and expected stage 4 — which was a real test
+  // while stage 4 was green, and became vacuous the moment stage 4 went red for real: it asserted
+  // an answer the base state already gave. A mutation test whose mutation changes nothing passes
+  // forever. Stage 3 is chosen because it is currently READY and sits before stage 4.
   const withGap = (id) => {
     const at = { ...(real(id) ?? {}) };
-    if (id === "04-requirement-gaps")
-      at["every-blocking-gap-decided"] = { result: "not-satisfied", decidedBy: "test", reason: "in-memory only" };
+    if (id === "03-discovery")
+      at["unknowns-resolved"] = { result: "not-satisfied", decidedBy: "test", reason: "in-memory only" };
     return at;
   };
-  assert.equal(deriveCurrent(defs, withGap), "04-requirement-gaps");
+  assert.notEqual(deriveCurrent(defs, real), "03-discovery", "stage 3 must be ready, or the mutation below proves nothing");
+  assert.equal(deriveCurrent(defs, withGap), "03-discovery");
 
   // ...and an EARLIER stage wins, because "current" is the first unready one rather than any of them.
   const withEarlier = (id) => {

@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0025",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Local-state policy",
+  "responsibility": "Decide and enforce where session transcripts, consent records, compatibility results and setup journals live: by default under the outer project's ignored `.pi/sessions/` and `.pi/runtime/`, or, when explicitly selected, under an external per-user root derived from the committed non-secret project ID. Refuse to write any runtime data before the chosen location's protection is in place, and never commit an absolute user path in order to reach it.",
+  "satisfies": [
+    "REQ-0027",
+    "REQ-0023"
+  ],
+  "notes": "⚠️ THE EXTERNAL MODE DEPENDS ON A CAPABILITY NOBODY HAS PROVED. Relocating Pi's session directory outside the project must be achievable through a supported Pi option or API; if the pinned version cannot do it, this component's second mode does not exist and the design changes rather than substituting a committed absolute path."
+}

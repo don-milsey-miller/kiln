@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0072",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Each role has exactly its contract's tools, and a missing allowlist is a lint error",
+  "statement": "A real Pi run of each specialist reports an active tool set equal to the intersection of that role's declared allowlist and the measured host registry. A role definition with no declared tool list fails the roster lint rather than inheriting Pi's default active set.",
+  "evaluates": [
+    "CMP-0035"
+  ],
+  "verifies": [
+    "REQ-0026"
+  ]
+}

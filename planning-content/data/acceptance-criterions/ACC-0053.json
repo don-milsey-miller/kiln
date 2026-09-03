@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0053",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Inspection results report availability and never credential material",
+  "statement": "The presented result contains provider display names, exact model identifiers and present-or-absent for the research credential, and is asserted to contain no key, token, header, environment value or credential-derived fingerprint. No external service is contacted during the inspection.",
+  "evaluates": [
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0024",
+    "REQ-0023"
+  ]
+}

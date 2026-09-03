@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0046",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "One owner writes the ignore block, and a removed block is not restored",
+  "statement": "A fresh project receives exactly one Kiln-marked block containing `.planning/`, `.pi/sessions/` and `.pi/runtime/`. An exact unmodified legacy block containing only `.planning/` is migrated to the extended block with every byte outside the markers preserved, and the migration is recorded and byte-stable on rerun. A block the operator removed or edited is reported and requires an explicit choice; it is never silently rewritten.",
+  "evaluates": [
+    "CMP-0023"
+  ],
+  "verifies": [
+    "REQ-0027"
+  ]
+}

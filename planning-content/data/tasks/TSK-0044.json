@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0044",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Register the read, mutation and attestation tools over the existing registries",
+  "statement": "Wrap project status and lint reads, `TYPED_TOOLS`, `MUTATION_TOOLS`, `PROJECT_TOOLS` and the stage-attestation read and write operations as validated Pi tools, and launch the session with Pi's built-in mutation tools disabled.",
+  "role": "platform",
+  "implements": [
+    "CMP-0032"
+  ],
+  "fulfils": [
+    "REQ-0024",
+    "REQ-0001",
+    "REQ-0002"
+  ],
+  "acceptedBy": [
+    "ACC-0064",
+    "ACC-0065"
+  ],
+  "dependsOn": [
+    "TSK-0043"
+  ]
+}

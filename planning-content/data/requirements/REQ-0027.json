@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0027",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Runtime state survives a tool update and never enters version control",
+  "statement": "Session transcripts, launch state, consent records, compatibility results and setup journals must be written where updating the tool clone cannot destroy them and where ordinary version control does not track them, while reproducible non-secret project configuration remains committed and reviewable. The system must not write runtime state into a location before the ignore coverage protecting that location is in place.",
+  "rationale": "The tool clone at `.planning/` is updated with `git pull`, so anything runtime written inside it is state the update channel is entitled to destroy. The outer project is version-controlled by the operator, so anything runtime written there is state Git is entitled to publish. Both halves of that sentence have to hold at once, which is why the requirement names an ordering — coverage first, then data — rather than only a location.",
+  "priority": "must",
+  "derivedFrom": [
+    "REQ-0020"
+  ],
+  "notes": "⚠️ THE ORDERING IS THE OPERATIONAL HALF. A design that puts transcripts under an ignored path is correct and still leaks if the first transcript is written before the ignore rule exists, or if the operator deleted the rule and setup carried on. The safe sequence and the refusal that follows a missing rule are both part of the requirement."
+}

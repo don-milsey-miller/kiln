@@ -1,0 +1,30 @@
+{
+  "id": "DEC-0029",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Runtime state defaults to the outer project's ignored .pi/, with an explicit external mode",
+  "statement": "Session transcripts live under `<project>/.pi/sessions/` and launch, consent, compatibility and transaction records under `<project>/.pi/runtime/`, both covered by Kiln's marked `.gitignore` block and neither written before that coverage exists. `.pi/settings.json` and `.pi/kiln.json` are deliberately not ignored: they are reproducible, non-secret project configuration and should be reviewable in a diff. An explicit external mode relocates the two ignored directories to a per-user root keyed by the committed project ID, and exists only if the pinned runtime supports it.",
+  "rationale": "Two locations are excluded for different reasons. Inside the tool clone is wrong because `git pull` on `.planning/` is the update channel and may destroy anything there. Tracked inside the outer project is wrong because transcripts and consent records are host-specific and sometimes sensitive. What is left is an ignored directory in the outer project, which is also where Pi already expects project-local runtime state to live.",
+  "decidedAt": "2026-09-02",
+  "addresses": [
+    "QST-0027",
+    "REQ-0027"
+  ],
+  "alternatives": [
+    {
+      "option": "Under .planning/, as the original decision #29 said",
+      "whyNot": "Dirties the clone that the update channel replaces. Tool state is not permission to write runtime data into the tool's own source checkout."
+    },
+    {
+      "option": "Always external, under a per-user state root",
+      "whyNot": "Removes the simple case for no benefit most operators would notice, and makes the common path depend on a Pi capability that has not been proved to exist."
+    },
+    {
+      "option": "Ignore the whole of .pi/",
+      "whyNot": "Would hide the package entry, the skill-override path and the model selection — the reproducible configuration that most deserves to be reviewed in a diff."
+    }
+  ],
+  "notes": "⚠️ THIS IS THE GRAPH RECORD OF THE AMENDMENT ALREADY MADE TO CANONICAL DECISION #29 AND #71 on 2026-09-02. Those rows and the layout diagram in the notes were updated in the same change, so only one answer is live. ⚠️ COVERAGE BEFORE DATA IS THE OPERATIONAL RULE: if the marked block is missing or was deliberately edited, setup offers the external mode or stops, and never writes a transcript into a path Git is tracking."
+}

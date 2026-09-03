@@ -1,0 +1,28 @@
+{
+  "id": "TSK-0041",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the setup-only preflight tool and the bounded canary request",
+  "statement": "Register `kiln_preflight` outside the orchestrator registry, accepting only the one-time challenge schema and returning a fixed acknowledgement with no access to content, mutation, research, validation, delegation or shell; issue the canary under a low token ceiling and remove the tool from the effective set before the user-facing session starts.",
+  "role": "platform",
+  "implements": [
+    "CMP-0030"
+  ],
+  "fulfils": [
+    "REQ-0012",
+    "REQ-0023",
+    "REQ-0025",
+    "REQ-0028",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0061",
+    "ACC-0062"
+  ],
+  "dependsOn": [
+    "TSK-0036",
+    "TSK-0043"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "DEC-0028",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The project's provider and model selection is committed configuration, with no local-only mode",
+  "statement": "The selected provider, exact model identifier and thinking level are written to the project's `.pi/settings.json` and committed. There is no local-only override mode in which the selection is kept out of version control. What is never committed is anything host-specific or secret: credentials, the operator's consent to use this machine's connections, session transcripts, and compatibility records.",
+  "rationale": "The selection is the answer to which model produced this project's content, and that answer belongs with the content. A local-only mode was floated in an earlier draft of the proposal and specified nowhere — no flag, no storage location, no precedence rule — which is the shape of a feature that sounds accommodating and has never been designed. Removing it also keeps one rule instead of two about what a clone inherits: configuration yes, consent no.",
+  "decidedAt": "2026-09-02",
+  "addresses": [
+    "REQ-0025"
+  ],
+  "alternatives": [
+    {
+      "option": "Allow an operator to keep the provider and model out of the committed settings file",
+      "whyNot": "It would make the recorded content unattributable to a model and would need a second, uncommitted configuration location with its own precedence rules. The privacy concern it answers is met by the existing separation: the selection is not a secret, and the credential it authenticates against never appears in the file."
+    },
+    {
+      "option": "Commit nothing and re-select on every machine",
+      "whyNot": "Turns a one-time decision into a prompt at every clone, and guarantees two operators on one project silently plan against different models."
+    }
+  ],
+  "notes": "⚠️ A COMMITTED SELECTION IS NOT A COMMITTED AUTHORISATION. Another operator inherits the choice of model and does not inherit permission to use this machine's credentials for it; that consent record lives in the ignored local-state root and its absence reopens the prompt."
+}

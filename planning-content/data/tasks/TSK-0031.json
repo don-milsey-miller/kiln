@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0031",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the local-state policy and its two modes",
+  "statement": "Derive and create the chosen state root, enforce coverage-before-data, generate and persist the stable non-secret project ID once, and pass external session and runtime locations through the route the spike proved. Withdraw the external mode if QST-0027 comes back negative.",
+  "role": "platform",
+  "implements": [
+    "CMP-0025"
+  ],
+  "fulfils": [
+    "REQ-0027",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0049",
+    "ACC-0050"
+  ],
+  "dependsOn": [
+    "TSK-0022",
+    "TSK-0028"
+  ]
+}

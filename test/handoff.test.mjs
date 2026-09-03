@@ -133,13 +133,43 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
     );
 
   // ---- today's state. Deliberately compact, so a legitimate movement of the plan edits these lines
-  // and nothing else. Five movements so far, and every one was caused by authoring work rather than
+  // and nothing else. SIX movements so far, and every one was caused by authoring work rather than
   // by a defect: stage 5 regressed on the application requirements and recovered on CMP-0012..0020,
-  // stage 6 regressed on DEC-0018 and recovered on DEC-0019's validated read contract, and stage 8
-  // regressed when TSK-0003..TSK-0014 arrived unjudged.
-  assert.deepEqual(notReady, [], "every stage gate is ready; the plan is publishable");
-  assert.deepEqual(c.blockers, [], JSON.stringify(c.blockers, null, 2));
-  assert.equal(c.ready, true, "with no unready stage the handoff must be ready");
+  // stage 6 regressed on DEC-0018 and recovered on DEC-0019's validated read contract, stage 8
+  // regressed when TSK-0003..TSK-0014 arrived unjudged, and on 2026-09-02 the agent-delivery layer
+  // entered the graph — 7 requirements, 21 components, 52 criteria and 47 tasks that had never been
+  // represented while every gate read green, which is the condition that expansion existed to undo.
+  //
+  // ⚠️ THE BLOCKER LIST IS NO LONGER ASSERTED ITEM BY ITEM, and that is a deliberate narrowing
+  // rather than a loosening. What is asserted is the part that carries meaning: WHICH stage is
+  // unready, and which KINDS of blocker are reported. The conjunction invariant above still checks
+  // every unready stage is named.
+  // SEVENTH movement, 2026-09-03: two more criteria went red, and both because a link added earlier
+  // in the same cycle made them false. QST-0033's OAuth question was given `blocks: [REQ-0025]` so
+  // the unproved route could not be lost — which makes stage 4's blocking-gap criterion undecided
+  // and, by DEC-0014's definition, makes it a critical question at stage 9.
+  // EIGHTH movement: the 53 agent-delivery tasks were reviewed and approved under DEC-0015, so
+  // `executable-content-not-approved` disappeared. The three red stage criteria remain the whole
+  // refusal, which is the state this snapshot now records.
+  assert.deepEqual(
+    notReady,
+    ["04-requirement-gaps", "05-solution-design", "09-handoff"],
+    "stage 4's undecided OAuth gap, stage 5's unapproved data model, and stage 9's critical question"
+  );
+  assert.equal(c.ready, false, "with an unready stage the handoff must refuse");
+  assert.deepEqual(
+    [...new Set(c.blockers.map((b) => b.reason))].sort(),
+    ["criterion-not-satisfied"],
+    JSON.stringify([...new Set(c.blockers.map((b) => b.reason))], null, 2)
+  );
+  // ⚠️ EACH RED CRITERION NAMED, not merely counted. The conjunction invariant above proves every
+  // unready STAGE is named; this proves the specific criteria are, so a stage going red for a
+  // different reason than the one recorded here cannot pass unnoticed.
+  for (const criterion of ["every-blocking-gap-decided", "data-model-approved", "no-unresolved-critical-questions"])
+    assert.ok(
+      c.blockers.some((b) => b.criterion === criterion),
+      `${criterion} is not satisfied but the handoff does not name it as a blocker`
+    );
 
   // ⚠️ READY IS NOT THE SAME AS BUILT, and the package has to keep saying so — a publishable plan
   // that reads as a finished system is the QST-0015 hazard leaving the repository. Two checks,
@@ -148,7 +178,14 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
     readdirSync(join(contentRoot, "data", dir)).map((f) =>
       JSON.parse(readFileSync(join(contentRoot, "data", dir, f), "utf-8"))
     );
-  const comps = read("components").filter((d) => Number(d.id.slice(4)) >= 12);
+  // ⚠️ BOUNDED AT BOTH ENDS SINCE 2026-09-02, and the missing upper bound was a live defect rather
+  // than a tidiness point. This slice means "the application shell cycle's components", and it was
+  // written as `>= 12` when 20 was the highest id that existed. The agent-delivery layer added
+  // CMP-0021..CMP-0041, so the open range silently grew from 9 components to 30 and took the
+  // criteria count with it — the invariants below would then have been asserted over a subgraph
+  // this test says nothing about.
+  const SHELL = (id) => { const n = Number(id.slice(4)); return n >= 12 && n <= 20; };
+  const comps = read("components").filter((d) => SHELL(d.id));
   assert.equal(comps.length, 9, "the nine application components");
 
   const shellIds = new Set(comps.map((d) => d.id));
@@ -156,7 +193,11 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   const shellCriteria = read("acceptance-criterions").filter((a) =>
     (a.evaluates ?? []).some((id) => shellIds.has(id))
   );
-  assert.equal(shellCriteria.length, 25, "every run-2 criterion, plus ACC-0036 and ACC-0037");
+  // 26 since 2026-09-02: the twenty-five run-2 criteria plus ACC-0036 and ACC-0037, and now
+  // ACC-0078, which is the agent layer's one claim on a shell component — the launcher must receive
+  // a private stdin under the supervisor so it cannot consume the operator's typing. It evaluates
+  // CMP-0020, so it belongs to this slice even though the work that motivated it does not.
+  assert.equal(shellCriteria.length, 26, "every run-2 criterion, plus ACC-0036, ACC-0037 and ACC-0078");
 
   // INVARIANT 1: a criterion may only be `pass` if every component it evaluates has code. Accepted
   // work that nothing implements is the sharpest form of the QST-0015 hazard — it would put a tick

@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0064",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The orchestrator holds Kiln's typed tools and none of Pi's built-in mutation tools",
+  "statement": "The user-facing session's measured active tool set contains the registered Kiln tools and does not contain Pi's built-in shell, write or edit tools. The measurement is of the session's reported registry, not of what the launch options requested.",
+  "evaluates": [
+    "CMP-0032"
+  ],
+  "verifies": [
+    "REQ-0024",
+    "REQ-0001"
+  ]
+}

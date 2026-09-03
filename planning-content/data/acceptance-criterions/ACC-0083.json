@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0083",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The pre-install import graph uses Node built-ins only",
+  "statement": "A static check of the setup command's import graph, up to and including the dependency-install step, finds no import of any installed dependency. Adding a top-level import of the Pi runtime or the validator makes that check fail.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

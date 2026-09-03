@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0079",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An unrelated healthy HTTP service does not satisfy readiness",
+  "statement": "With an unrelated server already answering on the chosen port, launch refuses rather than reporting the browser ready. A response carrying a wrong run identifier, a wrong project identifier, or arriving while the expected child is not alive, likewise fails readiness.",
+  "evaluates": [
+    "CMP-0037"
+  ],
+  "verifies": [
+    "REQ-0028"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "EVD-0076",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: reviseArtifact writes two trace fields its own comment says it refuses",
+  "kind": "experiment",
+  "summary": "A throwaway content root with one question, three revision attempts. POSITIVE CONTROL: reviseArtifact('question', id, {derivedFrom: [...]}) was REFUSED with the #101 message, proving the trace-field guard executes in this fixture and that a subsequent write is a real bypass rather than the guard failing to run. TEST 1: {answeredBy: ['DEC-9999']} WAS WRITTEN — a dangling link to a decision that does not exist, on a question whose resolution stayed 'unanswered'. That is precisely the state resolveQuestion refuses to produce: it validates that each answeredBy ref is an artifact ID and that the file exists, and refuses 'answered' carrying neither answer nor link. TEST 2: {blocks: ['REQ-9999']} WAS ALSO WRITTEN, a second dangling trace link. THE CAUSE IS A HARDCODED LIST: evidence-tools.mjs:206 enumerates seventeen trace-like field names, and blocks, raisedBy, satisfies, evaluates, verifies, fulfils, acceptedBy, implementedBy and answeredBy are all absent from it. The comment at evidence-tools.mjs:302 states that reviseArtifact 'refuses answeredBy — correctly, since it is a trace field (#101)'. It does not.",
+  "outcome": "success",
+  "observedAt": "2026-09-02",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "node": "v24.18.0",
+      "os": "Windows 11 Pro 10.0.26200",
+      "module": "lib/tools/evidence-tools.mjs at commit cd4574d plus uncommitted working tree",
+      "fixture": "throwaway content root under the system temp directory, one question artifact"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "notes": "⚠️ FOUND BY DOING IT, 2026-09-02, while authoring the agent-delivery graph. Two questions were created with a `blocks` link that pointed at a component instead of a requirement — a plain authoring mistake, caught immediately by the lint's trace/wrong-target-type rule, which is the lint working exactly as intended. The finding is what happened NEXT: unlinkTrace REFUSED to remove the bad link, because it validates the target type on removal as well as on addition, so the typed path offered no way to undo a link the lint was blocking on. The repair had to go through reviseArtifact, which should also have refused and did not. ⚠️ THE LINT IS THE ONLY THING CATCHING THIS. Both dangling links written in this probe would be reported by trace/target-missing at lint time, so the graph is not silently corruptible — but the guard that decision #101 put on the tool is not the thing holding, and a bypass caught downstream is a different safety property from a bypass refused at the write."
+}

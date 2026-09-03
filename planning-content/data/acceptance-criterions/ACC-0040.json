@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0040",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "No spike artefact contains credential material",
+  "statement": "Every byte the suite RETAINS is asserted to contain no API key, OAuth token, authorisation header, credential-derived fingerprint, username, or absolute user-home path. What is retained is enumerated and complete: the result summary; the captured stdout and stderr of every subprocess the suite starts, including the consumer's `npm install`, `pi install -l`, every Pi child, the model-registry probes and the fake provider; and the generated state the suite produced — the provider request log, the project settings file and the trust store. The assertion runs over those captured bytes rather than over a summary of them; redaction happens at write time and the runner refuses to save a file that still violates the rule. Output that is streamed and discarded is out of scope, because nothing can scan it.",
+  "evaluates": [
+    "CMP-0041"
+  ],
+  "verifies": [
+    "REQ-0024"
+  ],
+  "notes": "PASS 2026-09-03, AND IT FAILED THREE TIMES FIRST — the sequence is the point. (1) The initial result set was saved unredacted and was full of absolute home paths. (2) The second version redacted the summary while npm's output went straight to the terminal and was captured nowhere, so the test scanned a summary while the criterion said 'command output'. (3) The third still omitted `pi install -l`, the fake provider's streams, and every generated file, and the DETECTOR could not see a Windows home path once JSON-escaped — `C:\\\\Users\\\\alice` in serialised bytes returned an empty violation list while the raw string was flagged. ⚠️ NARROWED TO WHAT IS ACTUALLY COVERED, AND THE COVERAGE WIDENED TO MEET IT. The scope is now RETAINED bytes, enumerated; streamed-and-discarded output is explicitly out, because a criterion nothing can check is worse than a narrower one. ⚠️ THE DETECTOR AND THE REDACTOR ARE TESTED AGAINST EACH OTHER, in both directions: every forbidden shape must be SEEN by the detector before the redactor is asked to remove it, and both must handle the JSON-escaped form. They disagreed twice — once with the redactor weaker, once with the detector weaker — and the second is the dangerous direction."
+}

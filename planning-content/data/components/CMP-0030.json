@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0030",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Live model and tool canary",
+  "responsibility": "Prove, with one separately authorised request, that the selected provider and model actually answer and actually emit the shape of tool call Kiln depends on: expose a single read-only setup-only tool, require the model to call it with a random challenge against the declared schema, send no planning content, permit no mutation, cap the token budget, and record success only against the exact provider, model, thinking level, runtime version, package capability signature and non-secret endpoint identity that produced it.",
+  "satisfies": [
+    "REQ-0025",
+    "REQ-0023",
+    "REQ-0028"
+  ],
+  "notes": "⚠️ THE APPROVAL NAMES THE COST. The provider may bill for this request, so the prompt says so and names the exact model; declining leaves a valid content and browser setup and an agent that is not described as ready. ⚠️ MODEL PROSE CLAIMING TOOL SUPPORT IS NOT EVIDENCE — the observation is the tool call arriving with the right challenge, taken upstream of anything the model says about itself."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0056",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Give the launcher a private stdin and emit run identity",
+  "statement": "Change `bin/start-shell.mjs` so that under the supervisor it receives a private stdin pipe and propagates the run identifier, project identifier and chosen port to the application, preserving its existing standalone behaviour and its current cleanup tests.",
+  "role": "platform",
+  "implements": [
+    "CMP-0020"
+  ],
+  "fulfils": [
+    "REQ-0022"
+  ],
+  "acceptedBy": [
+    "ACC-0078"
+  ],
+  "dependsOn": [
+    "TSK-0055"
+  ]
+}

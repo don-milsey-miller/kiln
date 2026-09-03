@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0052",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Replace stdinDelivered with an observed task-binding result",
+  "statement": "Change `verifyChild()` in `lib/specialists/contract.mjs` from `stdinDelivered` to an independently observed task-binding outcome, rename `CHILD_REFUSED.NO_STDIN` and its detail text to describe a missing task binding, and update the existing tests so both facts are asserted together.",
+  "role": "platform",
+  "implements": [
+    "CMP-0009"
+  ],
+  "fulfils": [
+    "REQ-0026"
+  ],
+  "acceptedBy": [
+    "ACC-0074"
+  ],
+  "dependsOn": [
+    "TSK-0051"
+  ]
+}

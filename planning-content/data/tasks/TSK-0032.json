@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0032",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Integrate project trust through the route the spike established",
+  "statement": "Implement obtaining, reading and reporting the trust decision per DEC-0027, including the non-interactive refusal and the browser-only fallback. If QST-0026 found no supported programmatic route, remove or defer the `--trust` option and document the manual step instead.",
+  "role": "platform",
+  "implements": [
+    "CMP-0026"
+  ],
+  "fulfils": [
+    "REQ-0023",
+    "REQ-0026"
+  ],
+  "acceptedBy": [
+    "ACC-0051"
+  ],
+  "dependsOn": [
+    "TSK-0019",
+    "TSK-0024"
+  ]
+}

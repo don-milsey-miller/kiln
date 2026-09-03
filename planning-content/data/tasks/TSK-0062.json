@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0062",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the deterministic non-billable provider fixture",
+  "statement": "Stand up a local provider the pinned runtime can resolve as a custom model, answering deterministically and able to emit a correctly shaped tool call, so the canary and the Stage 1 exchange are testable in CI without a paid account or a network dependency.",
+  "role": "platform",
+  "implements": [
+    "CMP-0040"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0020",
+    "REQ-0028",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0086"
+  ],
+  "dependsOn": [
+    "TSK-0023"
+  ]
+}

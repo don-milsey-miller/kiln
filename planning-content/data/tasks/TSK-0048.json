@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0048",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the orchestrator context, policy and the /kiln-start entry",
+  "statement": "Build the persistent session behaviour: resolve and guard the content root, derive the current stage from definitions and attestations, load the matching skill, and register the start prompt that begins Stage 1 on a fresh project or summarises stage, blockers and the single recommended next action on an existing one.",
+  "role": "platform",
+  "implements": [
+    "CMP-0034"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0001"
+  ],
+  "acceptedBy": [
+    "ACC-0068",
+    "ACC-0071"
+  ],
+  "dependsOn": [
+    "TSK-0044",
+    "TSK-0046"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0066",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Settle OAuth discovery for a built-in provider, or record it as documentation-only",
+  "statement": "Determine whether saved OAuth authentication can be discovered for a BUILT-IN provider using a fabricated credential, or whether it requires a real interactive `/login` against a real subscription. If the latter, run it once manually, retain the sanitised outcome as single-instance evidence labelled as such, and keep it out of CI — the treatment section 15.3 already gives live paid-provider tests. Answers QST-0033.",
+  "role": "platform",
+  "implements": [
+    "CMP-0027"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0025"
+  ],
+  "notes": "⚠️ THE SPIKE'S NEGATIVE RESULT IS NOT EVIDENCE ABOUT OAUTH. A provider declared in models.json is composed with API-key auth only, so a stored OAuth credential for one never resolves — the model being unavailable says something about provider composition and nothing about the OAuth path. ⚠️ UNTIL THIS IS SETTLED, no acceptance criterion may be written as though the OAuth route were verified, and section 6.2 must keep saying so.",
+  "acceptedBy": [
+    "ACC-0091"
+  ],
+  "dependsOn": [
+    "TSK-0018"
+  ]
+}

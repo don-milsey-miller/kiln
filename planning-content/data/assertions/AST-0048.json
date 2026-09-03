@@ -1,0 +1,18 @@
+{
+  "id": "AST-0048",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A task passed as a CLI message reaches a child whose stdin is closed",
+  "statement": "On pi 0.84.4, a non-interactive child spawned with stdin closed and the task supplied as the `-p` argument receives that exact task: the text is observable in the user message sent to the provider, and the turn completes normally. Closed stdin does not prevent task delivery.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "supportedBy": [
+    "EVD-0082"
+  ]
+}

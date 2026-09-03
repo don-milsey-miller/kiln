@@ -1,0 +1,15 @@
+{
+  "id": "REQ-0022",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "One documented command carries a clean project to a running planning conversation",
+  "statement": "From a machine that has Git and the supported Node version and nothing else of Kiln's, one documented command must initialise the planning workspace, install the pinned agent runtime, obtain every decision it needs from the operator, and end with the planning agent conversing about this project — or refuse, naming the phase that stopped and an exact command that resumes it. Starting the browser application alone does not satisfy this requirement.",
+  "rationale": "The product is a planning conversation that writes structured content and shows it in a browser. Until 2026-09-02 the documented consumer path ended at `npm --prefix .planning start`, which starts the browser and nothing else: Pi started nowhere, so the half of the product that does the planning was unreachable by any documented route. A requirement that says `installable and runnable` (REQ-0020) was satisfied by that state, which is how the gap stayed invisible.",
+  "priority": "must",
+  "derivedFrom": [
+    "REQ-0020"
+  ],
+  "notes": "⚠️ THE REFUSAL HALF IS NOT DECORATION. Setup touches an operator's credentials, trust store, ports and money; the number of ways it can legitimately stop is larger than the number of ways it can succeed. A command that succeeds or hangs is worse than one that refuses precisely, which is why the phase and the resume command are in the statement rather than in the error-handling section of a design document."
+}

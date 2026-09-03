@@ -1,0 +1,19 @@
+{
+  "id": "AST-0050",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A consumer resolves the pinned Pi runtime from its own .planning/node_modules",
+  "statement": "After a consumer's own `npm install` inside a tracked-file copy of the tool, the Pi CLI resolved through that copy's installed `bin.pi` reports the version this repository pins, lies within the consumer directory, and lies outside the development checkout. Verified on Windows and Linux from a generated temporary project whose git repository has no commits.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ THE NEGATIVE HALF IS THE LOAD-BEARING ONE. 'The CLI resolved' is satisfied just as well by a fixture running the development checkout's own node_modules, which is what the first version of this spike did, and the two are indistinguishable from the outside. The assertion is only worth something because it also records that the resolved path is NOT inside this repository.",
+  "supportedBy": [
+    "EVD-0083"
+  ]
+}

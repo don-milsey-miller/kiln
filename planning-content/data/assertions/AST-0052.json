@@ -1,0 +1,21 @@
+{
+  "id": "AST-0052",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A Pi child resolves its configuration from PI_CODING_AGENT_DIR with no HOME on POSIX",
+  "statement": "On pi 0.84.4 on Linux, a child spawned with exactly PATH, TMPDIR and PI_CODING_AGENT_DIR — no HOME and no USERPROFILE, verified in the child's own report — loads the project package and completes a turn. On Windows the same construction leaves USERPROFILE present because the platform repopulates it, so the claim there is that the override is sufficient rather than that no home variable exists.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "platform": "linux",
+      "piVersion": "0.84.4"
+    }
+  },
+  "notes": "⚠️ THIS REPLACES A CLAIM THE HARNESS DID NOT SUPPORT. The earlier assertion said a child with no HOME loaded the package, while the harness supplied HOME unconditionally and the retained Linux report recorded `HOME: true`. The cell now names its entire environment and the test asserts the child's own observation, per platform.",
+  "supportedBy": [
+    "EVD-0085",
+    "EVD-0086"
+  ]
+}

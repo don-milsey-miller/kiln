@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0039",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "The suite runs on Windows and on the supported POSIX platform and records which",
+  "statement": "Each recorded observation names the platform, the exact pinned Pi version, and the Node version it was taken on, and the suite has been executed to completion on both Windows and the project's supported POSIX CI platform. A behaviour observed on one platform only is recorded as single-platform rather than as the contract.",
+  "evaluates": [
+    "CMP-0041"
+  ],
+  "verifies": [
+    "REQ-0006"
+  ],
+  "notes": "PASS 2026-09-03. Retained results exist for both platforms and each names its platform, Node version and the pinned Pi version. ⚠️ THE TEST ALSO FAILS ON A PIN BUMP: it compares the pin in package.json against the pin the evidence was taken under and refuses a mismatch, naming the command to re-run. That is what stops a version change inheriting the previous version's evidence. POSIX was measured on Ubuntu 24.04 under WSL2 and the live tier re-runs on ubuntu-latest in CI. ⚠️ 'RECORDS WHICH PLATFORM' NOW MEANS SOMETHING TO THE DERIVATION ENGINE, which it did not before: the environment facts were written as prose — `platform: 'windows and linux'`, `piVersion: '0.84.4, installed by...'` — and the engine compares facts by exact equality, so every supporting record was excluded and ten of twelve spike assertions derived as unverified while reading as proved. Facts are scalars now, prose lives in summaries, and the one observation whose RESULT differs by platform has a single-platform record of its own."
+}

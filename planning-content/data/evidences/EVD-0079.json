@@ -1,0 +1,31 @@
+{
+  "id": "EVD-0079",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: the package entry `pi install -l` writes is relative on both platforms, and separator-divergent",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0",
+      "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "`pi install -l ./.planning/pi-package` run from the consumer root wrote `.pi/settings.json` containing exactly one key. On Windows the entry was `\"..\\\\.planning\\\\pi-package\"`; on Linux it was `\"../.planning/pi-package\"`. Both are RELATIVE to the settings file and both resolve to the same package directory. The two differ only in path separator, so normalising the Windows form to forward slashes is a separator-only rewrite whose canonical equivalence is directly provable rather than assumed.",
+  "notes": "⚠️ THE PROPOSAL'S PREDICTED LITERAL WAS RIGHT AND ITS RISK WAS REAL. `../.planning/pi-package` is what section 6.3 asked for and what POSIX produces unaided; Windows produces the same path with backslashes, which is not portable in a committed file. The normalisation the proposal guarded with a proof requirement is exactly the normalisation needed, and the proof is cheap. ⚠️ NO ABSOLUTE PATH APPEARED ON EITHER PLATFORM, which was the failure this question was most worried about."
+}

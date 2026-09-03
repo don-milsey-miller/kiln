@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0037",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Combined runtime supervisor",
+  "responsibility": "Own the lifecycle of the two processes that make up a running Kiln: validate the project and settings, choose and prove a port, start the browser launcher with a private stdin pipe so it cannot consume the operator's typing, wait for identity-confirmed readiness, start Pi in the outer project root with the terminal inherited, begin or resume the recorded planning session, and on exit or signal stop both process trees within bounded grace periods and remove only what this invocation created.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0028"
+  ],
+  "notes": "⚠️ ONE TERMINAL, TWO PROCESSES, AND ONLY ONE MAY READ IT. If the background launcher inherits stdin it will eat the authentication answer or the first planning message. ⚠️ PI'S WORKING DIRECTORY IS THE OUTER PROJECT, never the tool clone, and the self-hosting checkout — where those two are the same directory — is refused unless explicitly opted into."
+}

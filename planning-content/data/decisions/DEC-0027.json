@@ -1,0 +1,29 @@
+{
+  "id": "DEC-0027",
+  "type": "decision",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Project trust is granted through a supported Pi mechanism, not by writing Pi's trust file",
+  "statement": "Kiln does not write Pi's user-scoped trust store directly. Interactive setup obtains the decision through Pi's own trust flow or a supported public API; non-interactive setup accepts a pre-existing decision or refuses. If the pinned version exposes no supported route to record a decision programmatically, the proposed `--trust approve` option is removed or deferred rather than implemented by writing the file. This withdraws the mechanism half of decision #67(a); the detection half, #67(b), is unaffected and still owed.",
+  "rationale": "Writing another tool's undocumented user-scoped security file is brittle — its shape is unversioned and may change under any release — and it crosses a boundary that belongs to the operator rather than to Kiln. The argument that carried #67(a) was that a recorded decision keeps the grant where the operator can read and delete it, which remains right; what changed is the judgement that Kiln should not be the one writing it.",
+  "decidedAt": "2026-09-02",
+  "addresses": [
+    "QST-0026"
+  ],
+  "alternatives": [
+    {
+      "option": "Keep #67(a): setup writes the canonical-directory entry into Pi's user trust file",
+      "whyNot": "Measured causal on 0.80.6 with grant, denial and removal controls, so it demonstrably works. It is still a write into an undocumented file owned by another tool and scoped to the user rather than the project, and it silently acquires responsibility for a format nobody promised to keep stable."
+    },
+    {
+      "option": "Pass --approve on every specialist spawn line",
+      "whyNot": "Rejected in #67 and still rejected. It overrides the operator's own defaultProjectTrust silently, for every child, permanently, with no way to decline short of editing Kiln's code."
+    },
+    {
+      "option": "Change the operator's global defaultProjectTrust to always",
+      "whyNot": "Widens a machine-wide security setting to solve one project's problem, and leaves it widened after Kiln is gone."
+    }
+  ],
+  "notes": "⚠️ THIS DECISION IS CONDITIONAL ON A MEASUREMENT AND SAYS SO. The route it requires may not exist in 0.84.4; that is the open question this decision addresses rather than assumes. A negative answer stops for review, which is a deliberate refusal to let the fallback be chosen by default."
+}

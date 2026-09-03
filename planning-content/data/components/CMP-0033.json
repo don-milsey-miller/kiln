@@ -1,0 +1,13 @@
+{
+  "id": "CMP-0033",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Stage skill generation and overrides",
+  "responsibility": "Generate one packaged skill per canonical stage definition so that stage purpose, outputs and exit criteria are never hand-maintained twice, fail a check when the packaged skills are stale relative to `stages/`, and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.",
+  "satisfies": [
+    "REQ-0022"
+  ],
+  "notes": "⚠️ THE GENERATOR EXISTS TO PREVENT ONE SPECIFIC DRIFT: the agent working confidently to exit criteria the application is not checking. Two hand-maintained descriptions of one pipeline disagree, and the disagreement is invisible from either side."
+}

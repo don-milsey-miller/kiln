@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0078",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The background launcher never reads the terminal",
+  "statement": "Under the supervisor the application launcher's stdin is a private pipe: input typed at the terminal during authentication and during the first planning turn reaches Pi and never the launcher, and the launcher still stops on the existing stop control message and on stdin close.",
+  "evaluates": [
+    "CMP-0020"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

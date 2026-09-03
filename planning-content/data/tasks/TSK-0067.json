@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0067",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Prove the Kiln capability signature loads and can be compared",
+  "statement": "Once the Kiln Pi package exists, extend the compatibility suite to observe that its machine-readable capability signature is present in a loaded session and that a deliberate change to a measured tool signature is detected by a comparing consumer. Until then the suite proves extension, skill and prompt loading only.",
+  "role": "platform",
+  "implements": [
+    "CMP-0031"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0025"
+  ],
+  "notes": "⚠️ IT CANNOT BE MEASURED YET AND SAYING SO IS THE POINT. The signature belongs to a package that does not exist; a spike cannot prove a property of something unbuilt, and claiming it did is the failure this cycle exists to prevent. Blocked on CMP-0031.",
+  "dependsOn": [
+    "TSK-0043"
+  ],
+  "acceptedBy": [
+    "ACC-0092"
+  ]
+}

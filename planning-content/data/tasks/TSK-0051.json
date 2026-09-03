@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0051",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Author the three role definitions and the roster lint",
+  "statement": "Write `research.md`, `planning.md` and `validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, deriving write boundaries from `lib/specialists/contract.mjs`; add the lint that fails a role with no declared tools.",
+  "role": "platform",
+  "implements": [
+    "CMP-0035"
+  ],
+  "fulfils": [
+    "REQ-0026",
+    "REQ-0025"
+  ],
+  "acceptedBy": [
+    "ACC-0072",
+    "ACC-0073"
+  ],
+  "dependsOn": [
+    "TSK-0044"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "EVD-0077",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: ProjectTrustStore is a public API and is causal on pi 0.84.4 (Windows)",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "platform": "windows",
+      "os": "Windows 11 Pro 10.0.26200",
+      "node": "v24.18.0",
+      "piVersion": "0.84.4",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+      "agentDir": "isolated via PI_CODING_AGENT_DIR; the operator's own ~/.pi/agent was never read or written"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "Five runs against a disposable consumer fixture, isolated by PI_CODING_AGENT_DIR, with defaultProjectTrust set to never. The observable is a marker file written by the extension at LOAD time, upstream of session_start and of any inference. RESULTS: (1) no decision, no override -> extension NOT loaded, session completed normally, no error mentioning trust. (2) --approve -> LOADED, which is the fixture control proving the same extension can load. (3) ProjectTrustStore.set(cwd, true) through the PUBLIC exported class, no --approve -> LOADED. (4) set(cwd, false) -> NOT loaded, so an explicit denial is honoured. (5) set(cwd, null) -> NOT loaded, so removing the decision reverts the behaviour. Rows 4 and 5 are what make row 3 causal rather than correlated. get(cwd) returned true after set(true) and null after set(null); getEntry(cwd) returned the canonical path and the boolean.",
+  "notes": "⚠️ THE PUBLIC API IS THE POINT. `ProjectTrustStore` is exported from the package root with a typed declaration — constructor(agentDir), get, getEntry, set, setMany — alongside `getProjectTrustOptions`, `getProjectTrustParentPath` and `hasTrustRequiringProjectResources`. Kiln therefore does not need to write the undocumented trust.json shape by hand, which is exactly what DEC-0027 required and what decision #67(a) did. ⚠️ THE SILENT FAILURE OF 2026-08-15 REPRODUCES ON 0.84.4 UNCHANGED: row 1 completed a well-formed session with none of the package's tools and said nothing about it."
+}

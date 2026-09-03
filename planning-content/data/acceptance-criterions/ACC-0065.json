@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0065",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Every wrapper resolves the canonical content root and preserves the write discipline",
+  "statement": "Each registered mutation tool writes through the existing locked, atomic, validated path with the content root resolved by the shared resolver, returns structured success or refusal, and leaks no credential or absolute home path in its result. Business rules stay in `lib/`; the wrapper adds schema and rendering only.",
+  "evaluates": [
+    "CMP-0032"
+  ],
+  "verifies": [
+    "REQ-0002"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "AST-0047",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pi session storage can be relocated outside the project without committing a path",
+  "statement": "On pi 0.84.4 three routes relocate session transcripts, in the documented precedence order `--session-dir`, then `PI_CODING_AGENT_SESSION_DIR`, then the `sessionDir` setting. The command-line and environment routes are supplied at launch, so an external user-local state root is reachable without writing an absolute user path into committed configuration.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "supportedBy": [
+    "EVD-0081"
+  ]
+}

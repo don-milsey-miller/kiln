@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0094",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An invalid or stale link can be removed through the typed path",
+  "statement": "`unlinkTrace` removes a link whose target is of the wrong type, whose target does not exist, and whose target has been superseded — each verified by the link being gone and the lint finding it clears. It removes `answeredBy` entries, which no operation could previously withdraw. It continues to refuse an unknown FIELD, and it preserves the lock, fresh-read and atomic-write discipline. Adding a link is unaffected and still validates the target type.",
+  "evaluates": [
+    "CMP-0005"
+  ],
+  "verifies": [
+    "REQ-0014"
+  ],
+  "notes": "⚠️ THE ADD/REMOVE ASYMMETRY IS THE WHOLE FIX. Validating a target on ADD is what keeps the graph sound; validating it on REMOVE refuses exactly the operations that repair an unsound one. The criterion asserts both halves so a later simplification cannot collapse them."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0035",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the Tavily consent, probe and plain-English outcomes",
+  "statement": "After a separate approval, run the existing `GET /usage` capability probe from `lib/research/tavily-adapter.mjs`, persist the non-secret project choice and the local approval, and map each internal state to its required user-facing wording. Declining leaves research unavailable and does not block planning.",
+  "role": "platform",
+  "implements": [
+    "CMP-0027"
+  ],
+  "fulfils": [
+    "REQ-0003",
+    "REQ-0012"
+  ],
+  "acceptedBy": [
+    "ACC-0053",
+    "ACC-0054"
+  ],
+  "dependsOn": [
+    "TSK-0033"
+  ]
+}

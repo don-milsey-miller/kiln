@@ -1,0 +1,12 @@
+{
+  "id": "REQ-0024",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Credential material never enters project files, logs, process arguments, or planning content",
+  "statement": "No committed project file, emitted log line, error message, generated artifact, test fixture, or constructed process argument may contain a credential value or a value derived from one. A credential reaches a subprocess only through an audited contract that names, for one selected provider, the exact environment-variable names required; a provider with no such recorded mapping is refused rather than granted a wider inheritance of the operator's environment.",
+  "rationale": "The specialist child environment is the concrete hazard. The existing contract passes base OS variables plus TAVILY_API_KEY for the research role, which is correct for the tool plane and insufficient for the model plane: a provider authenticated only through OPENAI_API_KEY leaves every child unable to infer. The tempting fix — inherit more of the environment — is the one that must be foreclosed by a requirement, because it works immediately and leaks everything.",
+  "priority": "must",
+  "notes": "⚠️ PROCESS ARGUMENTS ARE IN THE LIST DELIBERATELY. Command lines are visible in process listings to other users on the same machine, so passing a key through Pi's `--api-key` option is a disclosure even though nothing is written to disk. ⚠️ SO ARE DERIVED VALUES: a hash or prefix of a key recorded as a cache identity is credential-derived, and a compatibility record keyed on one is a credential artifact wearing a different name."
+}

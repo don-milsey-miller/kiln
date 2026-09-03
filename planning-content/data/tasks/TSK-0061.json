@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0061",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the argument surface, refusal codes and non-interactive contract",
+  "statement": "Implement the documented flags including the explicit consent options, reject API keys as arguments, refuse on any missing decision in non-interactive mode, and publish the exit-code mapping in `--help` and in tests.",
+  "role": "platform",
+  "implements": [
+    "CMP-0039"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0027"
+  ],
+  "acceptedBy": [
+    "ACC-0084"
+  ],
+  "dependsOn": [
+    "TSK-0060"
+  ]
+}

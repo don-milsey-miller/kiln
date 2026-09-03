@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0036",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Delegation runtime",
+  "responsibility": "Run a specialist as an isolated Pi child and decide whether its answer may be used: build a task-scoped context rather than forwarding the conversation, bind the role prompt and the task through a private file with restrictive permissions and closed stdin, pass the orchestrator's exact provider, model and thinking level, pass the intersection of the role's allowlist and the measured host registry, enforce a bounded timeout, delete temporary material on every exit path, and verify the child's capability signature before reading its substantive output.",
+  "satisfies": [
+    "REQ-0026",
+    "REQ-0024",
+    "REQ-0025"
+  ],
+  "notes": "⚠️ THE EXISTING VERIFIER CONTRADICTS THE SPAWN CONTRACT AND MUST BE CORRECTED. `verifyChild()` refuses unless `stdinDelivered` is true and explains failure as a task not delivered on stdin, while the approved contract closes stdin so a non-interactive child cannot wait forever for input. The observation wanted is that the task was bound through the supported non-stdin channel, and the tests must assert both facts at once — stdin closed, task arrived."
+}

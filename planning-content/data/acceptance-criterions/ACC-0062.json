@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0062",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The canary cannot see or change planning content, and its record invalidates correctly",
+  "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, package capability signature or endpoint identity invalidates it and reopens approval.",
+  "evaluates": [
+    "CMP-0030"
+  ],
+  "verifies": [
+    "REQ-0024",
+    "REQ-0025"
+  ]
+}

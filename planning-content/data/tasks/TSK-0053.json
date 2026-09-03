@@ -1,0 +1,26 @@
+{
+  "id": "TSK-0053",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the delegation extension: launch, binding, inheritance and cleanup",
+  "statement": "Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path.",
+  "role": "platform",
+  "implements": [
+    "CMP-0036"
+  ],
+  "fulfils": [
+    "REQ-0026",
+    "REQ-0025",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0076"
+  ],
+  "dependsOn": [
+    "TSK-0039",
+    "TSK-0051",
+    "TSK-0052"
+  ]
+}

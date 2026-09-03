@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0081",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Shutdown leaves nothing running on either platform",
+  "statement": "After Pi exits, or after an interrupt, both process trees are stopped within their grace periods, the port is free, and only files created by that invocation were removed. Verified on Windows and on the supported POSIX platform.",
+  "evaluates": [
+    "CMP-0037"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0055",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Add the run-identity health route",
+  "statement": "Add the Kiln health endpoint to the application, taking the run and project identifiers supplied by the supervisor at start, and returning only the identity fields.",
+  "role": "frontend",
+  "implements": [
+    "CMP-0038"
+  ],
+  "fulfils": [
+    "REQ-0028"
+  ],
+  "acceptedBy": [
+    "ACC-0077"
+  ],
+  "dependsOn": [
+    "TSK-0025"
+  ]
+}

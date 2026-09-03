@@ -1,0 +1,33 @@
+{
+  "id": "EVD-0080",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: the child environment allowlist is exact on POSIX and a floor on Windows",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "platform": "windows",
+      "os": "Windows 11 Pro 10.0.26200",
+      "node": "v24.18.0",
+      "piVersion": "0.84.4",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted",
+      "agentDir": "isolated via PI_CODING_AGENT_DIR; the operator's own ~/.pi/agent was never read or written",
+      "alsoObservedOn": "Ubuntu 24.04 under WSL2, node v24.11.0"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "A Pi child was spawned with a replaced environment and reported, from inside the loaded extension, which configuration variables it could see and how many variables existed. LINUX: a restricted child saw 11 variables and zero sentinels; a control child with the full environment saw 35 and both sentinels, proving the sentinel test can detect leakage. A child given only PATH, TMPDIR and PI_CODING_AGENT_DIR — no HOME at all — still loaded the package and ran a complete turn. WINDOWS: the restricted child saw 25 variables and zero sentinels, control saw 75 and both sentinels. BUT a child passed only SystemRoot and PATH was still given HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR. That was isolated with a bare `node -e` child rather than pi, which excludes Pi as the source. It does NOT distinguish the operating system from Node or libuv's own process-creation path, so no attribution is claimed: what is recorded is the observable the product depends on — a Node-spawned child on Windows receives these names whatever environment it was handed.",
+  "notes": "⚠️ AN ALLOWLIST ON WINDOWS IS A FLOOR, NOT A CEILING, and the proposal's language — that the child environment IS the union of the measured base, the provider's model-plane names and the role's tool-plane names — is not achievable exactly there. What survives is the claim that matters: no CREDENTIAL variable crosses, which the sentinel pair proves on both platforms. ⚠️ THE SECOND CONSEQUENCE IS SHARPER. Because USERPROFILE is always present on Windows, a child can always resolve the default ~/.pi/agent, so a child cannot be isolated from the operator's real Pi configuration by omitting a variable — PI_CODING_AGENT_DIR must be set positively to redirect it."
+}

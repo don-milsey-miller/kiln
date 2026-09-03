@@ -1,0 +1,25 @@
+{
+  "id": "TSK-0026",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the setup transaction: one lock, preflight, write plan and journal",
+  "statement": "Add `lib/setup-transaction.mjs` owning the existing `.planning-init.lock` for the whole command: canonicalise and print targets, schema-validate readable files, probe temp-create and atomic rename in each parent, hash existing files, compare under the lock before each merge, and keep a non-secret resumable journal.",
+  "role": "platform",
+  "implements": [
+    "CMP-0022"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0027"
+  ],
+  "acceptedBy": [
+    "ACC-0043",
+    "ACC-0044",
+    "ACC-0045"
+  ],
+  "dependsOn": [
+    "TSK-0025"
+  ]
+}

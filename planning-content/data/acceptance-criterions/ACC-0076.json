@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0076",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The child inherits the orchestrator's exact selection and a scoped context",
+  "statement": "The child's reported provider, model and thinking level equal the orchestrator's, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
+  "evaluates": [
+    "CMP-0036"
+  ],
+  "verifies": [
+    "REQ-0025",
+    "REQ-0024"
+  ]
+}

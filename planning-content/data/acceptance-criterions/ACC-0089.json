@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0089",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Every negative control refuses",
+  "statement": "Each of the enumerated wrong states produces a refusal rather than an apparent success: wrong working directory, inspection denied, a configuration read attempted before consent, implicit adoption of a sole or default model, missing model authentication, an overbroad environment-only provider, a TTY-less login attempt, live-check denial and a malformed canary tool call, Tavily contacted before approval, a committed research choice with no local consent, trust denial, corrupt settings, untracked-state exposure, an interrupted transaction, an occupied port, an unrelated healthy HTTP service, tool signature drift, and a fake child returning plausible prose without Kiln tools.",
+  "evaluates": [
+    "CMP-0040"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0028",
+    "REQ-0023"
+  ]
+}

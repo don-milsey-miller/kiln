@@ -1,0 +1,31 @@
+{
+  "id": "EVD-0085",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: the proof cells the first spike was missing — no-HOME, config directory, prompts, env auth, entry equivalence",
+  "kind": "experiment",
+  "observedAt": "2026-09-03",
+  "outcome": "success",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0",
+      "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+      "inference": "local deterministic fake provider on 127.0.0.1, explicitly selected per run"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "NO HOME: a child given exactly PATH, TMPDIR and PI_CODING_AGENT_DIR — HOME absent — loaded the package and exited 0 on Linux, with the child reporting HOME false and USERPROFILE false. On Windows the same run reports HOME false but USERPROFILE TRUE, because the platform repopulates it; the honest Windows claim is that the override is sufficient, not that the child had no home. CONFIGURATION DIRECTORY: with HOME redirected at a scratch directory and no override, the agent directory resolved under that home; with PI_CODING_AGENT_DIR set it resolved to the override, and the two differed — the control that stops 'the override wins' being vacuous. PROMPT TEMPLATES: a packaged template invoked as `/kiln-probe-prompt` expanded, and its body marker arrived in the user message at the provider while the literal slash string did not. PROVIDER-SCOPED ENVIRONMENT AUTH: a models.json provider whose key is `$KILN_PROBE_PROVIDER_KEY` was listed by `--list-models` in a child carrying that variable and absent from one without it, while the inline-key provider was listed in both — so the variable is what moved. PACKAGE ENTRY EQUIVALENCE: the raw entry and its separator-normalised form resolve to one real path, and that path is the package directory.",
+  "notes": "⚠️ TWO HARNESS DEFECTS WERE FOUND BY THEIR OWN RECORDED CONTRADICTIONS, which is the argument for recording both halves of a condition rather than only the result. The no-HOME cell first reported `homeWasPassed: false` beside `HOME: true` — the wrapper was silently dropping the exact-environment option and falling back to the allowlist, which always carries HOME. The environment-auth cell first failed in BOTH directions because `--models` is a NAME FILTER and not a path: pointing it at a file yields `No models match pattern <path>`, and a cell that fails identically with and without its variable is not a negative result, it is a broken probe. ⚠️ THE ENTRY-EQUIVALENCE CELL IS THE ONE THE DESIGN EXPLICITLY DEMANDED. Recording that two spellings differ only by separator was never the same as showing they name one directory, and the proposal required the proof before permitting the rewrite."
+}

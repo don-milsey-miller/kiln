@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0074",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Stdin is closed and the exact task still arrived",
+  "statement": "One test asserts both facts about the same child: its stdin was closed, and the exact delegated task reached it through the supported non-stdin channel, observed at the child. The verifier's field and its refusal reason describe task binding rather than stdin.",
+  "evaluates": [
+    "CMP-0009"
+  ],
+  "verifies": [
+    "REQ-0026"
+  ]
+}

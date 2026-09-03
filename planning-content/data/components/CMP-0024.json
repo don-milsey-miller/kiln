@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0024",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pi settings merge",
+  "responsibility": "Merge only Kiln's owned fields into the project's `.pi/settings.json` — the local package entry, the skill-override path, the selected default provider, model and thinking level, and the project-local session directory when that mode is chosen — preserving every unrelated key and package entry, refusing a malformed or unknown-schema-version file rather than replacing it, and changing no bytes when the desired state is already present.",
+  "satisfies": [
+    "REQ-0024",
+    "REQ-0025"
+  ],
+  "notes": "⚠️ THE FILE HAS TWO AUTHORS. `pi install -l` writes it and so does Kiln, and it is also a file the operator may hand-edit. Every one of those is a legitimate writer, so the merge is the boundary: Kiln owns four keys and must be able to prove it touched nothing else. ⚠️ NO SECRET EVER LANDS HERE. This file is committed on purpose, which is exactly why an API key, an OAuth token or an absolute home path reaching it is a disclosure rather than an untidiness."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0048",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The committed settings file contains no secret and no absolute home path",
+  "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
+  "evaluates": [
+    "CMP-0024"
+  ],
+  "verifies": [
+    "REQ-0024"
+  ]
+}

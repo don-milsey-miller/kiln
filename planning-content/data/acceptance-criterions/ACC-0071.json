@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0071",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "It refuses to operate on the tool's own planning content",
+  "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root; given a state in which the tool's own bundled content would resolve instead, it refuses and names both paths rather than authoring into the tool's plan.",
+  "evaluates": [
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

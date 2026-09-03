@@ -1,0 +1,24 @@
+{
+  "id": "QST-0026",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "Does the pinned Pi version offer a supported route to grant project trust?",
+  "statement": "Kiln must obtain a project trust decision, because a non-interactive child launched against an untrusted project loads no package and therefore none of Kiln's typed tools, silently. The mechanism is now open. Decision #67(a) chose writing Pi's user trust file directly and proved that causal; the PM withdrew that on 2026-09-02 in favour of a supported public API or native flow. So: does @earendil-works/pi-coding-agent 0.84.4 expose a documented API, command, or non-interactive option through which a caller can record, read, and revoke a project trust decision?",
+  "blocks": [
+    "REQ-0022",
+    "REQ-0026"
+  ],
+  "raisedBy": [
+    "CMP-0026"
+  ],
+  "notes": "⚠️ ITS ANSWER CHANGES A PUBLISHED COMMAND CONTRACT, which is what makes it blocking rather than interesting. If no supported route exists, interactive setup uses Pi's native trust flow, non-interactive setup must require a pre-existing decision or refuse, and the proposed `--trust approve` option is removed or deferred. ⚠️ THE FALLBACK IS EXPLICITLY CLOSED BY PM DIRECTION: a negative answer stops Phase 1 for review and does not authorise reverting to writing the trust file. ⚠️ THE MEASUREMENT NEEDS THE 2026-08-18 CONTROLS — grant, revoke, and explicit denial each observed through a marker written at extension load time, upstream of anything the model says.",
+  "answer": "YES. `ProjectTrustStore` is exported from the package root of pi 0.84.4 with a typed declaration — constructor(agentDir), get(cwd), getEntry(cwd), set(cwd, decision), setMany(updates) — alongside getProjectTrustOptions, getProjectTrustParentPath and hasTrustRequiringProjectResources. Measured causal on Windows and Linux with the full control set: a grant loads the package without --approve, an explicit denial prevents loading, and revocation reverts. DEC-0027 is satisfiable exactly as written and the `--trust approve` option can ship. Kiln depends on the exported class; it never writes the trust.json shape.",
+  "answeredBy": [
+    "AST-0041",
+    "EVD-0077",
+    "EVD-0078"
+  ]
+}

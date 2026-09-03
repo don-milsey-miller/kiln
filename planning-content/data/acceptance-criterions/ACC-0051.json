@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0051",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Trust is obtained through a supported route, and a denial stops the agent cleanly",
+  "statement": "Interactive setup displays the canonical project path and obtains the decision through Pi's own supported mechanism. A denial leaves the planning scaffold intact and valid, does not describe the agent as ready, and still permits an explicit browser-only start. Non-interactive setup with no pre-existing decision refuses rather than defaulting to approval.",
+  "evaluates": [
+    "CMP-0026"
+  ],
+  "verifies": [
+    "REQ-0023",
+    "REQ-0026"
+  ]
+}

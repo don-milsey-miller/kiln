@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0069",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The second question is chosen from updated state, not from a list",
+  "statement": "After the intake document changes, the next question differs according to what the answer supplied — demonstrated by driving two different first answers from the same starting state and observing two different second questions.",
+  "evaluates": [
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0001"
+  ]
+}

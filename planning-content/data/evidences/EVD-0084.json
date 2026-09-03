@@ -1,0 +1,30 @@
+{
+  "id": "EVD-0084",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Experiment: authentication and model discovery through ModelRuntime and ModelRegistry",
+  "kind": "experiment",
+  "observedAt": "2026-09-03",
+  "outcome": "success",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "network": "allowModelNetwork defaults to false; no external service was contacted",
+      "credentials": "fabricated probe credentials in an isolated auth.json; no real credential involved"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "SURFACE: `AuthStorage` is a real class at dist/core/auth-storage.js and is NOT reachable — the package's exports map publishes only '.', './rpc-entry' and './client', so a deep import is blocked. The supported route is `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` plus `ModelRegistry`, with `readStoredCredential` exported from the root for a one-off presence read. `allowModelNetwork` defaults to FALSE, which is what lets a consent-gated inspection satisfy the rule that it contacts nothing. CATALOGUE: `getAll()` returned 1291 models — the entire built-in catalogue across every provider pi knows of, usable or not — while `getAvailable()` returned 0 with no credential. DISCOVERY, with the no-credential control first: no credential -> not available, hasConfiguredAuth false, getProviderAuthStatus {configured:false}. Stored api_key -> available, hasConfiguredAuth true, {configured:true, source:'stored'}. Stored OAuth credential in pi-ai's canonical {type,refresh,access,expires} shape -> getProviderAuthStatus {configured:true, source:'stored'} BUT hasConfiguredAuth false, isUsingOAuth false, and the model absent from getAvailable().",
+  "notes": "⚠️ THE DISAGREEMENT IS THE FINDING, and section 6.6 would have walked into it. That section says a launch check should 'verify some supported authentication source is configured'. `getProviderAuthStatus()` answers exactly that question and answers it TRUE for a credential the registry will not use — so a launch gate written to the section as drafted would report the agent ready to a project that cannot infer. Gate on `getAvailable()` or `hasConfiguredAuth()`, never on the status alone. ⚠️ PRESENT `getAvailable()`, NEVER `getAll()`: offering an operator 1291 models, nearly all unauthenticated, is not a selection step. ⚠️ WHAT THIS DOES NOT ESTABLISH: OAuth discovery for a BUILT-IN provider. A provider declared in models.json is composed with apiKey auth only — pi-ai's ProviderAuth notes that even keyless local servers supply apiKey auth — so a stored OAuth credential for such a provider has no flow to resolve it, and the negative result above is expected rather than informative about the OAuth path itself. Proving that needs a real interactive /login against a real account."
+}

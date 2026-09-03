@@ -1,0 +1,20 @@
+{
+  "id": "AST-0045",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A Node-spawned child on Windows receives home and user variables it was never passed",
+  "statement": "On Windows, a child process created by Node with an explicit replacement environment nonetheless receives HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE and WINDIR. The same construction on Linux yields exactly the variables passed and nothing more. An environment allowlist therefore establishes a lower bound on what a child sees on Windows, and an exact set on POSIX.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "platform": "windows",
+      "os": "Windows 11 Pro 10.0.26200"
+    }
+  },
+  "notes": "⚠️ NARROWED 2026-09-03 AFTER REVIEW, and the narrowing is about attribution rather than about the observation. The retained control is a bare `node -e` child handed two variable names: it excludes Pi as the source, which is what the credential argument needs, but it does NOT separate the operating system from Node's own process-creation path — libuv could equally be the layer that repopulates them. The earlier wording said 'Windows injects', which claimed the attribution the control cannot support. What the product depends on is the effective observable, and that is what this now states. ⚠️ THE CONTROL IS RETAINED rather than described: `osInjection` in tools/pi-compat/runs/windows.json and linux.json records what was passed, what arrived, and the difference, on both platforms. ⚠️ IT DOES NOT WEAKEN THE CREDENTIAL CLAIM — none of the nine is a credential, and sentinel secrets were absent from the child on both platforms against a control that showed them crossing under inheritance. ⚠️ SECOND CONSEQUENCE, unchanged: because USERPROFILE is always present, a child always resolves the default agent directory, so redirecting one requires setting PI_CODING_AGENT_DIR positively and can never be done by omitting a variable.",
+  "supportedBy": [
+    "EVD-0080"
+  ]
+}

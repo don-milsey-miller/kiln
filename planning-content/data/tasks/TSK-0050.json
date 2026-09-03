@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0050",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Implement the approval and attestation boundary",
+  "statement": "Make the orchestrator show material proposed changes before making them, require the operator's decision where the stage says the decision is theirs, and refuse to approve an artifact or satisfy a user-owned exit criterion under any prompting.",
+  "role": "platform",
+  "implements": [
+    "CMP-0034"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0001"
+  ],
+  "acceptedBy": [
+    "ACC-0070"
+  ],
+  "dependsOn": [
+    "TSK-0048"
+  ]
+}

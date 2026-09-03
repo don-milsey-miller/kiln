@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0068",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The first Stage 1 turn asks one question and invents no solution",
+  "statement": "On a fresh project the orchestrator reads the name, description and starter document and responds with a single relevant question. It proposes no architecture, no requirement set and no solution, and the answer it receives is written into the intake document through the typed path rather than by editing the file.",
+  "evaluates": [
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0001"
+  ]
+}

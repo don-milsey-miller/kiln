@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0043",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Create the Pi package manifest, entry point and capability signature",
+  "statement": "Add `pi-package/` with a declared package manifest naming extensions, skills and prompts, a registration entry point, and a machine-readable capability signature that the supervisor, the canary and the delegation verifier can each compare against what they expected.",
+  "role": "platform",
+  "implements": [
+    "CMP-0031"
+  ],
+  "fulfils": [
+    "REQ-0026",
+    "REQ-0028"
+  ],
+  "acceptedBy": [
+    "ACC-0063"
+  ],
+  "dependsOn": [
+    "TSK-0030",
+    "TSK-0032"
+  ]
+}

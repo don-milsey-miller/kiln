@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0054",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build capability-signature verification and the refusal matrix",
+  "statement": "Verify the child's Kiln capability signature before reading its substantive answer, and cover each refusal cause with a test, including the fake child that returns plausible prose with none of Kiln's tools. This is the detection half of decision #67 that has never been built.",
+  "role": "platform",
+  "implements": [
+    "CMP-0036"
+  ],
+  "fulfils": [
+    "REQ-0026",
+    "REQ-0025",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0075"
+  ],
+  "dependsOn": [
+    "TSK-0053"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "QST-0027",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "Can Pi's session and runtime locations be moved outside the project without committing a path?",
+  "statement": "The default state mode writes transcripts under the outer project's ignored `.pi/sessions/`. The explicit external mode places them under a per-user root outside the project entirely, keyed by the committed non-secret project ID. That mode exists only if the pinned Pi version can be told where to put session state through a supported option or API, without Kiln committing an absolute user path to reach it. Does 0.84.4 support that, and through what?",
+  "blocks": [
+    "REQ-0027"
+  ],
+  "raisedBy": [
+    "CMP-0025"
+  ],
+  "notes": "⚠️ A NEGATIVE ANSWER DELETES A FEATURE RATHER THAN DEGRADING IT. If Pi cannot relocate session state, the external mode is withdrawn and `--local-state user` does not ship; the one thing that must not happen is substituting a committed absolute home path, which would leak the operator's username into the repository and break on every other machine.",
+  "answer": "YES, by three routes with a documented precedence: `--session-dir`, then `PI_CODING_AGENT_SESSION_DIR`, then the `sessionDir` setting. All three were exercised on both platforms and each put the transcript where it was told to. Because the first two are supplied at launch by the supervisor, external user-local state needs no absolute path in committed configuration. The external mode survives and DEC-0029's conditional clause is discharged.",
+  "answeredBy": [
+    "AST-0047",
+    "EVD-0081"
+  ]
+}

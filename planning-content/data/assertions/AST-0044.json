@@ -1,0 +1,23 @@
+{
+  "id": "AST-0044",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "superseded",
+  "title": "A Pi child resolves its configuration from PI_CODING_AGENT_DIR alone, with no HOME",
+  "statement": "SUPERSEDED 2026-09-03 by the assertion recorded from the dedicated exact-environment cell. This claim — that a child with only PATH, TMPDIR and PI_CODING_AGENT_DIR loads the package — was made from a run whose harness supplied HOME unconditionally, and the retained Linux report recorded `HOME: true` beside it. The behaviour turned out to hold once the cell was built properly, but this record was not evidence of it.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4",
+      "platform": "linux"
+    }
+  },
+  "supportedBy": [
+    "EVD-0080"
+  ],
+  "notes": "⚠️ KEPT RATHER THAN DELETED, because the interesting part is how it passed review the first time: the claim was true, the harness did not test it, and nothing in the record contradicted the claim until someone read the retained environment report next to the assertion. The replacement cell records the whole environment it passed AND the child's own observation, so the two can disagree visibly.",
+  "supersededBy": [
+    "AST-0052"
+  ]
+}

@@ -14,7 +14,7 @@
     "constraints-recorded": {
       "result": "satisfied",
       "decidedBy": "pm",
-      "reason": "The intake records current-source research, experimental validation, consequential-validation governance, and preservation of claim strength, while removing an unsupported local constraint."
+      "reason": "⚠️ RE-EVALUATED 2026-09-02 AGAINST THE EXPANDED GRAPH, not carried forward. The four operating constraints the agent-delivery work introduced are now recorded in `stages/01-intake.md` under a dated PM heading, with their provenance stated the way this document states every other later addition: internet assumed on a first run, local inference engines operated by the project manager, planning work potentially billable, and the tool not yet version-pinned for consumers. ⚠️ THE BILLING ONE IS THE LOAD-BEARING ADDITION and it is recorded as the general case rather than the instance. REQ-0012 already covered a VALIDATION that spends money; inference is not validation, and that gap is how an intake turn could bill an account nobody warned. REQ-0025 and the separate canary authorisation are the graph's answer to it."
     },
     "stage-set-determinable": {
       "result": "satisfied",

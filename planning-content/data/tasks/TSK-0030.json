@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0030",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Normalise the package entry only after proving canonical equivalence",
+  "statement": "Compare the literal entry `pi install -l` wrote against the portable `../.planning/pi-package` form, prove both canonicalise to the same directory on this platform, and rewrite only on proof. Refuse when equivalence cannot be established rather than constructing a target.",
+  "role": "platform",
+  "implements": [
+    "CMP-0024"
+  ],
+  "fulfils": [
+    "REQ-0024",
+    "REQ-0025"
+  ],
+  "acceptedBy": [
+    "ACC-0047"
+  ],
+  "dependsOn": [
+    "TSK-0021",
+    "TSK-0029"
+  ]
+}

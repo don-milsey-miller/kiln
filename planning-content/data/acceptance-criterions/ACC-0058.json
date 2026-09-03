@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0058",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "An unknown environment-only provider is refused, not widened",
+  "statement": "A provider whose credential contract is neither built in nor declared through the validated custom shape yields an `unsupported-credential-contract` refusal naming the provider. No additional variables are inherited, and no variable name is inferred from the provider id or discovered by scanning the environment.",
+  "evaluates": [
+    "CMP-0029"
+  ],
+  "verifies": [
+    "REQ-0024",
+    "REQ-0026"
+  ]
+}

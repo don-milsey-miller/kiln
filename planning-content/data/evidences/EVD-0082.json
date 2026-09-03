@@ -1,0 +1,31 @@
+{
+  "id": "EVD-0082",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "observedAt": "2026-09-02",
+  "outcome": "success",
+  "title": "Experiment: a delegated task reaches a closed-stdin child and a tool call returns the exact challenge",
+  "kind": "experiment",
+  "environment": {
+    "execution": "host",
+    "facts": {
+      "piVersion": "0.84.4",
+      "platformsObserved": "windows, linux",
+      "windowsHost": "Windows 11 Pro 10.0.26200, node v24.18.0",
+      "linuxHost": "Ubuntu 24.04 under WSL2, node v24.11.0",
+      "inference": "local deterministic OpenAI-compatible fake provider on 127.0.0.1; no paid provider contacted"
+    },
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation"
+      ]
+    }
+  },
+  "summary": "TASK BINDING: a `--mode json -p <task> --no-session` child spawned with stdio stdin set to ignore — stdin genuinely closed — completed a turn with exit 0, and the exact task sentinel KILN-TASK-SENTINEL-9F3A was observed in the user message the provider received. The observation is taken at the provider boundary, not from anything the model said. CANARY SHAPE: when the provider returned a tool call, the registered custom tool executed and received `{\"challenge\":\"abc123xyz\"}` — the exact value — through the real pinned runtime. CONTROL A: a provider returning prose instead produced no tool execution. CONTROL B: the same request with the tool excluded from `--tools` produced no execution and the tool was not offered to the model. Both platforms agree on every row.",
+  "notes": "⚠️ TWO CONTROLS, BECAUSE ONE WOULD NOT DO. Without the prose control, 'the tool executed' could be an artefact of the fixture always executing it; without the exclusion control, the allowlist could be decorative. ⚠️ THE TOOL SIGNATURE IS execute(toolCallId, params, signal, onUpdate, ctx) — the parameters are the SECOND argument. Reading the first argument as the parameters silently yields the tool-call id, which is how this run first reported a null challenge against a tool that had in fact been called correctly."
+}

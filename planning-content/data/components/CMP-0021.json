@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0021",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Pinned Pi runtime",
+  "responsibility": "Be the only route by which any Pi process is started. Resolve the exact pinned CLI from the tool's own node_modules, report its version, refuse a version that does not match the pin, and hand every caller — setup, the user-facing session, and every specialist child — the same executable invoked through the current Node binary with shell interpolation disabled. Discovering Pi on PATH is outside this component and outside the product.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0028"
+  ],
+  "notes": "⚠️ THE BOUNDARY IS 'NEVER PATH', and it is a correctness rule rather than a preference. A globally installed Pi may exist at any version; if a specialist child resolves a different binary from the orchestrator, the capability signature the delegation verifier compares was measured against a runtime that is not the one that answered."
+}

@@ -1,0 +1,27 @@
+{
+  "id": "TSK-0042",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the zero-cost preflight and the compatibility record",
+  "statement": "Check configuration, auth availability, model resolution, package loading and tool signatures at no cost; store canary success keyed to its exact inputs in the local-state root; and implement every invalidation input so a changed key reopens approval.",
+  "role": "platform",
+  "implements": [
+    "CMP-0030"
+  ],
+  "fulfils": [
+    "REQ-0012",
+    "REQ-0023",
+    "REQ-0025",
+    "REQ-0028",
+    "REQ-0024"
+  ],
+  "acceptedBy": [
+    "ACC-0060",
+    "ACC-0062"
+  ],
+  "dependsOn": [
+    "TSK-0041"
+  ]
+}

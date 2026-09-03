@@ -1,0 +1,12 @@
+{
+  "id": "REQ-0026",
+  "type": "requirement",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A delegated result is used only when the child that produced it is proven to have had its tools",
+  "statement": "Before any part of a specialist's substantive answer is read or acted on, the system must observe that the child ran with the capability signature and tool set its role contract requires. A child that exited cleanly, emitted a well-formed transcript, and did not have those tools must fail the delegation loudly; its prose must not be accepted as the answer to the delegated task.",
+  "rationale": "Measured on 2026-08-15 and not since mitigated: a non-interactive Pi child launched against an untrusted project loads no package, therefore none of Kiln's typed tools, and DOES NOT ERROR. The session completes, turn_start and turn_end and agent_end all fire, and the model answers in freehand prose. Every role boundary in this system is enforced by typed tools, so a child without them is not a degraded specialist — it is an unconstrained model whose output looks exactly like a specialist's.",
+  "priority": "must",
+  "notes": "⚠️ THIS IS THE OPEN HALF OF DECISION #67. Half of that decision — recording a trust grant so children come up trusted — has been executed and measured. The detection half has never been built, and it is the half that holds when the grant is missing, revoked, or made on a different machine."
+}

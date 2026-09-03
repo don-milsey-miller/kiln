@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0091",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "OAuth discovery is either proved or recorded as documentation-only, and never implied",
+  "statement": "Either a fabricated OAuth credential is shown to make a BUILT-IN provider model available through the supported discovery surface, or a single manual run against a real subscription is retained as sanitised single-instance evidence labelled as such. Until one of those exists, no acceptance criterion and no section of the specification states the OAuth route as verified, and QST-0033 remains open and blocking.",
+  "evaluates": [
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0025"
+  ]
+}

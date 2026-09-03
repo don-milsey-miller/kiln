@@ -1,0 +1,20 @@
+{
+  "id": "QST-0028",
+  "type": "question",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "resolution": "answered",
+  "title": "What literal package entry does `pi install -l` write, and can it be normalised portably?",
+  "statement": "Setup installs Kiln's package project-locally and then commits the resulting settings file. The entry Pi writes must therefore resolve to the same directory on another operator's machine and on the other platform. What does 0.84.4 actually write — a relative literal, an absolute path, platform separators — and can that be normalised to the portable `../.planning/pi-package` form after proving canonical equivalence, or does normalisation change which directory Pi resolves?",
+  "raisedBy": [
+    "CMP-0031",
+    "CMP-0024"
+  ],
+  "notes": "⚠️ NORMALISING WITHOUT PROVING EQUIVALENCE IS THE FAILURE MODE. Rewriting Pi's entry to a literal that looks right and resolves elsewhere produces a project whose package silently does not load — the same silent class as the untrusted child. If equivalence cannot be proved, setup refuses rather than constructing a target of its own.",
+  "answer": "A RELATIVE entry, differing only by separator: `..\\.planning\\pi-package` on Windows and `../.planning/pi-package` on Linux, both relative to `.pi/settings.json` and neither containing an absolute or home path. Normalising the Windows form to forward slashes is therefore a separator-only rewrite between two spellings of one directory, and canonical equivalence is provable by resolving both — which is precisely the proof the design required before permitting the rewrite.",
+  "answeredBy": [
+    "AST-0043",
+    "EVD-0079"
+  ]
+}

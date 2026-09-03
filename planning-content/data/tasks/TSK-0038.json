@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0038",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the audited provider credential contract table",
+  "statement": "Add `lib/pi-provider-credentials.mjs` declaring, per supported provider, the id, supported auth source categories, and the exact required and optional model-plane variable names — names only, never values — plus the validated declarative shape by which a custom provider may contribute names.",
+  "role": "platform",
+  "implements": [
+    "CMP-0029"
+  ],
+  "fulfils": [
+    "REQ-0024",
+    "REQ-0026"
+  ],
+  "acceptedBy": [
+    "ACC-0058"
+  ],
+  "dependsOn": [
+    "TSK-0020"
+  ]
+}

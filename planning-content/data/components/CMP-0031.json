@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0031",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Kiln Pi package",
+  "responsibility": "Be the installable unit Pi loads for this project: a declared package manifest naming its extensions, skills and prompts; a registration entry point; and a machine-readable capability signature that any consumer — the supervisor, the canary, a delegation verifier — can compare against what it expected to be loaded.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0026",
+    "REQ-0028"
+  ],
+  "notes": "⚠️ THE COMMITTED PACKAGE ENTRY MUST BE PORTABLE. `pi install -l` writes whatever it writes; the entry that ends up in a committed settings file has to be a separator-normalised relative literal that resolves to the same directory on another operator's machine, and it may be normalised only after canonical equivalence to what Pi wrote is proved. An absolute path here breaks every clone."
+}

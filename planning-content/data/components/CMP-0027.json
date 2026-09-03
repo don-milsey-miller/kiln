@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0027",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Connection inspection and consent",
+  "responsibility": "Ask before looking, and record what was granted. Obtain explicit permission before reading Pi's user authentication store, its custom-model registry, or the presence of any credential environment variable; then report sanitised availability only — provider display names, model identifiers, and present-or-absent for the research credential — contacting no external service. Persist the operator's grant where a clone does not carry it to another machine, and reopen the prompt when the provider or research choice changes.",
+  "satisfies": [
+    "REQ-0023",
+    "REQ-0024"
+  ],
+  "notes": "⚠️ THE PROMPT'S WORDING IS PART OF THE COMPONENT. 'Check this computer for existing AI-provider and web-research connections' is what is happening; 'search for credentials' describes the same act in a way that is both more alarming and less accurate, since nothing is displayed or copied. ⚠️ A DECLINED INSPECTION PERFORMS NO READS AT ALL — not a presence check, not a registry load — and leaves setup honestly partial rather than reporting that nothing is configured."
+}

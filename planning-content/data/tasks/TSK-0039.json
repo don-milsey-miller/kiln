@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0039",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build child environment construction and prove it with sentinels",
+  "statement": "Construct each child's environment as the union of the measured base runtime and configuration variables, the selected provider's model-plane names and the role's tool-plane names, and prove the boundary with sentinel variables that must not cross it. Extend the existing `childEnv()` in `lib/specialists/contract.mjs` rather than adding a parallel builder.",
+  "role": "platform",
+  "implements": [
+    "CMP-0029"
+  ],
+  "fulfils": [
+    "REQ-0024",
+    "REQ-0026"
+  ],
+  "acceptedBy": [
+    "ACC-0057",
+    "ACC-0059"
+  ],
+  "dependsOn": [
+    "TSK-0038"
+  ]
+}

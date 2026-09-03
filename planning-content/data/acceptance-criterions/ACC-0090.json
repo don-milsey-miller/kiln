@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0090",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Pi's login step is observed owning the terminal, and its no-TTY behaviour is recorded",
+  "statement": "A manually invoked check records, against the pinned runtime alone: that the authentication-only step launches with exclusive terminal ownership; that a successful exit is distinguished from proven authentication by rediscovering auth afterwards rather than trusting the exit code; and what the same invocation does with no TTY, stated as the observed outcome — clean refusal, error, or indefinite wait — rather than as a required one. The transcript is retained. No claim is made here about Kiln's own refusal or its recovery messaging.",
+  "evaluates": [
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ],
+  "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation."
+}

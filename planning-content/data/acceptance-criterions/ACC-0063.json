@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0063",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The package loads under trust, does not load without it, and reports its signature",
+  "statement": "With the project trusted, a real Pi run loads the package's extensions, tools, skills and start prompt and exposes a capability signature. With trust absent the package does not load — and that state is detected and reported rather than passing silently, which is the control that makes the positive result meaningful.",
+  "evaluates": [
+    "CMP-0031"
+  ],
+  "verifies": [
+    "REQ-0026",
+    "REQ-0028"
+  ]
+}

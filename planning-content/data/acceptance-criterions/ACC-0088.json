@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0088",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Shutdown is clean and a rerun resumes rather than restarting",
+  "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes.",
+  "evaluates": [
+    "CMP-0040"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

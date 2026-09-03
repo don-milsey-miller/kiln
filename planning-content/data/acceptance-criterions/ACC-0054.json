@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0054",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A clone does not inherit the first operator's consent",
+  "statement": "A project carrying a committed research choice, opened on a machine with no local consent record, reopens the prompt and does not use that host's credential until it is answered. Changing the provider or the research choice likewise reopens the relevant prompt.",
+  "evaluates": [
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0023"
+  ]
+}

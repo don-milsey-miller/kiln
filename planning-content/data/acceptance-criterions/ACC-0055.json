@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0055",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A single available model still requires confirmation, and no default is adopted",
+  "statement": "When discovery returns exactly one usable model, setup displays its provider display name and exact identifier and requires confirmation before assigning it. Pi's global default and the first entry in discovery order are never adopted implicitly, and a mutable alias is never selected on the operator's behalf.",
+  "evaluates": [
+    "CMP-0028"
+  ],
+  "verifies": [
+    "REQ-0025",
+    "REQ-0023"
+  ]
+}

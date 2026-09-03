@@ -1,0 +1,22 @@
+{
+  "id": "TSK-0046",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the stage-skill generator and its check mode",
+  "statement": "Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.",
+  "role": "platform",
+  "implements": [
+    "CMP-0033"
+  ],
+  "fulfils": [
+    "REQ-0001"
+  ],
+  "acceptedBy": [
+    "ACC-0066"
+  ],
+  "dependsOn": [
+    "TSK-0043"
+  ]
+}

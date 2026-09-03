@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0084",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Each refusal class has a distinct published exit code",
+  "statement": "Invalid arguments, content conflict, filesystem or settings refusal, missing runtime, trust denial, interactive authentication required, provider or credential-contract failure, live compatibility refusal, package or capability failure, and launch failure each exit with their own code, and the mapping in `--help` matches the codes the tests observe.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

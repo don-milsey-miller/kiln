@@ -1,0 +1,15 @@
+{
+  "id": "CMP-0039",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Setup command",
+  "responsibility": "Compose the whole first run in one ordered, resumable, idempotent command over the existing primitives: resolve and print every path before mutating, validate the runtime, run the existing initializer under the shared transaction, establish state protection, install and register the package, obtain each consent in its own step, bind and prove the model, read back everything it wrote, and either launch the combined runtime or explain exactly what remains. Use a distinct exit code per refusal class and publish the mapping.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0023",
+    "REQ-0027"
+  ],
+  "notes": "⚠️ ITS PRE-INSTALL IMPORT GRAPH IS BUILT-INS ONLY. Setup runs before the dependency graph it installs exists, so a top-level import of Pi, Ajv or anything else installed is not a style question — the command cannot start. Everything after the install step is loaded dynamically. ⚠️ IT IS NOT A SECOND INITIALIZER: `bin/init-project.mjs` keeps its content-only contract and its refusal semantics."
+}

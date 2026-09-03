@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0024",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Build the pinned Pi resolver and version gate",
+  "statement": "Add `lib/pi-runtime.mjs`: resolve the CLI entry point from the tool root's node_modules, report the installed version, refuse a mismatch against the pin, and spawn through the current Node executable with shell interpolation disabled. Add the pinned dependency and raise engines.node per DEC-0026.",
+  "role": "platform",
+  "implements": [
+    "CMP-0021"
+  ],
+  "fulfils": [
+    "REQ-0022",
+    "REQ-0028"
+  ],
+  "acceptedBy": [
+    "ACC-0041"
+  ],
+  "dependsOn": [
+    "TSK-0019"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0050",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "External state derives from the committed project ID with no path committed",
+  "statement": "In external mode the state root derives from the platform convention and the committed non-secret project ID; two projects on one machine occupy separate roots; and no committed file contains an absolute user path. The mode is available only if the pinned runtime supports relocation.",
+  "evaluates": [
+    "CMP-0025"
+  ],
+  "verifies": [
+    "REQ-0027",
+    "REQ-0023"
+  ]
+}

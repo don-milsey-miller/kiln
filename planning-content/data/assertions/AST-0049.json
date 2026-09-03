@@ -1,0 +1,18 @@
+{
+  "id": "AST-0049",
+  "type": "assertion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A model-issued tool call reaches a registered Kiln tool with its arguments intact",
+  "statement": "On pi 0.84.4, a tool call emitted by the provider is delivered to a tool registered by a project package with its arguments intact, and the execution is observable inside the extension. A response without a tool call produces no execution, and a tool excluded from the active allowlist is neither offered to the model nor executed.",
+  "loadBearing": true,
+  "targetEnvironment": {
+    "facts": {
+      "piVersion": "0.84.4"
+    }
+  },
+  "supportedBy": [
+    "EVD-0082"
+  ]
+}

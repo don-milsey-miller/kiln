@@ -1,0 +1,14 @@
+{
+  "id": "CMP-0040",
+  "type": "component",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Clean-consumer agent-delivery verification",
+  "responsibility": "Prove the documented journey from an empty directory on both supported platforms: initialise a repository with no commits, take a tracked-file-only copy of the tool as the clone, run the documented setup against a deterministic non-billable provider, drive a Stage 1 exchange, observe the intake document change through the browser's change stream, attempt an unauthorised stage advance and see it refused, shut down and prove nothing is left running, then rerun and prove resumption and idempotency.",
+  "satisfies": [
+    "REQ-0022",
+    "REQ-0028"
+  ],
+  "notes": "⚠️ THE NEGATIVE CONTROLS CARRY MORE WEIGHT THAN THE HAPPY PATH, because every one of them corresponds to a way this layer can appear to work while being wrong: wrong working directory, inspection denied, a read attempted before consent, a sole model adopted implicitly, a TTY-less login, a denied live check, Tavily contacted before approval, trust denied, an unrelated healthy HTTP service on the port, signature drift, and a fake child returning plausible prose with none of Kiln's tools."
+}
