@@ -1032,6 +1032,26 @@ Setup has one project-wide transaction owner in `lib/setup-transaction.mjs`. It 
 canonical `<project>/.planning-init.lock`; the initializer and `.gitignore` helper must accept the
 already-held transaction rather than acquire competing nested locks.
 
+**The transaction is an authenticated capability with a lifetime, not an object with a shape.** A
+collaborator that runs inside a held transaction — the initializer, the ignore owner — must
+establish that the transaction module *issued* the object it was handed and that the object is
+*still live*, because neither fact is visible in its structure. Reading `plan.projectRoot` and
+believing it accepts an object literal as proof the lock is held. The transaction is therefore
+tracked in a private `WeakMap` carrying its project and an active flag; it is revoked before the
+lock is released; and every operation through a revoked transaction is refused.
+
+Authenticating a collaborator at the door is not the same as having it inside: work runs within a
+transaction only by being *registered* with it, through the transaction-owned primitive that
+re-authenticates and enrols in one step. Registered work is drained to quiescence before revocation
+— repeatedly, until the registry is empty, because an operation being drained can start another —
+and if any work was still running when the body returned, it completes under the lock and the run is
+reported failed, that being the one route by which a write could outlive the lock without meeting a
+revocation check. Nothing is claimed about operations the body did not await that had already
+settled: they are indistinguishable from awaited ones and could not have crossed the boundary.
+Correspondingly, the nesting guard records *leases* rather than names: an async context created
+inside a lock keeps that context permanently, so a guard that recorded ancestry refused legitimate
+acquisitions from such a context long after the lock was gone.
+
 **The lock is acquired before the plan is built, not after.** Planning is not a read-only survey: it
 probes each parent by creating and renaming a real file, so two unlocked planners create and delete
 the same directories concurrently. Planning therefore refuses unless the calling process

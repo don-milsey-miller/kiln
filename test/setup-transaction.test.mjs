@@ -39,9 +39,11 @@ import {
   SETUP_LOCK_FILE,
   SetupRefusal,
   planTransaction,
+  transactionState,
   removeJournalFile,
   removeOrReport,
   runTransaction,
+  runWithTransaction,
 } from "../lib/setup-transaction.mjs";
 import { createRuntimeValidators, assertValidRecord } from "../lib/runtime-records.mjs";
 
@@ -797,5 +799,200 @@ test("every target is canonicalised and printable before anything is written", a
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+/* ============================================== the transaction's lifetime ===================== */
+
+/**
+ * ⚠️ **A TRANSACTION IS A CAPABILITY, AND A CAPABILITY HAS A LIFETIME.** Three defects lived in the
+ * gap between "this object looks right" and "this object is a live lock": an async context that
+ * outlived its lock, an object literal accepted as proof of one, and a real transaction that kept
+ * working after its lock was gone. Each control below writes through the gap the fix closed.
+ */
+
+test("a callback created inside the lock may take that lock later, once it is released", async () => {
+  const root = project();
+  try {
+    // ⚠️ ASYNC ANCESTRY IS PERMANENT; A LOCK IS NOT. This continuation is REGISTERED inside the
+    // transaction, so it inherits that async context and still carries it long after the lock is
+    // released. Refusing it as "nested" refuses an acquisition with nothing to be nested inside.
+    //
+    // ⚠️ **THE REGISTRATION IS WHAT MATTERS, NOT THE CLOSURE**, and the first version of this test
+    // got that wrong: it stored an arrow function and called it from the test body, which runs in
+    // the TEST's context. It passed against the defect. Async context follows execution, so the
+    // continuation has to be attached with `.then` from inside the body to descend from it.
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    let descendant;
+
+    await runTransaction({ projectRoot: root, files: [{ path: ".pi/a.json" }] }, async (tx) => {
+      tx.declarePhases(["w"]);
+      await tx.phase("w", () => tx.merge(".pi/a.json", () => settings({ a: 1 })));
+      descendant = gate.then(() =>
+        runTransaction({ projectRoot: root, files: [{ path: ".pi/b.json" }] }, async (t2) => {
+          t2.declarePhases(["w"]);
+          return t2.phase("w", () => t2.merge(".pi/b.json", () => settings({ b: 2 })));
+        })
+      );
+    });
+
+    assert.equal(existsSync(join(root, SETUP_LOCK_FILE)), false, "the first lock really is gone");
+    release();
+    const out = await descendant;
+    assert.equal(out.changed, true, "a descendant context must not be refused a lock nobody holds");
+    assert.deepEqual(tree(root), [".pi", ".pi/a.json", ".pi/b.json"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an object that merely looks like a transaction is not one", () => {
+  const root = project();
+  try {
+    // ⚠️ THE FORGERY THAT WORKED: this literal was accepted as proof the lock was held.
+    assert.equal(transactionState({ plan: { projectRoot: root } }), null);
+    for (const [label, notATransaction] of [
+      ["null", null],
+      ["undefined", undefined],
+      ["a string", "tx"],
+      ["a number", 42],
+      ["an empty object", {}],
+      ["a null-prototype object", Object.create(null)],
+      ["a plausible plan", { plan: { projectRoot: root, files: new Map() }, merge: async () => {} }],
+    ])
+      assert.equal(transactionState(notATransaction), null, `${label} is not a transaction`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a transaction is live only inside its body, and the ledger says so", async () => {
+  const root = project();
+  try {
+    let captured = null;
+    let insideState = null;
+
+    await runTransaction({ projectRoot: root, files: [{ path: ".pi/settings.json" }] }, async (tx) => {
+      captured = tx;
+      insideState = transactionState(tx);
+    });
+
+    assert.deepEqual(insideState, { projectRoot: root, active: true });
+    assert.deepEqual(transactionState(captured), { projectRoot: root, active: false }, "revoked on the way out");
+
+    // ⚠️ A RETAINED HANDLE USED TO STILL WRITE. The lockfile is gone, so this write would have had
+    // no exclusion behind it at all.
+    await assert.rejects(
+      () => captured.merge(".pi/settings.json", () => settings({ sneaked: true })),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_REVOKED
+    );
+    for (const call of [
+      () => captured.beginJournal(),
+      () => captured.setRecovery("x"),
+      () => captured.phase("w", () => {}),
+    ])
+      await assert.rejects(call, (e) => e.reason === REFUSAL.TRANSACTION_REVOKED, "every write path is revoked");
+    assert.throws(() => captured.declarePhases(["w"]), (e) => e.reason === REFUSAL.TRANSACTION_REVOKED);
+
+    assert.deepEqual(tree(root), [".pi"], "and nothing was written after the lock went");
+    // Reads still work: reporting on a finished transaction is exactly who needs them.
+    assert.equal(captured.describe().projectRoot, root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a write the body never awaited is finished under the lock, and the run is reported failed", async () => {
+  const root = project();
+  try {
+    // ⚠️ THE ROUTE REVOCATION CANNOT SEE. This operation starts while the transaction is live, so it
+    // is already past the guard; without tracking, it would land after the lock was released.
+    await assert.rejects(
+      () =>
+        runTransaction({ projectRoot: root, files: [{ path: ".pi/settings.json" }] }, async (tx) => {
+          tx.merge(".pi/settings.json", () => settings({ unawaited: true })); // no await — the defect
+        }),
+      (e) =>
+        e instanceof SetupRefusal && e.reason === REFUSAL.OPERATION_STILL_RUNNING && e.detail.pending === 1,
+      "the run must be reported failed, because nobody waited to learn whether the write happened"
+    );
+
+    // It completed INSIDE the lock rather than being abandoned or allowed to cross the boundary.
+    assert.equal(existsSync(join(root, SETUP_LOCK_FILE)), false);
+    assert.deepEqual(JSON.parse(read(root, ".pi/settings.json")), { unawaited: true });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a straggler that starts another straggler is drained too", async () => {
+  const root = project();
+  try {
+    // ⚠️ ONE SNAPSHOT IS NOT A DRAIN. The nested operation is registered while `a` is being awaited,
+    // so a single `allSettled` over the operations first seen revokes and releases with it still
+    // running — the same unprotected write, one level deeper.
+    //
+    // ⚠️ **THE ASSERTION IS ON THE LOCK'S PRESENCE, NOT ON THE FILE.** The first version of this
+    // test only checked that both files existed, and it passed against a single-snapshot drain:
+    // `merge` runs synchronously as far as its first `await`, so the nested write landed before
+    // release either way. What separates the two is WHEN, so the nested work sleeps first and then
+    // looks — with a real drain the lock is still there; without one it is long gone.
+    let lockHeldWhenNestedRan = null;
+    let nested;
+
+    await assert.rejects(
+      () =>
+        runTransaction(
+          { projectRoot: root, files: [{ path: ".pi/a.json" }, { path: ".pi/b.json" }] },
+          async (tx) => {
+            nested = tx
+              .merge(".pi/a.json", () => settings({ a: 1 }))
+              .then(() =>
+                runWithTransaction(tx, "nested", async () => {
+                  await new Promise((r) => setTimeout(r, 25));
+                  lockHeldWhenNestedRan = existsSync(join(root, SETUP_LOCK_FILE));
+                  return tx.merge(".pi/b.json", () => settings({ b: 2 }));
+                })
+              );
+          }
+        ),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.OPERATION_STILL_RUNNING && e.detail.pending === 1,
+      "the count is what was running when the body returned, which is the one thing observable"
+    );
+    await nested.catch(() => {}); // so a failing variant reports through the assertions, not a crash
+
+    assert.equal(lockHeldWhenNestedRan, true, "nested work must run while the lock is still held");
+    assert.deepEqual(tree(root), [".pi", ".pi/a.json", ".pi/b.json"], "and it must have completed");
+    assert.equal(existsSync(join(root, SETUP_LOCK_FILE)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("work can only be enrolled through a real, live transaction", async () => {
+  const root = project();
+  try {
+    let captured = null;
+    let ran = false;
+
+    await runTransaction({ projectRoot: root }, async (tx) => {
+      captured = tx;
+      assert.equal(await runWithTransaction(tx, "collaborator", () => "ok"), "ok");
+    });
+
+    // A forgery cannot enrol, so it cannot borrow the lock by claiming to be inside it.
+    await assert.rejects(
+      () => runWithTransaction({ plan: { projectRoot: root } }, "collaborator", () => (ran = true)),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_NOT_AUTHENTIC
+    );
+    // Neither can a genuine transaction whose run is over.
+    await assert.rejects(
+      () => runWithTransaction(captured, "collaborator", () => (ran = true)),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_REVOKED
+    );
+    assert.equal(ran, false, "and the work must not have run either way");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

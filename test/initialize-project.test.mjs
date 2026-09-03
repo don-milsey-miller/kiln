@@ -62,6 +62,8 @@ import { createValidators } from "../lib/validate.mjs";
 import { lintProject, evaluateStageGate, SEVERITY } from "../lib/lint.mjs";
 import { loadStageAttestations } from "../lib/attestations.mjs";
 import { toolRoot } from "../lib/content-root.mjs";
+import { LockError } from "../lib/lock.mjs";
+import { SETUP_LOCK_FILE, runTransaction } from "../lib/setup-transaction.mjs";
 
 installReaper();
 
@@ -799,4 +801,155 @@ test("the setup record carries no timestamp and no machine-specific path", async
     steps: { contentScaffold: "complete", gitignore: "added" },
   });
   assert.equal(/\d{4}-\d{2}-\d{2}|[A-Za-z]:\\|\/home\/|\/Users\//.test(raw), false, `setup.json leaked: ${raw}`);
+});
+
+/* ================================================================== TSK-0027: held transaction == */
+
+/**
+ * ⚠️ **ONE LOCK FOR THE COMMAND.** `setup` holds `<project>/.planning-init.lock` for its whole run
+ * and calls the initializer and the ignore owner from inside it. Both must run in the held
+ * transaction rather than taking the lock a second time — and "must" here is enforced rather than
+ * documented, because the failure mode of forgetting is a ten-second stall reporting contention
+ * with this very process.
+ */
+
+test("the initializer runs inside a held transaction, and produces the same result as on its own", async () => {
+  const alone = asGitRepository(project());
+  const inTx = asGitRepository(project());
+
+  const solo = await init(alone);
+  const held = await runTransaction({ projectRoot: inTx }, (tx) => init(inTx, { transaction: tx }));
+
+  assert.equal(solo.status, STATUS.CREATED);
+  assert.equal(held.status, STATUS.CREATED, "the held path must do the whole job, not a reduced one");
+
+  // ⚠️ THE TREES ARE COMPARED BY CONTENT, not by count. A held transaction that silently skipped a
+  // step would still produce a plausible file list, and the point of this task is that nothing
+  // about the initializer's behaviour changes except who owns the lock.
+  assert.deepEqual(
+    hashTree(join(inTx, "planning-content")),
+    hashTree(join(alone, "planning-content")),
+    "the generated content must be byte-identical either way"
+  );
+
+  // The ignore owner ran under the transaction's lock, appending rather than rewriting.
+  assert.equal(countBlocks(readFileSync(join(inTx, ".gitignore"), "utf-8")), 1);
+  assert.equal(held.git.gitignore, GITIGNORE_STATUS.ADDED);
+
+  // And the transaction released the lock it owned, rather than the initializer removing it early.
+  assert.equal(existsSync(join(inTx, SETUP_LOCK_FILE)), false);
+});
+
+test("a second run inside a held transaction is still idempotent, and still touches no .gitignore", async () => {
+  const dir = asGitRepository(project());
+  const existing = "# mine\nnode_modules/\n";
+  writeFileSync(join(dir, ".gitignore"), existing, "utf-8");
+
+  await runTransaction({ projectRoot: dir }, (tx) => init(dir, { transaction: tx }));
+  const after = readFileSync(join(dir, ".gitignore"), "utf-8");
+
+  const second = await runTransaction({ projectRoot: dir }, (tx) => init(dir, { transaction: tx }));
+  assert.equal(second.status, STATUS.ALREADY_INITIALIZED, "the refusal semantics are unchanged by the lock's owner");
+  assert.equal(second.gitignore.touched, false);
+  assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), after, "and not one byte moved");
+  assert.equal(countBlocks(after), 1, "the block is added at most once, however the lock is held");
+});
+
+test("⚠️ forgetting to pass the transaction fails immediately, rather than waiting on itself", async () => {
+  const dir = asGitRepository(project());
+  const started = Date.now();
+
+  // ⚠️ THE ELAPSED TIME IS PART OF THE ASSERTION. Before this, the nested acquisition spun the whole
+  // bounded wait and then reported a timeout "held by pid <self>" — contention with nobody, phrased
+  // as contention with someone. The bounded wait here is set to a value the guard must beat.
+  await assert.rejects(
+    () => runTransaction({ projectRoot: dir }, () => init(dir, { lock: { maxWaitMs: 5_000 } })),
+    (e) => e instanceof LockError && /already held further up this call stack/.test(e.message),
+    "a nested acquisition must be refused, not waited out"
+  );
+  assert.ok(Date.now() - started < 2_000, "it must refuse rather than exhaust the wait");
+});
+
+test("a transaction holding a DIFFERENT project is not exclusion here", async () => {
+  const mine = asGitRepository(project());
+  const theirs = project();
+
+  const r = await runTransaction({ projectRoot: theirs }, (tx) => init(mine, { transaction: tx }));
+
+  // ⚠️ A TRANSACTION IS EXCLUSION OVER ONE PROJECT. Accepting any transaction at all would let a
+  // second initializer run on `mine` while this one believed it was protected — the guarantee would
+  // read as satisfied and be absent.
+  assert.equal(r.status, STATUS.REFUSED);
+  assert.equal(r.reason, "transaction-project-mismatch");
+  assert.equal(r.refusalClass, REFUSAL_CLASS.CONFLICT);
+  assert.equal(existsSync(join(mine, "planning-content")), false, "and nothing was written");
+});
+
+test("concurrent initializers still serialise — the guard rules out nesting, not concurrency", async () => {
+  // ⚠️ THE CONTROL ON THE GUARD ITSELF. A process-wide "already held" set would refuse this pair,
+  // breaking the exclusion it exists to protect: these are two independent operations that happen
+  // to share a process, which is precisely what the lock is for. Scoping the guard to the async
+  // context is what tells them apart from a nested acquisition.
+  const dir = project();
+  const [a, b] = await Promise.all([init(dir), init(dir)]);
+  assert.deepEqual([a.status, b.status].sort(), [STATUS.ALREADY_INITIALIZED, STATUS.CREATED]);
+});
+
+test("⚠️ an object shaped like a transaction is not one, and initializes nothing", async () => {
+  const dir = asGitRepository(project());
+
+  // ⚠️ THE FORGERY THAT WORKED. This literal used to satisfy the check and the scaffold was built
+  // with no lock held at all — the guarantee read as satisfied and was entirely absent. A shape
+  // describes data; only the issuing module can establish a capability.
+  const r = await init(dir, { transaction: { plan: { projectRoot: dir } } });
+
+  assert.equal(r.status, STATUS.REFUSED);
+  assert.equal(r.reason, "transaction-not-authentic");
+  assert.equal(r.refusalClass, REFUSAL_CLASS.INVALID_TARGET);
+  assert.equal(existsSync(join(dir, "planning-content")), false, "nothing may be created on a forged capability");
+  assert.equal(existsSync(join(dir, ".gitignore")), false);
+});
+
+test("a real transaction that has already finished is not a held lock", async () => {
+  const dir = asGitRepository(project());
+
+  let captured = null;
+  await runTransaction({ projectRoot: dir }, async (tx) => {
+    captured = tx;
+  });
+
+  // ⚠️ HOLDING THE LOCK ONCE IS NOT HOLDING IT NOW. The object is genuine; its lease is over.
+  const r = await init(dir, { transaction: captured });
+  assert.equal(r.status, STATUS.REFUSED);
+  assert.equal(r.reason, "transaction-not-active");
+  assert.equal(existsSync(join(dir, "planning-content")), false);
+
+  // ...and the same project initializes normally once a live transaction is supplied, so the
+  // refusal above is about the lease rather than about anything wrong with the project.
+  const ok = await runTransaction({ projectRoot: dir }, (tx) => init(dir, { transaction: tx }));
+  assert.equal(ok.status, STATUS.CREATED);
+});
+
+test("⚠️ an initializer the body never awaited still finishes under the lock", async () => {
+  const dir = asGitRepository(project());
+
+  // ⚠️ AUTHENTICATED AT THE DOOR IS NOT INSIDE. The initializer used to run outside the
+  // transaction's registry, so this returned successfully, released the lock, and left the scaffold
+  // being built with no exclusion behind it.
+  await assert.rejects(
+    () =>
+      runTransaction({ projectRoot: dir }, async (tx) => {
+        init(dir, { transaction: tx }); // no await — the defect
+      }),
+    (e) => e.reason === "operation-still-running",
+    "a run whose collaborator was still working cannot report itself successful"
+  );
+
+  // It completed under the lock rather than after it.
+  assert.equal(existsSync(join(dir, SETUP_LOCK_FILE)), false);
+  assert.deepEqual(
+    lintProject(context(join(dir, "planning-content"))).findings.filter((f) => f.severity === SEVERITY.ERROR),
+    [],
+    "and what it built is whole, not caught halfway"
+  );
 });
