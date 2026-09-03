@@ -14,6 +14,8 @@
     "lib/content-root.mjs",
     "lib/atomic-write.mjs",
     "lib/lock.mjs",
-    "lib/id-allocator.mjs"
-  ]
+    "lib/id-allocator.mjs",
+    "test/content-root.test.mjs"
+  ],
+  "notes": "⚠️ IT NOW OWNS THE PROJECT ROOT AS WELL AS THE CONTENT ROOT (TSK-0025). `projectRootCandidate()` and `resolveProjectRoot()` sit beside their content-root counterparts because the project root is DERIVED from the content root — `dirname(contentRoot)`, never `<toolRoot>/..` — and putting the derivation anywhere else would create the second path rule #70 exists to prevent. The two candidates agree in a normal consumer install and diverge under PLANNING_CONTENT_DIR, which is exactly where a caller joining its own path would go wrong quietly."
 }

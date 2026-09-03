@@ -11,6 +11,8 @@
     "REQ-0014"
   ],
   "implementedBy": [
-    "lib/tools/"
+    "lib/tools/",
+    "test/link-trace.test.mjs",
+    "test/evidence-tools.test.mjs"
   ]
 }

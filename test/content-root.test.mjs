@@ -1,14 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   toolRoot,
   resolveContentRoot,
   resolveInContentRoot,
   isInsideContentRoot,
+  projectRootCandidate,
+  resolveProjectRoot,
   ContentRootError,
   PathEscapeError,
   OVERRIDE_ENV,
@@ -123,3 +125,101 @@ test("a path that does not exist yet still resolves and is still contained", () 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+/* ===================================================== TSK-0025: the project root ============== */
+
+/**
+ * ⚠️ **THE PROJECT ROOT IS DERIVED FROM THE CONTENT ROOT, NEVER FROM THE TOOL ROOT.** The two agree
+ * in a normal consumer install, which is exactly why deriving it the wrong way would pass every
+ * ordinary test and fail only where it matters: under `PLANNING_CONTENT_DIR`, where the project is
+ * the owner of THAT directory and `<toolRoot>/..` names somewhere else entirely.
+ *
+ * These tests are written around that divergence rather than around the agreement.
+ */
+
+test("with no override, the project root is the parent of the derived content root", () => {
+  const base = consumerLayout();
+  try {
+    const candidate = projectRootCandidate({});
+    assert.equal(candidate.override, false);
+    assert.match(candidate.how, /^dirname\(<toolRoot>\/\.\.\/planning-content\)$/);
+    // In THIS repository the sibling content root does not exist, so resolution refuses — which is
+    // the same refusal `resolveContentRoot` gives, inherited rather than reimplemented.
+    assert.throws(() => resolveProjectRoot({ env: {} }), ContentRootError);
+    assert.ok(base);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("with the override set, the project root owns the OVERRIDE — not the tool's parent", () => {
+  const base = consumerLayout();
+  try {
+    const env = { [OVERRIDE_ENV]: join(base, "planning-content") };
+
+    const resolved = resolveProjectRoot({ env });
+    assert.equal(resolved, realpathSync(base), "the project is the owner of the overridden content directory");
+
+    // ⚠️ THE ASSERTION THAT MAKES THIS WORTH WRITING. `<toolRoot>/..` is a real directory and a
+    // plausible answer, and it is the wrong one. A resolver that took it would pass the test above.
+    assert.notEqual(resolved, resolve(toolRoot(), ".."), "the tool's parent must not be mistaken for the project");
+    assert.equal(projectRootCandidate(env).override, true);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("an explicit project root that disagrees with the content owner refuses, naming both", () => {
+  const base = consumerLayout();
+  const other = mkdtempSync(join(tmpdir(), "vpw-elsewhere-"));
+  try {
+    const env = { [OVERRIDE_ENV]: join(base, "planning-content") };
+
+    // Agreement passes, and passes on the CANONICAL comparison — an un-normalised spelling of the
+    // same directory is the same directory.
+    assert.equal(resolveProjectRoot({ env, expect: base }), realpathSync(base));
+    assert.equal(resolveProjectRoot({ env, expect: join(base, ".", "") }), realpathSync(base));
+
+    // ⚠️ A MISMATCH REFUSES RATHER THAN CHOOSING. Setup is handed one project root and resolves
+    // another; picking either silently is how a command initialises one project and reports a
+    // different one. Both paths and the rule that produced each go in the message.
+    let err;
+    try {
+      resolveProjectRoot({ env, expect: other });
+    } catch (e) {
+      err = e;
+    }
+    assert.ok(err instanceof ContentRootError, "a disagreement must refuse");
+    assert.match(err.message, new RegExp(escapeForRegExp(realpathSync(other))), "the supplied path must appear");
+    assert.match(err.message, new RegExp(escapeForRegExp(realpathSync(base))), "the resolved path must appear");
+    assert.match(err.message, /rule:/, "the rule that produced the resolved path must appear");
+    assert.match(err.message, new RegExp(OVERRIDE_ENV), "the override must be named, since it is one of the two things to correct");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test("the project root is canonical, so a symlinked route to it compares equal", () => {
+  const base = consumerLayout();
+  const linkBase = mkdtempSync(join(tmpdir(), "vpw-link-"));
+  const link = join(linkBase, "via-symlink");
+  try {
+    try {
+      symlinkSync(base, link, "junction");
+    } catch {
+      return; // symlink creation is privileged on some Windows configurations; skip rather than fail
+    }
+    const env = { [OVERRIDE_ENV]: join(link, "planning-content") };
+    // ⚠️ CANONICAL, NOT LEXICAL. Two spellings of one directory must not read as a disagreement, or
+    // the refusal above would fire on a correct setup invocation that happened to arrive by a link.
+    assert.equal(resolveProjectRoot({ env, expect: base }), realpathSync(base));
+  } finally {
+    rmSync(linkBase, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+function escapeForRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

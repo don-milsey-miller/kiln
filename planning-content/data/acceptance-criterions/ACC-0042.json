@@ -4,13 +4,14 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The project root is derived from the resolved content root, and a mismatch refuses",
-  "statement": "With PLANNING_CONTENT_DIR unset, the resolved project root is the parent of the content root derived from the tool location; with it set, the project root is the canonical parent of that explicit directory and not the tool's parent. When setup is given an explicit project root that disagrees with the resolved content owner, it refuses and prints both paths and the override rather than choosing one.",
+  "statement": "With PLANNING_CONTENT_DIR unset, the resolved project root is the parent of the content root derived from the tool location; with it set, it is the canonical parent of that explicit directory and NOT the tool's parent, asserted as a distinct value rather than merely as the right one. Given an explicit project root that disagrees with the resolved content owner, the resolver refuses and its message names both paths, the rule that produced the resolved one, and the override — rather than choosing between them. Comparison is canonical, so two spellings of one directory do not read as a disagreement.",
   "evaluates": [
     "CMP-0003"
   ],
   "verifies": [
     "REQ-0022"
-  ]
+  ],
+  "notes": "PASS 2026-09-03, mechanised in `test/content-root.test.mjs`. ⚠️ THE TESTS ARE WRITTEN AROUND THE DIVERGENCE, NOT THE AGREEMENT. `dirname(contentRoot)` and `<toolRoot>/..` name the same directory in an ordinary consumer install, so a resolver that took the wrong one would pass every test that did not set the override. The override case therefore asserts BOTH that the answer is the owner of the overridden directory AND that it is not the tool's parent — which is a real directory and a plausible wrong answer. ⚠️ CANONICAL COMPARISON IS PART OF THE CRITERION because without it the refusal misfires: a correct setup invocation arriving by a symlinked path would read as a disagreement, and a refusal that fires on correct input is worse than none. Covered with a junction, skipped rather than failed where symlink creation is privileged. ⚠️ SCOPE: THIS IS THE RESOLVER, AND ONLY THE RESOLVER. The obligation that SETUP calls it — printing every canonicalised path before the first lasting write, and refusing on disagreement — is ACC-0085 against CMP-0039, and is correctly still not-evaluated because setup does not exist. The third clause here previously read as though it were about setup; it is about the thing that does the refusing, which is what can be evaluated now."
 }

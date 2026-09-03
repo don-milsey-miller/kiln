@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "An invalid or stale link can be removed through the typed path",
   "statement": "`unlinkTrace` removes a link whose target is of the wrong type, whose target does not exist, and whose target has been superseded — each verified by the link being gone and the lint finding it clears. It removes `answeredBy` entries, which no operation could previously withdraw. It continues to refuse an unknown FIELD, and it preserves the lock, fresh-read and atomic-write discipline. Adding a link is unaffected and still validates the target type.",
   "evaluates": [
@@ -13,5 +13,5 @@
   "verifies": [
     "REQ-0014"
   ],
-  "notes": "⚠️ THE ADD/REMOVE ASYMMETRY IS THE WHOLE FIX. Validating a target on ADD is what keeps the graph sound; validating it on REMOVE refuses exactly the operations that repair an unsound one. The criterion asserts both halves so a later simplification cannot collapse them."
+  "notes": "PASS 2026-09-03, mechanised in `test/link-trace.test.mjs`. Each repair case asserts BOTH that the link is gone and that the lint finding it produced has cleared — `trace/wrong-target-type` for a wrong-type target, `trace/target-missing` for a deleted one, `lifecycle/trace-to-inactive` for a superseded one — because 'the array is shorter' was never the claim; 'the graph is repaired' is. Each fixture first asserts the finding EXISTS, so a case that stopped producing damage could not pass by repairing nothing. ⚠️ THE FIX IS AN ASYMMETRY AND BOTH HALVES ARE TESTED IN THE SAME FILE. Removal now inspects nothing about the target; addition still refuses a wrong type, a dangling reference and a malformed id. A later simplification that made them share one validation path would repair nothing and would pass a file that only tested removal. ⚠️ `answeredBy` OPENED FOR REMOVAL ONLY, and it is the only field that did. `supportedBy` and `refutedBy` still route to `unlinkEvidence` and `supersededBy` to `setLifecycle`, because those removal operations genuinely exist; `answeredBy` had none, which is what forced the deliberate exploitation of the companion defect during Phase 1. Adding an answer link still routes through `resolveQuestion`. ⚠️ THE WRITE DISCIPLINE IS ASSERTED RATHER THAN ASSUMED: the fresh-read-inside-the-lock is proved by editing the file between the artifact's creation and the unlink and requiring the edit to survive; the atomic write by requiring no temporary file beside the artifact; and the lock by requiring it released. #16's amend-on-change is covered, including that a no-op does not amend."
 }

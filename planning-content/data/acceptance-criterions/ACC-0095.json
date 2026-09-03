@@ -4,9 +4,9 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The trace-field guard is derived from the schemas, and covers every declared trace field",
-  "statement": "`reviseArtifact` refuses every field the schemas declare with `x-traceTarget`, established by enumerating those fields from the schema set at test time and asserting a refusal for each — not by comparing against a second list written in the test. Adding a trace field to a schema therefore extends the guard with no code change, and a test proves that by introducing one in a fixture. The nine fields that were previously reachable — `blocks`, `raisedBy`, `satisfies`, `evaluates`, `verifies`, `fulfils`, `acceptedBy`, `implementedBy`, `answeredBy` — are refused.",
+  "statement": "`reviseArtifact` refuses every field the schemas declare with `x-traceTarget`, established by enumerating those fields from the schema set at test time and asserting a refusal for each — not by comparing against a second list written in the test. Adding a trace field to a schema therefore extends the guard with no code change, proved by introducing one in a copied schema set and requiring the refusal. The eight fields that were previously reachable — `acceptedBy`, `answeredBy`, `blocks`, `evaluates`, `fulfils`, `raisedBy`, `satisfies` and `verifies` — are refused, while a non-trace field on the same type stays revisable so the guard is discriminating rather than simply refusing everything.",
   "evaluates": [
     "CMP-0005"
   ],
@@ -14,5 +14,5 @@
     "REQ-0013",
     "REQ-0014"
   ],
-  "notes": "⚠️ 'NOT BY COMPARING AGAINST A SECOND LIST' is the load-bearing clause. A test that hardcodes the expected field names reproduces the original defect one layer up: two hand-maintained lists that must agree, and the test would pass while the guard drifted from the schemas."
+  "notes": "PASS 2026-09-03. The guard is now `Array.isArray(effectiveSchema(schemas, type).properties[k]['x-traceTarget'])`, asked PER TYPE rather than as a union, because a name that is a link on one type need not be one on another. It is the same source `linkTrace` validates against, so the two cannot drift. ⚠️ THE COUNT WAS EIGHT, NOT NINE, AND MY EARLIER ACCOUNTS OF THIS DEFECT SAID NINE. They included `implementedBy`, which is deliberately NOT a trace field — the component schema says so explicitly: 'Paths rather than a trace field on purpose: code is not an artifact, and pretending it is would put the repository inside the planning model.' It declares no `x-traceTarget`, the derived guard leaves it alone, and a test asserts that it stays revisable. Enumerating from the schemas is what surfaced the miscount; a hand-written list would have carried it. ⚠️ THE SCHEMAS DECLARE 25 TRACE FIELDS AND THE OLD LIST HELD 17. Every name in the old list was a real trace field, so the defect was never a wrong entry — it was the eight that were never added, which is the failure mode of any guard maintained by hand beside a declaration that already exists. `reviseArtifact` already resolved the effective schema a few lines later, for materiality, under a comment reading 'never from a hardcoded field list'. The rule was in the file; it just had not been applied to the guard above it."
 }
