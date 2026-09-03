@@ -6,7 +6,7 @@
   "description": "A clonable, local-first planning system. This repo becomes a consumer's .planning/ directory (#1, #20, #32, #69).",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "test": "node --test",
@@ -24,6 +24,7 @@
     "start": "node bin/start-shell.mjs"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.4",
     "@mdx-js/mdx": "3.1.1",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",

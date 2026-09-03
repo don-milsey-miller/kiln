@@ -82,3 +82,28 @@ jobs:
       # to parse and nothing to interpret.
       - name: Run the test suite
         run: npm test
+
+      # ⚠️ THE PI CONTRACT, RE-PROVED RATHER THAN INHERITED. The default suite asserts over the
+      # results retained in `tools/pi-compat/runs/`; this step re-runs the spike itself against a
+      # real consumer install — a temporary project, `npm install` inside its `.planning`, and Pi
+      # resolved from that tree. It is what makes a pinned-version bump have to earn its evidence
+      # instead of carrying somebody's afternoon forward (TSK-0023, CMP-0041).
+      #
+      # ⚠️ ONE CELL, NOT ONE NODE VERSION. `matrix.node == '24'` alone still selects TWO cells —
+      # ubuntu and windows — because the matrix is the product of both axes. The contract is a
+      # property of the pinned Pi runtime and the platform, and this step spends a second full
+      # `npm install`, so it runs on exactly one: Ubuntu at Node 24.
+      #
+      # ⚠️ THE PLATFORM AXIS IS COVERED BY THE RETAINED EVIDENCE, not by running this twice. Both
+      # platforms' results are committed under `tools/pi-compat/runs/` and the default suite asserts
+      # the whole contract against each on every cell. What this step adds is a live re-proof, and
+      # one live re-proof is enough to catch a runtime that has changed under the pin.
+      #
+      # It cannot reach a paid provider: the runner has no provider credentials, the spike passes a
+      # sanitized allowlisted environment rather than inheriting one, and every run that can reach
+      # inference is pinned to a loopback fake model.
+      - name: Re-prove the Pi compatibility contract
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
+        run: npm test -- test/pi-compat.test.mjs
+        env:
+          KILN_PI_COMPAT: live
