@@ -320,7 +320,7 @@ Be the only route by which any Pi process is started. Resolve the exact pinned C
 Own one project-wide lock for the whole of setup, and make every lasting write happen under a plan rather than in sequence: canonicalise and print each target before mutating, schema-validate every file it may read or merge, probe same-directory temporary-file creation and atomic rename in each parent it will write to, record the identity of each existing file, re-compare that identity immediately before each merge, and maintain a non-secret journal that names the last completed phase so an interruption resumes rather than restarts.
 
 *Satisfies: REQ-0027, REQ-0022*
-*Not yet implemented.*
+*Implemented by: lib/setup-transaction.mjs, test/setup-transaction.test.mjs*
 
 ### CMP-0023 — Project ignore owner
 
@@ -1264,14 +1264,14 @@ Extend `lib/content-root.mjs` with `projectRootCandidate()` and `resolveProjectR
 
 Add `lib/setup-transaction.mjs` owning the existing `.planning-init.lock` for the whole command: canonicalise and print targets, schema-validate readable files, probe temp-create and atomic rename in each parent, hash existing files, compare under the lock before each merge, and keep a non-secret resumable journal.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**accepted** (5/5 criteria passed) · role: platform
 *Implements: CMP-0022 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0027 — Make the initializer and the ignore owner accept a held transaction
 
 Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an already-held transaction rather than acquiring their own lock, preserving their current idempotency and refusal semantics and their existing tests.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0022 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0028 — Extract the single ignore owner and add legacy block migration
@@ -1502,7 +1502,7 @@ Refuse the consumer command when the tool root and project root coincide, and im
 
 Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**outstanding** (0/4 criteria passed) · role: platform
 *Implements: CMP-0039 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0061 — Implement the argument surface, refusal codes and non-interactive contract

@@ -601,9 +601,11 @@
   },
   {
     "acceptedBy": [
-      "ACC-0043",
       "ACC-0044",
-      "ACC-0045"
+      "ACC-0096",
+      "ACC-0097",
+      "ACC-0098",
+      "ACC-0099"
     ],
     "dependsOn": [
       "TSK-0025"
@@ -1419,6 +1421,8 @@
   },
   {
     "acceptedBy": [
+      "ACC-0043",
+      "ACC-0045",
       "ACC-0083",
       "ACC-0085"
     ],
@@ -1446,7 +1450,7 @@
       "CMP-0039"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.",

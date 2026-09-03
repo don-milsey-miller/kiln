@@ -820,7 +820,7 @@
     ],
     "id": "ACC-0044",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "When a file the transaction recorded is modified after the plan is built and before the merge runs, the transaction detects the changed identity under the lock and refuses, leaving the operator's edit intact. A malformed or unknown-schema-version file likewise refuses rather than being replaced.",
@@ -1670,6 +1670,71 @@
     "verifies": [
       "REQ-0013",
       "REQ-0014"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0096",
+    "lifecycle": "active",
+    "outcome": "pass",
+    "reviewStatus": "approved",
+    "schemaVersion": 2,
+    "statement": "Every file the transaction may write is resolved through its deepest existing ancestor and proved to lie beneath a root the caller explicitly authorised, and the same proof is repeated under the lock immediately before each write. A junction or symbolic link on a target's path refuses and nothing is written through it, including a probe, even when the path spells as one inside the project. A root the caller did not pass is not a root the transaction can write to, and the transaction lock is not a writable target. Each target's plan key is derived from its resolved path, so two entries that reach the same physical file refuse whether they differ only in spelling or arrive through two authorised roots that overlap, and one file merged under any of its spellings reaches the single entry planned for it.",
+    "title": "Every write target is identified by resolution, not by spelling",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0097",
+    "lifecycle": "active",
+    "outcome": "pass",
+    "reviewStatus": "approved",
+    "schemaVersion": 2,
+    "statement": "The write plan is built while this process demonstrably holds the transaction lock, and planning refuses when it is not held. A plan that refuses leaves the project as it was found, directories included: every probe file and every directory created in order to probe is removed on every exit path. Where a removal cannot be completed, the transaction refuses and names each path it left behind, retaining alongside it whatever refusal caused the attempt — a cleanup failure is never reported as success. Absence is confirmed by observing the path, not by trusting the removal call's error code.",
+    "title": "Planning holds the lock, and a refused plan leaves the project unchanged",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0098",
+    "lifecycle": "active",
+    "outcome": "pass",
+    "reviewStatus": "approved",
+    "schemaVersion": 2,
+    "statement": "When the content a merge would produce is byte-identical to what is already on disk, the transaction performs no write. The evidence is the file's modification time, not the merge's reported status.",
+    "title": "A merge that would produce the current bytes writes nothing",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0022"
+    ],
+    "id": "ACC-0099",
+    "lifecycle": "active",
+    "outcome": "pass",
+    "reviewStatus": "approved",
+    "schemaVersion": 2,
+    "statement": "The journal is a planned, contained target validated against its schema before each write, and it records the whole ordered phase plan up front, marking a phase running before that phase's work begins. On failure it survives, naming the last completed phase and an exact recovery command, and nothing already written is rolled back. On success it is deleted, and a deletion that fails for any reason other than the file already being absent is reported rather than swallowed.",
+    "title": "The journal is a planned target whose lifecycle is never silent",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0027"
     ]
   }
 ]
