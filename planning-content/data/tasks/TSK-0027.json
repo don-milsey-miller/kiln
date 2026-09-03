@@ -15,7 +15,8 @@
     "REQ-0027"
   ],
   "acceptedBy": [
-    "ACC-0044"
+    "ACC-0044",
+    "ACC-0100"
   ],
   "dependsOn": [
     "TSK-0026"

@@ -13,6 +13,8 @@
   "notes": "⚠️ IT REUSES THE EXISTING LOCK RATHER THAN ADDING ONE. The initializer already owns `<project>/.planning-init.lock`; a second lock beside it would let setup and initialization interleave on the same files while each believed it held the project. The initializer and the ignore owner must therefore accept an already-held transaction instead of acquiring their own. ⚠️ THERE IS NO --force. A malformed file is a refusal, because the only thing --force could mean here is overwriting something the operator wrote and setup could not parse.",
   "implementedBy": [
     "lib/setup-transaction.mjs",
-    "test/setup-transaction.test.mjs"
+    "lib/lock.mjs",
+    "test/setup-transaction.test.mjs",
+    "test/initialize-project.test.mjs"
   ]
 }
