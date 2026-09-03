@@ -432,7 +432,7 @@ Own the lifecycle of the two processes that make up a running Kiln: validate the
 Answer the supervisor's readiness question with an identity rather than a status: the service name, a versioned health protocol, the ephemeral run identifier of this invocation, the non-secret stable project identifier, and the build version — and nothing else, in particular no absolute path, no credential, and no session or planning content.
 
 *Satisfies: REQ-0028*
-*Not yet implemented.*
+*Implemented by: lib/run-identity.mjs, app/health/kiln/route.js, app/server/identity.js, test/run-identity.test.mjs*
 
 ### CMP-0039 — Setup command
 
@@ -1467,7 +1467,7 @@ Verify the child's Kiln capability signature before reading its substantive answ
 
 Add the Kiln health endpoint to the application, taking the run and project identifiers supplied by the supervisor at start, and returning only the identity fields.
 
-**outstanding** (0/1 criteria passed) · role: frontend
+**accepted** (1/1 criteria passed) · role: frontend
 *Implements: CMP-0038 · fulfils: REQ-0028*
 
 ### TSK-0056 — Give the launcher a private stdin and emit run identity

@@ -630,6 +630,12 @@
   },
   {
     "id": "CMP-0038",
+    "implementedBy": [
+      "lib/run-identity.mjs",
+      "app/health/kiln/route.js",
+      "app/server/identity.js",
+      "test/run-identity.test.mjs"
+    ],
     "lifecycle": "active",
     "notes": "⚠️ EVERY FIELD IS THERE TO DEFEAT A SPECIFIC LOOKALIKE. The run id defeats a previous Kiln process still holding the port; the project id defeats a Kiln serving a different project; the service name and protocol defeat an unrelated application that happens to return JSON.",
     "responsibility": "Answer the supervisor's readiness question with an identity rather than a status: the service name, a versioned health protocol, the ephemeral run identifier of this invocation, the non-secret stable project identifier, and the build version — and nothing else, in particular no absolute path, no credential, and no session or planning content.",
