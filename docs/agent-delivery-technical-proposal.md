@@ -984,12 +984,25 @@ Implement `bin/start-kiln.mjs` as the lifecycle owner:
 4. generate a random run ID and load the non-secret stable Kiln project ID from `.pi/kiln.json`;
 5. start `bin/start-shell.mjs` with a private stdin pipe, inherited/teed output, the chosen port, the
    run ID, and the project ID;
-6. poll the Kiln-specific loopback health endpoint until it returns the expected service/protocol
-   identity, exact run ID, exact project ID, and build version while the expected child remains alive;
+6. poll the Kiln-specific loopback health endpoint until it returns the expected service and
+   protocol, the exact run ID and the exact project ID, while the expected child remains alive.
+   **Readiness rests on those four facts and child liveness — not on the build version.** The
+   reported package version is compared and a mismatch is reported, but it is *checked compatibility
+   metadata*, not independent build identity: this package is `0.0.0`, every build reports it, and a
+   field that cannot differ cannot discriminate. Neither of the available ways to make the wording
+   true is acceptable — inventing a fingerprint puts a derived value in a readiness handshake that
+   nothing versions, and bumping the version to satisfy a sentence is the sentence editing the
+   system. The clause becomes a real check when there is a real versioning policy, and says only
+   what it does until then;
 7. start the pinned Pi CLI in the outer project root with terminal stdin/stdout/stderr inherited;
 8. on first session, send the unique `/kiln-start` prompt; on later sessions, resume the stored session
    and invoke the resume behavior;
-9. if Pi exits, send `stop` and close the application launcher's stdin;
+9. if Pi exits, send `stop` and close the application launcher's stdin — **both, in that order, and
+   then observe the exit rather than assuming it.** The launcher's side of this contract is already
+   proved: it reacts to the message and to the close. What is unproved until the supervisor is built
+   is that the supervisor *exercises* it, and "the launcher would have stopped if asked" is not the
+   same claim as "it was asked". The observation is bounded — a supervisor that waits forever on a
+   child that is not going has replaced a hung application with a hung terminal;
 10. on Ctrl+C or termination, stop Pi and the application launcher, wait for both, and escalate after
    bounded grace periods; and
 11. remove only runtime files created by that invocation.
@@ -1015,6 +1028,16 @@ application the very pipe its own stop control arrives on, so a second reader on
 bytes from the reader meant to have them — standalone, it hands over the terminal directly. The
 application needs no stdin, so it is given none, which makes the guarantee structural rather than a
 question of who reads first.
+
+**Proving the supervisor's hop needs an adversary, not a happy path.** "Input reached Pi" passes
+whenever Pi happens to win a read, including in the very arrangement this rule forbids — both
+processes holding the terminal. Two things are therefore required together: structurally, that the
+launcher is spawned with a private *writable* stdin the supervisor can send to and close while Pi
+inherits the terminal; and behaviourally, that with a launcher-side reader actively trying to consume
+input, an exact sentinel written to the supervisor's stdin arrives at Pi and the launcher-side reader
+receives nothing. The specific mutation to defeat is changing the launcher's stdin from a private
+pipe to inherited terminal input, and a control that cannot fail against that mutation has not tested
+this rule.
 
 The launcher validates the run identifier, project identifier and port before using any of them, and
 propagates the identity it validated rather than whatever the environment held. A partial, malformed
@@ -1267,7 +1290,8 @@ following:
 - Session, consent, compatibility, and transaction state was either covered by the exact project
   ignore policy or placed in the validated external user-local state root.
 - The browser health response matched the current run ID and project ID; an unrelated listener could
-  not satisfy readiness.
+  not satisfy readiness. The build version was compared as compatibility metadata and carried no part
+  of the identity claim, since every build of this package reports `0.0.0`.
 - The Kiln capability signature was present.
 - The Stage 1 skill was loaded.
 - The first user-facing response asks one relevant question.
