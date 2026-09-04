@@ -52,7 +52,8 @@ import {
   buildScaffold,
   yamlString,
 } from "../lib/project-scaffold.mjs";
-import { REFUSAL_CLASS, STATUS, applyGitignore, initializeProject, planGitignore } from "../lib/initialize-project.mjs";
+import { REFUSAL_CLASS, STATUS, initializeProject } from "../lib/initialize-project.mjs";
+import { applyIgnoreBlock, planIgnoreBlock } from "../lib/project-gitignore.mjs";
 import { parseArgs } from "../bin/init-project.mjs";
 import { SCHEMA_VERSION, manifestSchemaVersion } from "../lib/content-version.mjs";
 import { loadStageDefinitions } from "../lib/stages.mjs";
@@ -613,11 +614,11 @@ test("⚠️ the write is an APPEND, so an edit made between plan and apply surv
   const dir = asGitRepository(project());
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
 
-  const plan = planGitignore(dir);
+  const plan = planIgnoreBlock(dir);
   assert.equal(plan.action, "append");
 
   appendFileSync(join(dir, ".gitignore"), "coverage/\n", "utf-8"); // somebody else, in between
-  applyGitignore(plan);
+  applyIgnoreBlock(plan);
 
   const text = readFileSync(join(dir, ".gitignore"), "utf-8");
   assert.match(text, /^coverage\/$/m, "the edit made between plan and apply was not reverted");
@@ -630,11 +631,11 @@ test("⚠️ a .gitignore created between plan and apply is appended to, never o
   // check followed by a write would be the same race with a wider window, and the loser would
   // silently discard whatever the winner wrote.
   const dir = asGitRepository(project());
-  const plan = planGitignore(dir);
+  const plan = planIgnoreBlock(dir);
   assert.equal(plan.action, "create");
 
   writeFileSync(join(dir, ".gitignore"), "# somebody got there first\n", "utf-8");
-  applyGitignore(plan);
+  applyIgnoreBlock(plan);
 
   const text = readFileSync(join(dir, ".gitignore"), "utf-8");
   assert.match(text, /somebody got there first/, "the other writer's file survived");
@@ -645,10 +646,10 @@ test("applying twice adds nothing the second time", async () => {
   const dir = asGitRepository(project());
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
 
-  const plan = planGitignore(dir);
-  applyGitignore(plan);
+  const plan = planIgnoreBlock(dir);
+  applyIgnoreBlock(plan);
   const once = readFileSync(join(dir, ".gitignore"), "utf-8");
-  applyGitignore(plan); // the same stale plan, re-applied
+  applyIgnoreBlock(plan); // the same stale plan, re-applied
   assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), once, "the marker is re-read, not assumed absent");
 });
 
