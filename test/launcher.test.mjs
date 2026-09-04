@@ -271,6 +271,13 @@ test("⚠️ closing the supplied stdin stops the launcher, exactly as `stop` do
     const { proc, log } = await launch({ PORT: String(PORT + 2) }, PORT + 2);
     const runDir = runDirFrom(log());
     assert.ok(runDir && existsSync(runDir), "the run directory must exist before EOF proves it is removed");
+
+    // ⚠️ **THE SECOND REAL START MUST NOT REINSTALL, AND THIS IS WHERE THAT WAS CAUGHT.** `npm
+    // install` touches `package-lock.json`, and the old check compared it to the `node_modules`
+    // DIRECTORY mtime — which reinstalling the same tree never moves. So one install made every
+    // later start reinstall, two minutes a time, until this test timed out waiting for readiness.
+    // The launcher's own words are the evidence: it says which branch it took.
+    assert.match(log(), /dependencies present; skipping install/, "a warm checkout must not reinstall");
     const childPid = JSON.parse(readFileSync(join(runDir, "run.json"), "utf-8")).pid;
 
     proc.stdin.end(); // no message at all — just the close

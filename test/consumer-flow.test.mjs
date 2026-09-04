@@ -31,7 +31,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -150,16 +150,22 @@ test("a fresh project initializes, opens, lints clean, and refuses to publish", 
 
   /* ---- 2. the launcher resolves and prints that same sibling --------------- */
 
-  // ⚠️ AN EMPTY `node_modules/`, CREATED ONLY NOW AND ONLY TO STOP `npm install`. The launcher's
-  // `needsInstall()` is true when the directory is absent, so without this the run below shells out
-  // to npm and this test needs a network, a registry, and minutes — and the first version of it did
-  // exactly that, passing on partial output because the 60s timeout killed the install. An empty
-  // directory makes the launcher take its "dependencies present" branch and fail immediately at the
+  // ⚠️ A `node_modules/` WITH npm'S MARKER, CREATED ONLY NOW AND ONLY TO STOP `npm install`. Without
+  // it the run below shells out to npm and this test needs a network, a registry, and minutes — and
+  // the first version of it did exactly that, passing on partial output because the 60s timeout
+  // killed the install. Taking the "dependencies present" branch makes it fail immediately at the
   // missing Next CLI instead, which is offline, fast, and the same code path.
+  //
+  // ⚠️ **THE MARKER IS NEW HERE, AND ITS ABSENCE USED TO BE ENOUGH.** An empty directory sufficed
+  // while the freshness check would fall through to "no lockfile to compare against" and declare the
+  // tree usable — a guess about a tree nothing had laid down. That branch was removed on 2026-09-04
+  // (ACC-0033, EVD-0087), so this fixture now has to say what it was previously allowed to imply:
+  // npm put this here. Writing the marker is more honest than the empty directory ever was.
   //
   // It is created AFTER the initialization above, so the "no dependencies installed" claim that step
   // makes is not quietly weakened by a directory that exists to serve this one.
   mkdirSync(join(tool, "node_modules"));
+  writeFileSync(join(tool, "node_modules", ".package-lock.json"), '{"name":"fixture","lockfileVersion":3}\n');
 
   // ⚠️ Nothing sets PLANNING_CONTENT_DIR here, and the environment it inherits must not either — the
   // whole point is that `<toolRoot>/../planning-content` finds the project on its own.

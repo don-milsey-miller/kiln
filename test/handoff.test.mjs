@@ -303,11 +303,12 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
       "ACC-0035",
       "ACC-0036",
       "ACC-0037",
-      // ⚠️ THE AGENT LAYER'S FIRST PASS ON A SHELL COMPONENT. ACC-0101 evaluates CMP-0020, so it
-      // joins this slice: the launcher now validates a supplied run identity, propagates it to the
-      // application, and stops on both the stop message and stdin close. Its sibling ACC-0078 is
-      // NOT here and must not be — it needs the supervisor to observe that terminal input reaches
-      // Pi rather than the launcher, so it stays `not-evaluated` until TSK-0057 can establish it.
+      // ⚠️ THE AGENT LAYER'S TWO PASSES ON A SHELL COMPONENT, and they arrived a task apart. ACC-0101
+      // came with the launcher: a validated run identity propagated to the application, and stop and
+      // EOF through the stdin it was given. ACC-0078 needed the SUPERVISOR — proving that terminal
+      // input reaches Pi and not the launcher takes the process holding both — so it stayed
+      // `not-evaluated` through TSK-0056 and is satisfied here by TSK-0057. Both evaluate CMP-0020.
+      "ACC-0078",
       "ACC-0101",
     ],
     "criteria evaluated so far"

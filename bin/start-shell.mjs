@@ -35,12 +35,13 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { contentRootCandidate, resolveContentRoot, ContentRootError } from "../lib/content-root.mjs";
+import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { PROJECT_ID_ENV, RUN_ID_ENV, parsePort, readSuppliedIdentity } from "../lib/run-identity.mjs";
 
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -113,19 +114,6 @@ function runToCompletion(label, args, env) {
   }
 }
 
-/** True when dependencies are missing or older than the lockfile that describes them. */
-function needsInstall() {
-  const modules = join(ROOT, "node_modules");
-  if (!existsSync(modules)) return true;
-  const lock = join(ROOT, "package-lock.json");
-  if (!existsSync(lock)) return false;
-  try {
-    return statSync(lock).mtimeMs > statSync(modules).mtimeMs;
-  } catch {
-    return true;
-  }
-}
-
 /**
  * ⚠️ INSTALL IS THE ONE STEP THAT LEGITIMATELY NEEDS npm, so it is the one place npm is spawned.
  * `npm_execpath` is set when this launcher was itself started through npm, and running that script
@@ -193,8 +181,11 @@ async function main() {
   // and in whether anything is polling it. An operator reading the log should not have to infer it.
   say(identity.mode === "supervised" ? `supervised run ${identity.runId}` : "standalone (no supervisor identity)");
 
-  if (needsInstall()) installDependencies(env);
-  else say("dependencies present; skipping install");
+  // ⚠️ IT SAYS WHICH BRANCH IT TOOK, AND WHY. An install that happens silently on every start is
+  // indistinguishable from one that is needed, which is how the broken condition survived.
+  const deps = dependencyState(ROOT);
+  if (deps.install) installDependencies(env);
+  else say(`dependencies present; skipping install (${deps.why})`);
 
   runToCompletion("building (production)…", [NEXT, "build"], env);
 
