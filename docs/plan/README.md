@@ -3,16 +3,16 @@
 **Generated. Nothing here was written by hand**, and editing it edits a rendering — the next
 `npm run handoff` overwrites you. Change `planning-content/` instead.
 
-- snapshot: `a90c5f61adca24cd`
+- snapshot: `d81ade254e9b49b9`
 - tool version: `0.0.0`
 
 ## What is in it
 
-- 101 acceptance-criterions
+- 102 acceptance-criterions
 - 53 assertions
 - 41 components
 - 33 decisions
-- 86 evidences
+- 87 evidences
 - 33 questions
 - 28 requirements
 - 1 runbook-step

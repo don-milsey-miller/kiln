@@ -2669,5 +2669,49 @@
     "summary": "A dedicated exact-environment cell, recorded from the EFFECTIVE environment handed to the child rather than from the caller's intent. No configuration-locating variable was supplied — `configLocatingNamesSupplied: []`, covering HOME, USERPROFILE, APPDATA, LOCALAPPDATA, XDG_CONFIG_HOME and XDG_STATE_HOME — while PI_CODING_AGENT_DIR was. The child reported HOME false and USERPROFILE false, loaded the project package, and exited 0. The same construction on Windows leaves USERPROFILE present because the platform repopulates it, which is why that result is recorded separately and claimed differently.",
     "title": "Experiment: a Pi child loads and completes a turn with no home variable at all (Linux)",
     "type": "evidence"
+  },
+  {
+    "environment": {
+      "execution": "host",
+      "facts": {
+        "command": "node bin/start-shell.mjs, and node --test test/dependency-freshness.test.mjs",
+        "installBefore": "2m, every start",
+        "launcherSuiteAfter": "8.9s and 8.5s",
+        "launcherSuiteBefore": "300s timeout on the second launch",
+        "node": "v24.18.0",
+        "os": "Windows 11"
+      },
+      "isolationBoundary": {
+        "doesNotClaim": [
+          "containment-of-hostile-code",
+          "host-filesystem-denial",
+          "network-isolation",
+          "process-isolation"
+        ],
+        "isolates": []
+      },
+      "omissions": [
+        {
+          "fact": "posix-marker-behaviour",
+          "reason": "npm writes `node_modules/.package-lock.json` on every platform, but the mtime comparison was only observed on Windows. Nothing here measures whether a POSIX filesystem's timestamp granularity could make a same-second install and lockfile write compare equal; the branch would skip an install it should have run.",
+          "state": "not-captured"
+        },
+        {
+          "fact": "cold-install-branch",
+          "reason": "The cold branch is exercised over a temporary directory rather than by a real `npm install`. EVD-0074 measured the real cold install for the original criterion and still supports that clause; this record adds only the warm and missing-marker branches.",
+          "state": "not-captured"
+        }
+      ]
+    },
+    "id": "EVD-0087",
+    "kind": "experiment",
+    "lifecycle": "active",
+    "observedAt": "2026-09-04",
+    "outcome": "success",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "summary": "The launcher's install condition compared `package-lock.json`'s mtime against the `node_modules` DIRECTORY mtime. Measured on this checkout: package-lock.json 2026-09-04T01:30:58Z, node_modules directory 2026-08-18T18:25:26Z, node_modules/.package-lock.json 2026-09-04T01:30:58Z — so the comparison was true and had been since the first install, because a directory's mtime moves only when an entry is added or removed at its top level while `npm install` rewrites files inside it and touches the lockfile. Consequence observed by hand: `PORT=4415 node bin/start-shell.mjs` printed `installing dependencies…` and npm reported `up to date, audited 279 packages in 2m` — a two-minute install on a checkout with nothing to do, on every start. It surfaced only because a second real launch was added to the launcher suite and timed out after 300s waiting for readiness. After repairing the comparison to npm's installed-tree marker, the same two launches took 8.9s and 8.5s. The three branches ACC-0033 now names are exercised directly over temporary directories: a cold checkout installs; a warm checkout whose lockfile is not newer than the marker skips; a missing marker installs, including when there is no lockfile at all — the case that depends on the marker being checked BEFORE the lockfile. A regression control asserts that a day-old `node_modules` directory mtime is not treated as a stale install, which is the ordinary state of every checkout after its first install.",
+    "title": "Measurement: the conditional install was permanently true, and the three branches after the repair",
+    "type": "evidence"
   }
 ]

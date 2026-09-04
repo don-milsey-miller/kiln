@@ -306,7 +306,7 @@ Statically prove, without executing the application, that every planning-content
 Install and run the shell from one documented command: build the application and start it in production mode, owning the `next start` process as a child, forwarding shutdown to it, waiting for it to exit, and leaving nothing behind — no process on the port, no temporary directory it created. The file watcher is an in-process resource of the child and is released by its teardown.
 
 *Satisfies: REQ-0020*
-*Implemented by: bin/start-shell.mjs, lib/run-identity.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs*
+*Implemented by: bin/start-shell.mjs, lib/run-identity.mjs, lib/dependency-freshness.mjs, docs/running-the-shell.md, package.json, next.config.mjs, test/launcher.test.mjs, test/dependency-freshness.test.mjs*
 
 ### CMP-0021 — Pinned Pi runtime
 
@@ -425,7 +425,7 @@ Run a specialist as an isolated Pi child and decide whether its answer may be us
 Own the lifecycle of the two processes that make up a running Kiln: validate the project and settings, choose and prove a port, start the browser launcher with a private stdin pipe so it cannot consume the operator's typing, wait for identity-confirmed readiness, start Pi in the outer project root with the terminal inherited, begin or resume the recorded planning session, and on exit or signal stop both process trees within bounded grace periods and remove only what this invocation created.
 
 *Satisfies: REQ-0022, REQ-0028*
-*Not yet implemented.*
+*Implemented by: lib/supervisor.mjs, bin/start-kiln.mjs, test/supervisor.test.mjs, test/fixtures/supervisor*
 
 ### CMP-0038 — Run-identity health endpoint
 
@@ -1479,9 +1479,9 @@ Change `bin/start-shell.mjs` to validate the run identifier, project identifier 
 
 ### TSK-0057 — Build the supervisor's start sequence and identity handshake
 
-Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.
+Implement `bin/start-kiln.mjs` over an importable supervisor: validate the Kiln project record and the runtime inputs used here — the port and the supplied identity — bind-test the port, generate the run identifier, start the launcher with a private writable stdin, poll the Kiln health endpoint for matching service, protocol, run and project identity while the expected child is alive, then start the pinned Pi resolved from its own declared `bin.pi` entry, in the outer project root with the terminal inherited. Readiness rests on those four identity facts and child liveness; the reported package version is compared as compatibility metadata and carries no part of the identity claim while every build reports `0.0.0`. On Pi's exit, send the stop message, request the end of the launcher's stdin, and observe a bounded exit. Settings validation, session resumption and cross-platform signal shutdown belong to their own tasks.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**accepted** (4/4 criteria passed) · role: platform
 *Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
 
 ### TSK-0058 — Build session resumption and bounded shutdown
