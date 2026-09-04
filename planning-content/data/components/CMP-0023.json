@@ -9,5 +9,9 @@
   "satisfies": [
     "REQ-0027"
   ],
-  "notes": "⚠️ THIS IS A REFACTOR OF WORKING CODE, NOT A NEW CAPABILITY. `lib/initialize-project.mjs` already owns planning, append safety, recorded idempotency and the deliberately-deleted-block rule. The failure this component prevents is a second appender in setup with different idempotency rules — which is how a file people edit by hand acquires two Kiln blocks."
+  "notes": "⚠️ THIS IS A REFACTOR OF WORKING CODE, NOT A NEW CAPABILITY. `lib/initialize-project.mjs` already owns planning, append safety, recorded idempotency and the deliberately-deleted-block rule. The failure this component prevents is a second appender in setup with different idempotency rules — which is how a file people edit by hand acquires two Kiln blocks.",
+  "implementedBy": [
+    "lib/project-gitignore.mjs",
+    "test/project-gitignore.test.mjs"
+  ]
 }

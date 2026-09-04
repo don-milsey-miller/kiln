@@ -105,6 +105,31 @@ function fail(code, message) {
   process.exitCode = code;
 }
 
+/**
+ * One line about what the ignore owner actually did.
+ *
+ * ⚠️ **A REPORT IS NOT A FAILURE AND NOT A SUCCESS, and it gets the most words** — it is the one
+ * outcome where the operator has to do something, and where a line that scrolled past would leave
+ * runtime paths unprotected while the command exited 0.
+ */
+function gitignoreLine(event) {
+  if (event.changed !== true)
+    return (
+      `.gitignore:    NOT WRITTEN — ${event.detail ?? event.note ?? "nothing to do"}\n` +
+      `               ${event.path}\n` +
+      (event.uncovered?.length
+        ? `               still not ignored: ${event.uncovered.join(", ")}\n` +
+          `               Kiln will not write runtime state into a path Git is tracking. Add those\n` +
+          `               lines yourself, or restore Kiln's block, before running setup.`
+        : `               Nothing was changed.`)
+    );
+
+  const wrote = event.wrote?.join(", ") ?? "";
+  if (event.action === "migrate") return `.gitignore:    migrated Kiln's block to ${wrote} in ${event.path}`;
+  if (event.action === "create") return `.gitignore:    created ${event.path} with ${wrote}`;
+  return `.gitignore:    appended ${wrote} to ${event.path}`;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -154,7 +179,12 @@ async function main() {
         say(`content root:  ${event.contentRoot}`);
       }
       if (event.kind === "temp-directory") say(`staging in:    ${event.path}`);
-      if (event.kind === "gitignore") say(`.gitignore:    ${event.action === "create" ? "created" : "appended"} ${event.path}`);
+      // ⚠️ WHAT IT SAYS COMES FROM WHAT THE OWNER DID, NOT FROM WHAT IT PLANNED. This line used to
+      // read `action === "create" ? "created" : "appended"`, which was true of the only two actions
+      // that existed — and would have announced an append for a migration, and for a report that
+      // deliberately wrote nothing at all. Claiming a write that did not happen is the defect this
+      // whole component exists to prevent, one layer up.
+      if (event.kind === "gitignore") say(gitignoreLine(event));
       if (event.kind === "notice") notices.push(event.message);
     },
   });

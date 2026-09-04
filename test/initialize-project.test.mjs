@@ -45,7 +45,6 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
   GITIGNORE_BEGIN,
   GITIGNORE_END,
-  GITIGNORE_RULE,
   GITIGNORE_STATUS,
   SETUP_VERSION,
   ScaffoldError,
@@ -53,7 +52,7 @@ import {
   yamlString,
 } from "../lib/project-scaffold.mjs";
 import { REFUSAL_CLASS, STATUS, initializeProject } from "../lib/initialize-project.mjs";
-import { applyIgnoreBlock, planIgnoreBlock } from "../lib/project-gitignore.mjs";
+import { IGNORE_RULES, applyIgnoreBlock, blockText, planIgnoreBlock, ruleSpellings } from "../lib/project-gitignore.mjs";
 import { parseArgs } from "../bin/init-project.mjs";
 import { SCHEMA_VERSION, manifestSchemaVersion } from "../lib/content-version.mjs";
 import { loadStageDefinitions } from "../lib/stages.mjs";
@@ -554,8 +553,9 @@ test("⚠️ two concurrent initializers produce one valid result", async () => 
 
 /* ================================================================== .gitignore */
 
-const block = (eol = "\n") => [GITIGNORE_BEGIN, GITIGNORE_RULE, GITIGNORE_END].join(eol) + eol;
+const block = (eol = "\n", rules = IGNORE_RULES) => blockText(eol, rules);
 const countBlocks = (text) => text.split(/\r?\n/).filter((l) => l.trim() === GITIGNORE_BEGIN).length;
+const IGNORES_PLANNING = ruleSpellings(".planning/");
 
 test("a project that is not a Git repository is told so, and nothing is written", async () => {
   const dir = project();
@@ -589,21 +589,39 @@ test("a repository with no .gitignore gets one containing only the block", async
   assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), block());
 });
 
-test("⚠️ an existing rule for .planning/ is OBSERVED, not duplicated", async () => {
+test("⚠️ an existing rule the operator wrote is OBSERVED, and never written a second time", async () => {
+  // The rule set grew from one entry to three (DEC-0029), so a project that already ignores
+  // `.planning/` is no longer fully covered — but it must still not acquire a second `.planning/`.
+  // The block carries what is missing, which is the whole reason coverage is computed per rule.
   for (const rule of [".planning/", ".planning", "/.planning/", "/.planning"]) {
     const dir = asGitRepository(project());
     const existing = `# already handled\n${rule}\n`;
     writeFileSync(join(dir, ".gitignore"), existing, "utf-8");
 
     const r = await init(dir);
-    assert.equal(r.git.gitignore, GITIGNORE_STATUS.ALREADY_IGNORED, rule);
-    assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), existing, `${rule}: the file is untouched`);
-    assert.equal(
-      JSON.parse(readFileSync(join(r.contentRoot, "state", "setup.json"), "utf-8")).steps.gitignore,
-      "already-ignored",
-      `${rule}: the record says Kiln observed the rule rather than adding it`
-    );
+    const text = readFileSync(join(dir, ".gitignore"), "utf-8");
+
+    assert.equal(r.git.gitignore, GITIGNORE_STATUS.ADDED, rule);
+    assert.ok(text.startsWith(existing), `${rule}: the operator's lines are untouched`);
+    assert.deepEqual(r.git.applied.wrote, [".pi/sessions/", ".pi/runtime/"], `${rule}: only what was missing`);
+    assert.equal(text.split(/\r?\n/).filter((l) => IGNORES_PLANNING.has(l.trim())).length, 1, `${rule}: not twice`);
+    assert.equal(countBlocks(text), 1, rule);
   }
+});
+
+test("⚠️ a file that already covers every rule is left completely alone", async () => {
+  const dir = asGitRepository(project());
+  const existing = `# I did this myself\n${IGNORE_RULES.join("\n")}\n`;
+  writeFileSync(join(dir, ".gitignore"), existing, "utf-8");
+
+  const r = await init(dir);
+  assert.equal(r.git.gitignore, GITIGNORE_STATUS.ALREADY_IGNORED);
+  assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), existing, "the file is untouched");
+  assert.equal(
+    JSON.parse(readFileSync(join(r.contentRoot, "state", "setup.json"), "utf-8")).steps.gitignore,
+    "already-ignored",
+    "and the record says Kiln observed the rules rather than adding them"
+  );
 });
 
 test("⚠️ the write is an APPEND, so an edit made between plan and apply survives", async () => {
@@ -618,7 +636,7 @@ test("⚠️ the write is an APPEND, so an edit made between plan and apply surv
   assert.equal(plan.action, "append");
 
   appendFileSync(join(dir, ".gitignore"), "coverage/\n", "utf-8"); // somebody else, in between
-  applyIgnoreBlock(plan);
+  await applyIgnoreBlock(plan);
 
   const text = readFileSync(join(dir, ".gitignore"), "utf-8");
   assert.match(text, /^coverage\/$/m, "the edit made between plan and apply was not reverted");
@@ -635,7 +653,7 @@ test("⚠️ a .gitignore created between plan and apply is appended to, never o
   assert.equal(plan.action, "create");
 
   writeFileSync(join(dir, ".gitignore"), "# somebody got there first\n", "utf-8");
-  applyIgnoreBlock(plan);
+  await applyIgnoreBlock(plan);
 
   const text = readFileSync(join(dir, ".gitignore"), "utf-8");
   assert.match(text, /somebody got there first/, "the other writer's file survived");
@@ -647,9 +665,9 @@ test("applying twice adds nothing the second time", async () => {
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
 
   const plan = planIgnoreBlock(dir);
-  applyIgnoreBlock(plan);
+  await applyIgnoreBlock(plan);
   const once = readFileSync(join(dir, ".gitignore"), "utf-8");
-  applyIgnoreBlock(plan); // the same stale plan, re-applied
+  await applyIgnoreBlock(plan); // the same stale plan, re-applied
   assert.equal(readFileSync(join(dir, ".gitignore"), "utf-8"), once, "the marker is re-read, not assumed absent");
 });
 
@@ -788,6 +806,32 @@ test("the CLI prints every absolute directory before it uses one", async () => {
   for (const label of ["tool root:", "project root:", "content root:", "staging in:"])
     assert.ok(text.includes(label), `the run did not report its ${label}\n${text}`);
   assert.ok(text.includes(join(dir, "planning-content")), "and the content root is absolute");
+});
+
+test("⚠️ the CLI reports what the ignore owner DID, never what it planned", async () => {
+  // This line read `action === "create" ? "created" : "appended"`, which was true of the only two
+  // actions that existed. With migration and reporting added it would have announced an append for
+  // a migration, and for a report that deliberately wrote nothing — a claimed write that did not
+  // happen, one layer up from the component whose whole job is not to make one.
+  const migrating = asGitRepository(project());
+  writeFileSync(join(migrating, ".gitignore"), block("\n", [".planning/"]), "utf-8");
+  const m = await cli(["--project-root", migrating, "--name", "M"], { cwd: migrating });
+  assert.equal(code(m), 0, both(m));
+  assert.match(both(m), /\.gitignore: +migrated Kiln's block/, both(m));
+  assert.equal(countBlocks(readFileSync(join(migrating, ".gitignore"), "utf-8")), 1);
+
+  const reporting = asGitRepository(project());
+  writeFileSync(join(reporting, ".gitignore"), `${GITIGNORE_BEGIN}\nnot mine\n${GITIGNORE_END}\n`, "utf-8");
+  const r = await cli(["--project-root", reporting, "--name", "R"], { cwd: reporting });
+  const text = both(r);
+  assert.match(text, /NOT WRITTEN/, text);
+  assert.match(text, /still not ignored: .*\.pi\/sessions\/.*\.pi\/runtime\//, text);
+  assert.equal(/appended|created/.test(text.split("\n").find((l) => l.includes(".gitignore:")) ?? ""), false);
+  assert.equal(
+    readFileSync(join(reporting, ".gitignore"), "utf-8"),
+    `${GITIGNORE_BEGIN}\nnot mine\n${GITIGNORE_END}\n`,
+    "and the operator's block is exactly as they left it"
+  );
 });
 
 test("the setup record carries no timestamp and no machine-specific path", async () => {
