@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0102",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "outcome": "pass",
+  "title": "The supervisor performs the Pi-exit handoff and observes the launcher go",
+  "statement": "When Pi exits, the supervisor sends the stop control message on the launcher's stdin, requests that stdin be ended, and then waits for the launcher to exit within a bounded period, escalating if it does not. Three facts are recorded separately: that the message was sent, that the end was requested, and whether the exit was actually observed. A run whose launcher was never seen to exit is reported as a failure with the address something may still be listening on — not as a success carrying the agent's own exit code, since the agent finishing cleanly says nothing about whether the launcher went. Writing to the pipe never throws: a stream error is delivered asynchronously, so it is listened for rather than wrapped in a try. An error observed before the shutdown result is finalised is recorded on that result; one arriving after it is not, and the criterion claims no more than that — what proves the launcher went is the observed exit, not the error record. That the launcher REACTS to a stop message and to a close is established elsewhere and is not what this asks; what this asks is that the supervisor performs the contract, since a supervisor that never sends anything is indistinguishable from one that does whenever the launcher would have exited for its own reasons. The wait is bounded in both directions: returning before the child is gone leaves a process holding the port, and waiting without limit replaces a hung application with a hung terminal. ⚠️ SIGNAL HANDLING, BOTH PROCESS TREES, GRACE PERIODS ACROSS PLATFORMS AND INVOCATION-OWNED FILE CLEANUP ARE NOT THIS CRITERION'S. They are ACC-0081's, on TSK-0058; claiming them here would mark work accepted that nothing has built.",
+  "evaluates": [
+    "CMP-0037"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

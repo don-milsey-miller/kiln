@@ -13,9 +13,11 @@
   "implementedBy": [
     "bin/start-shell.mjs",
     "lib/run-identity.mjs",
+    "lib/dependency-freshness.mjs",
     "docs/running-the-shell.md",
     "package.json",
     "next.config.mjs",
-    "test/launcher.test.mjs"
+    "test/launcher.test.mjs",
+    "test/dependency-freshness.test.mjs"
   ]
 }

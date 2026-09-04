@@ -2,11 +2,11 @@
   "id": "ACC-0033",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
   "outcome": "pass",
   "title": "The application installs and starts from one documented command",
-  "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps.",
+  "statement": "On a machine with the repository and Node present and no prior application state, the documented command installs and starts the application in production mode, and the project view responds, without further steps. The install is conditional and the command says which branch it took: a cold checkout installs; a warm checkout whose root lockfile is not newer than npm's installed-tree marker skips the install; and a missing or stale marker installs rather than guessing about a tree npm did not lay down. ⚠️ THE FRESHNESS COMPARISON IS AGAINST npm's MARKER, NOT THE `node_modules` DIRECTORY mtime. A directory's mtime moves only when an entry is added or removed at its top level, which reinstalling the same tree does not do, while `npm install` touches the lockfile every time — so comparing the two made the condition permanently true and the documented command reinstalled on every start, which is the outcome a conditional install exists to prevent.",
   "evaluates": [
     "CMP-0020"
   ],
@@ -15,6 +15,7 @@
   ],
   "notes": "'No further steps' is the testable half. DEC-0018 fixes the mode: `next build` then `next start`, never the development server. ⚠️ MARKED `pass` IN ERROR ON 2026-08-29 AND RETURNED TO `not-evaluated` THE SAME DAY. EVD-0073 recorded, in its own omissions, that the install branch was never taken: `node_modules` was present in every run, so the launcher printed `dependencies present; skipping install`. This criterion says 'on a machine with... no prior application state' and 'installs and starts'. Half of it was measured and the whole of it was ticked. ⚠️ THE EVIDENCE ITSELF SAID SO, WHICH IS THE PART WORTH RECORDING. The omission was written down accurately and then contradicted by the outcome three lines later — a criterion marked against evidence that explicitly disclaims the thing being claimed. Recording an omission is not the same as honouring it. ⚠️ WHAT WOULD SETTLE IT: the documented command run in a disposable copy of the repository with no `node_modules` and no `.next`, installing, building, serving and cleaning up with no further steps. ⚠️ EVALUATED PROPERLY 2026-08-29 (EVD-0074) AND RETURNED TO `pass`. The documented command was run in a disposable copy holding only tracked files, with `node_modules` and `.next` confirmed absent. It installed, built, served and cleaned up in 27.2s with no further steps, and the install branch was asserted positively rather than inferred from the run succeeding.",
   "evidencedBy": [
-    "EVD-0074"
+    "EVD-0074",
+    "EVD-0087"
   ]
 }

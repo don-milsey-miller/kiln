@@ -2,9 +2,9 @@
   "id": "ACC-0080",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Port handling refuses out-of-range values and never silently persists a choice",
   "statement": "A port outside 1..65535 or a non-integer value is refused. When the default is occupied, interactive mode offers another available port for that invocation only and non-interactive mode refuses with an exact PORT recovery command. An automatically chosen port is never written into project configuration.",
   "evaluates": [

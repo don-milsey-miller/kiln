@@ -2,11 +2,11 @@
   "id": "ACC-0078",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
-  "title": "The background launcher never reads the terminal",
-  "statement": "Under the supervisor the application launcher's stdin is a private pipe: input typed at the terminal during authentication and during the first planning turn reaches Pi and never the launcher, and the launcher still stops on the existing stop control message and on stdin close.",
+  "outcome": "pass",
+  "title": "The background launcher cannot read the terminal, proved against an adversary",
+  "statement": "Two proofs are required together, because either alone passes in the arrangement this criterion forbids. Structurally: under the supervisor the application launcher is spawned with a private stdin the supervisor can WRITE to and CLOSE, while Pi is spawned with the terminal inherited. Behaviourally: with a launcher-side reader actively attempting to consume input, an exact sentinel written to the supervisor's own stdin is received by Pi and the launcher-side reader receives none of that sentinel — it is expected to receive the supervisor's later stop control message, which is its own channel working. A positive check that input reached Pi does not satisfy this on its own: it passes whenever Pi happens to win a read, including when both processes hold the terminal, which is precisely the defect. The control must fail when the launcher's stdin is changed from a private pipe to inherited terminal input, and a control that survives that mutation has not tested this criterion. The launcher continues to stop on the stop control message and on its stdin being closed. ⚠️ SCOPE OF THE EVIDENCE: the harness supplies a pipe rather than a pseudo-terminal, so what is proved is descriptor ownership and byte routing, not terminal line discipline or signal behaviour. The structural assertion is what ties it to the real topology — whatever descriptor 0 is, the launcher is not given it.",
   "evaluates": [
     "CMP-0020"
   ],

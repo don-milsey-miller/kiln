@@ -10,5 +10,11 @@
     "REQ-0022",
     "REQ-0028"
   ],
-  "notes": "⚠️ ONE TERMINAL, TWO PROCESSES, AND ONLY ONE MAY READ IT. If the background launcher inherits stdin it will eat the authentication answer or the first planning message. ⚠️ PI'S WORKING DIRECTORY IS THE OUTER PROJECT, never the tool clone, and the self-hosting checkout — where those two are the same directory — is refused unless explicitly opted into."
+  "notes": "⚠️ ONE TERMINAL, TWO PROCESSES, AND ONLY ONE MAY READ IT. If the background launcher inherits stdin it will eat the authentication answer or the first planning message. ⚠️ PI'S WORKING DIRECTORY IS THE OUTER PROJECT, never the tool clone, and the self-hosting checkout — where those two are the same directory — is refused unless explicitly opted into.",
+  "implementedBy": [
+    "lib/supervisor.mjs",
+    "bin/start-kiln.mjs",
+    "test/supervisor.test.mjs",
+    "test/fixtures/supervisor"
+  ]
 }

@@ -2,10 +2,10 @@
   "id": "TSK-0057",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "amended",
+  "reviewStatus": "approved",
   "lifecycle": "active",
   "title": "Build the supervisor's start sequence and identity handshake",
-  "statement": "Implement `bin/start-kiln.mjs`: validate project and settings, parse and bind-test the port, generate the run identifier, start the launcher with a private stdin, poll the Kiln health endpoint for matching service, protocol, run, project and build identity while the expected child is alive, then start Pi in the outer project root with the terminal inherited.",
+  "statement": "Implement `bin/start-kiln.mjs` over an importable supervisor: validate the Kiln project record and the runtime inputs used here — the port and the supplied identity — bind-test the port, generate the run identifier, start the launcher with a private writable stdin, poll the Kiln health endpoint for matching service, protocol, run and project identity while the expected child is alive, then start the pinned Pi resolved from its own declared `bin.pi` entry, in the outer project root with the terminal inherited. Readiness rests on those four identity facts and child liveness; the reported package version is compared as compatibility metadata and carries no part of the identity claim while every build reports `0.0.0`. On Pi's exit, send the stop message, request the end of the launcher's stdin, and observe a bounded exit. Settings validation, session resumption and cross-platform signal shutdown belong to their own tasks.",
   "role": "platform",
   "implements": [
     "CMP-0037"
@@ -18,7 +18,8 @@
   "acceptedBy": [
     "ACC-0078",
     "ACC-0079",
-    "ACC-0080"
+    "ACC-0080",
+    "ACC-0102"
   ],
   "dependsOn": [
     "TSK-0055",
