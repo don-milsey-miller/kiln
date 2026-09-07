@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import {
   blockText,
   coverage,
   findBlock,
+  blockWasWritten,
   planIgnoreBlock,
   readRecordedIgnoreStep,
   recordIgnoreStep,
@@ -253,6 +254,50 @@ test("a migrated file is byte-stable on rerun", async () => {
   assert.equal(read(dir), migrated, "a second migration is not a second write");
 });
 
+test("⚠️ a legacy block is matched BY ITS BYTES, so a whitespace edit is not 'untouched'", async () => {
+  // The mutation: comparing the TRIMMED interior. Every one of these reads as `[".planning/"]` after
+  // trimming and would have been classified untouched legacy output and overwritten — destroying the
+  // edit that was the evidence it was not Kiln's to replace. Migration is the only operation here
+  // that replaces bytes, so it is the only one that must ask a question about bytes.
+  const edits = {
+    "an indented rule": [GITIGNORE_BEGIN, "  .planning/", GITIGNORE_END].join("\n") + "\n",
+    "a trailing space on the rule": [GITIGNORE_BEGIN, ".planning/ ", GITIGNORE_END].join("\n") + "\n",
+    "an indented begin marker": [`  ${GITIGNORE_BEGIN}`, ".planning/", GITIGNORE_END].join("\n") + "\n",
+    "a trailing space on the end marker": [GITIGNORE_BEGIN, ".planning/", `${GITIGNORE_END} `].join("\n") + "\n",
+    "a tab before the rule": [GITIGNORE_BEGIN, "\t.planning/", GITIGNORE_END].join("\n") + "\n",
+    "a blank line inside the block": [GITIGNORE_BEGIN, ".planning/", "", GITIGNORE_END].join("\n") + "\n",
+    "mixed line endings": `${GITIGNORE_BEGIN}\r\n.planning/\n${GITIGNORE_END}\r\n`,
+  };
+
+  for (const [what, text] of Object.entries(edits)) {
+    const dir = repo();
+    write(dir, text);
+
+    const plan = planIgnoreBlock(dir);
+    assert.equal(plan.state, IGNORE_STATE.EDITED, `${what}: classified as edited, not legacy`);
+    assert.equal(plan.action, IGNORE_ACTION.REPORT, what);
+
+    const applied = await applyIgnoreBlock(plan);
+    assert.equal(applied.changed, false, what);
+    assert.equal(read(dir), text, `${what}: not one byte was replaced`);
+  }
+});
+
+test("the byte-exact rule tolerates only a stripped final newline, and puts it back as it found it", async () => {
+  // An editor that trims the file's last newline has not authored anything; those bytes were never
+  // Kiln's to begin with, and `findBlock` has already excluded them from the block's extent.
+  const dir = repo();
+  write(dir, `head\n${legacyBlock().replace(/\n$/, "")}`);
+
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.state, IGNORE_STATE.LEGACY);
+
+  await applyIgnoreBlock(plan);
+  const text = read(dir);
+  assert.equal(text, `head\n${blockText().replace(/\n$/, "")}`, "still no trailing newline");
+  assert.deepEqual(coverage(text).uncovered, []);
+});
+
 test("a CRLF legacy block migrates to a CRLF block, and introduces no bare LF", async () => {
   const dir = repo();
   write(dir, `node_modules/\r\n${legacyBlock("\r\n")}`);
@@ -273,10 +318,11 @@ test("⚠️ migration does not duplicate a rule the operator wrote outside the 
   assert.equal(text.split(/\r?\n/).filter((l) => l.trim() === ".pi/runtime/").length, 1);
 });
 
-test("⚠️ a legacy block edited between plan and apply refuses rather than overwriting", async () => {
+test("⚠️ a legacy block edited between plan and apply is reported, and the edit survives", async () => {
   // Compare before write, the same rule the setup transaction enforces on every file it merges. The
   // plan says the block was untouched Kiln output when it was READ; only a fresh read under the
-  // caller's lock can say it still is.
+  // caller's lock can say it still is — and when it says otherwise, the answer is the edited block's
+  // answer, not the plan's.
   const dir = repo();
   write(dir, `head\n${legacyBlock()}tail\n`);
   const plan = planIgnoreBlock(dir);
@@ -285,24 +331,57 @@ test("⚠️ a legacy block edited between plan and apply refuses rather than ov
   const edited = `head\n${[GITIGNORE_BEGIN, ".planning/", "# and this, which I need", GITIGNORE_END].join("\n")}\ntail\n`;
   write(dir, edited); // somebody else, in between
 
-  await assert.rejects(
-    () => applyIgnoreBlock(plan),
-    (e) => e instanceof IgnoreRefusal && e.reason === "block-changed"
-  );
+  const applied = await applyIgnoreBlock(plan);
+  assert.equal(applied.changed, false);
+  assert.equal(applied.state, IGNORE_STATE.EDITED, "the outcome describes the file, not the plan");
+  assert.equal(applied.status, GITIGNORE_STATUS.NEEDS_ATTENTION);
+  assert.match(applied.note ?? "", /legacy when planned and is edited now/);
   assert.equal(read(dir), edited, "and not one byte of their edit was lost");
 });
 
-test("a block that vanished between plan and apply refuses rather than re-creating it", async () => {
+test("⚠️ a `rewrite` answer does not carry over to a block that arrived after it was given", async () => {
+  // The operator was shown one block and answered about that one. Applying their answer to whatever
+  // is there now is how a considered "yes" becomes consent to overwrite something they never saw.
+  const dir = repo();
+  write(dir, `head\n${legacyBlock()}tail\n`);
+  const plan = planIgnoreBlock(dir);
+
+  const theirs = `head\n${[GITIGNORE_BEGIN, "entirely mine", GITIGNORE_END].join("\n")}\ntail\n`;
+  write(dir, theirs);
+
+  const applied = await applyIgnoreBlock(plan, { choice: IGNORE_CHOICE.REWRITE });
+  assert.equal(applied.changed, false, "the plan was a migration; the answer belonged to no report");
+  assert.equal(read(dir), theirs);
+});
+
+test("⚠️ a block that vanished between plan and apply is REPORTED when the record says Kiln wrote one", async () => {
+  const dir = repo();
+  write(dir, legacyBlock());
+  const plan = planIgnoreBlock(dir, { recorded: GITIGNORE_STATUS.ADDED });
+
+  write(dir, "# I removed it while you were thinking\n");
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.changed, false);
+  assert.equal(applied.state, IGNORE_STATE.REMOVED);
+  assert.equal(read(dir), "# I removed it while you were thinking\n", "a deliberate deletion is not undone");
+});
+
+test("with nothing recorded, a vanished block is a project with no block, and one is written", async () => {
+  // The other half of the rule above, and the reason the record exists at all: with no record there
+  // is nothing to distinguish "they removed it" from "there was never one", and appending is the
+  // documented behaviour for the second. What must not happen is the plan's stale conclusion being
+  // written instead of this one.
   const dir = repo();
   write(dir, legacyBlock());
   const plan = planIgnoreBlock(dir);
 
-  write(dir, "# I removed it while you were thinking\n");
-  await assert.rejects(
-    () => applyIgnoreBlock(plan),
-    (e) => e instanceof IgnoreRefusal && e.reason === "block-changed"
-  );
-  assert.equal(read(dir), "# I removed it while you were thinking\n");
+  write(dir, "# not a Kiln block\n");
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.action, IGNORE_ACTION.APPEND, "reported as what it did, not as what it planned");
+  assert.deepEqual(applied.wrote, [...IGNORE_RULES]);
+  assert.deepEqual(coverage(read(dir)).uncovered, []);
 });
 
 /* ================================================================== the operator's block */
@@ -438,6 +517,58 @@ test("⚠️ the migration is recorded, and the record is byte-identical to a ge
   assert.equal(readdirSync(dir).filter((f) => f.includes("vpw-tmp")).length, 0, "the atomic write left nothing behind");
 });
 
+test("⚠️ a report IS recorded, on a project where nothing yet claims a block was written", async () => {
+  // The mutation: recording gated on `result.changed`. A report is the one outcome that never writes
+  // to .gitignore, so it was the one outcome never recorded — which made `needs-attention` an
+  // unreachable value in a vocabulary that documents it as persisted.
+  const dir = repo();
+  write(dir, `${[GITIGNORE_BEGIN, "not Kiln's", GITIGNORE_END].join("\n")}\n`);
+  const r = await initializeProject({ projectRoot: dir, name: "Reported", description: "d" });
+
+  assert.equal(r.git.gitignore, GITIGNORE_STATUS.NEEDS_ATTENTION, "the scaffold records what was found");
+  assert.equal(readRecordedIgnoreStep(r.contentRoot), GITIGNORE_STATUS.NEEDS_ATTENTION);
+
+  const applied = await applyIgnoreBlock(planIgnoreBlock(dir, { recorded: readRecordedIgnoreStep(r.contentRoot) }), {
+    contentRoot: r.contentRoot,
+  });
+  assert.equal(applied.changed, false);
+  assert.equal(applied.record.changed, false, "and re-recording the same answer is not a write");
+});
+
+test("⚠️ a report NEVER erases a record that says Kiln wrote a block", async () => {
+  // The field answers one question: has Kiln ever put a block in this file? `added` and `migrated`
+  // are what make a later run classify a missing block as `removed` rather than `absent`. Writing
+  // `needs-attention` over one of them destroys that signal, and the run after it restores the block
+  // the operator deleted — the defect this component exists to prevent, arriving through the
+  // mechanism meant to prevent it.
+  const dir = repo();
+  const r = await initializeProject({ projectRoot: dir, name: "Protected", description: "d" });
+  assert.equal(readRecordedIgnoreStep(r.contentRoot), GITIGNORE_STATUS.ADDED);
+
+  write(dir, "# I removed Kiln's block on purpose\n");
+  const plan = planIgnoreBlock(dir, { recorded: readRecordedIgnoreStep(r.contentRoot) });
+  assert.equal(plan.state, IGNORE_STATE.REMOVED);
+
+  const applied = await applyIgnoreBlock(plan, { contentRoot: r.contentRoot });
+  assert.equal(applied.record.changed, false);
+  assert.equal(applied.record.refused, "would-erase-block-written");
+  assert.equal(readRecordedIgnoreStep(r.contentRoot), GITIGNORE_STATUS.ADDED, "the signal survives");
+
+  // And the run after it still refuses, rather than restoring what they deleted.
+  const again = planIgnoreBlock(dir, { recorded: readRecordedIgnoreStep(r.contentRoot) });
+  assert.equal(again.state, IGNORE_STATE.REMOVED);
+  assert.equal((await applyIgnoreBlock(again, { contentRoot: r.contentRoot })).changed, false);
+  assert.equal(read(dir), "# I removed Kiln's block on purpose\n");
+});
+
+test("the record's one question is answered by exactly two statuses", () => {
+  assert.deepEqual(
+    Object.values(GITIGNORE_STATUS).filter(blockWasWritten).sort(),
+    [GITIGNORE_STATUS.ADDED, GITIGNORE_STATUS.MIGRATED].sort()
+  );
+  assert.equal(blockWasWritten(null), false);
+});
+
 test("recording the same status twice writes nothing", async () => {
   const dir = repo();
   const r = await initializeProject({ projectRoot: dir, name: "Stable", description: "d" });
@@ -487,7 +618,7 @@ test("a record from an unsupported setup version reads as nothing recorded", () 
 
 /* ================================================================== races */
 
-test("⚠️ a marked block that arrives between plan and apply is not appended beside", async () => {
+test("⚠️ a CURRENT block that arrives between plan and apply is not appended beside", async () => {
   const dir = repo();
   write(dir, "node_modules/\n");
   const plan = planIgnoreBlock(dir);
@@ -497,7 +628,67 @@ test("⚠️ a marked block that arrives between plan and apply is not appended 
   const applied = await applyIgnoreBlock(plan);
 
   assert.equal(applied.changed, false);
+  assert.equal(applied.status, GITIGNORE_STATUS.ADDED, "and it really is covered, so `added` is true");
   assert.equal(countBlocks(read(dir)), 1);
+});
+
+test("⚠️ a block that arrives between plan and apply is CLASSIFIED, not merely detected", async () => {
+  // The mutation: `if (findBlock(existing)) return unchanged()`. Any block satisfies that — legacy,
+  // edited, malformed — and the run then returned the plan's `added` while `.pi/sessions/` and
+  // `.pi/runtime/` were not ignored by anything. A truthful `added` on an unprotected project is
+  // worse than a refusal, because the next thing that happens is setup writing transcripts into it.
+  const arrivals = [
+    { what: "legacy", text: legacyBlock(), state: IGNORE_STATE.LEGACY, migrates: true },
+    {
+      what: "edited",
+      text: `${[GITIGNORE_BEGIN, "something of mine", GITIGNORE_END].join("\n")}\n`,
+      state: IGNORE_STATE.EDITED,
+      migrates: false,
+    },
+    // ⚠️ TWO LEGACY BLOCKS, not one current and one legacy: the point is a malformed file that is
+    // also genuinely uncovered, so "reported" and "not protected" are asserted about the same file.
+    { what: "malformed", text: `${legacyBlock()}${legacyBlock()}`, state: IGNORE_STATE.MALFORMED, migrates: false },
+  ];
+
+  for (const { what, text, state, migrates } of arrivals) {
+    const dir = repo();
+    write(dir, "node_modules/\n");
+    const plan = planIgnoreBlock(dir);
+    assert.equal(plan.action, IGNORE_ACTION.APPEND, what);
+
+    write(dir, `node_modules/\n${text}`); // arrives in between
+    const applied = await applyIgnoreBlock(plan);
+
+    assert.equal(applied.state, state, `${what}: the outcome describes the file as it is`);
+    if (migrates) {
+      assert.equal(applied.changed, true, what);
+      assert.deepEqual(coverage(read(dir)).uncovered, [], `${what}: and it ends up protected`);
+    } else {
+      assert.equal(applied.changed, false, what);
+      assert.equal(applied.status, GITIGNORE_STATUS.NEEDS_ATTENTION, `${what}: never a bare "added"`);
+      assert.notDeepEqual(coverage(read(dir)).uncovered, [], `${what}: which is honest — it is not covered`);
+    }
+    assert.equal(countBlocks(read(dir)), what === "malformed" ? 2 : 1, what);
+  }
+});
+
+test("⚠️ a file that disappears after a PARTIAL-coverage plan is recreated with every rule", async () => {
+  // The mutation: the exclusive create wrote `plan.adds`. Those were the rules the file did not
+  // already cover — a subtraction whose subtrahend went with the file when it was deleted. The
+  // recreated block held two rules and left `.planning/` ignored by nothing, which is the one shape
+  // of this bug that looks entirely successful in the result object.
+  const dir = repo();
+  write(dir, "# mine\n.planning/\n");
+  const plan = planIgnoreBlock(dir);
+  assert.deepEqual(plan.adds, [".pi/sessions/", ".pi/runtime/"], "the plan is right about the file it read");
+
+  rmSync(ignoreFile(dir)); // the operator deletes the whole file
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.action, IGNORE_ACTION.CREATE);
+  assert.deepEqual(applied.wrote, [...IGNORE_RULES], "the coverage those two were subtracted against is gone");
+  assert.equal(read(dir), blockText());
+  assert.deepEqual(coverage(read(dir)).uncovered, []);
 });
 
 test("⚠️ a rule that arrives between plan and apply is not written a second time", async () => {
