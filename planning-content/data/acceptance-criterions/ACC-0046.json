@@ -2,9 +2,9 @@
   "id": "ACC-0046",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "One owner writes the ignore block, and a removed block is not restored",
   "statement": "A fresh project receives exactly one Kiln-marked block containing `.planning/`, `.pi/sessions/` and `.pi/runtime/`. An exact unmodified legacy block containing only `.planning/` is migrated to the extended block with every byte outside the markers preserved, and the migration is recorded and byte-stable on rerun. A block the operator removed or edited is reported and requires an explicit choice; it is never silently rewritten.",
   "evaluates": [
@@ -12,5 +12,6 @@
   ],
   "verifies": [
     "REQ-0027"
-  ]
+  ],
+  "notes": "⚠️ \"EXACT UNMODIFIED\" IS ENFORCED AS BYTES, AND THE CRITERION'S WORDING IS WHAT DECIDED THAT. Migration replaces bytes rather than appending them, so the question it answers is not \"does this look like Kiln's block\" but \"is this, byte for byte, output nobody has touched\". A trimmed comparison answers the first and reads as if it answered the second: an indented rule, a trailing space, a tab, a blank line inside the block or mixed line endings all compare equal, and the edit that is the evidence the block was not Kiln's to replace is what gets destroyed. ⚠️ THE MISSING-FINAL-NEWLINE CASE WAS SETTLED THE OTHER WAY ON PURPOSE. A legacy block whose trailing newline something stripped is short one byte Kiln wrote, so it is modified and is reported rather than migrated. The alternative was to amend this criterion to permit one normalisation, which buys an automatic migration in a rare case at the cost of the criterion no longer meaning what it says. The tolerance survives where it belongs — on an explicit rewrite, where the operator asked and the only duty is not to tidy anything unasked. ⚠️ \"REQUIRES AN EXPLICIT CHOICE\" IS ABOUT OWNERSHIP, NOT COVERAGE. An edited or malformed block can hold every rule Kiln would have written and still be somebody's own work, so the choice is required whether or not its contents happen to protect the paths. Deriving it from coverage produced a report offering two options and requiring neither. ⚠️ WHAT \"NEVER SILENTLY REWRITTEN\" TURNED OUT TO COVER, after four review rounds, is wider than a single check: consent is to replacing the bytes the operator was SHOWN, so an answer about one block does not authorise replacing a different one that replaced it, and a plan that reported operator-owned content writes nothing at all — not a create, not an append, not a migration — unless that exact file is still there and the answer was `rewrite`. Deleting the block one has just been told about is a plausible answer to being told about it; the run that recreated it for `keep` is the clearest statement of what this criterion forbids."
 }
