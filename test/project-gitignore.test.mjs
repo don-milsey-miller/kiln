@@ -59,6 +59,15 @@ const countBlocks = (text) => text.split(/\r?\n/).filter((l) => l.trim() === GIT
 /** The block Kiln wrote before the rule set grew to three (DEC-0029). */
 const legacyBlock = (eol = "\n") => [GITIGNORE_BEGIN, ".planning/", GITIGNORE_END].join(eol) + eol;
 
+/**
+ * A reader that answers `first` once and `rest` thereafter — the file changing between the check and
+ * the write that check authorised, which is otherwise unreachable without a second thread.
+ */
+function movingReader(first, rest) {
+  let calls = 0;
+  return () => (calls++ === 0 ? first : rest);
+}
+
 /** Everything except the block, so "no byte outside the markers moved" is a comparison of bytes. */
 function outsideBlock(text) {
   const b = findBlock(text);
@@ -283,19 +292,35 @@ test("⚠️ a legacy block is matched BY ITS BYTES, so a whitespace edit is not
   }
 });
 
-test("the byte-exact rule tolerates only a stripped final newline, and puts it back as it found it", async () => {
-  // An editor that trims the file's last newline has not authored anything; those bytes were never
-  // Kiln's to begin with, and `findBlock` has already excluded them from the block's extent.
+test("⚠️ a legacy block missing the final newline Kiln wrote is MODIFIED, and is not migrated", async () => {
+  // ACC-0046 authorises migrating "an exact unmodified legacy block". A block short one byte Kiln
+  // wrote is modified, whatever stripped it, so it does not qualify — the criterion and the code's
+  // definition of exactness have to be the same definition, or the criterion is not what is enforced.
   const dir = repo();
-  write(dir, `head\n${legacyBlock().replace(/\n$/, "")}`);
+  const text = `head\n${legacyBlock().replace(/\n$/, "")}`;
+  write(dir, text);
 
   const plan = planIgnoreBlock(dir);
-  assert.equal(plan.state, IGNORE_STATE.LEGACY);
+  assert.equal(plan.state, IGNORE_STATE.EDITED, "not legacy: it is not byte-for-byte what Kiln wrote");
+  assert.equal(plan.action, IGNORE_ACTION.REPORT);
+  assert.match(plan.detail, /byte for byte/);
 
-  await applyIgnoreBlock(plan);
-  const text = read(dir);
-  assert.equal(text, `head\n${blockText().replace(/\n$/, "")}`, "still no trailing newline");
-  assert.deepEqual(coverage(text).uncovered, []);
+  assert.equal((await applyIgnoreBlock(plan)).changed, false);
+  assert.equal(read(dir), text, "nothing was written");
+});
+
+test("⚠️ an explicit rewrite still does not add a trailing newline the file did not have", async () => {
+  // The tolerance belongs to the WRITE, not to the recognition. Migration is automatic and must match
+  // the criterion exactly; a rewrite was asked for, and there the only duty is not to tidy anything
+  // that was not asked about. A file that gained a final newline it never had is a diff nobody wanted.
+  const dir = repo();
+  write(dir, `head\n${legacyBlock().replace(/\n$/, "")}`);
+  const plan = planIgnoreBlock(dir);
+
+  await applyIgnoreBlock(plan, { choice: IGNORE_CHOICE.REWRITE });
+  const after = read(dir);
+  assert.equal(after, `head\n${blockText().replace(/\n$/, "")}`, "still no trailing newline");
+  assert.deepEqual(coverage(after).uncovered, []);
 });
 
 test("a CRLF legacy block migrates to a CRLF block, and introduces no bare LF", async () => {
@@ -337,6 +362,75 @@ test("⚠️ a legacy block edited between plan and apply is reported, and the e
   assert.equal(applied.status, GITIGNORE_STATUS.NEEDS_ATTENTION);
   assert.match(applied.note ?? "", /legacy when planned and is edited now/);
   assert.equal(read(dir), edited, "and not one byte of their edit was lost");
+});
+
+test("⚠️ consent to rewrite block A does not authorise rewriting block B", async () => {
+  // The mutation: comparing only `action === "report"` on both sides. Two edited blocks are both
+  // reports and are not the same file, so an answer given about one operator's block destroyed a
+  // different one that had replaced it. Consent is to replacing the bytes they were SHOWN, never to
+  // a category of file.
+  const dir = repo();
+  const blockA = `head\n${[GITIGNORE_BEGIN, "block A, which I wrote", GITIGNORE_END].join("\n")}\ntail\n`;
+  const blockB = `head\n${[GITIGNORE_BEGIN, "block B, entirely different", GITIGNORE_END].join("\n")}\ntail\n`;
+
+  write(dir, blockA);
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.state, IGNORE_STATE.EDITED);
+  assert.equal(plan.action, IGNORE_ACTION.REPORT);
+
+  write(dir, blockB); // A is replaced by a different reportable block before the answer is applied
+
+  const applied = await applyIgnoreBlock(plan, { choice: IGNORE_CHOICE.REWRITE });
+  assert.equal(applied.changed, false, "the answer was not applied to a block it was not about");
+  assert.equal(applied.reported, true);
+  assert.match(applied.note ?? "", /changed after the report this answer was given about/);
+  assert.equal(read(dir), blockB, "and block B is byte-identical to what its author left");
+
+  // The operator can still answer about what is actually there, and that answer is honoured.
+  const fresh = planIgnoreBlock(dir);
+  assert.equal((await applyIgnoreBlock(fresh, { choice: IGNORE_CHOICE.REWRITE })).changed, true);
+  assert.deepEqual(coverage(read(dir)).uncovered, []);
+});
+
+test("⚠️ the INNERMOST consent check refuses when the file moves after the answer was matched", async () => {
+  // The outer check compares the fresh classification against the plan; this one closes the window
+  // between that comparison and the write it authorised. It refuses rather than reporting, because
+  // reaching it means the file moved inside the caller's lock — a race, not an ordinary outcome.
+  //
+  // Reachable only through the injected reader: both reads live inside `applyIgnoreBlock`, so nothing
+  // single-threaded can interleave them on a real file. `movingReader` returns what the classification
+  // saw, then something else — which is exactly the race, without needing one.
+  const dir = repo();
+  const theirs = `${[GITIGNORE_BEGIN, "mine", GITIGNORE_END].join("\n")}\n`;
+  write(dir, theirs);
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.state, IGNORE_STATE.EDITED);
+
+  await assert.rejects(
+    () =>
+      applyIgnoreBlock(plan, {
+        choice: IGNORE_CHOICE.REWRITE,
+        read: movingReader(theirs, `${[GITIGNORE_BEGIN, "somebody else's, now", GITIGNORE_END].join("\n")}\n`),
+      }),
+    (e) => e instanceof IgnoreRefusal && e.reason === "consent-stale"
+  );
+  assert.equal(read(dir), theirs, "nothing was written");
+});
+
+test("⚠️ the INNERMOST migration check refuses when the block moves after it was classified", async () => {
+  // The same guard on the other write path. A weaker re-check here than the one that authorised the
+  // migration would be theatre: it would pass for exactly the blocks the classification refused.
+  const dir = repo();
+  write(dir, legacyBlock());
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.action, IGNORE_ACTION.MIGRATE);
+
+  const edited = `${[GITIGNORE_BEGIN, ".planning/", "# and this", GITIGNORE_END].join("\n")}\n`;
+  await assert.rejects(
+    () => applyIgnoreBlock(plan, { read: movingReader(legacyBlock(), edited) }),
+    (e) => e instanceof IgnoreRefusal && e.reason === "block-changed"
+  );
+  assert.equal(read(dir), legacyBlock(), "nothing was written");
 });
 
 test("⚠️ a `rewrite` answer does not carry over to a block that arrived after it was given", async () => {
