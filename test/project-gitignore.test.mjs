@@ -389,6 +389,50 @@ test("⚠️ a reported block that is DELETED before apply is not recreated, wha
   }
 });
 
+test("⚠️ a replacement block that happens to cover everything STILL requires a choice", async () => {
+  // The mutation: deriving `requiresChoice` from coverage alone. Coverage and ownership are separate
+  // questions. This block holds all three rules — the operator arranged them itself, with a comment
+  // among them — so nothing is unprotected, and it is still not Kiln's block to replace. Deriving the
+  // answer from coverage produced `requiresChoice: false` beside `choices: [keep, rewrite]`: a report
+  // offering two options and requiring neither.
+  const dir = repo();
+  write(dir, `head\n${[GITIGNORE_BEGIN, "block A, mine", GITIGNORE_END].join("\n")}\ntail\n`);
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.action, IGNORE_ACTION.REPORT);
+
+  const covered = `head\n${[GITIGNORE_BEGIN, "# my own arrangement", ...IGNORE_RULES, GITIGNORE_END].join("\n")}\ntail\n`;
+  write(dir, covered);
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.state, IGNORE_STATE.EDITED, "still not a block Kiln wrote");
+  assert.deepEqual(applied.uncovered, [], "and nothing is unprotected — that is the point");
+  assert.equal(applied.requiresChoice, true, "ownership, not coverage, is what decides this");
+  assert.deepEqual(applied.choices, [IGNORE_CHOICE.KEEP, IGNORE_CHOICE.REWRITE]);
+  assert.equal(applied.changed, false);
+  assert.equal(read(dir), covered, "block B is byte-identical to what its author left");
+});
+
+test("a stale report over a file that resolved itself requires no choice", async () => {
+  // The other side of the same rule, so "requires a choice" cannot quietly become "always true" and
+  // still pass. It has to run through the stale-report path to hold that, not merely plan a covered
+  // file: the operator removed the block Kiln reported AND wrote the rules themselves, so there is
+  // nothing left to decide and nothing to protect.
+  const dir = repo();
+  write(dir, `${[GITIGNORE_BEGIN, "block A, mine", GITIGNORE_END].join("\n")}\n`);
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.action, IGNORE_ACTION.REPORT);
+
+  const resolved = `# I did this myself\n${IGNORE_RULES.join("\n")}\n`;
+  write(dir, resolved);
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.state, IGNORE_STATE.ALREADY_COVERED);
+  assert.equal(applied.requiresChoice, false, "nothing is unprotected and nothing is Kiln's to touch");
+  assert.equal(applied.status, GITIGNORE_STATUS.ALREADY_IGNORED, "a truthful status, inherited because nothing would have been written");
+  assert.equal(applied.changed, false);
+  assert.equal(read(dir), resolved);
+});
+
 test("⚠️ a non-writing plan does not become an automatic MIGRATION either", async () => {
   // The boundary is above every fresh action, not just `create`. A reported block replaced by an
   // untouched legacy one would otherwise be migrated — a byte-replacing write on a plan whose whole
