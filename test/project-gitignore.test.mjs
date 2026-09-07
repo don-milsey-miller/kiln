@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -364,6 +364,64 @@ test("⚠️ a legacy block edited between plan and apply is reported, and the e
   assert.equal(read(dir), edited, "and not one byte of their edit was lost");
 });
 
+test("⚠️ a reported block that is DELETED before apply is not recreated, whatever the answer", async () => {
+  // The mutation: testing consent inside the `report` branch, so it was consulted only while the file
+  // still classified as a report. A deleted block reclassified as `create` and was recreated — for no
+  // choice, for `keep`, and for `rewrite` alike. Deleting the block you have just been told about is
+  // a plausible answer to being told about it, and answering that with a fresh block is the worst
+  // available reading of it. A plan that reported operator-owned content writes NOTHING unless the
+  // file is still byte-for-byte what was reported and the operator said `rewrite`.
+  const theirs = `head\n${[GITIGNORE_BEGIN, "operator-owned content", GITIGNORE_END].join("\n")}\ntail\n`;
+
+  for (const choice of [null, IGNORE_CHOICE.KEEP, IGNORE_CHOICE.REWRITE]) {
+    const dir = repo();
+    write(dir, theirs);
+    const plan = planIgnoreBlock(dir);
+    assert.equal(plan.action, IGNORE_ACTION.REPORT, String(choice));
+
+    rmSync(ignoreFile(dir)); // the operator deletes the whole file after being shown the report
+    const applied = await applyIgnoreBlock(plan, choice === null ? {} : { choice });
+
+    assert.equal(applied.changed, false, `${choice}: nothing was written`);
+    assert.equal(existsSync(ignoreFile(dir)), false, `${choice}: the file is still absent`);
+    assert.equal(applied.status, GITIGNORE_STATUS.NEEDS_ATTENTION, `${choice}: never a bare "added"`);
+    assert.deepEqual(applied.uncovered, [...IGNORE_RULES], `${choice}: and it says so`);
+  }
+});
+
+test("⚠️ a non-writing plan does not become an automatic MIGRATION either", async () => {
+  // The boundary is above every fresh action, not just `create`. A reported block replaced by an
+  // untouched legacy one would otherwise be migrated — a byte-replacing write on a plan whose whole
+  // meaning was that the operator had to decide first.
+  const dir = repo();
+  write(dir, `${[GITIGNORE_BEGIN, "operator-owned content", GITIGNORE_END].join("\n")}\n`);
+  const plan = planIgnoreBlock(dir);
+  assert.equal(plan.action, IGNORE_ACTION.REPORT);
+
+  write(dir, legacyBlock());
+  const applied = await applyIgnoreBlock(plan);
+
+  assert.equal(applied.changed, false);
+  assert.equal(read(dir), legacyBlock(), "not one byte replaced");
+  assert.match(applied.note ?? "", /nothing was written/);
+
+  // Planning afresh against what is actually there does migrate it, which is the point: the refusal
+  // is about acting on a stale plan, not about refusing the work.
+  assert.equal((await applyIgnoreBlock(planIgnoreBlock(dir))).changed, true);
+  assert.deepEqual(coverage(read(dir)).uncovered, []);
+});
+
+test("a report answered `rewrite` on the UNCHANGED file still writes — the boundary is not a block on work", async () => {
+  const dir = repo();
+  const theirs = `head\n${[GITIGNORE_BEGIN, "mine", GITIGNORE_END].join("\n")}\ntail\n`;
+  write(dir, theirs);
+
+  const applied = await applyIgnoreBlock(planIgnoreBlock(dir), { choice: IGNORE_CHOICE.REWRITE });
+  assert.equal(applied.changed, true);
+  assert.equal(read(dir), `head\n${blockText()}tail\n`);
+  assert.deepEqual(coverage(read(dir)).uncovered, []);
+});
+
 test("⚠️ consent to rewrite block A does not authorise rewriting block B", async () => {
   // The mutation: comparing only `action === "report"` on both sides. Two edited blocks are both
   // reports and are not the same file, so an answer given about one operator's block destroyed a
@@ -383,7 +441,7 @@ test("⚠️ consent to rewrite block A does not authorise rewriting block B", a
   const applied = await applyIgnoreBlock(plan, { choice: IGNORE_CHOICE.REWRITE });
   assert.equal(applied.changed, false, "the answer was not applied to a block it was not about");
   assert.equal(applied.reported, true);
-  assert.match(applied.note ?? "", /changed after the report this answer was given about/);
+  assert.match(applied.note ?? "", /the edited block that was reported has been replaced by different content/);
   assert.equal(read(dir), blockB, "and block B is byte-identical to what its author left");
 
   // The operator can still answer about what is actually there, and that answer is honoured.
