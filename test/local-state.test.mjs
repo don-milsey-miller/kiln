@@ -123,21 +123,26 @@ test("project mode is the project's own .pi/, and its layout is derived in one p
 });
 
 test("⚠️ two projects on one machine occupy separate external roots", () => {
-  const env = { XDG_STATE_HOME: "/home/x/.state" };
-  const a = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/a", projectId: ID_A, platform: "linux", env });
-  const b = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/b", projectId: ID_B, platform: "linux", env });
+  // ⚠️ REAL DIRECTORIES, because the derivation now proves the root is outside the project and that
+  // is a question about the filesystem. Synthetic paths like `/p` do not exist, so canonicalising
+  // them yields their deepest existing ancestor — the drive root — against which everything looks
+  // "inside the project". The fixture was asserting path arithmetic; the code answers about places.
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const env = { XDG_STATE_HOME: home };
+  const a = stateRootFor({ mode: STATE_MODE.USER, projectRoot: project(), projectId: ID_A, platform: "linux", env });
+  const b = stateRootFor({ mode: STATE_MODE.USER, projectRoot: project(), projectId: ID_B, platform: "linux", env });
 
   assert.notEqual(a.root, b.root);
-  assert.equal(a.root, join("/home/x/.state", "kiln", "projects", ID_A));
-  assert.equal(b.root, join("/home/x/.state", "kiln", "projects", ID_B));
+  assert.equal(a.root, join(home, "kiln", "projects", ID_A));
+  assert.equal(b.root, join(home, "kiln", "projects", ID_B));
 });
 
 test("⚠️ the external root is keyed by the ID, not by where the project sits", () => {
   // Deriving it from the path would move the state out from under an operator who moved or renamed
   // the project — exactly when it must not move.
-  const env = { XDG_STATE_HOME: "/s" };
-  const before = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/old/place", projectId: ID_A, platform: "linux", env });
-  const after = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/somewhere/else", projectId: ID_A, platform: "linux", env });
+  const env = { XDG_STATE_HOME: reapLater(mkdtempSync(join(tmpdir(), "kiln-home-"))) };
+  const before = stateRootFor({ mode: STATE_MODE.USER, projectRoot: project(), projectId: ID_A, platform: "linux", env });
+  const after = stateRootFor({ mode: STATE_MODE.USER, projectRoot: project(), projectId: ID_A, platform: "linux", env });
   assert.equal(before.root, after.root);
 });
 
@@ -146,7 +151,8 @@ test("⚠️ A TRAVERSAL ID NEVER BECOMES A PATH COMPONENT", () => {
   // into the external root, putting `sessions/` and `runtime/` outside `<state-home>/kiln/projects`.
   // Checked at the boundary where the id becomes a path, because a caller can supply one directly
   // without ever having gone through the record reader.
-  const env = { XDG_STATE_HOME: "/s" };
+  const env = { XDG_STATE_HOME: reapLater(mkdtempSync(join(tmpdir(), "kiln-home-"))) };
+  const dir = project();
   const bad = [
     "../../escaped",
     "..",
@@ -164,15 +170,83 @@ test("⚠️ A TRAVERSAL ID NEVER BECOMES A PATH COMPONENT", () => {
   ];
   for (const projectId of bad)
     assert.throws(
-      () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId, platform: "linux", env }),
+      () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: dir, projectId, platform: "linux", env }),
       (e) => e instanceof LocalStateRefusal && [STATE_REFUSAL.INVALID_PROJECT_ID, STATE_REFUSAL.NO_PROJECT_ID].includes(e.reason),
       JSON.stringify(projectId)
     );
 
   // And the derived root for a good id really is under projects/, not merely non-throwing.
-  const ok = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId: ID_A, platform: "linux", env });
+  const ok = stateRootFor({ mode: STATE_MODE.USER, projectRoot: dir, projectId: ID_A, platform: "linux", env });
   assert.equal(ok.root, join(ok.within, ID_A));
   assert.match(ok.within, /projects$/);
+});
+
+test("⚠️ EXTERNAL STATE MUST BE PROVED EXTERNAL, not assumed from the mode's name", async () => {
+  // Reproduced before the fix, both ways. `XDG_STATE_HOME=".state"` produced a RELATIVE root, which
+  // Pi resolves against its own working directory — the project — so transcripts landed in the
+  // repository unignored while the gate reported `covered: true`. An absolute value pointing under
+  // the project did the same without even looking unusual. The exemption is a claim about WHERE the
+  // root is, and it was never checked.
+  const dir = project();
+  writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8"); // no coverage at all
+
+  for (const [what, env] of [
+    ["a relative XDG_STATE_HOME", { XDG_STATE_HOME: ".state" }],
+    ["a relative path with no separator", { XDG_STATE_HOME: "state" }],
+    ["an absolute XDG_STATE_HOME under the project", { XDG_STATE_HOME: join(dir, ".state") }],
+    ["the project root itself", { XDG_STATE_HOME: dir }],
+  ]) {
+    assert.throws(
+      () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: dir, projectId: ID_A, platform: "linux", env }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL,
+      what
+    );
+  }
+
+  // Windows takes the same route through a different variable.
+  assert.throws(
+    () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: dir, projectId: ID_A, platform: "win32", env: { LOCALAPPDATA: "AppData\Local" } }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL
+  );
+});
+
+test("⚠️ the coverage exemption re-proves it, because it is reachable on its own", () => {
+  // `stateRootFor` proves this when it derives the root; `coverageState` is exported and can be
+  // called directly, and an exemption that is only sound when reached through one caller is not
+  // sound. It also refuses to answer at all without the root: whether external state is external is
+  // a question about a location, not about a mode name.
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL && /without the state root/.test(e.message),
+    "no root supplied"
+  );
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: join(dir, "inside") } }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL,
+    "a root inside the project"
+  );
+
+  const good = coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: join(home, "kiln") } });
+  assert.equal(good.covered, true);
+  assert.match(good.reason, /outside the repository/);
+});
+
+test("⚠️ a link that moves the state root inside the project after setup is caught", () => {
+  // Canonical, so the relationship cannot be reversed by a junction created later. A spelling
+  // comparison would still read `<home>/kiln` as outside.
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const linked = join(home, "redirected");
+  mkdirSync(join(dir, "inside-the-project"), { recursive: true });
+  symlinkSync(join(dir, "inside-the-project"), linked, process.platform === "win32" ? "junction" : "dir");
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: linked } }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL
+  );
 });
 
 test("external mode without a committed id refuses rather than inventing one", () => {

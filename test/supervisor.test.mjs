@@ -996,21 +996,33 @@ const ignoreAll = (dir) =>
  */
 function recordingSpawn(calls) {
   return (command, args, options) => {
+    const exitListeners = [];
     const child = {
       exitCode: null,
       signalCode: null,
       stdin: null,
       pid: null,
       killed: [],
+      // ⚠️ A KILL THAT ACTUALLY ENDS THE STUB. One that only recorded left the supervisor waiting out
+      // its grace period and escalating on a child that could never go — a fake manufacturing the
+      // failure it was standing in to avoid.
       kill: (sig) => {
         child.killed.push(sig ?? null);
+        child.exitCode = 0;
+        for (const cb of exitListeners.splice(0)) cb(0, null);
         return true;
       },
       once: (event, cb) => {
-        if (event === "exit")
+        if (event !== "exit") return;
+        if (child.exitCode !== null) return void setImmediate(() => cb(child.exitCode, null));
+        exitListeners.push(cb);
+        // The agent is the one whose exit ends the run; the launcher waits to be stopped.
+        if (command !== "L")
           setImmediate(() => {
-            child.exitCode = 0;
-            cb(0, null);
+            if (child.exitCode === null) {
+              child.exitCode = 0;
+              for (const l of exitListeners.splice(0)) l(0, null);
+            }
           });
       },
     };
@@ -1024,7 +1036,7 @@ const healthyFetch = (runId = "07".repeat(16)) => async () => ({
   json: async () => ({ service: "kiln", protocol: "kiln.health/1", runId, projectId: PROJECT_ID, build: null }),
 });
 
-test("\u26a0\ufe0f an unprotected project is REFUSED, and Pi is never started", async () => {
+test("⚠️ an unprotected project is REFUSED, and Pi is never started", async () => {
   // REQ-0027's ordering, at the last moment it can still be asked: the transcript is the first thing
   // Pi writes. The assertion that matters is that the agent was never spawned — a version that
   // logged a warning and launched anyway would satisfy any check on the message.
@@ -1052,7 +1064,7 @@ test("\u26a0\ufe0f an unprotected project is REFUSED, and Pi is never started", 
   assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "and no session directory was created");
 });
 
-test("\u26a0\ufe0f the gate is asked at LAUNCH, so a block removed after setup still refuses", async () => {
+test("⚠️ the gate is asked at LAUNCH, so a block removed after setup still refuses", async () => {
   const dir = repoProject();
   ignoreAll(dir);
   assert.equal(resolveRunState({ projectRoot: dir, projectId: PROJECT_ID }).roots.sessions, join(dir, ".pi", "sessions"));
@@ -1074,7 +1086,7 @@ test("partial coverage is not coverage, and the refusal names what is missing", 
   );
 });
 
-test("\u26a0\ufe0f external state is located by the committed id, and needs no ignore block", () => {
+test("⚠️ external state is located by the committed id, and needs no ignore block", () => {
   // Nothing under the per-user root is inside the repository, so no rule protects it and none is
   // needed — which is why this project has no coverage at all and still resolves.
   const dir = repoProject();
@@ -1091,7 +1103,40 @@ test("\u26a0\ufe0f external state is located by the committed id, and needs no i
   assert.equal(roots.sessions, join(home, "kiln", "projects", PROJECT_ID, "sessions"));
 });
 
-test("\u26a0\ufe0f the session directory is supplied by the FLAG, and the variable is made to agree", () => {
+test("⚠️ an ABSENT session directory is a first run, not a refusal — and the supervisor does not create it", async () => {
+  // The ownership contract, stated where it can be checked. The pinned Pi creates a custom session
+  // directory itself (`SessionManager`'s constructor calls `mkdirSync(..., {recursive: true})`), and
+  // that is authorised BECAUSE the location was proved ignored first — coverage-before-data as
+  // REQ-0027 words it: the protection exists before the data. ACC-0103 requires absent storage to
+  // read as a first run rather than as a problem.
+  //
+  // What must remain true is that the SUPERVISOR creates nothing: making directories is setup's
+  // work, under the transaction that owns the project lock.
+  const dir = repoProject();
+  ignoreAll(dir);
+  assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "precondition: nothing has created it");
+
+  const { roots } = resolveRunState({ projectRoot: dir, projectId: PROJECT_ID });
+  assert.equal(roots.sessions, join(dir, ".pi", "sessions"));
+  assert.equal(existsSync(roots.sessions), false, "resolving the location must not create it");
+
+  const calls = [];
+  await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: ["a"] },
+    agent: { command: "A", args: ["b"] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded — an absent directory is not a refusal");
+  assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "and the supervisor still created nothing");
+});
+
+test("⚠️ the session directory is supplied by the FLAG, and the variable is made to agree", () => {
   // All three routes were measured to work (EVD-0081) and they are not interchangeable: the flag is
   // the one a stale exported variable or a leftover `sessionDir` setting cannot outrank. The variable
   // is set to the same path so a future version that stopped passing the flag would still land in the
@@ -1103,7 +1148,7 @@ test("\u26a0\ufe0f the session directory is supplied by the FLAG, and the variab
   assert.equal(out.env.PATH, "x", "and the rest of the environment is untouched");
 });
 
-test("\u26a0\ufe0f an agent already naming a session directory is refused, never appended to", () => {
+test("⚠️ an agent already naming a session directory is refused, never appended to", () => {
   // Two of them leave the location to whichever Pi prefers, and the coverage check is only
   // meaningful if Kiln can say where the transcripts went.
   for (const args of [["--session-dir", "/theirs"], ["--session-dir=/theirs"], ["x", "--session-dir", "/theirs"]])
