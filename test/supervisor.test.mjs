@@ -578,6 +578,12 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
 
   const [launcher, agent] = calls;
   assert.deepEqual(launcher.options.stdio, ["pipe", "inherit", "inherit"], "the launcher must get its OWN stdin");
+  // ⚠️ **A PROCESS GROUP ON POSIX, AND ONLY FOR THE LAUNCHER.** `kill(-pid)` can only reach
+  // `next start`'s workers if the child leads a group, which `detached` is what creates. The agent
+  // is deliberately NOT detached: a detached foreground process cannot read the terminal — it takes
+  // SIGTTIN — which would break the very routing ACC-0078 protects.
+  assert.equal(launcher.options.detached, process.platform !== "win32");
+  assert.ok(!agent.options.detached, "the agent stays in the terminal's foreground group");
   assert.equal(launcher.options.shell, false, "no shell to re-parse the argument array");
   assert.equal(agent.options.stdio, "inherit", "the agent inherits the terminal, fd 0 included");
   assert.equal(agent.options.shell, false);

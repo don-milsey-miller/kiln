@@ -2,7 +2,7 @@
   "id": "TSK-0058",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build session resumption and bounded shutdown",
   "statement": "Send the start prompt on a first session and resume the recorded Kiln session afterwards, recovering by presenting available sessions when the record is missing or corrupt rather than resuming an unrelated generic session; stop both trees on Pi exit and on signals with bounded escalation, on Windows and POSIX.",
@@ -16,7 +16,8 @@
     "REQ-0022"
   ],
   "acceptedBy": [
-    "ACC-0081"
+    "ACC-0081",
+    "ACC-0103"
   ],
   "dependsOn": [
     "TSK-0031",

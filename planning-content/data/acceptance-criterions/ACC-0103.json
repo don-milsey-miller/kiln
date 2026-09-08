@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0103",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A rerun resumes the exact recorded session, not merely a session",
+  "statement": "A fresh start requires BOTH that no session record is present and that the session storage was successfully inspected and found absent or empty. Storage that could not be inspected — unreadable, or a regular file where the directory belongs — is not an empty one, and a record that exists but cannot be opened is not a missing one: only a genuine absence answers, and every other failure asks. Starting fresh over sessions nobody could enumerate is the failure this clause exists to prevent, and it is reachable by exactly those two routes. On that first run the supervisor sends the start prompt and records the session it began. On a later run it resumes the exact session named in the record, proved by the session identifier the agent was invoked with matching the stored one — not by the agent having started successfully, which is equally true of a brand-new unrelated session and is the check this criterion exists to rule out. The record is accepted only when its project and its state mode both match the run: a state root can be shared or copied, so a record whose every field is individually valid can still belong to another project, and the mode decides which store the identifier refers to. When the record is missing, unreadable, invalid, foreign, recorded under a different mode, or names a session that is no longer there, the supervisor presents the sessions actually available and asks; it never silently resumes a different one and never silently starts a fresh one in place of a session the operator believes they are returning to. A non-interactive run refuses instead, with the exact recovery command for the shell it is running in. The record names a session and a mode and carries no absolute path, so a project moved or a state root relocated does not resume something belonging elsewhere.",
+  "evaluates": [
+    "CMP-0037"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}
