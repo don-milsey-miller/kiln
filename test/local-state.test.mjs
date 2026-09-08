@@ -13,7 +13,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -69,8 +69,8 @@ const ID_B = "b".repeat(32);
  *
  * ⚠️ `stateRoot` IS PASSED EXPLICITLY, because a transaction that never named one authorises none.
  */
-const withTx = (dir, body, { stateRoot, files = [projectRecordTarget()] } = {}) =>
-  runTransaction({ projectRoot: dir, ...(stateRoot ? { stateRoot } : {}), files }, body);
+const withTx = (dir, body, { stateRoot, stateMode = STATE_MODE.PROJECT, files = [projectRecordTarget()] } = {}) =>
+  runTransaction({ projectRoot: dir, ...(stateRoot ? { stateRoot, stateMode } : {}), files }, body);
 
 /** The state root a project-local transaction over `dir` would authorise. */
 const projectStateRoot = (dir) => join(dir, ".pi");
@@ -319,8 +319,57 @@ test("⚠️ an EXTERNAL root the transaction did not plan is refused", async ()
   assert.equal(existsSync(ext.root), false, "the external root was never created");
 
   // Planned explicitly, it is created — the binding is to the planned root, not a blanket refusal.
-  await withTx(dir, (tx) => createStateRoot(ext, { transaction: tx }), { stateRoot: ext.root });
+  await withTx(dir, (tx) => createStateRoot(ext, { transaction: tx }), { stateRoot: ext.root, stateMode: STATE_MODE.USER });
   for (const d of stateDirs(ext)) assert.equal(existsSync(d), true, d);
+});
+
+test("⚠️ THE MODE CANNOT BE CHANGED BY THE CALLER TO PERMIT AN ESCAPE", async () => {
+  // Reproduced before the fix. `<project>/.pi` is a junction pointing outside; the transaction plans
+  // that root, so the binding check passes and project mode refuses on containment. Taking the same
+  // legitimate roots and changing ONE field — `mode: "project"` to `"user"` — used to turn that
+  // refusal into a directory outside the project. The root was authorised the whole time; the rule
+  // governing it was the caller's to rewrite, which is half an authorisation.
+  const dir = project();
+  covered(dir);
+  const outside = reapLater(mkdtempSync(join(tmpdir(), "kiln-escape-")));
+  const link = join(dir, ".pi");
+  symlinkSync(outside, link, process.platform === "win32" ? "junction" : "dir");
+
+  const legit = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+  const flipped = { ...legit, mode: STATE_MODE.USER };
+
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(legit, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT,
+      "project mode refuses on containment"
+    );
+    assert.throws(
+      () => createStateRoot(flipped, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE && /state mode this transaction does not authorise/.test(e.message),
+      "and the flipped mode is refused rather than obeyed"
+    );
+    // ⚠️ NO PLANNED FILES. The default fixture plans `project:.pi/kiln.json`, which through this
+    // junction resolves outside the project — so the TRANSACTION refuses at plan time, correctly,
+    // and the test would never reach the check it exists for.
+  }, { stateRoot: link, stateMode: STATE_MODE.PROJECT, files: [] });
+
+  assert.equal(existsSync(join(outside, "sessions")), false, "nothing was created outside the project");
+});
+
+test("⚠️ a state root planned with no mode, or a mode with no root, is refused at PLAN time", async () => {
+  // One without the other is a spec that has not decided, and a mode that defaulted would be a
+  // policy this code chose rather than the operator — the same defect as a default state root.
+  const dir = project();
+
+  await assert.rejects(
+    () => runTransaction({ projectRoot: dir, stateRoot: projectStateRoot(dir) }, () => {}),
+    (e) => /names no stateMode/.test(String(e.message))
+  );
+  await assert.rejects(
+    () => runTransaction({ projectRoot: dir, stateMode: STATE_MODE.PROJECT }, () => {}),
+    (e) => /no stateRoot/.test(String(e.message))
+  );
 });
 
 test("⚠️ a root that matches but SUBDIRECTORIES that escape are still refused", async () => {
@@ -515,7 +564,7 @@ test("⚠️ external mode is exempt because it is OUTSIDE the repository, not b
         env: { XDG_STATE_HOME: home },
         transaction: tx,
       }),
-    { stateRoot: external.root }
+    { stateRoot: external.root, stateMode: STATE_MODE.USER }
   );
 
   assert.equal(result.ok, true);

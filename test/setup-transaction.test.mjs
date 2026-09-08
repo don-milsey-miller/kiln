@@ -177,7 +177,7 @@ test("an external state root outside the project is authorized only by being pas
   const stateRoot = join(stateHome, "kiln", "projects", "a".repeat(32));
   try {
     const out = await runTransaction(
-      { projectRoot: root, stateRoot, files: [{ path: "state:runtime/consent.json" }] },
+      { projectRoot: root, stateRoot, stateMode: "user", files: [{ path: "state:runtime/consent.json" }] },
       async (tx) => {
         tx.declarePhases(["w"]);
         return tx.phase("w", () => tx.merge("state:runtime/consent.json", () => settings({ recordVersion: 1 })));
@@ -443,6 +443,7 @@ test("two overlapping roots reaching one file refuses, which no key check could 
           {
             projectRoot: root,
             stateRoot: join(root, ".pi"),
+            stateMode: "project",
             files: [{ path: ".pi/runtime/consent.json" }, { path: "state:runtime/consent.json" }],
           },
           noop
@@ -555,7 +556,7 @@ test("an interruption leaves a journal naming the phase and an exact resume comm
   try {
     await assert.rejects(() =>
       runTransaction(
-        { projectRoot: root, stateRoot, files: [{ path: ".pi/settings.json" }], journal: journalSpec },
+        { projectRoot: root, stateRoot, stateMode: "project", files: [{ path: ".pi/settings.json" }], journal: journalSpec },
         async (tx) => {
           tx.declarePhases(["initialize", "install", "bind-model"]);
           await tx.beginJournal();
@@ -607,7 +608,7 @@ test("`running` is persisted BEFORE the work, so a killed phase is distinguishab
   try {
     let seen = null;
     await assert.rejects(() =>
-      runTransaction({ projectRoot: root, stateRoot, journal: journalSpec }, async (tx) => {
+      runTransaction({ projectRoot: root, stateRoot, stateMode: "project", journal: journalSpec }, async (tx) => {
         tx.declarePhases(["install"]);
         await tx.beginJournal();
         await tx.phase("install", () => {
@@ -635,6 +636,7 @@ test("re-running after an interruption completes the remaining phases and remove
     const spec = {
       projectRoot: root,
       stateRoot,
+      stateMode: "project",
       files: [{ path: ".pi/settings.json" }, { path: ".pi/kiln.json" }],
       journal: journalSpec,
     };
@@ -699,7 +701,7 @@ test("the journal is a planned, contained target — not a path handed in at wri
     // And it is not a mergeable file: `merge` is the operator-content path, with its own semantics.
     await assert.rejects(
       () =>
-        runTransaction({ projectRoot: root, stateRoot: join(root, ".pi"), journal: journalSpec }, async (tx) => {
+        runTransaction({ projectRoot: root, stateRoot: join(root, ".pi"), stateMode: "project", journal: journalSpec }, async (tx) => {
           tx.declarePhases(["w"]);
           await tx.phase("w", () => tx.merge(JOURNAL, () => "{}\n"));
         }),
@@ -719,6 +721,7 @@ test("a record that would not validate stops the transaction instead of being wr
           {
             projectRoot: root,
             stateRoot: join(root, ".pi"),
+            stateMode: "project",
             journal: {
               path: JOURNAL,
               validate: () => {
@@ -770,6 +773,8 @@ test("every target is canonicalised and printable before anything is written", a
       {
         projectRoot: root,
         stateRoot,
+        stateMode: "user",
+      stateMode: "project",
         files: [{ path: ".pi/settings.json" }, { path: ".pi/kiln.json" }],
         journal: journalSpec,
       },
@@ -880,12 +885,27 @@ test("⚠️ the ledger reports the roots it authorised, and a `state` root only
     const state = transactionState(tx);
     assert.deepEqual(Object.keys(state.roots), ["project"], "no state root was planned, so none is authorised");
     assert.equal(state.roots.state, undefined);
+    assert.equal(state.stateMode, null, "and no policy either — there is nothing for one to govern");
   });
 
-  await runTransaction({ projectRoot: root, stateRoot }, (tx) => {
+  await runTransaction({ projectRoot: root, stateRoot, stateMode: "project" }, (tx) => {
     const state = transactionState(tx);
     assert.deepEqual(state.roots, { project: root, state: canonicalPath(stateRoot) }, "canonical, both of them");
+    // ⚠️ THE MODE TRAVELS WITH THE ROOT. It decides whether that root may lie outside the project,
+    // so an authorisation carrying the location without the policy is half an authorisation — and
+    // the half it was missing is the one a caller could then supply itself.
+    assert.equal(state.stateMode, "project");
   });
+
+  // A mode without a root, or a root without a mode, is a spec that has not decided.
+  await assert.rejects(
+    () => runTransaction({ projectRoot: root, stateRoot }, noop),
+    (e) => e instanceof SetupRefusal && /names no stateMode/.test(e.message)
+  );
+  await assert.rejects(
+    () => runTransaction({ projectRoot: root, stateMode: "project" }, noop),
+    (e) => e instanceof SetupRefusal && /no stateRoot/.test(e.message)
+  );
 });
 
 test("⚠️ the reported roots cannot be used to authorise a root nobody planned", async () => {
@@ -919,10 +939,10 @@ test("a transaction is live only inside its body, and the ledger says so", async
     // ⚠️ THE WHOLE SHAPE, because `roots` is now an authorisation and a collaborator decides where
     // it may write from it. A test that checked only the two fields it already knew would not have
     // noticed the third arriving, and an authorisation nobody asserts is one nobody is holding.
-    assert.deepEqual(insideState, { projectRoot: root, active: true, roots: { project: root } });
+    assert.deepEqual(insideState, { projectRoot: root, active: true, roots: { project: root }, stateMode: null });
     assert.deepEqual(
       transactionState(captured),
-      { projectRoot: root, active: false, roots: { project: root } },
+      { projectRoot: root, active: false, roots: { project: root }, stateMode: null },
       "revoked on the way out"
     );
 
