@@ -46,6 +46,7 @@ import {
   runWithTransaction,
 } from "../lib/setup-transaction.mjs";
 import { createRuntimeValidators, assertValidRecord } from "../lib/runtime-records.mjs";
+import { canonicalPath } from "../lib/content-root.mjs";
 
 const validators = createRuntimeValidators();
 const validateJournal = (record) => assertValidRecord(validators, "setup-transaction", record, "setup journal");
@@ -867,6 +868,43 @@ test("an object that merely looks like a transaction is not one", () => {
   }
 });
 
+test("⚠️ the ledger reports the roots it authorised, and a `state` root only if one was planned", async () => {
+  // `local-state.mjs` decides where it may create directories from this, so it is the authorisation
+  // rather than a diagnostic. It has to say `state` ONLY when the spec named one: a transaction that
+  // never mentioned a state root cannot be allowed to authorise creating one, which is the same rule
+  // `authorizedRoots` states for writes and had no answer for directories.
+  const root = project();
+  const stateRoot = join(root, ".pi");
+
+  await runTransaction({ projectRoot: root }, (tx) => {
+    const state = transactionState(tx);
+    assert.deepEqual(Object.keys(state.roots), ["project"], "no state root was planned, so none is authorised");
+    assert.equal(state.roots.state, undefined);
+  });
+
+  await runTransaction({ projectRoot: root, stateRoot }, (tx) => {
+    const state = transactionState(tx);
+    assert.deepEqual(state.roots, { project: root, state: canonicalPath(stateRoot) }, "canonical, both of them");
+  });
+});
+
+test("⚠️ the reported roots cannot be used to authorise a root nobody planned", async () => {
+  // Handing back the ledger's own map would let a holder add a root and then pass the check that
+  // reads it — the forgery `transactionState` returns a copy to prevent, wearing a third hat.
+  const root = project();
+  await runTransaction({ projectRoot: root }, (tx) => {
+    const first = transactionState(tx);
+    assert.equal(Object.isFrozen(first.roots), true);
+    try {
+      first.roots.state = "/anywhere";
+    } catch {
+      /* frozen in strict mode throws; either way it must not stick */
+    }
+    assert.equal(transactionState(tx).roots.state, undefined, "the ledger is unchanged");
+    assert.notEqual(transactionState(tx).roots, first.roots, "and each call hands back its own object");
+  });
+});
+
 test("a transaction is live only inside its body, and the ledger says so", async () => {
   const root = project();
   try {
@@ -878,8 +916,15 @@ test("a transaction is live only inside its body, and the ledger says so", async
       insideState = transactionState(tx);
     });
 
-    assert.deepEqual(insideState, { projectRoot: root, active: true });
-    assert.deepEqual(transactionState(captured), { projectRoot: root, active: false }, "revoked on the way out");
+    // ⚠️ THE WHOLE SHAPE, because `roots` is now an authorisation and a collaborator decides where
+    // it may write from it. A test that checked only the two fields it already knew would not have
+    // noticed the third arriving, and an authorisation nobody asserts is one nobody is holding.
+    assert.deepEqual(insideState, { projectRoot: root, active: true, roots: { project: root } });
+    assert.deepEqual(
+      transactionState(captured),
+      { projectRoot: root, active: false, roots: { project: root } },
+      "revoked on the way out"
+    );
 
     // ⚠️ A RETAINED HANDLE USED TO STILL WRITE. The lockfile is gone, so this write would have had
     // no exclusion behind it at all.

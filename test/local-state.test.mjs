@@ -63,10 +63,17 @@ const ID_B = "b".repeat(32);
 /**
  * A real setup transaction over `dir`, with the project record planned.
  *
- * ⚠️ NOT A STUB. The whole point of the correction these tests hold is that the lease is
- * authenticated by the transaction module, so a fake would prove the opposite of what is wanted.
+ * ⚠️ NOT A STUB. The whole point of the corrections these tests hold is that the lease is
+ * authenticated by the transaction module and the root it authorises comes from its own plan, so a
+ * fake would prove the opposite of what is wanted.
+ *
+ * ⚠️ `stateRoot` IS PASSED EXPLICITLY, because a transaction that never named one authorises none.
  */
-const withTx = (dir, body, files = [projectRecordTarget()]) => runTransaction({ projectRoot: dir, files }, body);
+const withTx = (dir, body, { stateRoot, files = [projectRecordTarget()] } = {}) =>
+  runTransaction({ projectRoot: dir, ...(stateRoot ? { stateRoot } : {}), files }, body);
+
+/** The state root a project-local transaction over `dir` would authorise. */
+const projectStateRoot = (dir) => join(dir, ".pi");
 
 const covered = (dir) => writeFileSync(join(dir, ".gitignore"), blockText("\n", IGNORE_RULES), "utf-8");
 const stateDirs = (roots) => [roots.root, roots.sessions, roots.runtime];
@@ -144,9 +151,10 @@ test("⚠️ A TRAVERSAL ID NEVER BECOMES A PATH COMPONENT", () => {
     "../../escaped",
     "..",
     "a/b",
-    "a\b",
+    "a\\b",
     "/abs",
-    "C:\win",
+    "C:\\win",
+    "..\\..\\escaped",
     "A".repeat(32),          // uppercase hex is not the contract
     "a".repeat(31),          // too short
     "a".repeat(33),          // too long
@@ -247,10 +255,124 @@ test("with the block in place, project-local state opens and the directories exi
   assert.equal(decided.roots.root, join(dir, ".pi"));
   for (const d of stateDirs(decided.roots)) assert.equal(existsSync(d), false, `${d} before the lease`);
 
-  const opened = await withTx(dir, (tx) =>
-    openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT, transaction: tx })
+  const opened = await withTx(
+    dir,
+    (tx) => openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT, transaction: tx }),
+    { stateRoot: projectStateRoot(dir) }
   );
   for (const d of stateDirs(opened.roots)) assert.equal(existsSync(d), true, d);
+});
+
+test("⚠️ A LEASE FOR ONE PROJECT CANNOT CREATE STATE IN ANOTHER", async () => {
+  // Reproduced before the fix: a live transaction for A created `B/.pi/sessions`. The lease was
+  // authenticated against a `projectRoot` the caller passed and the destination came from a `roots`
+  // the caller also passed — two claims from one source, agreeing with each other and with nothing.
+  // The authorising root now comes out of the transaction's own ledger.
+  const a = project();
+  const b = project();
+  covered(a);
+  covered(b);
+  const rootsB = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: b });
+
+  await withTx(a, (tx) => {
+    assert.throws(
+      () => createStateRoot(rootsB, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
+    );
+  }, { stateRoot: projectStateRoot(a) });
+
+  for (const d of stateDirs(rootsB)) assert.equal(existsSync(d), false, `${d} in the other project`);
+});
+
+test("⚠️ a transaction that planned NO state root authorises none", async () => {
+  // `authorizedRoots` adds `state` only when the spec names one, and says why: there is no default
+  // state root, so a spec that never mentions one cannot write to one. Creating directories under
+  // such a transaction was that default arriving through a different door.
+  const dir = project();
+  covered(dir);
+  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(roots, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE && /authorises no state root/.test(e.message)
+    );
+  }); // deliberately no stateRoot
+
+  for (const d of stateDirs(roots)) assert.equal(existsSync(d), false, d);
+});
+
+test("⚠️ an EXTERNAL root the transaction did not plan is refused", async () => {
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const ext = stateRootFor({
+    mode: STATE_MODE.USER, projectRoot: dir, projectId: ID_A, platform: "linux", env: { XDG_STATE_HOME: home },
+  });
+
+  // A transaction that planned the PROJECT-local root does not thereby authorise the external one.
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(ext, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
+    );
+  }, { stateRoot: projectStateRoot(dir) });
+  assert.equal(existsSync(ext.root), false, "the external root was never created");
+
+  // Planned explicitly, it is created — the binding is to the planned root, not a blanket refusal.
+  await withTx(dir, (tx) => createStateRoot(ext, { transaction: tx }), { stateRoot: ext.root });
+  for (const d of stateDirs(ext)) assert.equal(existsSync(d), true, d);
+});
+
+test("⚠️ a root that matches but SUBDIRECTORIES that escape are still refused", async () => {
+  // The equality check binds `roots.root` to the planned root; it says nothing about `sessions` and
+  // `runtime`, which are fields on the same caller-supplied object. Containment against the
+  // AUTHENTICATED root is what covers those, and this is the case that proves it: the root is
+  // exactly what the transaction planned, so the binding check passes, and only the containment
+  // check stands between a caller and a transcript directory outside the project.
+  const dir = project();
+  covered(dir);
+  const outside = reapLater(mkdtempSync(join(tmpdir(), "kiln-escape-")));
+  const root = projectStateRoot(dir);
+
+  const forged = {
+    mode: STATE_MODE.PROJECT,
+    root,                                   // exactly the planned root
+    // ⚠️ A `within` THAT GENUINELY CONTAINS BOTH. `resolve("/")` looked permissive and was not: on
+    // Windows it is the CWD's drive root, and the temp directory is often on another, so a version
+    // consulting `within` would have refused for a reason that had nothing to do with the rule. The
+    // common ancestor of the project and the escape is what makes this fixture actually permissive.
+    within: tmpdir(),
+    sessions: join(outside, "sessions"),    // but these are somewhere else entirely
+    runtime: join(outside, "runtime"),
+  };
+
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(forged, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT
+    );
+  }, { stateRoot: root });
+
+  assert.equal(existsSync(join(outside, "sessions")), false, "nothing was created outside the project");
+  assert.equal(existsSync(join(outside, "runtime")), false);
+});
+
+test("⚠️ the caller's own `within` no longer authorises anything", async () => {
+  // The old check compared the destination against a `within` field on the same caller-supplied
+  // object. Widening it to the filesystem root used to authorise everything; now it authorises
+  // nothing, because containment is proved against the transaction's root instead.
+  const dir = project();
+  const other = project();
+  covered(dir);
+  const forged = { ...stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: other }), within: resolve("/") };
+
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(forged, { transaction: tx }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
+    );
+  }, { stateRoot: projectStateRoot(dir) });
+  assert.equal(existsSync(join(other, ".pi", "sessions")), false);
 });
 
 test("⚠️ creating a state root WITHOUT a lease is refused, and creates nothing", async () => {
@@ -262,7 +384,7 @@ test("⚠️ creating a state root WITHOUT a lease is refused, and creates nothi
 
   for (const bogus of [undefined, null, {}, { plan: { projectRoot: dir } }])
     assert.throws(
-      () => createStateRoot(roots, { transaction: bogus, projectRoot: dir }),
+      () => createStateRoot(roots, { transaction: bogus }),
       (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE,
       String(bogus)
     );
@@ -275,18 +397,18 @@ test("⚠️ a FINISHED transaction is not a held lock, and a transaction on ano
   covered(dir);
   const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
 
-  const expired = await withTx(dir, (tx) => tx);
+  const expired = await withTx(dir, (tx) => tx, { stateRoot: projectStateRoot(dir) });
   assert.throws(
-    () => createStateRoot(roots, { transaction: expired, projectRoot: dir }),
+    () => createStateRoot(roots, { transaction: expired }),
     (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
   );
 
   await withTx(other, (tx) => {
     assert.throws(
-      () => createStateRoot(roots, { transaction: tx, projectRoot: dir }),
+      () => createStateRoot(roots, { transaction: tx }),
       (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
     );
-  });
+  }, { stateRoot: projectStateRoot(other) });
   for (const d of stateDirs(roots)) assert.equal(existsSync(d), false, d);
 });
 
@@ -306,12 +428,15 @@ test("⚠️ a state root that RESOLVES outside its authorising root is refused"
   const escaped = { mode: STATE_MODE.PROJECT, root: escapedRoot, within: dir,
                     sessions: join(escapedRoot, "sessions"), runtime: join(escapedRoot, "runtime") };
 
+  // ⚠️ THE TRANSACTION PLANS THE ESCAPED ROOT ITSELF, so this is not the binding check firing by
+  // accident. Equality with the planned root is satisfied; what refuses is project-local state
+  // resolving outside the transaction's project, which is the junction case stated as a place.
   await withTx(dir, (tx) => {
     assert.throws(
-      () => createStateRoot(escaped, { transaction: tx, projectRoot: dir }),
+      () => createStateRoot(escaped, { transaction: tx }),
       (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT
     );
-  });
+  }, { stateRoot: escapedRoot });
   assert.equal(existsSync(escapedRoot), false, "the escaped root was never created, not created and then refused");
   assert.equal(existsSync(join(escapedRoot, "sessions")), false, "nothing was created outside the project");
 });
@@ -376,15 +501,21 @@ test("⚠️ external mode is exempt because it is OUTSIDE the repository, not b
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8"); // no coverage at all
   const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
 
-  const result = await withTx(dir, (tx) =>
-    openStateRoot({
-      projectRoot: dir,
-      mode: STATE_MODE.USER,
-      projectId: ID_A,
-      platform: "linux",
-      env: { XDG_STATE_HOME: home },
-      transaction: tx,
-    })
+  const external = stateRootFor({
+    mode: STATE_MODE.USER, projectRoot: dir, projectId: ID_A, platform: "linux", env: { XDG_STATE_HOME: home },
+  });
+  const result = await withTx(
+    dir,
+    (tx) =>
+      openStateRoot({
+        projectRoot: dir,
+        mode: STATE_MODE.USER,
+        projectId: ID_A,
+        platform: "linux",
+        env: { XDG_STATE_HOME: home },
+        transaction: tx,
+      }),
+    { stateRoot: external.root }
   );
 
   assert.equal(result.ok, true);
@@ -422,12 +553,12 @@ test("⚠️ coverage is asked of the FILE, not of the setup record", async () =
 test("⚠️ the project id is minted once, and only through a live lease", async () => {
   const dir = project();
 
-  const first = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
+  const first = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, randomBytes }));
   assert.equal(first.created, true);
   assert.match(first.projectId, /^[0-9a-f]{32}$/);
 
   seed = 99; // a different generator answer, to prove the second call does not reach for it
-  const second = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
+  const second = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, randomBytes }));
   assert.equal(second.created, false);
   assert.equal(second.changed, false, "and nothing was rewritten");
   assert.equal(second.projectId, first.projectId, "regenerating would orphan every transcript keyed on it");
@@ -440,7 +571,7 @@ test("⚠️ minting an id WITHOUT a lease is refused, and writes nothing", asyn
   const dir = project();
   for (const bogus of [undefined, null, {}, { plan: { projectRoot: dir } }])
     await assert.rejects(
-      () => ensureProjectId({ transaction: bogus, projectRoot: dir, randomBytes }),
+      () => ensureProjectId({ transaction: bogus, randomBytes }),
       (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE,
       String(bogus)
     );
@@ -449,7 +580,7 @@ test("⚠️ minting an id WITHOUT a lease is refused, and writes nothing", asyn
 
 test("the id lands in the committed record, and the record is exactly what the schema permits", async () => {
   const dir = project();
-  const { projectId } = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
+  const { projectId } = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, randomBytes }));
 
   const record = JSON.parse(readFileSync(join(dir, ...PROJECT_RECORD.split("/")), "utf-8"));
   assert.deepEqual(Object.keys(record).sort(), ["projectId", "recordVersion"], "nothing else is invented");
@@ -463,7 +594,7 @@ test("⚠️ NO COMMITTED FILE HOLDS AN ABSOLUTE USER PATH", async () => {
   // ACC-0050's third clause, and it is a property of what is NOT written. The external root is
   // recomputed from the platform and the id on every run, so a clone derives its own.
   const dir = project();
-  await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
+  await withTx(dir, (tx) => ensureProjectId({ transaction: tx, randomBytes }));
   const raw = readFileSync(join(dir, ...PROJECT_RECORD.split("/")), "utf-8");
 
   assert.equal(/[A-Za-z]:\\|\/home\/|\/Users\/|AppData|XDG_STATE_HOME/.test(raw), false, `leaked: ${raw}`);
@@ -500,7 +631,7 @@ test("⚠️ an INVALID record is a recovery decision — never repaired, never 
     // the refusal arrives wrapped as the transaction's own. Asserting `instanceof LocalStateRefusal`
     // here would have been asserting the weaker of the two outcomes.
     await assert.rejects(
-      () => withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes })),
+      () => withTx(dir, (tx) => ensureProjectId({ transaction: tx, randomBytes })),
       (e) => /kiln\.json/.test(String(e.message)) && /recovery decision/.test(String(e.message)),
       what
     );
@@ -540,8 +671,10 @@ test("⚠️ the planned target validates the record, so a transaction over a br
 test("two spellings of one state root have one identity", async () => {
   const dir = project();
   covered(dir);
-  const roots = await withTx(dir, (tx) =>
-    createStateRoot(stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir }), { transaction: tx, projectRoot: dir })
+  const roots = await withTx(
+    dir,
+    (tx) => createStateRoot(stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir }), { transaction: tx }),
+    { stateRoot: projectStateRoot(dir) }
   );
   assert.equal(stateRootIdentity(roots.root), stateRootIdentity(join(dir, ".pi", "x", "..")));
 });
