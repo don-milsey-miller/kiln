@@ -774,7 +774,6 @@ test("every target is canonicalised and printable before anything is written", a
         projectRoot: root,
         stateRoot,
         stateMode: "user",
-      stateMode: "project",
         files: [{ path: ".pi/settings.json" }, { path: ".pi/kiln.json" }],
         journal: journalSpec,
       },

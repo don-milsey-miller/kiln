@@ -357,6 +357,44 @@ test("⚠️ THE MODE CANNOT BE CHANGED BY THE CALLER TO PERMIT AN ESCAPE", asyn
   assert.equal(existsSync(join(outside, "sessions")), false, "nothing was created outside the project");
 });
 
+test("⚠️ AN UNKNOWN MODE REFUSES — it does not inherit the permissive one", async () => {
+  // The fail-open. Containment ran only when the mode was exactly `project`, so every other value
+  // reached the branch that permits a root outside the project: `"projcet"`, `"PROJECT"`,
+  // `" project"` — a one-character typo in a spec wrote transcripts outside the repository through a
+  // junction. A rule shaped "if it is the strict one, be strict" grants the permissive case to every
+  // value nobody thought of, which is the wrong way round for a check guarding an escape.
+  //
+  // The transaction keeps the value opaque by design, so this layer owns the vocabulary — and owning
+  // it means validating it, not assuming the planner did.
+  const unknown = ["projcet", "PROJECT", "Project", " project", "project ", "user ", "anything", "local"];
+
+  for (const mode of unknown) {
+    const dir = project();
+    covered(dir);
+    const outside = reapLater(mkdtempSync(join(tmpdir(), "kiln-escape-")));
+    const link = join(dir, ".pi");
+    symlinkSync(outside, link, process.platform === "win32" ? "junction" : "dir");
+
+    const roots = { ...stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir }), mode };
+
+    await withTx(dir, (tx) => {
+      assert.throws(
+        () => createStateRoot(roots, { transaction: tx }),
+        (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.UNKNOWN_MODE,
+        JSON.stringify(mode)
+      );
+    }, { stateRoot: link, stateMode: mode, files: [] });
+
+    assert.equal(existsSync(join(outside, "sessions")), false, `${JSON.stringify(mode)}: nothing outside the project`);
+  }
+});
+
+test("the two known modes are exactly the two the session schema names", () => {
+  // If a third is ever added, the check above refuses it until this module is taught it — which is
+  // the safe direction, and the reason the containment branch is written as "unless it is `user`".
+  assert.deepEqual(Object.values(STATE_MODE).sort(), ["project", "user"]);
+});
+
 test("⚠️ a state root planned with no mode, or a mode with no root, is refused at PLAN time", async () => {
   // One without the other is a spec that has not decided, and a mode that defaulted would be a
   // policy this code chose rather than the operator — the same defect as a default state root.
