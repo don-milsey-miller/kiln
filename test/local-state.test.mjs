@@ -28,12 +28,16 @@ import {
   createStateRoot,
   ensureProjectId,
   openStateRoot,
+  RECORD,
+  projectRecordState,
+  projectRecordTarget,
   readProjectId,
   stateRootFor,
   stateRootIdentity,
   userStateHome,
 } from "../lib/local-state.mjs";
-import { IGNORE_RULES, GITIGNORE_BEGIN, GITIGNORE_END, blockText } from "../lib/project-gitignore.mjs";
+import { IGNORE_RULES, GITIGNORE_BEGIN, GITIGNORE_END, applyIgnoreBlock, blockText, coverage as ignoreCoverage } from "../lib/project-gitignore.mjs";
+import { runTransaction } from "../lib/setup-transaction.mjs";
 
 installReaper();
 
@@ -47,6 +51,22 @@ function project({ git = true } = {}) {
   if (git) mkdirSync(join(dir, ".git"), { recursive: true });
   return dir;
 }
+
+/**
+ * Real ids. The first version of this file used `1111`, `id` and `abc123`, which is how it managed
+ * to pass while `../../escaped` was also accepted: a test whose fixture could never be a traversal
+ * cannot notice that traversals are allowed.
+ */
+const ID_A = "a".repeat(32);
+const ID_B = "b".repeat(32);
+
+/**
+ * A real setup transaction over `dir`, with the project record planned.
+ *
+ * ⚠️ NOT A STUB. The whole point of the correction these tests hold is that the lease is
+ * authenticated by the transaction module, so a fake would prove the opposite of what is wanted.
+ */
+const withTx = (dir, body, files = [projectRecordTarget()]) => runTransaction({ projectRoot: dir, files }, body);
 
 const covered = (dir) => writeFileSync(join(dir, ".gitignore"), blockText("\n", IGNORE_RULES), "utf-8");
 const stateDirs = (roots) => [roots.root, roots.sessions, roots.runtime];
@@ -78,7 +98,7 @@ test("a platform that will not say where state belongs is a refusal, not a guess
   assert.equal(userStateHome({ platform: "linux", env: {}, home: "" }), null);
 
   assert.throws(
-    () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId: "abc", platform: "win32", env: {} }),
+    () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId: ID_A, platform: "win32", env: {} }),
     (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_USER_STATE_HOME
   );
 });
@@ -97,21 +117,54 @@ test("project mode is the project's own .pi/, and its layout is derived in one p
 
 test("⚠️ two projects on one machine occupy separate external roots", () => {
   const env = { XDG_STATE_HOME: "/home/x/.state" };
-  const a = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/a", projectId: "1111", platform: "linux", env });
-  const b = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/b", projectId: "2222", platform: "linux", env });
+  const a = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/a", projectId: ID_A, platform: "linux", env });
+  const b = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/b", projectId: ID_B, platform: "linux", env });
 
   assert.notEqual(a.root, b.root);
-  assert.equal(a.root, join("/home/x/.state", "kiln", "projects", "1111"));
-  assert.equal(b.root, join("/home/x/.state", "kiln", "projects", "2222"));
+  assert.equal(a.root, join("/home/x/.state", "kiln", "projects", ID_A));
+  assert.equal(b.root, join("/home/x/.state", "kiln", "projects", ID_B));
 });
 
 test("⚠️ the external root is keyed by the ID, not by where the project sits", () => {
   // Deriving it from the path would move the state out from under an operator who moved or renamed
   // the project — exactly when it must not move.
   const env = { XDG_STATE_HOME: "/s" };
-  const before = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/old/place", projectId: "id", platform: "linux", env });
-  const after = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/somewhere/else", projectId: "id", platform: "linux", env });
+  const before = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/old/place", projectId: ID_A, platform: "linux", env });
+  const after = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/somewhere/else", projectId: ID_A, platform: "linux", env });
   assert.equal(before.root, after.root);
+});
+
+test("⚠️ A TRAVERSAL ID NEVER BECOMES A PATH COMPONENT", () => {
+  // Reproduced before the fix: `../../escaped` is a non-empty string, and it was joined straight
+  // into the external root, putting `sessions/` and `runtime/` outside `<state-home>/kiln/projects`.
+  // Checked at the boundary where the id becomes a path, because a caller can supply one directly
+  // without ever having gone through the record reader.
+  const env = { XDG_STATE_HOME: "/s" };
+  const bad = [
+    "../../escaped",
+    "..",
+    "a/b",
+    "a\b",
+    "/abs",
+    "C:\win",
+    "A".repeat(32),          // uppercase hex is not the contract
+    "a".repeat(31),          // too short
+    "a".repeat(33),          // too long
+    "",
+    "  ",
+    "a".repeat(31) + "z",    // not hex
+  ];
+  for (const projectId of bad)
+    assert.throws(
+      () => stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId, platform: "linux", env }),
+      (e) => e instanceof LocalStateRefusal && [STATE_REFUSAL.INVALID_PROJECT_ID, STATE_REFUSAL.NO_PROJECT_ID].includes(e.reason),
+      JSON.stringify(projectId)
+    );
+
+  // And the derived root for a good id really is under projects/, not merely non-throwing.
+  const ok = stateRootFor({ mode: STATE_MODE.USER, projectRoot: "/p", projectId: ID_A, platform: "linux", env });
+  assert.equal(ok.root, join(ok.within, ID_A));
+  assert.match(ok.within, /projects$/);
 });
 
 test("external mode without a committed id refuses rather than inventing one", () => {
@@ -188,10 +241,79 @@ test("with the block in place, project-local state opens and the directories exi
   const dir = project();
   covered(dir);
 
-  const result = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
-  assert.equal(result.ok, true);
-  assert.equal(result.roots.root, join(dir, ".pi"));
-  for (const d of stateDirs(result.roots)) assert.equal(existsSync(d), true, d);
+  // Deciding creates nothing; only a live lease creates.
+  const decided = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
+  assert.equal(decided.ok, true);
+  assert.equal(decided.roots.root, join(dir, ".pi"));
+  for (const d of stateDirs(decided.roots)) assert.equal(existsSync(d), false, `${d} before the lease`);
+
+  const opened = await withTx(dir, (tx) =>
+    openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT, transaction: tx })
+  );
+  for (const d of stateDirs(opened.roots)) assert.equal(existsSync(d), true, d);
+});
+
+test("⚠️ creating a state root WITHOUT a lease is refused, and creates nothing", async () => {
+  // An earlier version created directories with a bare recursive mkdir, outside the one place that
+  // owns the project lock. A directory made beside the transaction is made with no exclusion at all.
+  const dir = project();
+  covered(dir);
+  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  for (const bogus of [undefined, null, {}, { plan: { projectRoot: dir } }])
+    assert.throws(
+      () => createStateRoot(roots, { transaction: bogus, projectRoot: dir }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE,
+      String(bogus)
+    );
+  for (const d of stateDirs(roots)) assert.equal(existsSync(d), false, d);
+});
+
+test("⚠️ a FINISHED transaction is not a held lock, and a transaction on another project is not one either", async () => {
+  const dir = project();
+  const other = project();
+  covered(dir);
+  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  const expired = await withTx(dir, (tx) => tx);
+  assert.throws(
+    () => createStateRoot(roots, { transaction: expired, projectRoot: dir }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
+  );
+
+  await withTx(other, (tx) => {
+    assert.throws(
+      () => createStateRoot(roots, { transaction: tx, projectRoot: dir }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE
+    );
+  });
+  for (const d of stateDirs(roots)) assert.equal(existsSync(d), false, d);
+});
+
+test("⚠️ a state root that RESOLVES outside its authorising root is refused", async () => {
+  // The junction case, expressed as the thing a junction actually does: `.pi` names a place outside
+  // the project. `mkdirSync(recursive)` follows it without complaint, which is how `sessions/` and
+  // `runtime/` were created outside the project and reported as success.
+  const dir = project();
+  covered(dir);
+  const outside = reapLater(mkdtempSync(join(tmpdir(), "kiln-escape-")));
+
+  // ⚠️ THE ESCAPED ROOT DOES NOT EXIST YET, and that is what makes this a control on the check that
+  // runs BEFORE the mkdir. Pointed at a directory that already exists, a version checking only
+  // afterwards still throws — on the root, before reaching `sessions` — and looks identical. Pointed
+  // at one that does not, a post-hoc check creates it and then complains.
+  const escapedRoot = join(outside, "redirected");
+  const escaped = { mode: STATE_MODE.PROJECT, root: escapedRoot, within: dir,
+                    sessions: join(escapedRoot, "sessions"), runtime: join(escapedRoot, "runtime") };
+
+  await withTx(dir, (tx) => {
+    assert.throws(
+      () => createStateRoot(escaped, { transaction: tx, projectRoot: dir }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT
+    );
+  });
+  assert.equal(existsSync(escapedRoot), false, "the escaped root was never created, not created and then refused");
+  assert.equal(existsSync(join(escapedRoot, "sessions")), false, "nothing was created outside the project");
 });
 
 test("⚠️ the refusal carries the three answers, with the block's actual bytes", async () => {
@@ -201,11 +323,36 @@ test("⚠️ the refusal carries the three answers, with the block's actual byte
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
 
   const { options } = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
-  assert.deepEqual(options.map((o) => o.id), ["add-block", "user-state", "stop"]);
+  assert.deepEqual(options.map((o) => o.id), ["fix-ignore", "user-state", "stop"]);
 
-  const add = options[0];
-  assert.equal(add.available, true);
-  assert.equal(add.block, blockText("\n", IGNORE_RULES), "the bytes, not a description of them");
+  const fix = options[0];
+  assert.equal(fix.available, true);
+  assert.equal(fix.action, "append");
+  assert.equal(fix.replaces, false);
+  assert.equal(fix.block, blockText("\n", IGNORE_RULES), "the bytes, not a description of them");
+});
+
+test("⚠️ over an exact LEGACY block the option is a MIGRATION, and applying it leaves one block", async () => {
+  // The defect: always offering "add the block" with freshly composed bytes. For a legacy block that
+  // is the wrong operation twice over — it needs its markers replaced in place, and appending beside
+  // it produces the duplicate CMP-0023 exists to prevent. The option carries the owner's own plan, so
+  // integration performs the operation the owner decided on rather than re-deriving one.
+  const dir = project();
+  const legacy = [GITIGNORE_BEGIN, ".planning/", GITIGNORE_END].join("\n") + "\n";
+  writeFileSync(join(dir, ".gitignore"), `head\n${legacy}tail\n`, "utf-8");
+
+  const { options } = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
+  const fix = options[0];
+  assert.equal(fix.action, "migrate", "not an append");
+  assert.equal(fix.replaces, true);
+  assert.equal(fix.available, true);
+
+  const applied = await applyIgnoreBlock(fix.plan);
+  assert.equal(applied.changed, true);
+  const text = readFileSync(join(dir, ".gitignore"), "utf-8");
+  assert.equal(text.split(/\r?\n/).filter((l) => l.trim() === GITIGNORE_BEGIN).length, 1, "exactly one block");
+  assert.deepEqual(ignoreCoverage(text).uncovered, []);
+  assert.equal(openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT }).ok, true, "and the gate now opens");
 });
 
 test("⚠️ over an EDITED block, 'add the block' is offered as unavailable rather than silently", async () => {
@@ -215,9 +362,12 @@ test("⚠️ over an EDITED block, 'add the block' is offered as unavailable rat
   writeFileSync(join(dir, ".gitignore"), `${[GITIGNORE_BEGIN, "mine", GITIGNORE_END].join("\n")}\n`, "utf-8");
 
   const { options } = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
-  const add = options.find((o) => o.id === "add-block");
-  assert.equal(add.available, false);
-  assert.match(add.unavailableBecause, /edited/);
+  const fix = options.find((o) => o.id === "fix-ignore");
+  assert.equal(fix.available, false);
+  assert.equal(fix.action, "report");
+  assert.equal(fix.requiresChoice, true, "CMP-0023 requires the operator to decide about their block");
+  assert.deepEqual(fix.choices, ["keep", "rewrite"]);
+  assert.match(fix.unavailableBecause, /edited/);
   assert.equal(options.find((o) => o.id === "user-state").available, true, "external state is still a way out");
 });
 
@@ -226,18 +376,21 @@ test("⚠️ external mode is exempt because it is OUTSIDE the repository, not b
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8"); // no coverage at all
   const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
 
-  const result = openStateRoot({
-    projectRoot: dir,
-    mode: STATE_MODE.USER,
-    projectId: "abc123",
-    platform: "linux",
-    env: { XDG_STATE_HOME: home },
-  });
+  const result = await withTx(dir, (tx) =>
+    openStateRoot({
+      projectRoot: dir,
+      mode: STATE_MODE.USER,
+      projectId: ID_A,
+      platform: "linux",
+      env: { XDG_STATE_HOME: home },
+      transaction: tx,
+    })
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.covers.covered, true);
   assert.match(result.covers.reason, /outside the repository/);
-  assert.equal(result.roots.root, join(home, "kiln", "projects", "abc123"));
+  assert.equal(result.roots.root, join(home, "kiln", "projects", ID_A));
   for (const d of stateDirs(result.roots)) assert.equal(existsSync(d), true, d);
   assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "and nothing was created in the project");
 });
@@ -257,87 +410,138 @@ test("⚠️ coverage is asked of the FILE, not of the setup record", async () =
   // written, and the two differ exactly when it matters: the operator deleted the block afterwards.
   const dir = project();
   covered(dir);
-  assert.equal(openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT, create: false }).ok, true);
+  assert.equal(openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT }).ok, true);
 
   writeFileSync(join(dir, ".gitignore"), "# I removed it\n", "utf-8");
   const after = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT, recorded: "added" });
   assert.equal(after.ok, false, "a record saying `added` does not make a deleted block present");
 });
 
-/* ================================================================== the project id */
+/* ================================================================== the project record */
 
-test("⚠️ the project id is minted once and never regenerated", async () => {
+test("⚠️ the project id is minted once, and only through a live lease", async () => {
   const dir = project();
-  const first = await ensureProjectId({ projectRoot: dir, randomBytes });
+
+  const first = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
   assert.equal(first.created, true);
   assert.match(first.projectId, /^[0-9a-f]{32}$/);
 
-  seed = 99; // a different generator answer, to prove the second call does not use it
-  const second = await ensureProjectId({ projectRoot: dir, randomBytes });
+  seed = 99; // a different generator answer, to prove the second call does not reach for it
+  const second = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
   assert.equal(second.created, false);
+  assert.equal(second.changed, false, "and nothing was rewritten");
   assert.equal(second.projectId, first.projectId, "regenerating would orphan every transcript keyed on it");
   seed = 0;
 });
 
-test("the id lands in the committed record, and the record is valid JSON with a version", async () => {
+test("⚠️ minting an id WITHOUT a lease is refused, and writes nothing", async () => {
+  // The bare `atomicWrite` this replaces claimed in a comment to re-read "under the caller's lock".
+  // The API could not establish that: nothing in it took a lock or a lease.
   const dir = project();
-  const { projectId } = await ensureProjectId({ projectRoot: dir, randomBytes });
+  for (const bogus of [undefined, null, {}, { plan: { projectRoot: dir } }])
+    await assert.rejects(
+      () => ensureProjectId({ transaction: bogus, projectRoot: dir, randomBytes }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NO_LEASE,
+      String(bogus)
+    );
+  assert.equal(existsSync(join(dir, ...PROJECT_RECORD.split("/"))), false, "no record was written");
+});
+
+test("the id lands in the committed record, and the record is exactly what the schema permits", async () => {
+  const dir = project();
+  const { projectId } = await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
 
   const record = JSON.parse(readFileSync(join(dir, ...PROJECT_RECORD.split("/")), "utf-8"));
+  assert.deepEqual(Object.keys(record).sort(), ["projectId", "recordVersion"], "nothing else is invented");
   assert.equal(record.projectId, projectId);
   assert.equal(Number.isInteger(record.recordVersion), true);
   assert.equal(readProjectId(dir), projectId);
+  assert.equal(projectRecordState(dir).kind, RECORD.VALID);
 });
 
 test("⚠️ NO COMMITTED FILE HOLDS AN ABSOLUTE USER PATH", async () => {
   // ACC-0050's third clause, and it is a property of what is NOT written. The external root is
   // recomputed from the platform and the id on every run, so a clone derives its own.
   const dir = project();
-  await ensureProjectId({ projectRoot: dir, randomBytes });
+  await withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes }));
   const raw = readFileSync(join(dir, ...PROJECT_RECORD.split("/")), "utf-8");
 
   assert.equal(/[A-Za-z]:\\|\/home\/|\/Users\/|AppData|XDG_STATE_HOME/.test(raw), false, `leaked: ${raw}`);
   assert.equal(raw.includes(dir), false, "not even the project's own path");
 });
 
-test("⚠️ a damaged project record is a recovery decision, not a second identity", async () => {
+test("⚠️ an INVALID record is a recovery decision — never repaired, never a second identity", async () => {
+  // Reading only `projectId` accepted a record with a missing id, a missing version, or an unknown
+  // property, and the writer then generated an id INTO it and preserved whatever else it held. A
+  // `token` field went straight back into the committed record.
+  const broken = {
+    "missing the id": { recordVersion: 1 },
+    "an unknown property": { recordVersion: 1, projectId: "a".repeat(32), token: "sk-SECRET" },
+    "an id that is not one": { recordVersion: 1, projectId: "../../escaped" },
+    "an id of the wrong shape": { recordVersion: 1, projectId: "ABCDEF" },
+    "no version": { projectId: "a".repeat(32) },
+  };
+
+  for (const [what, record] of Object.entries(broken)) {
+    const dir = project();
+    mkdirSync(join(dir, ".pi"), { recursive: true });
+    const path = join(dir, ...PROJECT_RECORD.split("/"));
+    const before = JSON.stringify(record, null, 2) + "\n";
+    writeFileSync(path, before, "utf-8");
+
+    assert.equal(projectRecordState(dir).kind, RECORD.INVALID, what);
+    assert.throws(
+      () => readProjectId(dir),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.RECORD_INVALID,
+      what
+    );
+    // ⚠️ THE TRANSACTION REFUSES AT PLAN TIME, WHICH IS STRONGER THAN REFUSING AT THE MERGE. The
+    // planned target validates the record, so the run stops before anything lasting is written and
+    // the refusal arrives wrapped as the transaction's own. Asserting `instanceof LocalStateRefusal`
+    // here would have been asserting the weaker of the two outcomes.
+    await assert.rejects(
+      () => withTx(dir, (tx) => ensureProjectId({ transaction: tx, projectRoot: dir, randomBytes })),
+      (e) => /kiln\.json/.test(String(e.message)) && /recovery decision/.test(String(e.message)),
+      what
+    );
+    assert.equal(readFileSync(path, "utf-8"), before, `${what}: not one byte was repaired`);
+  }
+});
+
+test("⚠️ an unreadable record is invalid, not absent", async () => {
+  // `absent` invites minting an id, and this file holds an identity other things already key on.
   const dir = project();
   mkdirSync(join(dir, ".pi"), { recursive: true });
   writeFileSync(join(dir, ...PROJECT_RECORD.split("/")), "{ not json", "utf-8");
 
-  assert.throws(
-    () => readProjectId(dir),
-    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.RECORD_UNREADABLE
-  );
-  await assert.rejects(
-    () => ensureProjectId({ projectRoot: dir, randomBytes }),
-    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.RECORD_UNREADABLE
-  );
+  const state = projectRecordState(dir);
+  assert.equal(state.kind, RECORD.INVALID);
+  assert.match(state.detail, /not JSON/);
 });
 
 test("a project with no record has no id, which is not an error", () => {
-  assert.equal(readProjectId(project()), null);
+  const dir = project();
+  assert.equal(projectRecordState(dir).kind, RECORD.ABSENT);
+  assert.equal(readProjectId(dir), null);
 });
 
-test("minting an id preserves any other key the record already held", async () => {
+test("⚠️ the planned target validates the record, so a transaction over a broken one refuses at PLAN time", async () => {
+  // Before anything lasting is written, rather than at the merge that would have written it.
   const dir = project();
   mkdirSync(join(dir, ".pi"), { recursive: true });
-  writeFileSync(
-    join(dir, ...PROJECT_RECORD.split("/")),
-    JSON.stringify({ recordVersion: 1, research: { provider: "tavily" } }, null, 2) + "\n",
-    "utf-8"
-  );
+  writeFileSync(join(dir, ...PROJECT_RECORD.split("/")), JSON.stringify({ recordVersion: 1 }), "utf-8");
 
-  await ensureProjectId({ projectRoot: dir, randomBytes });
-  const record = JSON.parse(readFileSync(join(dir, ...PROJECT_RECORD.split("/")), "utf-8"));
-  assert.deepEqual(record.research, { provider: "tavily" }, "the committed research choice survived");
-  assert.match(record.projectId, /^[0-9a-f]{32}$/);
+  await assert.rejects(() => withTx(dir, () => {}), (e) => /projectId|kiln\.json/.test(String(e.message)));
 });
+
 
 /* ================================================================== identity */
 
-test("two spellings of one state root have one identity", () => {
+test("two spellings of one state root have one identity", async () => {
   const dir = project();
-  const roots = createStateRoot(stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir }));
+  covered(dir);
+  const roots = await withTx(dir, (tx) =>
+    createStateRoot(stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir }), { transaction: tx, projectRoot: dir })
+  );
   assert.equal(stateRootIdentity(roots.root), stateRootIdentity(join(dir, ".pi", "x", "..")));
 });
