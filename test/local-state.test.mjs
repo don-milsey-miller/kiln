@@ -78,6 +78,9 @@ const projectStateRoot = (dir) => join(dir, ".pi");
 const covered = (dir) => writeFileSync(join(dir, ".gitignore"), blockText("\n", IGNORE_RULES), "utf-8");
 const stateDirs = (roots) => [roots.root, roots.sessions, roots.runtime];
 
+/** A complete layout at `root` — a partial one is not a layout and is refused as one. */
+const layoutAt = (root, mode = STATE_MODE.USER) => ({ mode, root, within: root, sessions: join(root, "sessions"), runtime: join(root, "runtime") });
+
 /* ================================================================== the platform roots */
 
 test("⚠️ the per-user home follows the convention already written down, on both platforms", () => {
@@ -224,14 +227,104 @@ test("⚠️ the coverage exemption re-proves it, because it is reachable on its
     "no root supplied"
   );
   assert.throws(
-    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: join(dir, "inside") } }),
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layoutAt(join(dir, "inside")) }),
     (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL,
     "a root inside the project"
   );
 
-  const good = coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: join(home, "kiln") } });
+  const good = coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layoutAt(join(home, "kiln")) });
   assert.equal(good.covered, true);
   assert.match(good.reason, /outside the repository/);
+});
+
+test("⚠️ A CHILD JUNCTION CANNOT REVERSE WHAT THE ROOT PROVED", () => {
+  // Reproduced before the fix. The root is genuine — absolute, real, outside the project, everything
+  // the root check asks — and its `sessions` child is a junction back into the repository. Coverage
+  // reported `covered: true` while the canonical write target was inside the project. The root is
+  // not where anything is written; the children are, and they redirect independently.
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const captured = join(dir, "captured");
+  mkdirSync(captured, { recursive: true });
+
+  for (const child of ["sessions", "runtime"]) {
+    const root = join(home, `root-${child}`);
+    mkdirSync(root, { recursive: true });
+    symlinkSync(captured, join(root, child), process.platform === "win32" ? "junction" : "dir");
+
+    assert.throws(
+      () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layoutAt(root) }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL && new RegExp(child).test(e.message),
+      `a ${child} junction into the project`
+    );
+  }
+});
+
+test("⚠️ a child that leaves its own external root is refused even when it lands nowhere near the project", () => {
+  // "Inside the root" and "outside the project" are asked separately because neither implies the
+  // other. This is the first without the second: somewhere else entirely, still not the location
+  // Kiln checked.
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const elsewhere = reapLater(mkdtempSync(join(tmpdir(), "kiln-elsewhere-")));
+  const root = join(home, "root");
+  mkdirSync(root, { recursive: true });
+  symlinkSync(elsewhere, join(root, "sessions"), process.platform === "win32" ? "junction" : "dir");
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layoutAt(root) }),
+    (e) => e instanceof LocalStateRefusal && /outside the state root/.test(e.message)
+  );
+});
+
+test("⚠️ a project the external root would write INTO is caught, which the root check alone cannot see", () => {
+  // The case that makes both directions necessary, and it took a correction to state properly: a
+  // root at `<home>` with the project at `<home>/proj` is NOT this case — the children are siblings
+  // of the project and the code rightly allows it. The hazard is a project sitting exactly where a
+  // child would be written. The root satisfies "not inside the project" because it is the project's
+  // PARENT, and `sessions` then resolves onto the project itself.
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const dir = join(home, "sessions");
+  mkdirSync(join(dir, ".git"), { recursive: true });
+
+  const layout = layoutAt(home);
+  assert.equal(layout.sessions, dir, "the fixture is only meaningful if the child IS the project");
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layout }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL
+  );
+
+  // And the sibling arrangement it is often confused with is genuinely fine.
+  const sibling = join(home, "proj");
+  mkdirSync(join(sibling, ".git"), { recursive: true });
+  assert.equal(coverageState({ projectRoot: sibling, mode: STATE_MODE.USER, roots: layoutAt(home) }).covered, true);
+});
+
+test("⚠️ PROJECT MODE is proved contained at launch, not only under the setup transaction", () => {
+  // The inverse rule. `createStateRoot` proves this when setup creates the directories; nothing
+  // re-asked it at start, so a `.pi` junction created afterwards would send transcripts outside the
+  // project that the ignore block claims to protect.
+  const dir = project();
+  const outside = reapLater(mkdtempSync(join(tmpdir(), "kiln-escape-")));
+  covered(dir);
+  symlinkSync(outside, join(dir, ".pi"), process.platform === "win32" ? "junction" : "dir");
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT,
+    "a fully-ignoring .gitignore does not protect a directory that is not there"
+  );
+});
+
+test("a layout missing a directory is refused rather than partially proved", () => {
+  const dir = project();
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  for (const partial of [{ root: home }, { root: home, sessions: join(home, "s") }, {}])
+    assert.throws(
+      () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { mode: STATE_MODE.USER, ...partial } }),
+      (e) => e instanceof LocalStateRefusal,
+      JSON.stringify(partial)
+    );
 });
 
 test("⚠️ a link that moves the state root inside the project after setup is caught", () => {
@@ -244,7 +337,7 @@ test("⚠️ a link that moves the state root inside the project after setup is 
   symlinkSync(join(dir, "inside-the-project"), linked, process.platform === "win32" ? "junction" : "dir");
 
   assert.throws(
-    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: { root: linked } }),
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: layoutAt(linked) }),
     (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.NOT_EXTERNAL
   );
 });
