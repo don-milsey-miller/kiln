@@ -38,8 +38,13 @@ import {
   retryWithPort,
   readProjectRecord,
   runSupervisor,
+  resolveRunState,
+  SESSION_DIR_ENV,
+  SESSION_DIR_FLAG,
   stopLauncher,
+  withSessionDir,
 } from "../lib/supervisor.mjs";
+import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
 
 installReaper();
@@ -587,7 +592,13 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
   assert.equal(launcher.options.shell, false, "no shell to re-parse the argument array");
   assert.equal(agent.options.stdio, "inherit", "the agent inherits the terminal, fd 0 included");
   assert.equal(agent.options.shell, false);
-  assert.deepEqual([launcher.args, agent.args], [["a"], ["b"]], "structured arguments, never a command string");
+  assert.deepEqual(launcher.args, ["a"], "structured arguments, never a command string");
+  // ⚠️ THE AGENT'S ARRAY IS THE CALLER'S PLUS EXACTLY ONE PAIR THE SUPERVISOR OWNS. Where Pi writes
+  // transcripts is not the caller's to choose — the coverage gate is only meaningful if Kiln knows
+  // the location — so the flag is appended here rather than composed in `bin/start-kiln.mjs`, and it
+  // is still a structured array with no shell between it and the child.
+  assert.deepEqual(agent.args, ["b", "--session-dir", join(dir, ".pi", "sessions")]);
+  assert.equal(agent.options.env.PI_CODING_AGENT_SESSION_DIR, join(dir, ".pi", "sessions"), "every route agrees");
 
   // ⚠️ AND THE IDENTITY THE LAUNCHER IS TOLD TO SERVE is the one the supervisor then demands back.
   // A supervisor that generated a run id and passed a different one would poll forever.
@@ -958,3 +969,148 @@ test("⚠️ every externally reportable error is classified, not quoted", async
   assert.ok(!((e.message ?? "") + JSON.stringify(e.detail ?? {})).includes("sk-live-secret"), "nor any refusal");
   rmSync(dir, { recursive: true, force: true });
 });
+
+/* ============================================ where Pi's transcripts go (TSK-0031, REQ-0027) ==== */
+
+/**
+ * ⚠️ **THE OTHER SUPERVISOR FIXTURES ARE NOT GIT REPOSITORIES, so the coverage gate passes them
+ * vacuously.** That is correct for what they test and useless for testing the gate: `coverageState`
+ * answers "not a repository, so nothing here is tracked" and never looks at a `.gitignore`. These
+ * fixtures are repositories, which is the only way the refusal is reachable at all.
+ */
+function repoProject(opts) {
+  const dir = project(opts);
+  mkdirSync(join(dir, ".git"), { recursive: true });
+  return dir;
+}
+const ignoreAll = (dir) =>
+  writeFileSync(join(dir, ".gitignore"), `${IGNORE_RULES.join("\n")}\n`, "utf-8");
+
+/**
+ * Records every spawn without starting anything, so "nothing was started" is observable.
+ *
+ * ⚠️ IT REPORTS ITSELF EXITED ONCE ITS EXIT FIRES, and carries a `kill` that records rather than
+ * signalling. Without the first, the supervisor's cleanup treats the stub as a live child and tries
+ * to stop it; without the second it would call `kill` on a pid this test invented, which on a busy
+ * machine is somebody else's process.
+ */
+function recordingSpawn(calls) {
+  return (command, args, options) => {
+    const child = {
+      exitCode: null,
+      signalCode: null,
+      stdin: null,
+      pid: null,
+      killed: [],
+      kill: (sig) => {
+        child.killed.push(sig ?? null);
+        return true;
+      },
+      once: (event, cb) => {
+        if (event === "exit")
+          setImmediate(() => {
+            child.exitCode = 0;
+            cb(0, null);
+          });
+      },
+    };
+    calls.push({ command, args, options, child });
+    return child;
+  };
+}
+
+const healthyFetch = (runId = "07".repeat(16)) => async () => ({
+  status: 200,
+  json: async () => ({ service: "kiln", protocol: "kiln.health/1", runId, projectId: PROJECT_ID, build: null }),
+});
+
+test("\u26a0\ufe0f an unprotected project is REFUSED, and Pi is never started", async () => {
+  // REQ-0027's ordering, at the last moment it can still be asked: the transcript is the first thing
+  // Pi writes. The assertion that matters is that the agent was never spawned — a version that
+  // logged a warning and launched anyway would satisfy any check on the message.
+  const dir = repoProject();
+  writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
+  const calls = [];
+  const port = String(await freePort());
+
+  await assert.rejects(
+    () =>
+      runSupervisor({
+        projectRoot: dir,
+        launcher: { command: "L", args: ["a"] },
+        agent: { command: "A", args: ["b"] },
+        spawn: recordingSpawn(calls),
+        env: { PORT: port },
+        randomBytes: () => Buffer.alloc(16, 7),
+        fetchImpl: healthyFetch(),
+        build: null,
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.STATE_UNPROTECTED
+  );
+
+  assert.deepEqual(calls.map((c) => c.command), ["L"], "the launcher started; the AGENT never did");
+  assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "and no session directory was created");
+});
+
+test("\u26a0\ufe0f the gate is asked at LAUNCH, so a block removed after setup still refuses", async () => {
+  const dir = repoProject();
+  ignoreAll(dir);
+  assert.equal(resolveRunState({ projectRoot: dir, projectId: PROJECT_ID }).roots.sessions, join(dir, ".pi", "sessions"));
+
+  writeFileSync(join(dir, ".gitignore"), "# I removed it after setup ran\n", "utf-8");
+  assert.throws(
+    () => resolveRunState({ projectRoot: dir, projectId: PROJECT_ID }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.STATE_UNPROTECTED
+  );
+});
+
+test("partial coverage is not coverage, and the refusal names what is missing", () => {
+  const dir = repoProject();
+  writeFileSync(join(dir, ".gitignore"), ".planning/\n", "utf-8");
+
+  assert.throws(
+    () => resolveRunState({ projectRoot: dir, projectId: PROJECT_ID }),
+    (e) => e.reason === REFUSAL.STATE_UNPROTECTED && e.detail.uncovered.join() === ".pi/sessions/,.pi/runtime/"
+  );
+});
+
+test("\u26a0\ufe0f external state is located by the committed id, and needs no ignore block", () => {
+  // Nothing under the per-user root is inside the repository, so no rule protects it and none is
+  // needed — which is why this project has no coverage at all and still resolves.
+  const dir = repoProject();
+  writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+
+  const { roots } = resolveRunState({
+    projectRoot: dir,
+    stateMode: "user",
+    projectId: PROJECT_ID,
+    platform: "linux",
+    env: { XDG_STATE_HOME: home },
+  });
+  assert.equal(roots.sessions, join(home, "kiln", "projects", PROJECT_ID, "sessions"));
+});
+
+test("\u26a0\ufe0f the session directory is supplied by the FLAG, and the variable is made to agree", () => {
+  // All three routes were measured to work (EVD-0081) and they are not interchangeable: the flag is
+  // the one a stale exported variable or a leftover `sessionDir` setting cannot outrank. The variable
+  // is set to the same path so a future version that stopped passing the flag would still land in the
+  // gated directory rather than silently reverting to `.pi/sessions`.
+  const out = withSessionDir({ args: ["b"] }, "/s/sessions", { PATH: "x", PI_CODING_AGENT_SESSION_DIR: "/somewhere/stale" });
+
+  assert.deepEqual(out.args, ["b", SESSION_DIR_FLAG, "/s/sessions"]);
+  assert.equal(out.env[SESSION_DIR_ENV], "/s/sessions", "the operator's stale value is replaced, not respected");
+  assert.equal(out.env.PATH, "x", "and the rest of the environment is untouched");
+});
+
+test("\u26a0\ufe0f an agent already naming a session directory is refused, never appended to", () => {
+  // Two of them leave the location to whichever Pi prefers, and the coverage check is only
+  // meaningful if Kiln can say where the transcripts went.
+  for (const args of [["--session-dir", "/theirs"], ["--session-dir=/theirs"], ["x", "--session-dir", "/theirs"]])
+    assert.throws(
+      () => withSessionDir({ args }, "/ours", {}),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.SESSION_DIR_CONFLICT,
+      JSON.stringify(args)
+    );
+});
+
