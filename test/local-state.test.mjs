@@ -339,6 +339,30 @@ test("⚠️ a caller-supplied project layout pointing anywhere else in the repo
   assert.equal(coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots: real }).covered, true, "the real layout still passes");
 });
 
+test("⚠️ MATCHING TYPOS PASS THE BINDING AND MUST STILL BE REFUSED", () => {
+  // Binding the two values closes a disagreement between them and says nothing about whether either
+  // is a mode: the same misspelling in both passed the binding and fell through to the project
+  // branch, returning `covered: true` and echoing the unrecognised mode back as though it meant
+  // something. The supervisor route happens to be protected because `stateRootFor` refuses first —
+  // an exported function is not sound because of where its callers happen to check.
+  //
+  // This is the third place the vocabulary check was needed, after `createStateRoot`. The shape is
+  // what recurs: branches written as "external" and "everything else" answer an unknown mode with
+  // the second one.
+  const dir = project();
+  covered(dir);
+  const real = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  for (const typo of ["projcet", "PROJECT", "Project", " project", "user ", "anything", "", null, undefined])
+    assert.throws(
+      () => coverageState({ projectRoot: dir, mode: typo, roots: { ...real, mode: typo } }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.UNKNOWN_MODE,
+      JSON.stringify(typo)
+    );
+
+  assert.equal(coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots: real }).covered, true);
+});
+
 test("⚠️ THE COVERAGE MODE AND THE LAYOUT MODE MUST BE THE SAME MODE", () => {
   // Reproduced before the fix: `mode: "user"` with a project-mode layout applied the project
   // containment rule, passed it, and then took the external exemption — reporting the project's own
