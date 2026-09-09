@@ -45,6 +45,7 @@ import {
   withSessionDir,
 } from "../lib/supervisor.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
+import { exitStatusFor, stoppedSummary } from "../bin/start-kiln.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
 
 installReaper();
@@ -1567,4 +1568,134 @@ test("⚠️ the signal handlers are removed when the run ends, on every path", 
     build: null,
   }).catch(() => {});
   assert.deepEqual(signals2.installed(), [], "nothing left installed after a refusal either");
+});
+
+test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT TEARDOWN", async () => {
+  // The snapshots handed to the shutdown are copies of what each tracker had already seen, and the
+  // poll runs every 500ms. A worker that appeared since the last tick was missing from the copy the
+  // shutdown then acted on — `stop()` does take a final look, but it ran in the `finally`, after the
+  // stale copies had been used. Sampling immediately before the snapshots is what closes that.
+  //
+  // The lister below reports nothing at first and a worker afterwards, which is the whole scenario:
+  // `next start` spawns its workers a moment after the launcher itself is up.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const calls = [];
+  let listed = 0;
+  const WORKER = 6001;
+
+  // ⚠️ **ITS OWN STUB, WITH PIDS, AND DELIBERATELY NOT `recordingSpawn`.** That helper leaves `pid`
+  // null on purpose: a test that does not stub `run` would otherwise reach the real `taskkill` with
+  // a pid this fixture invented, which on a busy machine is somebody else's process. This test stubs
+  // both `run` and `kill`, so pids are safe here and necessary — `ps` relates a worker to its parent
+  // by pid, and a null one can never be anybody's parent.
+  let nextPid = 5900;
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: nextPid++,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      kill: () => {
+        child.exitCode = 0;
+        child.onExit?.(0, null);
+        return true;
+      },
+      once: (event, cb) => {
+        if (event !== "exit") return;
+        child.onExit = cb;
+        // The agent finishes on its own; the launcher waits to be stopped.
+        if (command !== "L")
+          setImmediate(() => {
+            child.exitCode = 0;
+            cb(0, null);
+          });
+      },
+    };
+    calls.push({ command, args, options, child });
+    return child;
+  };
+
+  const e = await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    // ⚠️ THE FIRST LOOK FINDS NOTHING; EVERY LATER ONE FINDS THE WORKER, reported as a child of the
+    // launcher. A tracker that never re-sampled would carry the empty first answer into the shutdown.
+    psRun: () => {
+      listed += 1;
+      const launcherPid = calls.find((c) => c.command === "L")?.child?.pid;
+      if (listed === 1 || !launcherPid) return { status: 0, stdout: "" };
+      return { status: 0, stdout: `${WORKER} ${launcherPid}
+` };
+    },
+    // The worker never dies, so it is a survivor at teardown — which is only observable if it was
+    // sampled at all.
+    kill: (pid, signal) => {
+      if (signal === 0 && Number(pid) === WORKER) return true;
+      if (signal === 0) {
+        const err = new Error("gone");
+        err.code = "ESRCH";
+        throw err;
+      }
+      return true;
+    },
+    run: () => ({ status: 0, stdout: "" }),
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs: 200,
+    hardMs: 100,
+  }).catch((x) => x);
+
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 160)}`);
+  assert.ok(
+    e.detail.shutdown.notObserved.includes("launcher-descendants-survived"),
+    `the late worker must reach the shutdown: ${JSON.stringify(e.detail.shutdown.notObserved)}`
+  );
+  assert.deepEqual(e.detail.shutdown.launcherTree.descendantsSurviving, [WORKER]);
+});
+
+/* ============================================ what the command reports (bin/start-kiln.mjs) ===== */
+
+test("⚠️ AN INTERRUPT NEVER EXITS 0, EVEN WHEN PI SHUT DOWN TIDILY", () => {
+  // The subtle half of this, and the one that survived the earlier fix. `code: null` from a killed
+  // Pi was already handled; a signal Pi HANDLES — shutting down cleanly and exiting 0 — left the
+  // agent's code saying success while the run had been interrupted, so a script wrapping this would
+  // carry on. The supervisor observed which of the two ended the run; that decides the status.
+  assert.equal(exitStatusFor({ trigger: "signal", agentExit: { code: 0, signal: null } }), 1, "the tidy interrupt");
+  assert.equal(exitStatusFor({ trigger: "signal", agentExit: { code: null, signal: "SIGINT" } }), 1);
+  assert.equal(exitStatusFor({ trigger: "signal", agentExit: { code: 7, signal: null } }), 1);
+
+  // And an uninterrupted run still reports what Pi reported.
+  assert.equal(exitStatusFor({ trigger: "agent-exit", agentExit: { code: 0, signal: null } }), 0);
+  assert.equal(exitStatusFor({ trigger: "agent-exit", agentExit: { code: 3, signal: null } }), 3);
+  assert.equal(exitStatusFor({ trigger: "agent-exit", agentExit: { code: null, signal: "SIGKILL" } }), 1);
+
+  // ⚠️ AN EXIT NOBODY SAW IS NOT A ZERO. Unreachable today — such a run refuses before returning —
+  // which is why it is pinned rather than left to the next change.
+  assert.equal(exitStatusFor({ trigger: "agent-exit", agentExit: { code: null, signal: null, observed: false } }), 1);
+});
+
+test("⚠️ the stopped summary reads the record that exists, not the one that used to", () => {
+  // The launcher's control-channel answer and its tree's are separate records now. This line kept
+  // reading the old flat fields and printed three `undefined`s on every successful run — in the one
+  // part of the system that had no test at all.
+  const line = stoppedSummary({
+    trigger: "agent-exit",
+    shutdown: {
+      launcher: { sentStop: true, endRequested: true, exitObserved: true },
+      launcherTree: { treeStopped: true },
+    },
+  });
+
+  assert.equal(/undefined/.test(line), false, `the summary must not print undefined: ${line}`);
+  assert.match(line, /stop sent: true/);
+  assert.match(line, /stdin end requested: true/);
+  assert.match(line, /launcher exit observed: true/);
+  assert.match(line, /launcher tree stopped: true/, "the tree is the half that notices a worker left behind");
+  assert.match(line, /\(agent-exit\)/, "and it says which of the two ended the run");
 });

@@ -19,7 +19,7 @@
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
@@ -36,6 +36,51 @@ const ask = (question) =>
       resolveAnswer(/^y(es)?$/i.test(answer.trim()));
     });
   });
+
+/**
+ * What the operator is told about the shutdown.
+ *
+ * ⚠️ **EXPORTED BECAUSE IT WAS WRONG AND NOTHING COULD SEE IT.** The launcher's control-channel
+ * answer moved under `shutdown.launcher` and its tree's under `shutdown.launcherTree`, and this line
+ * kept reading the old flat fields — printing three `undefined`s on every successful run, in the one
+ * part of the system with no test at all. A decision worth making is a decision worth being able to
+ * check, so both of this file's are functions now.
+ *
+ * The tree is named beside the control channel because it is the half that notices a worker left
+ * behind: a launcher can answer its pipe perfectly and still leave one.
+ */
+export function stoppedSummary(result) {
+  const { launcher, launcherTree } = result.shutdown;
+  return (
+    `stopped (${result.trigger}) — stop sent: ${launcher.sentStop}, stdin end requested: ` +
+    `${launcher.endRequested}, launcher exit observed: ${launcher.exitObserved}, ` +
+    `launcher tree stopped: ${launcherTree.treeStopped}`
+  );
+}
+
+/**
+ * The process status this run should leave with.
+ *
+ * ⚠️ **AN INTERRUPT IS NOT A CLEAN EXIT, WHATEVER CODE PI HAPPENED TO RETURN.** `code` is null when
+ * Pi is killed outright, and `?? 0` reported that as success — but the subtler case is the one that
+ * survived that fix: a signal Pi handles TIDILY, shutting down and exiting 0. The agent's code then
+ * says success and the run was still interrupted, so a script wrapping this would carry on.
+ *
+ * The supervisor already observed which of the two ended the run, recorded where the signal was
+ * handled rather than inferred from the processes having gone. That observation decides the status;
+ * the agent's own code is consulted only when nothing interrupted it.
+ *
+ * ⚠️ AND AN EXIT NOBODY SAW IS NOT A ZERO EITHER. `{code: null, signal: null}` is what the supervisor
+ * records when the agent never went, and `?? 0` reads that as success. It is unreachable today —
+ * such a run refuses before returning — which is exactly why it is worth pinning rather than
+ * leaving to the next change.
+ */
+export function exitStatusFor(result) {
+  if (result.trigger === "signal") return 1;
+  const { code, signal, observed } = result.agentExit;
+  if (observed === false) return 1;
+  return code ?? (signal ? 1 : 0);
+}
 
 async function main() {
   const projectRoot = canonicalPath(resolveProjectRoot());
@@ -56,17 +101,20 @@ async function main() {
     log: say,
   });
 
-  say(
-    `stopped — stop sent: ${result.shutdown.sentStop}, stdin end requested: ${result.shutdown.endRequested}, ` +
-      `launcher exit observed: ${result.shutdown.exitObserved}`
-  );
-  // ⚠️ **A SIGNAL IS NOT A CLEAN EXIT.** `code` is null when Pi was killed, and `?? 0` reported that
-  // as success. Reaching this line at all already means the launcher was seen to go — an unobserved
-  // shutdown is a refusal from the supervisor and leaves through the handler below.
-  process.exit(result.agentExit.code ?? (result.agentExit.signal ? 1 : 0));
+  say(stoppedSummary(result));
+  process.exit(exitStatusFor(result));
 }
 
-main().catch((e) => {
+/**
+ * ⚠️ **THE SAME GUARD `bin/init-project.mjs` CARRIES, AND FOR THE SAME REASON.** This file now exports
+ * the two decisions it makes, and without the guard importing it to test them would run the whole
+ * command against the TEST RUNNER's argv — starting a launcher and handing something the terminal.
+ * The exports are the reason the guard exists.
+ */
+const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+
+if (isEntryPoint)
+  main().catch((e) => {
   // ⚠️ **BOTH REFUSALS PRINT AS REFUSALS, NOT AS STACK TRACES.** A missing content root is the FIRST
   // thing a contributor meets running this in the Kiln repository, which is its own consumer and so
   // is not covered by the sibling rule (#70). Letting it fall through to the generic handler printed
