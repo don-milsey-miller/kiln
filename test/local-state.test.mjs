@@ -300,6 +300,67 @@ test("⚠️ a project the external root would write INTO is caught, which the r
   assert.equal(coverageState({ projectRoot: sibling, mode: STATE_MODE.USER, roots: layoutAt(home) }).covered, true);
 });
 
+test("⚠️ A REDIRECT THAT STAYS INSIDE THE REPOSITORY IS STILL A REDIRECT", () => {
+  // Containment was the wrong question. `.pi/sessions` junctioned to `<project>/captured` never
+  // leaves the repository and passed it — while the ignore rule that makes the gate meaningful is
+  // `.pi/sessions/`, which protects nothing at `captured/`. Coverage proves that SPECIFIC paths are
+  // ignored, so the writes have to land on those paths, not merely nearby.
+  const dir = project();
+  covered(dir);
+  mkdirSync(join(dir, "captured"), { recursive: true });
+  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+  mkdirSync(roots.root, { recursive: true });
+  symlinkSync(join(dir, "captured"), roots.sessions, process.platform === "win32" ? "junction" : "dir");
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT && /captured/.test(e.message)
+  );
+});
+
+test("⚠️ a caller-supplied project layout pointing anywhere else in the repository is refused", () => {
+  // The same rule reached without a link: the layout simply names a different in-repository
+  // directory. `.gitignore` ignores every rule Kiln writes and protects none of this.
+  const dir = project();
+  covered(dir);
+  const real = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  for (const [what, roots] of [
+    ["sessions elsewhere", { ...real, sessions: join(dir, "elsewhere") }],
+    ["runtime elsewhere", { ...real, runtime: join(dir, "docs") }],
+    ["a different state root", { ...real, root: join(dir, "state") }],
+  ])
+    assert.throws(
+      () => coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots }),
+      (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.ESCAPES_ROOT,
+      what
+    );
+
+  assert.equal(coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots: real }).covered, true, "the real layout still passes");
+});
+
+test("⚠️ THE COVERAGE MODE AND THE LAYOUT MODE MUST BE THE SAME MODE", () => {
+  // Reproduced before the fix: `mode: "user"` with a project-mode layout applied the project
+  // containment rule, passed it, and then took the external exemption — reporting the project's own
+  // `.pi` directory as "external state is outside the repository". Two modes from two sources, each
+  // answering half the question.
+  const dir = project();
+  covered(dir);
+  const home = reapLater(mkdtempSync(join(tmpdir(), "kiln-home-")));
+  const projectRoots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.USER, roots: projectRoots }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.UNKNOWN_MODE,
+    "a project layout checked as external"
+  );
+  assert.throws(
+    () => coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots: layoutAt(join(home, "kiln")) }),
+    (e) => e instanceof LocalStateRefusal && e.reason === STATE_REFUSAL.UNKNOWN_MODE,
+    "an external layout checked as project-local"
+  );
+});
+
 test("⚠️ PROJECT MODE is proved contained at launch, not only under the setup transaction", () => {
   // The inverse rule. `createStateRoot` proves this when setup creates the directories; nothing
   // re-asked it at start, so a `.pi` junction created afterwards would send transcripts outside the
