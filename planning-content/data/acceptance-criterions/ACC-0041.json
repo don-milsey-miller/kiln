@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Pi is resolved from the tool's node_modules and never from PATH",
   "statement": "With a different Pi version installed globally and earlier on PATH, every Pi process Kiln starts reports the pinned version. A test that removes the local dependency causes a refusal naming the expected version and the resolved path, rather than falling through to the global binary.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0022",
     "REQ-0028"
+  ],
+  "evidencedBy": [
+    "EVD-0090"
   ]
 }

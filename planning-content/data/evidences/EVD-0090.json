@@ -1,0 +1,57 @@
+{
+  "id": "EVD-0090",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: Pi resolves from the tool's own node_modules with a different pi first on PATH, both platforms through CI",
+  "kind": "experiment",
+  "summary": "ACC-0041's two sentences, observed on both platforms through CI. GitHub Actions run 34401161647 at commit 7413055, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green: 778 tests, 0 failures in every cell. Both of the criterion's new tests ran in EVERY cell, counted by name in each job's log rather than inferred from a green tick - the node 22 cells emit TAP (ok 702, ok 703) and the node 24 cells the spec reporter. FIRST SENTENCE, which had no test at all before this run: a real executable named `pi` reporting 9.9.9-shadow is placed first on PATH, and the measurement is two-sided. The CONTROL runs bare `pi --version` through the platform's own resolution and requires it to find the shadow; without that half the treatment would pass on a machine where shadowing was never possible, which is the failure mode of every 'we are not affected by X' test that never established X. The TREATMENT resolves the agent exactly as bin/start-kiln.mjs does and starts it with that same poisoned PATH: the started process reports 0.84.4, the shadow version appears nowhere in its output, and the resolver's own reported version agrees with the pin read from package.json. Every case-spelling of the variable is stripped from the copied environment before PATH is set, because a copied process.env on Windows can carry `Path` and a second `PATH` key beside it would leave the child resolving against whichever the platform prefers. SECOND SENTENCE: the missing-local-dependency case asserted only its reason code before this run, while the criterion asks the refusal to NAME the expected version and the resolved path. Both are now asserted twice over - in the prose an operator reads, and in a `detail` carrying `expected` and `pkgDir` so the test pins content rather than wording. DEC-0026's two values are also pinned by a test rather than left to drift: the dependency is exactly 0.84.4 and not a range, and engines.node is >=22.19.0, which is what the pinned runtime itself requires. STRUCTURE: TSK-0024 specifies lib/pi-runtime.mjs and the resolver had been written inside lib/supervisor.mjs, so the approved task described a module nobody could open. It moved verbatim to the named file, with one copy and no re-export. runSupervisor deliberately does not call it: the supervisor accepts an already-resolved command and argument array because the choice of program is the security boundary, so the consumer is bin/start-kiln.mjs, the half of the supervisor whose job is to say what runs. ONE PLATFORM DIFFERENCE, in cost rather than outcome: the PATH test costs 249ms on ubuntu/22 and 282ms on ubuntu/24 against 416ms on windows/22 and 653ms on windows/24, because the Windows control starts cmd.exe, resolves `pi` through PATHEXT to pi.cmd and then starts a second process for the batch file, where POSIX runs the `pi` script directly through its execute bit and shebang. Both routes found the shadow and both treatments reported 0.84.4, so the platforms agree on the result while differing in how they reach it.",
+  "outcome": "success",
+  "observedAt": "2026-09-09",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34401161647",
+      "commit": "7413055",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 102633116204, success, 778 tests / 775 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 102633116177, success, 778 tests / 775 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 102633115934, success, 778 tests / 777 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 102633116181, success, 778 tests / 777 pass / 0 fail / 1 skipped",
+      "new-tests-per-cell": "both in all four: 'ACC-0041: a different `pi` earlier on PATH is never what starts' and 'ACC-0041: the pin and the Node floor are exactly what DEC-0026 decided' - ok 702 and ok 703 on the node 22 cells, the spec reporter's marks on the node 24 cells",
+      "skip-counts": "3 on ubuntu and 1 on windows are pre-existing platform-gated tests, unchanged by this slice",
+      "command": "npm test (node --test), test/supervisor.test.mjs",
+      "shadow-executable": "pi.cmd on Windows resolved through PATHEXT; a chmod 0o755 sh script named pi on POSIX; both print 9.9.9-shadow",
+      "path-test-duration": "249ms ubuntu/22, 282ms ubuntu/24, 416ms windows/22, 653ms windows/24",
+      "under-test": "lib/pi-runtime.mjs resolvePinnedAgent and readOwnPin; bin/start-kiln.mjs as the consumer",
+      "pin-checked": "package.json dependencies['@earendil-works/pi-coding-agent'] === '0.84.4' exactly, engines.node === '>=22.19.0', per DEC-0026"
+    },
+    "omissions": [
+      {
+        "fact": "independently-installed-global-pi",
+        "state": "not-captured",
+        "reason": "The global Pi installation the criterion describes is represented by a real shadow executable placed first on PATH, not by an independently installed Pi package. The control proves the platform's own resolution finds that executable, so the shadowing is genuine; what is not observed is a second real Pi distribution - a different published version installed through npm -g with its own node_modules and its own bin shim. A shadow that prints a version string exercises the resolution route, not another Pi's behaviour."
+      },
+      {
+        "fact": "setup-and-specialist-launch-paths",
+        "state": "not-captured",
+        "reason": "Only Kiln's currently implemented Pi launch path is exercised: bin/start-kiln.mjs resolving the agent for the user-facing session. CMP-0021's responsibility names setup and every specialist child as callers that must receive the same executable, and neither launch path exists yet. This run therefore says nothing about them, and 'the only route by which any Pi process is started' is claimed for the one route there is."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed. Its PATH resolution resembles the POSIX cell, but nothing here runs on it."
+      }
+    ]
+  }
+}
