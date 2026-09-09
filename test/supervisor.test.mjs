@@ -43,7 +43,11 @@ import {
   SESSION_DIR_FLAG,
   stopLauncher,
   withSessionDir,
+  leftoverRunFiles,
+  runFilePath,
+  writeRunFile,
 } from "../lib/supervisor.mjs";
+import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import { exitStatusFor, stoppedSummary } from "../bin/start-kiln.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
@@ -1749,6 +1753,263 @@ test("⚠️ a project whose runtime directory is gone still runs, and says it l
   assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded");
   assert.equal(existsSync(join(dir, ".pi", "runtime")), false, "and nothing created the directory");
   assert.ok(lines.some((m) => m.includes("leaves no run file")), JSON.stringify(lines));
+});
+
+test("⚠️ A RUN ID THAT IS NOT ONE NEVER BECOMES A PATH (traversal)", () => {
+  // Reproduced before the check existed: `runFilePath(runtime, "x/../../escaped")` returned
+  // `<two directories above runtime>/escaped.json` — a path the shutdown would then have DELETED as
+  // a file this invocation created. The id is generated internally and cannot be malformed today;
+  // the function is exported, composes a path, and is one caller away from being handed anything.
+  const runtime = reapLater(mkdtempSync(join(tmpdir(), "kiln-runfile-")));
+  const bad = [
+    "x/../../escaped",
+    "..",
+    `../${"a".repeat(32)}`,
+    `${"a".repeat(30)}/x`,
+    "A".repeat(32), // uppercase hex is not what `generateRunId` writes
+    "a".repeat(31),
+    "a".repeat(33),
+    "",
+    `${"a".repeat(32)}.json`,
+    null,
+    12,
+  ];
+  for (const runId of bad) {
+    assert.throws(
+      () => runFilePath(runtime, runId),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.RUN_FILE_UNSAFE,
+      `runFilePath must refuse ${JSON.stringify(runId)}`
+    );
+    // ⚠️ AND THE WRITER REFUSES AT THE SAME BOUNDARY, because it is the writer that creates the
+    // file the shutdown will remove; a check only the path helper performs is one call away from
+    // being bypassed.
+    assert.throws(
+      () => writeRunFile(runtime, { runId, projectId: PROJECT_ID, port: 3000 }),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.RUN_FILE_UNSAFE,
+      `writeRunFile must refuse ${JSON.stringify(runId)}`
+    );
+  }
+  assert.deepEqual(readdirSync(runtime), [], "and nothing was written anywhere while refusing");
+
+  const runId = "0f".repeat(16);
+  const good = runFilePath(runtime, runId);
+  assert.equal(good, join(canonicalPath(runtime), `run-${runId}.json`), "a real run id still names its own file");
+});
+
+test("⚠️ A FILE ALREADY AT THAT NAME IS NOT CLAIMED BY THIS RUN, and survives it byte for byte", async () => {
+  // ⚠️ **THE OWNED LIST IS AN AUTHORSHIP CLAIM, AND AN OVERWRITE IS NOT AUTHORSHIP.** The writer
+  // used an ordinary `writeFileSync`: a file already at this exact name was silently replaced and
+  // then added to `ownedFiles`, so the shutdown deleted a file this invocation did not create — the
+  // half of clause 6 the run-file work was added to satisfy. `wx` is what makes the filesystem, not
+  // this module's own earlier stat, answer the question.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const runtime = join(dir, ".pi", "runtime");
+  mkdirSync(runtime, { recursive: true });
+
+  const runId = "07".repeat(16); // what `randomBytes` below produces, and what the health probe reports
+  const taken = join(runtime, `run-${runId}.json`);
+  const contents = "somebody else was here first";
+  writeFileSync(taken, contents, "utf-8");
+
+  const calls = [];
+  const lines = [];
+  const result = await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(runId),
+    build: null,
+    log: (m) => lines.push(m),
+  });
+
+  assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded — a breadcrumb is not a contract");
+  assert.deepEqual(result.shutdown.files.removed, [], "nothing was owned, so nothing was removed");
+  assert.deepEqual(result.shutdown.files.failed, []);
+  assert.equal(readFileSync(taken, "utf-8"), contents, "and the file that was there is untouched");
+  assert.ok(
+    lines.some((m) => m.includes("NOT written or claimed by this run")),
+    `the operator is told why this run left no file: ${JSON.stringify(lines)}`
+  );
+});
+
+test("⚠️ A LEFTOVER IS A RUN FILE, not anything shaped roughly like one", () => {
+  // Prefix-and-suffix matching put any `run-*.json` — an operator's, another tool's — into Kiln's
+  // log as a run that failed to shut down: a message about somebody else's file, containing a name
+  // somebody else chose, saying something went wrong.
+  const runtime = reapLater(mkdtempSync(join(tmpdir(), "kiln-runfile-")));
+  const real = `run-${"ab".repeat(16)}.json`;
+  for (const name of [real, "run-.json", "run-not-a-run-id.json", `run-${"AB".repeat(16)}.json`, "run-x.json.json", "notes.txt"])
+    writeFileSync(join(runtime, name), "x", "utf-8");
+  assert.deepEqual(leftoverRunFiles(runtime), [real]);
+});
+
+test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", async () => {
+  // Reproduced against the previous version, with this fixture: the two descendant joins ran one
+  // after the other and each waited out the process table's own timeout, and the run loop's
+  // `finally` then took two more of them, so the teardown had not finished when this test gave up
+  // at TWENTY SECONDS — with a 600ms budget configured, on a terminal whose operator had just
+  // pressed Ctrl+C. The sibling control below, which lets the old version run to completion,
+  // measured the whole of it at 48.8 seconds. Each bound was honoured; their sum was not bounded.
+  //
+  // ⚠️ ASSERTED AS A DEADLINE, because a hang has no failing assertion of its own — and the
+  // arithmetic is stated rather than a round number: a 600ms budget, of which enumeration may take a
+  // third, and three waiting periods that each keep their floor however little is left.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const calls = [];
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: 9100 + calls.length,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      kill: () => true, // nothing here ever goes: the bound is the whole of what is under test
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    calls.push({ command, args, options, child });
+    return child;
+  };
+
+  const graceMs = 400;
+  const hardMs = 200;
+  const outcome = runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    // ⚠️ A PROCESS TABLE THAT NEVER ANSWERS. Measured on Windows, not invented: an operator's
+    // Ctrl+Break reaches PowerShell too, and PowerShell answers it by breaking into its debugger.
+    psRun: () => new Promise(() => {}),
+    kill: () => true,
+    run: () => ({ status: 0, stdout: "" }),
+    signalTarget: signals,
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs,
+    hardMs,
+  }).catch((x) => x);
+
+  for (let i = 0; i < 400 && calls.length < 2; i++) await sleep(10);
+  assert.equal(calls.length, 2, "both children started");
+  const raised = Date.now();
+  signals.raise("SIGINT");
+  const e = await Promise.race([outcome, sleep(20_000).then(() => "HUNG")]);
+  const elapsed = Date.now() - raised;
+
+  assert.notEqual(e, "HUNG", "the teardown must end without waiting out two process-table timeouts");
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 140)}`);
+  const ceiling = graceMs + hardMs + 3 * (graceMs + hardMs) + 1500; // budget, the three floors, and slack
+  assert.ok(elapsed < ceiling, `the whole teardown must fit one budget: ${elapsed}ms, ceiling ${ceiling}ms`);
+
+  // ⚠️ AND THE JOIN HAPPENED RATHER THAN BEING SKIPPED, on BOTH trees. A shutdown that never
+  // waited for its queries would also be fast, and would be fast by not looking.
+  const shutdown = e.detail.shutdown;
+  assert.equal(shutdown.agent.descendantLooks.unresolved, 1, "the agent's query was joined, bounded, and reported");
+  assert.equal(shutdown.launcherTree.descendantLooks.unresolved, 1, "and so was the launcher's");
+  assert.equal(shutdown.budget.ms, graceMs + hardMs, "the record carries the budget it was given");
+  assert.ok(shutdown.budget.spentMs >= 0, "and what the teardown actually cost");
+});
+
+test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", async () => {
+  // The bound above is satisfied by a sequential join too — the periods after it simply get less —
+  // so the thing that makes the enumeration worth its share of the budget needs its own control.
+  // They are two independent queries about two different trees; run one after the other, the second
+  // starts with the budget already half spent.
+  //
+  // ⚠️ COUNTED, NOT TIMED. Two queries in flight at once is the fact; a duration would be a proxy
+  // for it that a slow machine can falsify.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const calls = [];
+  const byPid = new Map();
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: 9300 + calls.length,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      kill: () => {
+        child.exitCode = 0;
+        child.onExit?.(0, null);
+        return true;
+      },
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    byPid.set(child.pid, child);
+    calls.push({ command, args, options, child });
+    return child;
+  };
+  const end = (pid) => {
+    const c = byPid.get(Number(pid));
+    if (!c) return;
+    c.exitCode = 0;
+    c.onExit?.(0, null);
+  };
+
+  let hang = false;
+  let inFlight = 0;
+  let mostAtOnce = 0;
+  const startedAt = [];
+  const psRun = () => {
+    if (!hang) return Promise.resolve({ status: 0, stdout: "" });
+    startedAt.push(Date.now());
+    inFlight += 1;
+    mostAtOnce = Math.max(mostAtOnce, inFlight);
+    return new Promise(() => {}); // the join has to give up on this one, which is what makes it observable
+  };
+
+  const run = runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun,
+    // ⚠️ **WINDOWS, FOR ITS THREE-SECOND POLL.** What is being counted is the two joins the
+    // shutdown performs; a 500ms poll would put its own queries in flight beside them and the count
+    // would no longer be about the joins at all.
+    platform: "win32",
+    kill: (pid, signal) => (signal === 0 ? true : (end(pid), true)),
+    run: (cmd, args) =>
+      cmd === "taskkill" ? (end(args[args.indexOf("/pid") + 1]), { status: 0, stdout: "" }) : { status: 0, stdout: "" },
+    signalTarget: signals,
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs: 600,
+    hardMs: 300,
+  });
+
+  for (let i = 0; i < 400 && calls.length < 2; i++) await sleep(10);
+  assert.equal(calls.length, 2, "both children started");
+  hang = true;
+  signals.raise("SIGINT");
+  await run;
+
+  assert.equal(mostAtOnce, 2, `both joins must be in flight at once, saw at most ${mostAtOnce}`);
+  assert.equal(startedAt.length, 2, `one last look per tree and no more, saw ${startedAt.length}`);
+  // ⚠️ **AND THEY STARTED TOGETHER, WHICH IS THE PART THE COUNT ALONE DOES NOT SETTLE.** Measured
+  // against the previous version, the count assertions above pass there too, for a reason that has
+  // nothing to do with the fix: the joins ran one after the other for twelve seconds each, and
+  // during the first of them the OTHER tracker's three-second poll started a query of its own. Two
+  // were in flight, and neither pair was two joins. What separates the two versions is WHEN the
+  // second query begins — in the same tick as the first, or at whatever the other tracker's next
+  // poll happens to be, measured there at 3008ms after it.
+  const apart = Math.abs(startedAt[1] - startedAt[0]);
+  assert.ok(apart < 250, `the second join must not wait for the first: they began ${apart}ms apart`);
 });
 
 /* ============================================ what the command reports (bin/start-kiln.mjs) ===== */

@@ -868,13 +868,20 @@ test("⚠️ Pi exiting with a live child is not a stopped tree — the ordinary
 });
 
 test("a tracked tree whose children all went is a clean stop", async () => {
+  // ⚠️ **THE SAMPLE IS AWAITED, AND SO IS THE STOP.** Neither was: the first look is asynchronous,
+  // so the snapshot was taken before it settled and `known.pids` was EMPTY — the test then asserted
+  // that a tree with no known descendants had no survivors, which is true of any tree at all and
+  // would have passed against a tracker that never looked. The un-awaited `stop()` also left a query
+  // running past the end of the test.
   const table = processTable([100, 200]);
   const agent = child({ pid: 100 });
   const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1\n200 100\n" }) });
+  await tracker.sample();
   const known = tracker.snapshot();
+  assert.deepEqual(known.pids, [200], "the child was tracked while its parent lived");
   table.living.delete(200); // the child finished with its parent
   agent.go();
-  tracker.stop();
+  await tracker.stop();
 
   const r = await stopTree(agent, { platform: "linux", graceMs: 200, kill: table.kill, knownDescendants: known });
   assert.equal(r.treeStopped, true, "nothing survived, so the tree really is stopped");

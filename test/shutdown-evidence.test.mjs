@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
-import { probePort, pidAlive, runFilePath } from "../lib/supervisor.mjs";
+import { probePort, pidAlive, runFilePath, SHUTDOWN_MIN_PHASE_MS } from "../lib/supervisor.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 installReaper();
@@ -269,6 +269,20 @@ for (const mode of ["natural", "interrupt"]) {
     assert.deepEqual(record.shutdown.files.failed, [], "(6) and nothing it owned was left behind");
     assert.equal(existsSync(mine), false, "(6) the run's own file is gone from the disk, not only from the record");
     assert.equal(readFileSync(strangerIn(dir), "utf-8"), "not this run's\n", "(6) a file it did not create survives");
+
+    // ⚠️ **AND IT WAS BOUNDED END TO END, WHICH IS WHAT "WITHIN THEIR GRACE PERIODS" MEANS.** Every step was
+    // separately bounded before and their sum was not: two descendant joins at the process table's
+    // own timeout, then a grace and a hard period per tree, each started when its own step began.
+    // The budget is one deadline taken at the trigger; what it can legitimately exceed is the floor
+    // under each of the three waiting periods, which exists so a kill always has time to be observed.
+    // Clause 4 asks for escalation that is bounded; the statement asks for trees stopped within their
+    // grace periods, and a teardown whose steps are each bounded separately satisfies neither.
+    const budget = record.shutdown.budget;
+    const ceiling = budget.ms + 6 * SHUTDOWN_MIN_PHASE_MS;
+    assert.ok(
+      budget.spentMs <= ceiling,
+      `(4) the teardown must fit one budget: spent ${budget.spentMs}ms of ${budget.ms}ms, ceiling ${ceiling}ms`
+    );
 
     // ⚠️ **AND THE DESCENDANTS ARE CHECKED AGAINST THE OPERATING SYSTEM, not against the record.**
     // Everything above is the supervisor's account of itself. This is the independent one: the two
