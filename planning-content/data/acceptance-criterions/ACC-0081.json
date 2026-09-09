@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Shutdown leaves nothing running on either platform",
   "statement": "After Pi exits, or after an interrupt, both process trees are stopped within their grace periods, the port is free, and only files created by that invocation were removed. Seven things are observed and recorded SEPARATELY, because they fail separately and because any one of them standing for the others is how a shutdown claim becomes untestable. An observation that was not made is recorded as unmade and the shutdown is reported partial; it is never treated as one that passed. (1) Which of the two triggers ended the run — Pi exiting on its own, or a signal — derived from the observed signal rather than supplied beside it, so the record cannot contradict itself; the signal is recorded where it was handled and never inferred from the processes having gone, and a run ended by Pi exiting records no signal rather than a fabricated one. (2) For each tree independently, either that it had already exited or that a stop was requested of it: a tree that was already gone is recorded as such and is not asked, and a supervisor that asks one tree and not the other looks identical to a correct one on every run where the unasked tree exits anyway. (3) That each tree's exit was independently observed, so one going never stands in for the other. (4) That where a graceful stop did not complete, escalation was bounded and its outcome observed — reported as unobserved rather than assumed when the process still did not go. (5) That the port accepts a fresh exclusive bind afterwards, observed by rebinding rather than derived from any process record: an exit code says the leader is gone and says nothing about a worker still listening. (6) That only runtime files this invocation created were removed, proved by a file it did not create still being present afterwards, not merely by its own being gone. (7) That the results are recorded independently for Windows and for the supported POSIX platform through CI, rather than one platform's pass standing for both, and that each platform's observation includes a KNOWN DESCENDANT of each tree rather than only the leader's exit code. The platforms differ in the only mechanism that matters here: a graceful signal is unavailable on Windows, and on POSIX a process group can be targeted only for a child spawned as a group leader — which the foreground agent cannot be, since a detached process cannot read the terminal, so its descendants must be enumerated and signalled individually. A descendant enumeration that fails is recorded as unmade, because an empty list would claim a tree with no children.",
   "evaluates": [
@@ -12,5 +12,8 @@
   ],
   "verifies": [
     "REQ-0022"
+  ],
+  "evidencedBy": [
+    "EVD-0088"
   ]
 }

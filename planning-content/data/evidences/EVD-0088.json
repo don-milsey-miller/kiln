@@ -1,0 +1,58 @@
+{
+  "id": "EVD-0088",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the shutdown contract observed on both platforms through CI, seven observations per run",
+  "kind": "experiment",
+  "summary": "ACC-0081's seven observations, made separately on both platforms through CI rather than one platform's pass standing for the other. GitHub Actions run 34388578948 at commit 36df281, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green. Each cell runs the shutdown twice as a SEPARATE PROCESS driving the production `runSupervisor`, once ending with the agent exiting on its own and once with an operator's interrupt, with a real port, real children, a real grandchild under each tree, the platform's own process table (`ps` on POSIX, `Get-CimInstance Win32_Process` on Windows) and the platform's own kill mechanism. linux/interrupt (node 24, run 26fe94df5c98f86b4843cb3d082bf49c) is the cell that observes the SIGINT DELIVERY itself: trigger `signal`, signal `SIGINT` recorded where it was handled; the agent tree stopped by SIGTERM to the process and its descendants without escalation; the launcher tree escalated to SIGKILL on the process group; descendant looks clean 3 and clean 4 with nothing raced, failed or unresolved; both trees `treeStopped: true` with a known descendant each; exactly this invocation's run file in `files.removed` with a file it did not create — named like a run file on purpose — still byte-identical; `portFree: true` proved by rebinding; `notObserved: []`; `complete: true`; 5131ms of an 8000ms budget. linux/natural (11ff6636791140a1edc948ceae5a43ed) records the Pi-exit trigger with no signal fabricated, clean 7 and clean 8 looks, and 6987ms spent. win32/interrupt (8966f8adc2714ad369ad71340d05b0af) is delivered as a REAL console control event: a PowerShell harness allocates a private hidden console, starts the supervisor with CREATE_NEW_PROCESS_GROUP, proves through GetConsoleProcessList that the console holds only itself and that process, and sends CTRL_BREAK_EVENT to that group — `sent: true`, `isolated: true`, `refusal: null` on the CI runner, so the observation is made there and not only on the author's machine. The supervisor records `signal: \"SIGBREAK\"`, stops both trees through `taskkill /T /F`, clean 3 looks on the agent tree with nothing raced or failed, and spends 5512ms of 8000. win32/natural (d6b0815c0ae5531592f06f590df0e736) spends 7243ms and shows the ordinary Windows shape: clean 1, raced 1 — a look started before the leader exited and answered after it, discarded and counted rather than mistaken for an empty tree. Two production defects were found by these runs before the criterion could be met, and both are fixed and controlled. A shutdown that reported itself INCOMPLETE on roughly half of ordinary Windows exits, because the last descendant look raced the agent's exit and marked the enumeration unmade — a Windows process table costs about 1.4s against a 3s poll, so the race is the normal case; `enumerated` now means at least one look completed while the leader was alive, with raced, failed and unresolved counted in the record. And an unbounded wait that hung six supervisors on a wedged PowerShell query, since an operator's Ctrl+Break reaches the process table program too and PowerShell answers it by breaking into its debugger.",
+  "outcome": "success",
+  "observedAt": "2026-09-09",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34388578948",
+      "commit": "36df281",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 — all four cells green",
+      "node": "24.20.0 on the ubuntu cell quoted above; 22.x and 24.x across the matrix",
+      "command": "npm test (node --test), test/shutdown-evidence.test.mjs",
+      "linux-interrupt": "trigger signal, signal SIGINT, complete true, 5131ms of 8000ms",
+      "linux-natural": "trigger agent-exit, signal null, complete true, 6987ms of 8000ms",
+      "win32-interrupt": "CTRL_BREAK_EVENT to a private console's process group, signal SIGBREAK, complete true, 5512ms of 8000ms",
+      "win32-natural": "trigger agent-exit, signal null, complete true, 7243ms of 8000ms",
+      "process-table": "ps -A -o pid=,ppid= on POSIX; Get-CimInstance Win32_Process on Windows"
+    },
+    "omissions": [
+      {
+        "fact": "macos-shutdown",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. The criterion asks for Windows and THE supported POSIX platform, which this project's CI defines as Linux; macOS is not built, not tested and not claimed. A BSD-derived platform's process table and process-group behaviour are not observed by anything here."
+      },
+      {
+        "fact": "windows-sigint-delivery",
+        "state": "not-observable",
+        "reason": "No API can deliver SIGINT to a Windows process: `child.kill(\"SIGINT\")` is TerminateProcess, measured — the target's handler never runs and it dies reporting SIGKILL. What an operator's Ctrl+C sends is a console control event, and CTRL_C_EVENT is undeliverable on this route because a process started from PowerShell inherits Ctrl+C disabled and a process in a new process group ignores it by definition; the Ctrl+Break handler ran and the Ctrl+C handler never did, under both Start-Process and a raw ProcessStartInfo. The Windows cell therefore observes SIGBREAK through the same handler and the same shutdown, and the SIGINT delivery itself is observed only by the POSIX cell."
+      },
+      {
+        "fact": "real-pi-and-next-children",
+        "state": "not-captured",
+        "reason": "The supervisor under observation is the production one and the processes, port, process table and kill mechanism are real, but the two children are fixtures: Pi needs credentials and an interactive UI, and `next start` needs a build. What this does not observe is either real program's own behaviour on being signalled — only that the supervisor performs and observes the contract against processes that spawn real grandchildren."
+      },
+      {
+        "fact": "escalation-under-a-child-that-ignores-signals",
+        "state": "not-captured",
+        "reason": "Both trees went within their grace periods in all four cells, so the bounded-escalation clause is exercised here only where the launcher tree needed the group kill. A tree that survives escalation is covered by unit controls over injected process tables, not by this platform run."
+      }
+    ]
+  }
+}
