@@ -253,10 +253,16 @@ test("T4 there is no ambient-chain category, and no contract claims one", () => 
   // ⚠️ DEC: the supported categories are stored auth, explicit environment keys, and validated custom
   // declarations. A fourth would be the widening ACC-0058 forbids, dressed as a feature.
   assert.deepEqual(Object.values(AUTH_SOURCE).sort(), ["custom-environment-key", "environment-key", "stored"]);
+  // ⚠️ **A NAME BELONGING TO AN EXCLUDED BRANCH IS THE MILDEST FORM OF THE WIDENING.** `google-vertex`
+  // carried `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` as optional names, which configure the
+  // ADC branch — so the entry described two routes while claiming to support one. They are named here
+  // rather than left to the exact table below, because the rule is standing: no future entry may
+  // reintroduce them either.
+  const ambient = ["GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION"];
   for (const id of supportedProviders())
     for (const name of declaredNames(PROVIDER_CREDENTIALS[id]))
       assert.ok(
-        !/^AWS_/.test(name) && name !== "GOOGLE_APPLICATION_CREDENTIALS",
+        !/^AWS_/.test(name) && !ambient.includes(name),
         `${id} declares ${name}, which belongs to an ambient credential chain`
       );
 });
@@ -343,6 +349,170 @@ test("⚠️ T5 an invalid declaration makes the PROVIDER unsupported, under ACC
   );
   assert.equal(e.detail.provider, "acme");
   assert.equal(e.detail.declarationProblem, DECLARATION_PROBLEM.COMMAND);
+});
+
+/* ================================================ the exact declared names ===================== */
+
+/**
+ * Every supported provider and the complete, ordered list of names it declares.
+ *
+ * ⚠️ **EXACT, BECAUSE MEMBERSHIP ASSERTIONS CANNOT SEE AN ADDITION.** The tests above check that a
+ * provider declares the name it must; none of them notice a name that should not be there. That is
+ * exactly how `google-vertex` carried two ADC variables through a green suite and a green four-cell
+ * CI run. A frozen list fails on an addition, a removal and a reordering alike, so a change to the
+ * audited surface has to be made deliberately here.
+ *
+ * ⚠️ **AND IT IS A PIN, NOT A DERIVATION.** Generating this from the module would assert the module
+ * against itself. Each row was read back against its source: the 36 single-key rows against the
+ * `envVar` literal inside `getApiKeyEnvVars`, `anthropic` and `github-copilot` against the two
+ * branches above it, the Azure and Cloudflare companions against the provider table in
+ * `docs/providers.md`, and `llama.cpp` against `dist/extensions/llama/provider.js` with
+ * `docs/llama-cpp.md`.
+ */
+const EXACT_DECLARED_NAMES = Object.freeze({
+    "ant-ling": ["ANT_LING_API_KEY"],
+    anthropic: ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"],
+    "azure-openai-responses": [
+      "AZURE_OPENAI_API_KEY",
+      "AZURE_OPENAI_BASE_URL",
+      "AZURE_OPENAI_RESOURCE_NAME",
+      "AZURE_OPENAI_API_VERSION",
+      "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
+    ],
+    baseten: ["BASETEN_API_KEY"],
+    cerebras: ["CEREBRAS_API_KEY"],
+    "cloudflare-ai-gateway": ["CLOUDFLARE_API_KEY", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_GATEWAY_ID"],
+    "cloudflare-workers-ai": ["CLOUDFLARE_API_KEY", "CLOUDFLARE_ACCOUNT_ID"],
+    deepseek: ["DEEPSEEK_API_KEY"],
+    fireworks: ["FIREWORKS_API_KEY"],
+    "github-copilot": ["COPILOT_GITHUB_TOKEN"],
+    google: ["GEMINI_API_KEY"],
+    "google-vertex": ["GOOGLE_CLOUD_API_KEY"],
+    groq: ["GROQ_API_KEY"],
+    huggingface: ["HF_TOKEN"],
+    "kimi-coding": ["KIMI_API_KEY"],
+    "llama.cpp": ["LLAMA_BASE_URL", "LLAMA_API_KEY"],
+    minimax: ["MINIMAX_API_KEY"],
+    "minimax-cn": ["MINIMAX_CN_API_KEY"],
+    mistral: ["MISTRAL_API_KEY"],
+    moonshotai: ["MOONSHOT_API_KEY"],
+    "moonshotai-cn": ["MOONSHOT_API_KEY"],
+    nvidia: ["NVIDIA_API_KEY"],
+    openai: ["OPENAI_API_KEY"],
+    opencode: ["OPENCODE_API_KEY"],
+    "opencode-go": ["OPENCODE_API_KEY"],
+    openrouter: ["OPENROUTER_API_KEY"],
+    "qwen-token-plan": ["QWEN_TOKEN_PLAN_API_KEY"],
+    "qwen-token-plan-cn": ["QWEN_TOKEN_PLAN_CN_API_KEY"],
+    "qwen-token-plan-individual": ["QWEN_TOKEN_PLAN_API_KEY"],
+    radius: ["RADIUS_API_KEY"],
+    together: ["TOGETHER_API_KEY"],
+    "vercel-ai-gateway": ["AI_GATEWAY_API_KEY"],
+    xai: ["XAI_API_KEY"],
+    xiaomi: ["XIAOMI_API_KEY"],
+    "xiaomi-token-plan-ams": ["XIAOMI_TOKEN_PLAN_AMS_API_KEY"],
+    "xiaomi-token-plan-cn": ["XIAOMI_TOKEN_PLAN_CN_API_KEY"],
+    "xiaomi-token-plan-sgp": ["XIAOMI_TOKEN_PLAN_SGP_API_KEY"],
+    zai: ["ZAI_API_KEY"],
+    "zai-coding-cn": ["ZAI_CODING_CN_API_KEY"],
+});
+
+test("⚠️ the declared names are exactly these, for exactly these providers", () => {
+  assert.deepEqual(supportedProviders(), Object.keys(EXACT_DECLARED_NAMES).sort(), "the provider set is exact");
+
+  for (const [id, expected] of Object.entries(EXACT_DECLARED_NAMES))
+    assert.deepEqual(declaredNames(resolveProviderCredentials(id)), expected, `${id} declares exactly these names`);
+
+  // ⚠️ AND THE STRUCTURE BEHIND THE FLAT LIST, for the two entries where it is not a flat list. An
+  // `anyOf` collapsed into `required` would report Anthropic as needing all three credentials at once.
+  assert.deepEqual([...PROVIDER_CREDENTIALS.anthropic.required], []);
+  assert.equal(PROVIDER_CREDENTIALS.anthropic.anyOf.length, 1);
+  assert.deepEqual([...PROVIDER_CREDENTIALS["azure-openai-responses"].required], ["AZURE_OPENAI_API_KEY"]);
+  assert.deepEqual(
+    [...PROVIDER_CREDENTIALS["azure-openai-responses"].anyOf[0]],
+    ["AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_RESOURCE_NAME"]
+  );
+});
+
+test("⚠️ google-vertex declares the API-key branch and nothing from the ADC branch", () => {
+  // ⚠️ ITS OWN TEST BECAUSE IT WAS ITS OWN DEFECT. The key route is what Pi's env-key map supports;
+  // project and location belong to Application Default Credentials, which is excluded, so declaring
+  // them amounted to claiming a route this table does not support.
+  const contract = resolveProviderCredentials("google-vertex");
+  assert.deepEqual(declaredNames(contract), ["GOOGLE_CLOUD_API_KEY"]);
+  assert.deepEqual([...contract.optional], [], "no optional names, since the key is the whole contract");
+  assert.deepEqual([...contract.anyOf], []);
+});
+
+/* ================================================ F19: unknown properties ====================== */
+
+test("⚠️ F19 a property beyond the accepted shape is refused, not silently dropped", () => {
+  // ⚠️ **THESE ARE THE PROPERTIES AN OPERATOR WILL ACTUALLY PASTE.** A `models.json` provider block
+  // carries `baseUrl`, `api`, `headers` and `authHeader`, so someone copying one in has every reason
+  // to expect them to matter. Dropping them without a word lets a declaration that reads as
+  // "authenticate with this header" load as "authenticate with this variable name".
+  for (const extra of [
+    { baseUrl: "https://api.example.com" },
+    { api: "openai-completions" },
+    { headers: { Authorization: "Bearer x" } },
+    { authHeader: true },
+    { key: "sk-literal-credential" },
+    { env: { SOME_NAME: "some-value" } },
+    { models: [] },
+    { optionals: ["$OTHER"] },
+  ]) {
+    const e = refusalFrom(
+      () => validateCustomDeclaration({ id: "acme", apiKey: "$ACME_KEY", ...extra }),
+      CONTRACT_REFUSAL.DECLARATION_INVALID
+    );
+    assert.equal(e.detail.problem, DECLARATION_PROBLEM.UNKNOWN_PROPERTY, JSON.stringify(extra));
+    assert.equal(e.detail.unknownCount, 1);
+  }
+
+  // ⚠️ `optionals` IS IN THAT LIST ON PURPOSE: a near miss on `optional` would otherwise be dropped,
+  // and the operator's optional names would silently not exist.
+
+  const many = refusalFrom(
+    () => validateCustomDeclaration({ id: "acme", apiKey: "$ACME_KEY", baseUrl: "u", headers: {}, key: "k" }),
+    CONTRACT_REFUSAL.DECLARATION_INVALID
+  );
+  assert.equal(many.detail.unknownCount, 3);
+  assert.match(many.message, /id, apiKey, optional/, "the refusal must state the accepted shape");
+});
+
+test("⚠️ F19 the refusal names neither the property nor its value", () => {
+  // ⚠️ **ONE OF THEM MAY BE THE CREDENTIAL.** A `key` property holding a literal secret, or a header
+  // naming an internal host, would reach every log this refusal reaches. The count and the accepted
+  // shape are what an operator needs; the offending content is not.
+  const PROP = "zzUnexpectedProperty";
+  const VALUE = "zz-secret-value-must-not-escape";
+  const e = refusalFrom(
+    () => validateCustomDeclaration({ id: "acme", apiKey: "$ACME_KEY", [PROP]: VALUE }),
+    CONTRACT_REFUSAL.DECLARATION_INVALID
+  );
+
+  const everything = `${e.message} ${JSON.stringify(e.detail)}`;
+  assert.ok(!everything.includes(PROP), `the property name must not be echoed: ${everything}`);
+  assert.ok(!everything.includes(VALUE), `the property value must not be echoed: ${everything}`);
+  assert.ok(!everything.includes("zz"), "nor any fragment of either");
+  // What it must say instead.
+  assert.match(e.message, /acme/, "the provider id is the one identifier it does name");
+  assert.match(e.message, /1 property/, "and how many were rejected");
+});
+
+test("F19 the accepted shape still passes, with and without the optional array", () => {
+  assert.deepEqual([...validateCustomDeclaration({ id: "a", apiKey: "$A_KEY" }).optional], []);
+  assert.deepEqual(
+    [...validateCustomDeclaration({ id: "a", apiKey: "$A_KEY", optional: ["$A_REGION"] }).optional],
+    ["A_REGION"]
+  );
+  // ⚠️ AND AN UNKNOWN PROPERTY MAKES THE PROVIDER UNSUPPORTED THROUGH THE RESOLVER, like every other
+  // declaration failure — ACC-0058's reason, with the problem preserved.
+  const e = refusalFrom(
+    () => resolveProviderCredentials("acme", { custom: { id: "acme", apiKey: "$ACME_KEY", baseUrl: "u" } }),
+    CONTRACT_REFUSAL.UNSUPPORTED
+  );
+  assert.equal(e.detail.declarationProblem, DECLARATION_PROBLEM.UNKNOWN_PROPERTY);
 });
 
 /* ================================================ T6: agreement with the pinned package ========= */
