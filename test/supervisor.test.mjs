@@ -1659,6 +1659,98 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
   assert.deepEqual(e.detail.shutdown.launcherTree.descendantsSurviving, [WORKER]);
 });
 
+test("⚠️ THE RUN REMOVES THE FILE IT CREATED, AND LEAVES EVERY FILE IT DID NOT (clause 6)", async () => {
+  // ⚠️ **BOTH HALVES, BECAUSE ONLY ONE OF THEM IS ABOUT THIS INVOCATION.** "Its own file is
+  // gone" is satisfied by a shutdown that empties the runtime directory, which is the failure the
+  // criterion is worded against: another Kiln may be running in this project right now, and its live
+  // -run file has the same NAME SHAPE as ours. So a stranger's file and a previous run's file are
+  // both put there first, and both must still be there afterwards.
+  //
+  // ⚠️ AND THE LIST WAS VACUOUS UNTIL THIS RAN. The run loop passed `ownedFiles: []`, so
+  // `files.failed === []` was true of a shutdown that removed nothing and could never have failed.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const runtime = join(dir, ".pi", "runtime");
+  mkdirSync(runtime, { recursive: true });               // setup's work, done here as setup does it
+  const stranger = join(runtime, "notes.txt");
+  const earlier = join(runtime, `run-${"ab".repeat(16)}.json`);
+  writeFileSync(stranger, "not Kiln's", "utf-8");
+  writeFileSync(earlier, JSON.stringify({ runId: "ab".repeat(16) }), "utf-8");
+
+  const runId = "07".repeat(16);
+  const mine = join(runtime, `run-${runId}.json`);
+  const calls = [];
+  const spawn = recordingSpawn(calls);
+  const lines = [];
+
+  // ⚠️ OBSERVED WHILE THE RUN IS STILL GOING. Afterwards the file is gone either way — by
+  // being removed, or by never having been written — and those are the two things being told apart.
+  let presentAtAgentSpawn = null;
+  let contentAtAgentSpawn = null;
+
+  const result = await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: (command, args, options) => {
+      if (command === "A") {
+        presentAtAgentSpawn = existsSync(mine);
+        contentAtAgentSpawn = presentAtAgentSpawn ? JSON.parse(readFileSync(mine, "utf-8")) : null;
+      }
+      return spawn(command, args, options);
+    },
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(runId),
+    build: null,
+    log: (m) => lines.push(m),
+  });
+
+  assert.equal(presentAtAgentSpawn, true, "the run must have created its own file before handing over the terminal");
+  assert.equal(contentAtAgentSpawn.runId, runId, "and it names the run an operator would be reading the log for");
+  assert.equal(contentAtAgentSpawn.projectId, PROJECT_ID);
+  assert.equal(contentAtAgentSpawn.port, result.port, "and the port it holds");
+
+  assert.deepEqual(result.shutdown.files.removed, [mine], "exactly what this invocation created, and nothing else");
+  assert.deepEqual(result.shutdown.files.failed, []);
+  assert.equal(existsSync(mine), false, "the run's own file is gone");
+  assert.equal(existsSync(stranger), true, "a file this run did not create is still there");
+  assert.equal(readFileSync(earlier, "utf-8").includes("ab".repeat(16)), true, "and so is an earlier run's, byte for byte");
+
+  // The one thing that reads these files back: a leftover is REPORTED, by name, and left alone.
+  assert.ok(
+    lines.some((m) => m.includes("did not complete their shutdown") && m.includes(`run-${"ab".repeat(16)}.json`)),
+    `the earlier run's file must be reported to the operator: ${JSON.stringify(lines)}`
+  );
+});
+
+test("⚠️ a project whose runtime directory is gone still runs, and says it left no run file", async () => {
+  // ⚠️ THE SUPERVISOR CREATES NO STATE DIRECTORY, here as everywhere: that is setup's work,
+  // under the transaction that owns the project lock. The alternative — refusing — would make a
+  // deleted breadcrumb directory more serious than the run it is a breadcrumb for.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const lines = [];
+  const calls = [];
+  await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(),
+    build: null,
+    log: (m) => lines.push(m),
+  });
+
+  assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded");
+  assert.equal(existsSync(join(dir, ".pi", "runtime")), false, "and nothing created the directory");
+  assert.ok(lines.some((m) => m.includes("leaves no run file")), JSON.stringify(lines));
+});
+
 /* ============================================ what the command reports (bin/start-kiln.mjs) ===== */
 
 test("⚠️ AN INTERRUPT NEVER EXITS 0, EVEN WHEN PI SHUT DOWN TIDILY", () => {

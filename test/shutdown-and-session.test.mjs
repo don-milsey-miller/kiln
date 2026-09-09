@@ -126,6 +126,9 @@ function processTable(alive, { immortal = [] } = {}) {
 
 /* ============================================== 1. the signal is its own observation =========== */
 
+/** A newline, spelled without an escape so no generator can mangle it. */
+const LF = String.fromCharCode(10);
+
 test("⚠️ the signal is recorded where it was handled, never inferred from processes exiting", () => {
   // ⚠️ A SUPERVISOR WITH NO HANDLER AT ALL looks identical on every run where the children happened
   // to exit first. The only place "we were interrupted" is true is where the interrupt arrived.
@@ -876,6 +879,110 @@ test("a tracked tree whose children all went is a clean stop", async () => {
   const r = await stopTree(agent, { platform: "linux", graceMs: 200, kill: table.kill, knownDescendants: known });
   assert.equal(r.treeStopped, true, "nothing survived, so the tree really is stopped");
   assert.deepEqual(r.descendantsSurviving, []);
+});
+
+test("⚠️ STOP JOINS A QUERY ALREADY IN FLIGHT, rather than walking away from it", async () => {
+  // Reproduced: with the exited-leader return placed BEFORE the in-flight check, a leader that died
+  // during an interval query made `stop()` return at once — so the shutdown read and acted on a
+  // snapshot that the query, settling a moment later, was about to change. An exited leader is a
+  // reason not to START a query; it is not a reason to abandon the one whose answer is about to be
+  // doubted, because the record is supposed to describe every look this tracker took.
+  //
+  // The second query is held open deliberately, so the ordering is the thing under test rather than
+  // a timing that happens to work.
+  const child = { pid: 100, exitCode: null, signalCode: null };
+  let release;
+  const held = new Promise((r) => (release = r));
+  let calls = 0;
+
+  const tracker = trackDescendants(child, {
+    intervalMs: 20,
+    psRun: async () => {
+      calls += 1;
+      if (calls === 1) return { status: 0, stdout: "100 1" + LF + "200 100" + LF };
+      await held;
+      return { status: 0, stdout: "200 1" + LF }; // 200 has been re-parented: no children to relate
+    },
+  });
+
+  await new Promise((r) => setTimeout(r, 60)); // the interval starts a second query
+  child.exitCode = 0; // and the leader dies while it is running
+  setTimeout(release, 60);
+
+  await tracker.stop();
+  const snap = tracker.snapshot();
+  assert.equal(snap.looks.raced, 1, "the snapshot the shutdown uses must already count the look that raced");
+  assert.deepEqual(snap.pids, [200], "and the raced answer must not have removed what a live look found");
+  assert.equal(snap.enumerated, true, "a live look was made, so the enumeration was made");
+});
+
+test("⚠️ A TREE WHOSE ONLY LOOK RACED IS REPORTED UNMADE, not as an empty tree", async () => {
+  // ⚠️ THE HALF THAT KEEPS THE LENIENCY HONEST. A raced look is discarded rather than treated as a
+  // failure, which is right only while some look succeeded: if the leader died during the FIRST
+  // query, nothing ever saw its children, and an empty list would be the claim clause 7 forbids —
+  // a tree reported childless by a look that could not have seen a child.
+  const child = { pid: 100, exitCode: null, signalCode: null };
+  let release;
+  const held = new Promise((r) => (release = r));
+  const tracker = trackDescendants(child, {
+    intervalMs: 10_000,
+    psRun: async () => {
+      await held;
+      return { status: 0, stdout: "200 1" + LF };
+    },
+  });
+
+  await new Promise((r) => setTimeout(r, 30));
+  child.exitCode = 0;
+  setTimeout(release, 20);
+  await tracker.stop();
+
+  const snap = tracker.snapshot();
+  assert.equal(snap.enumerated, false, "no look survived the leader, so the enumeration was NOT made");
+  assert.deepEqual(snap.pids, [], "and nothing is claimed about the tree");
+  assert.equal(snap.looks.clean, 0);
+});
+
+test("⚠️ A PROCESS TABLE THAT NEVER ANSWERS DOES NOT HANG THE SHUTDOWN", async () => {
+  // ⚠️ **MEASURED, NOT IMAGINED.** An operator's Ctrl+Break on Windows reaches every process in the
+  // console — including the PowerShell this supervisor runs to read the process table — and
+  // PowerShell answers Ctrl+Break by breaking into its debugger, so the query never returns. Six
+  // supervisors were left hung on exactly that, each holding a wedged `powershell` child, in the
+  // middle of the shutdown ACC-0081 requires to be BOUNDED. Joining an in-flight query is right;
+  // waiting for one that never comes back is a hung terminal.
+  //
+  // Asserted as a DEADLINE, because a hang has no failing assertion of its own.
+  const child = { pid: 100, exitCode: null, signalCode: null };
+  const tracker = trackDescendants(child, { intervalMs: 10_000, psRun: () => new Promise(() => {}) });
+
+  const started = Date.now();
+  await tracker.stop({ joinMs: 300 });
+  assert.ok(Date.now() - started < 5000, "stop() must give up on a query that never answers");
+
+  const snap = tracker.snapshot();
+  assert.equal(snap.looks.unresolved, 1, "and say that a look was left unresolved");
+  assert.equal(snap.enumerated, false, "no look completed, so nothing was enumerated");
+});
+
+test("⚠️ A LOOK THAT FAILS LATER DOES NOT UNMAKE ONE THAT SUCCEEDED", async () => {
+  // The same reasoning as the raced look, and the same measured cause: an interrupt reaches the
+  // process table program too. A query it cancelled is a look that failed, and treating it as "this
+  // tree was never enumerated" would report the ordinary interrupted run as incomplete while the
+  // tree it names was enumerated, reached and stopped.
+  const child = { pid: 100, exitCode: null, signalCode: null };
+  let call = 0;
+  const tracker = trackDescendants(child, {
+    intervalMs: 10_000,
+    psRun: async () => (++call === 1 ? { status: 0, stdout: "100 1" + LF + "200 100" + LF } : { status: 1, stdout: "" }),
+  });
+  await tracker.sample();
+  await tracker.sample();
+
+  const snap = tracker.snapshot();
+  assert.equal(snap.enumerated, true, "a look was made, and a later failure does not unmake it");
+  assert.deepEqual(snap.pids, [200], "what the good look found is still what will be stopped");
+  assert.equal(snap.looks.failed, 1, "and the failure is recorded rather than forgiven silently");
+  await tracker.stop();
 });
 
 test("the tracker keeps the UNION, so a child seen once is not lost by a later poll", async () => {
