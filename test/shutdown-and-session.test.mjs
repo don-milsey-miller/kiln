@@ -841,10 +841,11 @@ test("⚠️ Pi exiting with a live child is not a stopped tree — the ordinary
 
   // Tracked while it lives, exactly as the run loop will.
   const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1\n200 100\n" }) });
+  await tracker.sample();
   const known = tracker.snapshot();
   assert.deepEqual(known.pids, [200], "the relationship was visible while the parent was alive");
   agent.go(); // Pi exits on its own
-  tracker.stop();
+  await tracker.stop();
 
   const r = await stopTree(agent, {
     platform: "linux",
@@ -877,7 +878,7 @@ test("a tracked tree whose children all went is a clean stop", async () => {
   assert.deepEqual(r.descendantsSurviving, []);
 });
 
-test("the tracker keeps the UNION, so a child seen once is not lost by a later poll", () => {
+test("the tracker keeps the UNION, so a child seen once is not lost by a later poll", async () => {
   // ⚠️ KEEPING ONLY THE LAST SAMPLE would lose anything that started and finished between two polls
   // — and, worse, anything present at the first look and re-parented before the second.
   const agent = child({ pid: 100 });
@@ -885,7 +886,11 @@ test("the tracker keeps the UNION, so a child seen once is not lost by a later p
   const tracker = trackDescendants(agent, {
     psRun: () => ({ status: 0, stdout: ++look === 1 ? "100 1\n200 100\n" : "100 1\n300 100\n" }),
   });
-  tracker.sample();
+  // ⚠️ **THE SAMPLE IS AWAITED NOW, because reading a process table is I/O and on Windows it costs a
+  // PowerShell start.** A synchronous poll at that price left the supervisor blocked a large share
+  // of the time, which is an operator's Ctrl+C sitting unhandled.
+  await tracker.sample();
+  await tracker.sample();
   assert.deepEqual(tracker.snapshot().pids.sort(), [200, 300], "both, not just the latest");
-  tracker.stop();
+  await tracker.stop();
 });
