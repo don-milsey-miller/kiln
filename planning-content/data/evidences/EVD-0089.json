@@ -1,0 +1,57 @@
+{
+  "id": "EVD-0089",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the self-host refusal and its two-part opt-in, observed on both platforms through CI",
+  "kind": "experiment",
+  "summary": "ACC-0082's refusal and its two-part opt-in, observed on both platforms through CI. GitHub Actions run 34397699648 at commit 7c3dde6, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green: 776 tests, 0 failures in every cell (3 skipped on the Linux cells, 1 on the Windows cells, all platform-gated and unrelated). Each of the four cells executed all TEN of the criterion's tests, counted in the log rather than inferred from a green tick — the node 22 cells emit TAP and the node 24 cells emit the spec reporter, so counting only the spec reporter's marks reports zero on half the matrix. What the ten observe: (1) the tool checkout refuses without the opt-in, with both roots and both parts of the opt-in named in the refusal; (2) that refusal arrives BEFORE the project record is read, so a tool checkout is refused for being one rather than answered with 'run setup for this project' — setup being precisely what would create .pi/ here; (3) the flag outside the tool checkout is refused rather than ignored, with the override supplied and agreeing so the root comparison is what is under test; (4) the flag without PLANNING_CONTENT_DIR is refused, naming the variable and a value for it; (5) the flag and the override are checked AGAINST EACH OTHER — the owning directory of the named content root is re-derived and compared to the tool root, since the project root is dirname(contentRoot) and comparing only it would check that derivation against itself; (6) both parts agreeing is the one accepted arrangement, and an ordinary consumer run with different roots and no flag is untouched by any of it; (7) the opt-in GRANTS NOTHING — a self-hosting run with an invalid .pi/kiln.json still refuses project-record-invalid, which is the mutation this exists to catch, a self-host branch that skips the consumer-root checks because the operator asked for it; (8) an accepted self-hosting run completes against the production runSupervisor and announces the mode and the directory; (9) --self-host with no override reaches the SELF-HOST refusal THROUGH THE REAL COMMAND, spawned as a child process with PLANNING_CONTENT_DIR removed from the inherited environment; (10) the command line takes --self-host and refuses --selfhost, --self_host, -s, --self-host=true and a bare word. Observation 9 is the one a direct call on the helper cannot make. main() reaches resolveSelfHost only after resolveProjectRoot, and the project root is dirname(contentRoot) — so with the flag given and no override there is no content root to take the dirname of, and the command died first with the generic 'no planning content root'. That refusal answers a question the operator did not ask, about the rule they were trying to override, and its hint line does not mention the flag they typed. The checks that need only the flag and the environment therefore moved into assertSelfHostOptIn, which bin/start-kiln.mjs calls before it resolves anything and which resolveSelfHost still calls itself, so the earlier call is an ordering fix rather than the only place the rule lives. That ordering was confirmed by mutation before this run: with the assertSelfHostOptIn call removed from main(), test 9 fails; restored, it passes.",
+  "outcome": "success",
+  "observedAt": "2026-09-09",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34397699648",
+      "commit": "7c3dde6",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "node": "node 22 and node 24 as provisioned by actions/setup-node on the runner images",
+      "command": "npm test (node --test), test/supervisor.test.mjs",
+      "acc-0082-tests": "10 of 10 in every cell: 102621376605 ubuntu/22, 102621377043 ubuntu/24, 102621377015 windows/22, 102621377014 windows/24",
+      "totals": "776 tests, 0 fail in each cell; 3 skipped on ubuntu, 1 on windows, all platform-gated and unrelated",
+      "cli-path": "test 9 spawns bin/start-kiln.mjs as a child with PLANNING_CONTENT_DIR deleted from the inherited environment, and asserts exit 2, the self-host refusal text, and the ABSENCE of the generic content-root refusal",
+      "under-test": "lib/supervisor.mjs assertSelfHostOptIn and resolveSelfHost; bin/start-kiln.mjs parseArgs and its pre-resolution guard"
+    },
+    "omissions": [
+      {
+        "fact": "pi-directory-before-and-after",
+        "state": "not-captured",
+        "reason": "The criterion's 'refuses rather than writing .pi/ into the tool repository' is established CAUSALLY here, not by measurement: the refusal is raised before the project record is read and before any child is spawned, and the test supplies a `spawn` that fails the test if it is called at all. No run compares a before-and-after .pi/ tree. What is observed is that the write cannot be REACHED, which is a different claim from a tree observed unchanged - a later change that moved a write earlier than this gate would not be caught by these ten."
+      },
+      {
+        "fact": "self-host-run-against-real-pi-and-next",
+        "state": "not-captured",
+        "reason": "The accepted self-hosting run drives the production runSupervisor, but both children are fixtures: Pi needs credentials and an interactive UI, and `next start` needs a build. What this does not observe is either real program running with the tool checkout as its working directory - only that the supervisor admits the mode and performs the same contract it performs for a consumer project."
+      },
+      {
+        "fact": "real-consumer-install-layout",
+        "state": "not-captured",
+        "reason": "Nine of the ten supply the tool root and the project root to the helper directly, over temporary directories. Only the command-level test runs against a real checkout, and that checkout is this repository, where the two roots coincide. No cell observes the ordinary consumer layout - a tool at <project>/.planning/ with the project one directory above it - reaching the non-self-hosting path end to end."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. The path-identity rule this criterion turns on is case-insensitive on Windows and case-sensitive on POSIX, and macOS's default case-insensitive filesystem is a third behaviour that nothing here runs on."
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The self-hosting checkout is refused unless explicitly opted into",
   "statement": "Run where the tool root and project root are the same directory, the normal command refuses rather than writing `.pi/` into the tool repository. The opt-in requires both the explicit content-directory override and the self-host flag, and the supervisor verifies the two agree before starting.",
   "evaluates": [
@@ -12,5 +12,8 @@
   ],
   "verifies": [
     "REQ-0022"
+  ],
+  "evidencedBy": [
+    "EVD-0089"
   ]
 }
