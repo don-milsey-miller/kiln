@@ -18,7 +18,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
 
 import {
@@ -40,6 +42,7 @@ import {
 } from "../lib/session-record.mjs";
 
 const PROJECT_ID = "abcdef0123456789abcdef0123456789";
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "supervisor");
 const scratch = () => mkdtempSync(join(tmpdir(), "kiln-shut-"));
 
 /**
@@ -969,6 +972,30 @@ test("⚠️ A PROCESS TABLE THAT NEVER ANSWERS DOES NOT HANG THE SHUTDOWN", asy
   const snap = tracker.snapshot();
   assert.equal(snap.looks.unresolved, 1, "and say that a look was left unresolved");
   assert.equal(snap.enumerated, false, "no look completed, so nothing was enumerated");
+});
+
+test("⚠️ A JOIN WITH NOTHING ELSE IN THE EVENT LOOP STILL ENDS, in its own process", async () => {
+  // ⚠️ **FOUND BY CI, ON NODE 22, ON BOTH PLATFORMS.** The bound that ends a join was created
+  // with an unreffed timer, copied from the poll above it - where unreffing is right, because a
+  // diagnostic must not keep a process alive. Here it is exactly backwards: the timer is the only
+  // thing that ENDS the join, so unreffed it is no live handle at all. With nothing else pending,
+  // node decides the loop has drained and the shutdown STOPS THERE - mid-teardown, no file cleanup,
+  // no record, no refusal, and in isolation `exit=13, unsettled top-level await`.
+  //
+  // ⚠️ **AND IT HAS TO BE A SEPARATE PROCESS.** Inside this suite there is always other work
+  // pending, which holds the loop open and resolves the join for reasons that have nothing to do
+  // with the join - which is why node 24's runner passed it and node 22's did not. Run alone, the
+  // observation is the same on every version.
+  const { stdout, code } = await new Promise((resolve) => {
+    execFile(process.execPath, [join(FIXTURES, "join-alone.mjs")], { timeout: 20_000 }, (error, out) =>
+      resolve({ stdout: out, code: error?.code ?? 0 })
+    );
+  });
+
+  assert.equal(code, 0, `the join must end rather than the process draining out from under it: ${stdout}`);
+  const seen = JSON.parse(stdout.trim());
+  assert.equal(seen.resolved, true, "stop() resolved");
+  assert.equal(seen.looks.unresolved, 1, "and the query that never answered is recorded as unresolved");
 });
 
 test("⚠️ A LOOK THAT FAILS LATER DOES NOT UNMAKE ONE THAT SUCCEEDED", async () => {
