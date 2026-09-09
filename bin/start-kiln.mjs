@@ -23,7 +23,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
-import { SupervisorRefusal, assertSelfHostOptIn, resolvePinnedAgent, runSupervisor } from "../lib/supervisor.mjs";
+import { SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
+import { resolvePinnedAgent } from "../lib/pi-runtime.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);

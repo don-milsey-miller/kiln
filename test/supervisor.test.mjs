@@ -18,10 +18,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 
@@ -35,7 +35,6 @@ import {
   classifyError,
   choosePort,
   probePort,
-  resolvePinnedAgent,
   retryWithPort,
   readProjectRecord,
   runSupervisor,
@@ -48,6 +47,7 @@ import {
   runFilePath,
   writeRunFile,
 } from "../lib/supervisor.mjs";
+import { PINNED_AGENT_NAME, readOwnPin, resolvePinnedAgent } from "../lib/pi-runtime.mjs";
 import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import { exitStatusFor, parseArgs, stoppedSummary } from "../bin/start-kiln.mjs";
@@ -492,6 +492,19 @@ test("a missing, mispinned or escaping agent entry is refused", () => {
     );
 
   refuses("not installed at all");
+
+  // ⚠️ **THE REFUSAL MUST NAME THE EXPECTED VERSION AND THE RESOLVED PATH, not merely refuse.**
+  // ACC-0041 asks for exactly those two, and asserting only the reason code passed while the message
+  // said "not installed" and left an operator to work out which version was wanted and where it was
+  // looked for. Both spellings are checked: the prose an operator reads, and the `detail` a caller
+  // can act on.
+  const missing = refusalFrom(() => resolvePinnedAgent(fake), REFUSAL.AGENT_NOT_INSTALLED);
+  assert.ok(missing.message.includes("0.84.4"), `the refusal must name the expected version: ${missing.message}`);
+  const resolvedPkgDir = join(canonicalPath(fake), "node_modules", "@earendil-works", "pi-coding-agent");
+  assert.ok(missing.message.includes(resolvedPkgDir), `and the path it resolved: ${missing.message}`);
+  assert.equal(missing.detail.expected, `${PINNED_AGENT_NAME}@0.84.4`);
+  assert.equal(missing.detail.pkgDir, resolvedPkgDir);
+
   const manifest = (o) => writeFileSync(join(pkgDir, "package.json"), JSON.stringify(o));
   manifest({ name: "@earendil-works/pi-coding-agent", version: "0.80.6", bin: { pi: "dist/bundle/cli.js" } });
   refuses("a version this checkout never measured");
@@ -503,6 +516,78 @@ test("a missing, mispinned or escaping agent entry is refused", () => {
   refuses("an entry point outside its own package");
   manifest({ name: "@earendil-works/pi-coding-agent", version: "0.84.4", bin: { pi: "dist/bundle/cli.js" } });
   refuses("declared but not installed");
+});
+
+/**
+ * A directory holding an executable named `pi` that reports a version this project never pinned.
+ *
+ * ⚠️ **A REAL EXECUTABLE ON A REAL PATH, because the claim is about what a PATH LOOKUP WOULD FIND.**
+ * A stub that only a test knows about proves nothing: the control below runs bare `pi` through the
+ * platform's own resolution and requires that it find THIS file, which is what makes the treatment
+ * meaningful. Windows resolves `pi` to `pi.cmd` through PATHEXT; POSIX needs the execute bit.
+ */
+const SHADOW_VERSION = "9.9.9-shadow";
+
+function shadowPiOnPath() {
+  const dir = reapLater(mkdtempSync(join(tmpdir(), "kiln-shadow-")));
+  if (process.platform === "win32") {
+    writeFileSync(join(dir, "pi.cmd"), `@echo off\r\necho ${SHADOW_VERSION}\r\n`);
+  } else {
+    const exe = join(dir, "pi");
+    writeFileSync(exe, `#!/bin/sh\necho ${SHADOW_VERSION}\n`);
+    chmodSync(exe, 0o755);
+  }
+
+  // ⚠️ **EVERY SPELLING OF THE VARIABLE IS REPLACED, NOT JUST `PATH`.** Windows environment names are
+  // case-insensitive and a copied `process.env` can carry `Path`; adding a second `PATH` key beside
+  // it leaves the child resolving against whichever the platform prefers, which is the one thing this
+  // test must not leave to chance.
+  const env = {};
+  for (const [k, v] of Object.entries(process.env)) if (!/^path$/i.test(k)) env[k] = v;
+  env.PATH = dir + delimiter + (process.env.PATH ?? "");
+  return { dir, env };
+}
+
+test("⚠️ ACC-0041: a different `pi` earlier on PATH is never what starts", () => {
+  const { env } = shadowPiOnPath();
+
+  // ⚠️ **THE CONTROL COMES FIRST, AND WITHOUT IT THE TREATMENT ASSERTS NOTHING.** If the shadow were
+  // not actually reachable — wrong directory, missing execute bit, PATHEXT not applying — the
+  // treatment below would pass on a machine where no shadowing was ever possible, which is the
+  // failure mode of every "we are not affected by X" test that never established X.
+  // ⚠️ ONE STRING, NOT A COMMAND PLUS ARGS: passing args alongside `shell: true` is deprecated
+  // (DEP0190) because the shell concatenates them unescaped, and a deprecation warning in every
+  // CI cell is noise nobody reads.
+  const control = spawnSync("pi --version", { env, encoding: "utf-8", shell: true });
+  assert.equal(control.status, 0, `the shadow must be runnable: ${control.stderr}`);
+  assert.match(
+    `${control.stdout}`,
+    new RegExp(SHADOW_VERSION),
+    `a PATH lookup must find the shadow, or this test proves nothing: ${control.stdout}`
+  );
+
+  // The treatment: resolve the agent the way the command does, and start it with that same poisoned
+  // PATH. What comes back must be the pinned version from this checkout's node_modules.
+  const agent = resolvePinnedAgent(ROOT);
+  const started = spawnSync(agent.command, [...agent.args, "--version"], { env, encoding: "utf-8" });
+
+  assert.equal(started.status, 0, `the pinned agent must run: ${started.stderr}`);
+  const said = `${started.stdout}`.trim();
+  assert.match(said, /0\.84\.4/, `the started process must report the pinned version, said: ${said}`);
+  assert.ok(!said.includes(SHADOW_VERSION), `the shadow must not be what ran: ${said}`);
+  assert.equal(agent.version, readOwnPin(ROOT).version, "and the resolver's report agrees with the pin");
+});
+
+test("⚠️ ACC-0041: the pin and the Node floor are exactly what DEC-0026 decided", () => {
+  // ⚠️ **EXACT, NOT A RANGE.** DEC-0026: "Changing the pin is an intentional, tested dependency
+  // update that re-runs the compatibility suite; it is never a range that floats." A `^` or `~` here
+  // would let a machine resolve a runtime nothing in this repository was measured against, and the
+  // compatibility suite would go on passing against whatever happened to be installed.
+  const own = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
+  assert.equal(own.dependencies[PINNED_AGENT_NAME], "0.84.4", "the pin is an exact version");
+  // ⚠️ AND THE FLOOR IS NOT A PREFERENCE: 0.84.4 declares engines.node >=22.19.0, and a >=22 floor
+  // would let a 22.0 install resolve a runtime that cannot start.
+  assert.equal(own.engines.node, ">=22.19.0", "the Node floor matches what the pinned runtime requires");
 });
 
 /* ============================================== ACC-0078: stdio routing ======================== */
