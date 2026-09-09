@@ -23,13 +23,14 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
   HOST,
   REFUSAL,
   SupervisorRefusal,
+  resolveSelfHost,
   awaitReadiness,
   classifyError,
   choosePort,
@@ -49,7 +50,7 @@ import {
 } from "../lib/supervisor.mjs";
 import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
-import { exitStatusFor, stoppedSummary } from "../bin/start-kiln.mjs";
+import { exitStatusFor, parseArgs, stoppedSummary } from "../bin/start-kiln.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
 
 installReaper();
@@ -2051,4 +2052,247 @@ test("⚠️ the stopped summary reads the record that exists, not the one that 
   assert.match(line, /launcher exit observed: true/);
   assert.match(line, /launcher tree stopped: true/, "the tree is the half that notices a worker left behind");
   assert.match(line, /\(agent-exit\)/, "and it says which of the two ended the run");
+});
+
+
+/* ============================================ ACC-0082: the self-hosting checkout =============== */
+
+/**
+ * ⚠️ **COVERED SEPARATELY, AND THAT SEPARATION IS THE POINT.** The consumer-root checks are what stop
+ * a run writing where it was not asked to; self-host mode is the one arrangement in which the tool
+ * checkout IS the place it was asked to write. A mode that arrived by relaxing those checks would be
+ * indistinguishable from the bug they exist to prevent, so both halves are asserted here: that the
+ * mode is refused unless it was asked for twice, and that asking twice buys nothing except permission
+ * to reach the same checks every other run makes.
+ */
+
+const selfHosting = (dir) => ({ toolRoot: dir, projectRoot: dir });
+
+/**
+ * The refusal itself, not merely the fact of one. `assert.throws` returns undefined, and what these
+ * assert is largely what the operator READS — the roots named, and the two parts of the opt-in.
+ */
+function refusalFrom(fn, reason) {
+  try {
+    fn();
+  } catch (e) {
+    assert.ok(e instanceof SupervisorRefusal && e.reason === reason, `expected ${reason}, got ${e?.reason ?? e}`);
+    return e;
+  }
+  assert.fail(`expected a ${reason} refusal, and nothing was thrown`);
+}
+
+test("the tool checkout is refused without the opt-in, and the refusal names both roots and both parts", () => {
+  const dir = project();
+  const e = refusalFrom(
+    () =>
+      resolveSelfHost({
+        ...selfHosting(dir),
+        selfHost: false,
+        env: { PLANNING_CONTENT_DIR: join(dir, "planning-content") },
+      }),
+    REFUSAL.SELF_HOST_UNDECLARED
+  );
+  // ⚠️ THE REFUSAL HAS TO BE ACTIONABLE, because the operator who meets it is one keystroke from the
+  // arrangement that writes `.pi/` into the tool repository.
+  assert.match(e.message, /--self-host/, "it must name the flag");
+  assert.match(e.message, /PLANNING_CONTENT_DIR/, "and the override, since the opt-in is both");
+  assert.ok(e.message.includes(canonicalPath(dir)), "and the directory it is refusing to write into");
+});
+
+test("⚠️ the refusal arrives BEFORE the project record, so it never tells the operator to run setup here", async () => {
+  // ⚠️ THIS IS THE ORDERING CLAUSE OF ACC-0082, NOT A TIDY-UP. A tool checkout has no `.pi/kiln.json`,
+  // so checking the record first would answer "run setup for this project" — and setup is precisely
+  // the thing that would create `.pi/` in the tool repository. The right refusal is about WHERE the
+  // run is, and it has to arrive first to be the one the operator reads.
+  const dir = reapLater(mkdtempSync(join(tmpdir(), "kiln-selfhost-")));
+  await assert.rejects(
+    () =>
+      runSupervisor({
+        ...selfHosting(dir),
+        selfHost: false,
+        launcher: { command: "L", args: [] },
+        agent: { command: "A", args: [] },
+        env: { PLANNING_CONTENT_DIR: join(dir, "planning-content") },
+        spawn: () => assert.fail("nothing may be spawned before the mode is settled"),
+        randomBytes: () => Buffer.alloc(16, 1),
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.SELF_HOST_UNDECLARED,
+    "a tool checkout must refuse for being one, not for being unset up"
+  );
+});
+
+test("the flag outside the tool checkout is refused rather than ignored", () => {
+  // ⚠️ ACCEPTING IT WOULD BE THE WORST OF THE FOUR OUTCOMES: an operator with `--self-host` left in a
+  // script believes they are running against the tool's own content while writing into someone
+  // else's project, and nothing in the output would say otherwise.
+  //
+  // ⚠️ THE OVERRIDE IS SUPPLIED AND AGREES WITH THE TOOL ROOT, so the opt-in half passes and this
+  // asserts the root comparison rather than being answered by an earlier check.
+  const dir = project();
+  const tool = join(dir, "tool");
+  assert.throws(
+    () =>
+      resolveSelfHost({
+        toolRoot: tool,
+        projectRoot: dir,
+        selfHost: true,
+        env: { PLANNING_CONTENT_DIR: join(tool, "planning-content") },
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.SELF_HOST_NOT_SELF_HOSTING
+  );
+});
+
+test("the flag without the content override is refused, because the opt-in is two inputs", () => {
+  const dir = project();
+  const e = refusalFrom(
+    () => resolveSelfHost({ ...selfHosting(dir), selfHost: true, env: {} }),
+    REFUSAL.SELF_HOST_NO_CONTENT_OVERRIDE
+  );
+  assert.match(e.message, /PLANNING_CONTENT_DIR=/, "it must name the variable AND a value to give it");
+});
+
+test("⚠️ the flag and the override are checked against each other, not merely each present", () => {
+  // ⚠️ **THE PROJECT ROOT IS DERIVED FROM THE OVERRIDE, SO COMPARING ONLY IT CHECKS A DERIVATION
+  // AGAINST ITSELF.** Here the caller says the project root is the tool root while the override names
+  // content that some other directory owns. One of the two inputs is wrong and neither may be picked.
+  const dir = project();
+  const elsewhere = reapLater(mkdtempSync(join(tmpdir(), "kiln-other-")));
+  const e = refusalFrom(
+    () =>
+      resolveSelfHost({
+        ...selfHosting(dir),
+        selfHost: true,
+        env: { PLANNING_CONTENT_DIR: join(elsewhere, "planning-content") },
+      }),
+    REFUSAL.SELF_HOST_CONTENT_MISMATCH
+  );
+  assert.ok(e.message.includes(canonicalPath(elsewhere)), "the refusal must name the directory that owns the content");
+  assert.ok(e.message.includes(canonicalPath(dir)), "and the tool root it disagrees with");
+});
+
+test("both parts, agreeing, is the one accepted arrangement", () => {
+  const dir = project();
+  const mode = resolveSelfHost({
+    ...selfHosting(dir),
+    selfHost: true,
+    env: { PLANNING_CONTENT_DIR: join(dir, "planning-content") },
+  });
+  assert.equal(mode.selfHost, true);
+  assert.equal(mode.projectRoot, canonicalPath(dir));
+
+  // And an ordinary consumer run — different roots, no flag — is untouched by any of this.
+  assert.equal(resolveSelfHost({ toolRoot: join(dir, ".planning"), projectRoot: dir, env: {} }).selfHost, false);
+});
+
+test("⚠️ the opt-in grants nothing: a self-hosting run meets every check a consumer run meets", async () => {
+  // ⚠️ THE MUTATION THIS EXISTS TO CATCH is a self-host branch that skips the consumer-root checks
+  // "because the operator asked for it". The opt-in decides WHERE the run is; the record, port,
+  // state-coverage and readiness checks all still have to happen after it.
+  const dir = project({ record: null });
+  writeFileSync(join(dir, ".pi", "kiln.json"), JSON.stringify({ recordVersion: 1, projectId: "nope" }));
+
+  await assert.rejects(
+    () =>
+      runSupervisor({
+        ...selfHosting(dir),
+        selfHost: true,
+        launcher: { command: "L", args: [] },
+        agent: { command: "A", args: [] },
+        env: { PLANNING_CONTENT_DIR: join(dir, "planning-content") },
+        spawn: () => assert.fail("an invalid record must refuse before anything is spawned"),
+        randomBytes: () => Buffer.alloc(16, 1),
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.PROJECT_RECORD_INVALID,
+    "self-host mode must not be a way past the project record"
+  );
+});
+
+test("an explicit self-hosting run completes, and says which directory it opened", async () => {
+  const dir = project();
+  const said = [];
+  let launcherExit = null;
+  const calls = [];
+
+  const result = await runSupervisor({
+    ...selfHosting(dir),
+    selfHost: true,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    env: { PLANNING_CONTENT_DIR: join(dir, "planning-content") },
+    psRun: NO_DESCENDANTS,
+    randomBytes: () => Buffer.alloc(16, 9),
+    build: null,
+    log: (m) => said.push(m),
+    spawn: (command, args, options) => {
+      calls.push(options);
+      if (calls.length === 1)
+        return {
+          get exitCode() {
+            return launcherExit;
+          },
+          signalCode: null,
+          stdin: { destroyed: false, write: () => {}, end: () => (launcherExit = 0) },
+          once: () => {},
+        };
+      return exitingChild();
+    },
+    fetchImpl: async () => ({
+      status: 200,
+      json: async () => ({
+        service: "kiln",
+        protocol: "kiln.health/1",
+        runId: "09".repeat(16),
+        projectId: PROJECT_ID,
+        build: null,
+      }),
+    }),
+  });
+
+  assert.equal(result.trigger, "agent-exit");
+  // ⚠️ SAID OUT LOUD. Self-hosting is the one mode where the tool repository is the thing being
+  // written into, and an operator should not have to infer that from a path in some later line.
+  assert.ok(
+    said.some((m) => /self-hosting/i.test(m) && m.includes(canonicalPath(dir))),
+    `the run must name the mode and the directory: ${JSON.stringify(said)}`
+  );
+});
+
+test("⚠️ --self-host with no override reaches the SELF-HOST refusal, through the real command", () => {
+  // ⚠️ **THE HELPER TEST ABOVE CANNOT SEE THIS, AND THAT IS THE WHOLE POINT.** `resolveSelfHost` is
+  // reached from `main()` only after `resolveProjectRoot()`, and the project root is
+  // `dirname(contentRoot)` — so with the flag given and no `PLANNING_CONTENT_DIR` there is no content
+  // root to take the dirname of, and the command died first with the generic "no planning content
+  // root". That refusal answers a question the operator did not ask: they were overriding that rule,
+  // and its hint line does not mention the flag they typed. Only running the command proves the
+  // order, so this runs the command.
+  const env = { ...process.env };
+  delete env.PLANNING_CONTENT_DIR;
+
+  const r = spawnSync(process.execPath, [join(ROOT, "bin", "start-kiln.mjs"), "--self-host"], {
+    env,
+    encoding: "utf-8",
+    cwd: ROOT,
+  });
+
+  assert.equal(r.status, 2, `expected a refusal exit, got ${r.status}: ${r.stderr}${r.stdout}`);
+  const said = `${r.stderr}${r.stdout}`;
+  assert.match(said, /--self-host was given without PLANNING_CONTENT_DIR/, "the refusal must be the self-host one");
+  assert.ok(!/No planning content root/.test(said), `the generic content-root refusal must not be what answers: ${said}`);
+
+  // ⚠️ AND IT MUST SAY WHAT TO DO, both parts of it. An operator who reads only the first line has to
+  // come away knowing the opt-in is two inputs and what the second one is.
+  assert.match(said, /opt-in is BOTH/, "it must say the opt-in is both inputs");
+  assert.match(said, /PLANNING_CONTENT_DIR=.+planning-content/, "and give the variable a value to use");
+  assert.match(said, /^\s*\[kiln\]\s+--self-host\s*$/m, "and repeat the flag beside it");
+});
+
+test("the command line takes --self-host and refuses anything else", () => {
+  assert.deepEqual(parseArgs([]), { selfHost: false });
+  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true });
+
+  // ⚠️ **A NEAR MISS IS A REFUSAL, NOT A SILENT FALSE.** A dropped unrecognised argument would report
+  // a mistyped flag as "refusing to run in the tool checkout", which reads as the flag not working.
+  for (const bad of ["--selfhost", "--self_host", "-s", "--self-host=true", "extra"])
+    assert.match(parseArgs([bad]).error ?? "", /Unrecognised argument/, `must refuse ${bad}`);
 });

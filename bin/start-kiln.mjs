@@ -23,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
-import { SupervisorRefusal, resolvePinnedAgent, runSupervisor } from "../lib/supervisor.mjs";
+import { SupervisorRefusal, assertSelfHostOptIn, resolvePinnedAgent, runSupervisor } from "../lib/supervisor.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -82,11 +82,58 @@ export function exitStatusFor(result) {
   return code ?? (signal ? 1 : 0);
 }
 
-async function main() {
+/**
+ * The command line, which is one flag and nothing else.
+ *
+ * ⚠️ **AN UNRECOGNISED ARGUMENT IS A REFUSAL, NOT A SHRUG.** This file read `process.argv` not at all,
+ * so anything typed after the script name was dropped in silence. That was tolerable while there were
+ * no flags and stops being tolerable the moment one of them is the difference between refusing to
+ * touch the tool repository and writing into it: `--selfhost` or `--self_host` would be discarded, and
+ * the operator would read the refusal that follows as the flag not working rather than as the flag not
+ * existing.
+ *
+ * ⚠️ It is EXPORTED for the same reason the two decisions above are: the alternative to testing it is
+ * running the whole command against the test runner's argv.
+ *
+ * @param {string[]} argv  the arguments after the script name
+ * @returns {{selfHost: boolean, error?: undefined} | {error: string}}
+ */
+export function parseArgs(argv) {
+  const out = { selfHost: false };
+  for (const arg of argv) {
+    if (arg !== "--self-host")
+      return { error: `Unrecognised argument: ${arg}\nThe only flag this command takes is --self-host.` };
+    out.selfHost = true;
+  }
+  return out;
+}
+
+async function main(argv = process.argv.slice(2)) {
+  const args = parseArgs(argv);
+  if (args.error) {
+    for (const line of args.error.split("\n")) console.error(`[kiln] ${line}`);
+    process.exit(2);
+  }
+
+  // ⚠️ **BEFORE THE PROJECT ROOT IS RESOLVED, BECAUSE WITH THE FLAG AND NO OVERRIDE IT CANNOT BE.**
+  // The project root is `dirname(contentRoot)`, and `--self-host` with no `PLANNING_CONTENT_DIR` has
+  // no content root to take the dirname of — so this line used to be the first one to run and the
+  // operator got "no planning content root", a refusal about a rule they were trying to override,
+  // with a hint that does not mention the flag they typed. The half of the opt-in that depends only
+  // on the flag and the environment is decided here; `runSupervisor` re-checks it with the roots.
+  assertSelfHostOptIn({ toolRoot: TOOL_ROOT, selfHost: args.selfHost });
+
   const projectRoot = canonicalPath(resolveProjectRoot());
 
   const result = await runSupervisor({
     projectRoot,
+    // ⚠️ **THE TOOL ROOT IS PASSED RATHER THAN LEFT TO THE SUPERVISOR'S DEFAULT.** This file already
+    // resolved it canonically to pick the launcher and the agent out of THIS checkout, and the
+    // self-host gate asks whether the project root is that same directory. Two derivations of "which
+    // checkout is running" can differ under a symlinked clone, and the one that decides whether `.pi/`
+    // may be written here should be the one that decided which programs run.
+    toolRoot: TOOL_ROOT,
+    selfHost: args.selfHost,
     // ⚠️ Both commands are `process.execPath` plus a script resolved from THIS checkout, so neither
     // depends on PATH and neither is a shell string that could be re-parsed.
     launcher: { command: process.execPath, args: [join(TOOL_ROOT, "bin", "start-shell.mjs")], cwd: TOOL_ROOT },
