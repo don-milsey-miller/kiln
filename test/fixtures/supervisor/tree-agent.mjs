@@ -37,6 +37,15 @@ child.unref?.();
 
 writeFileSync(reportPath, JSON.stringify({ pid: process.pid, childPid: child.pid, mode }) + "\n");
 
+// ⚠️ **ON WINDOWS THE INTERRUPT IS A CONSOLE EVENT, AND IT REACHES EVERYTHING IN THE CONSOLE.**
+// The evidence harness generates a real `CTRL_BREAK_EVENT`, which Windows delivers to every process
+// attached to that console — this one included. An agent that died of it would end the run by
+// EXITING, and the record would say `agent-exit` on a run an operator interrupted: the observation
+// replaced by the thing it is meant to be told apart from. Consuming it models Pi, which handles its
+// own interrupt rather than dying of one, and leaves exactly one process for the event to end — the
+// supervisor — so everything else in the record was stopped BY the supervisor.
+if (process.platform === "win32") process.on("SIGBREAK", () => {});
+
 if (mode === "exit") {
   // ⚠️ **LONG ENOUGH FOR ONE ENUMERATION TO FINISH WHILE THIS IS STILL ALIVE, which on Windows is
   // over a second.** A 400ms session was not a shorter version of a real one — it was a session the

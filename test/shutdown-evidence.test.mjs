@@ -5,14 +5,15 @@
  * MECHANISM.** Every other supervisor test injects `spawn`, `kill`, `run` or `psRun` so it can
  * observe a decision without starting anything. Those prove the supervisor decides correctly given
  * an answer; they cannot prove the answer. Here the children are real processes, the grandchildren
- * are real processes that outlive their parents, the port is a real port, and the enumeration and
- * the kill are whatever this platform actually provides — `ps` and `kill` on POSIX, `wmic`/`ps` and
- * `taskkill` on Windows.
+ * are real processes that outlive their parents, the port is a real port, the file removed at the
+ * end is one a real run created, and the enumeration and the kill are whatever this platform
+ * actually provides — `ps` and `kill` on POSIX, `Get-CimInstance Win32_Process` and `taskkill` on
+ * Windows, where `wmic` is absent from build 26200 and the CIM query is what production uses.
  *
  * ⚠️ **AND IT RECORDS PER PLATFORM RATHER THAN LETTING ONE STAND FOR THE OTHER (clause 7).** CI runs
  * the suite on `ubuntu-latest` and `windows-latest` independently, so each reports for itself; the
  * observation is written to a file under the run's own directory and asserted here. The platforms
- * differ in the only mechanism that matters: there is no graceful request on Windows, and on POSIX a
+ * differ in the only mechanism that matters: there is no graceful signal on Windows, and on POSIX a
  * process group can be targeted only for a child spawned as a group leader — which the foreground
  * agent cannot be, since a detached process cannot read the terminal. So the agent's descendants
  * must be enumerated and signalled individually on both, and the launcher's group form exists only
@@ -33,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
-import { probePort, pidAlive } from "../lib/supervisor.mjs";
+import { probePort, pidAlive, runFilePath } from "../lib/supervisor.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 installReaper();
@@ -44,17 +45,31 @@ const PROJECT_ID = "abcdef0123456789abcdef0123456789";
 const execFileAsync = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** A project the supervisor will accept: a repository, a committed record, and the ignore block. */
+/**
+ * A project the supervisor will accept: a repository, a committed record, the ignore block, and the
+ * runtime directory setup creates.
+ *
+ * ⚠️ **THE STRANGER IN THE RUNTIME DIRECTORY IS HALF OF CLAUSE 6.** "Its own file is gone" is
+ * satisfied by a shutdown that empties the directory, which is the failure the criterion is worded
+ * against — another Kiln may be running in this project right now, and its live-run file has the
+ * same name shape. So a file this run did not create is put there first and must still be there.
+ */
 function project() {
   const dir = reapLater(mkdtempSync(join(tmpdir(), "kiln-evidence-")));
   mkdirSync(join(dir, ".git"), { recursive: true });
-  mkdirSync(join(dir, ".pi"), { recursive: true });
+  mkdirSync(join(dir, ".pi", "runtime"), { recursive: true });
   writeFileSync(join(dir, ".pi", "kiln.json"), JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID }, null, 2) + "\n");
   writeFileSync(join(dir, ".gitignore"), blockText("\n", IGNORE_RULES), "utf-8");
+  writeFileSync(strangerIn(dir), "not this run's\n", "utf-8");
   return dir;
 }
 
-const readJson = (p) => JSON.parse(readFileSync(p, "utf-8"));
+const strangerIn = (dir) => join(dir, ".pi", "runtime", `run-${"ab".repeat(16)}.json`);
+// ⚠️ THE BOM IS STRIPPED, because PowerShell 5.1's `Out-File -Encoding utf8` writes one and
+// `JSON.parse` refuses it. A harness that reported "invalid JSON" here would be blaming the
+// observation for the way it was written down.
+const readJson = (p) => JSON.parse(stripBom(readFileSync(p, "utf-8")));
+const stripBom = (text) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
 
 /** Wait for a file to appear, so "the child got that far" is observed rather than assumed. */
 async function until(path, ms = 30_000) {
@@ -66,11 +81,21 @@ async function until(path, ms = 30_000) {
   assert.fail(`${path} never appeared`);
 }
 
+/** Wait for whichever of these appears first, so a refusal does not have to be waited out. */
+async function untilAny(paths, ms = 60_000) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    for (const p of paths) if (existsSync(p)) return p;
+    await sleep(25);
+  }
+  assert.fail(`none of ${paths.join(", ")} appeared`);
+}
+
 /**
  * Run one observed shutdown and return its record.
  *
- * `mode` is `natural` (Pi finishes on its own) or `interrupt` (the operator's Ctrl+C, delivered to
- * the supervisor process once both trees and both grandchildren are up).
+ * `mode` is `natural` (Pi finishes on its own) or `interrupt` (the operator's interrupt, delivered
+ * once both trees and both grandchildren are up).
  */
 async function observe(mode) {
   const dir = project();
@@ -83,8 +108,7 @@ async function observe(mode) {
     ready: join(dir, "ready"),
   };
   const { port } = await probePort(0);
-
-  const child = execFile(process.execPath, [
+  const argv = [
     join(FIXTURES, "shutdown-evidence.mjs"),
     dir,
     out,
@@ -95,9 +119,12 @@ async function observe(mode) {
     paths.agent,
     paths.agentChild,
     paths.ready,
-  ]);
-  reapLater(child);
+  ];
 
+  if (mode === "interrupt" && process.platform === "win32") return viaConsoleEvent({ dir, out, argv, paths });
+
+  const child = execFile(process.execPath, argv);
+  reapLater(child);
   const finished = new Promise((resolve) => child.once("exit", (code) => resolve(code)));
 
   // ⚠️ THE INTERRUPT WAITS FOR BOTH GRANDCHILDREN. Signalling before they exist would measure a
@@ -111,7 +138,69 @@ async function observe(mode) {
 
   await finished;
   assert.ok(existsSync(out), "the run must record an observation whether it completed or refused");
-  return { record: readJson(out), paths, dir };
+  return { record: readJson(out), paths, dir, delivery: { how: "signal" } };
+}
+
+/**
+ * The Windows interrupt, generated as a real console control event.
+ *
+ * ⚠️ **`child.kill("SIGINT")` IS NOT AN INTERRUPT ON WINDOWS AND THIS IS WHY THE ROUTE EXISTS.**
+ * Measured: it is `TerminateProcess` — the target's handler never runs and it dies reporting
+ * `SIGKILL`. What an operator's Ctrl+C or Ctrl+Break delivers is a CONSOLE CONTROL EVENT to every
+ * process attached to the console, which no Node API can generate. `GenerateConsoleCtrlEvent` can,
+ * so a small PowerShell harness allocates a PRIVATE console, starts the supervisor in it, and sends
+ * `CTRL_BREAK_EVENT` — which Node surfaces as `SIGBREAK`, one of the signals the supervisor watches.
+ *
+ * ⚠️ **IT IS CTRL+BREAK AND NOT CTRL+C, AND THAT LIMIT IS MEASURED.** Both were tried against a
+ * child handling each: the Ctrl+Break handler ran and the Ctrl+C handler never did, because a
+ * process started from PowerShell inherits Ctrl+C disabled and nothing can clear that from outside.
+ * So this cell observes the SIGBREAK path — the same handler, the same shutdown, the trigger
+ * recorded as what it was — and the SIGINT DELIVERY itself is observed only by the POSIX cell.
+ *
+ * ⚠️ **AND THE EVENT REACHES THE PROCESS TABLE PROGRAM TOO, which is how a real defect surfaced.**
+ * PowerShell answers Ctrl+Break by breaking into its debugger, so the CIM query the supervisor had
+ * in flight never returned; six runs hung on it. The shutdown now bounds that query and the join —
+ * `PROCESS_TABLE_TIMEOUT_MS` — and the look is recorded as unresolved rather than waited for.
+ *
+ * ⚠️ **AND IT REFUSES RATHER THAN SENDING INTO A SHARED CONSOLE.** Group 0 means "everything in my
+ * console"; sent from a process still attached to the test runner's console it would interrupt the
+ * test run. The harness proves the console is private — `GetConsoleProcessList` naming only itself
+ * and the supervisor — before sending, and reports the observation unmade if it cannot.
+ */
+async function viaConsoleEvent({ dir, out, argv, paths }) {
+  const plan = join(dir, "ctrl-break-plan.json");
+  const result = join(dir, "ctrl-break-result.json");
+  const trigger = join(dir, "ctrl-break-trigger");
+  const log = join(dir, "supervisor.log");
+  writeFileSync(plan, JSON.stringify({ exe: process.execPath, args: argv, trigger, result, log }) + "\n", "utf-8");
+
+  const ps = execFile("powershell", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    join(FIXTURES, "ctrl-break.ps1"),
+    "-Plan",
+    plan,
+  ]);
+  reapLater(ps);
+  const finished = new Promise((resolve) => ps.once("exit", (code) => resolve(code)));
+
+  // Either both trees come up — and then the event is sent — or the harness reports it could not.
+  const first = await untilAny([paths.agentChild, result]);
+  if (first !== result) {
+    await until(paths.launcherChild);
+    await sleep(3500); // the Windows tracker polls every 3s; let one land with the children present
+    writeFileSync(trigger, "go\n", "utf-8");
+  }
+
+  await finished;
+  const delivery = existsSync(result) ? { how: "console-ctrl-event", ...readJson(result) } : { how: "console-ctrl-event" };
+  // ⚠️ THE SUPERVISOR'S OWN LOG IS CARRIED BACK. On this route nothing is capturing its output, and a
+  // cell that failed with neither a record nor a log is a cell nobody can act on.
+  if (existsSync(log)) delivery.log = readFileSync(log, "utf-8").trimEnd().split("'+NL+'");
+  return { record: existsSync(out) ? readJson(out) : null, paths, dir, delivery };
 }
 
 /** A pid that is gone stays gone; a survivor is what this whole criterion is about. */
@@ -124,35 +213,31 @@ async function goneWithin(pid, ms = 15_000) {
   return false;
 }
 
-/**
- * ⚠️ **THE INTERRUPT PATH IS OBSERVABLE ON POSIX AND NOT ON WINDOWS, AND THAT IS RECORDED RATHER
- * THAN WORKED AROUND.** Measured here: `child.kill("SIGINT")` on Windows is `TerminateProcess` — the
- * target's handler never runs and it dies with `signal: SIGINT` and no chance to write anything; a
- * self-signal exits 1 the same way. What an operator's Ctrl+C actually delivers there is a CONSOLE
- * CONTROL EVENT to the foreground process group, which is not a signal to a pid and which a test
- * harness cannot generate without `GenerateConsoleCtrlEvent`.
- *
- * So this platform's interrupt observation is UNMADE, and ACC-0081 is explicit about what that
- * means: an observation that was not made is recorded as unmade, never treated as one that passed.
- * Faking it — driving the supervisor's signal seam directly — would observe the handler and not the
- * delivery, and would report a platform result the platform did not give.
- */
-const INTERRUPT_OBSERVABLE = process.platform !== "win32";
-
 for (const mode of ["natural", "interrupt"]) {
   test(`⚠️ PLATFORM EVIDENCE (${process.platform}, ${mode}): both trees stopped, each with a known descendant`, async (t) => {
-    if (mode === "interrupt" && !INTERRUPT_OBSERVABLE)
+    const { record, paths, dir, delivery } = await observe(mode);
+
+    // ⚠️ **AN OBSERVATION THAT COULD NOT BE MADE IS RECORDED AS UNMADE, NEVER APPROXIMATED.** The
+    // console harness refuses to send into a console it does not own, and on a runner where it
+    // cannot get a private one there is no way to deliver a real interrupt at all. Driving the
+    // supervisor's signal seam instead would observe the handler and not the delivery, and would
+    // report a platform result this platform did not give.
+    if (!record && delivery.refusal)
       return t.skip(
-        "windows delivers no handleable signal to another process: kill('SIGINT') is TerminateProcess, " +
-          "and an operator's Ctrl+C is a console control event this harness cannot generate. " +
-          "ACC-0081's interrupt observation is UNMADE on this platform and must come from the POSIX cell."
+        `the Windows interrupt could not be delivered safely here: ${delivery.refusal}. ` +
+          `ACC-0081's interrupt observation is UNMADE on this run and is reported as unmade.`
       );
 
-    const { record, paths } = await observe(mode);
+    assert.ok(record, "the run must record an observation whether it completed or refused");
 
     // ⚠️ THE RECORD IS PRINTED SO A CI LOG CARRIES IT. The assertions below are the gate; this is
     // what a person reads when one of them fails on a platform they do not have.
-    console.log(`\n[evidence ${process.platform}/${mode}]\n${JSON.stringify(record, null, 2)}\n`);
+    console.log(`\n[evidence ${process.platform}/${mode}]\n${JSON.stringify({ delivery, ...record }, null, 2)}\n`);
+
+    if (delivery.how === "console-ctrl-event") {
+      assert.equal(delivery.isolated, true, "the event must have gone to a console holding only the supervisor");
+      assert.equal(delivery.sent, true, "GenerateConsoleCtrlEvent must have reported success");
+    }
 
     const launcherChild = readJson(paths.launcherChild).pid;
     const agentChild = readJson(paths.agentChild).pid;
@@ -171,9 +256,19 @@ for (const mode of ["natural", "interrupt"]) {
     assert.notEqual(record.shutdown.agent.descendantsEnumerated, false, "(7) the agent's tree was enumerated");
     assert.notEqual(record.shutdown.launcherTree.descendantsEnumerated, false, "(7) the launcher's tree was enumerated");
     assert.equal(record.shutdown.portFree, true, "(5) the port accepts a fresh bind");
-    assert.deepEqual(record.shutdown.files.failed, [], "(6) nothing this run owned was left behind");
     assert.deepEqual(record.shutdown.notObserved, [], "every observation was made");
     assert.equal(record.shutdown.complete, true);
+
+    // ⚠️ **CLAUSE 6, BOTH WAYS.** `files.failed === []` is true of a shutdown that removed nothing,
+    // so it is not asked on its own: the file this run created is named, is in what was removed, and
+    // is gone — and the file it did not create is still there, byte for byte. The stranger is named
+    // like a run file on purpose. A shutdown that globbed the runtime directory would pass every
+    // other assertion here.
+    const mine = runFilePath(join(dir, ".pi", "runtime"), record.runId);
+    assert.deepEqual(record.shutdown.files.removed, [mine], "(6) exactly this invocation's file");
+    assert.deepEqual(record.shutdown.files.failed, [], "(6) and nothing it owned was left behind");
+    assert.equal(existsSync(mine), false, "(6) the run's own file is gone from the disk, not only from the record");
+    assert.equal(readFileSync(strangerIn(dir), "utf-8"), "not this run's\n", "(6) a file it did not create survives");
 
     // ⚠️ **AND THE DESCENDANTS ARE CHECKED AGAINST THE OPERATING SYSTEM, not against the record.**
     // Everything above is the supervisor's account of itself. This is the independent one: the two
@@ -186,15 +281,25 @@ for (const mode of ["natural", "interrupt"]) {
 test("⚠️ the enumeration really ran on this platform, rather than finding nothing to do", async () => {
   // ⚠️ A GUARD ON THE EVIDENCE ITSELF. Every assertion above is satisfied by an implementation that
   // enumerates nothing and reports an empty tree — `descendantsSurviving: []` reads the same whether
-  // the list was empty or never taken. This asserts the descendant was actually SEEN, which is what
-  // clause 7 means by including a known descendant rather than only the leader's exit code.
+  // the list was empty or never taken. This asserts each known descendant was actually SEEN, which is
+  // what clause 7 means by including a known descendant rather than only the leader's exit code.
+  //
+  // ⚠️ **BOTH TREES, BECAUSE THEY ARE ENUMERATED BY DIFFERENT ROUTES.** The launcher is a process
+  // group leader on POSIX and the agent cannot be; asking only the agent's would leave the launcher
+  // side resting on the group kill having reached something nobody looked for.
   const { record, paths } = await observe("natural");
   const agentChild = readJson(paths.agentChild).pid;
+  const launcherChild = readJson(paths.launcherChild).pid;
 
   assert.ok(
     record.shutdown.agent.descendants?.includes(agentChild),
     `the agent's real descendant ${agentChild} must appear in what was enumerated: ` +
       JSON.stringify(record.shutdown.agent.descendants)
+  );
+  assert.ok(
+    record.shutdown.launcherTree.descendants?.includes(launcherChild),
+    `the launcher's real descendant ${launcherChild} must appear in what was enumerated: ` +
+      JSON.stringify(record.shutdown.launcherTree.descendants)
   );
 });
 

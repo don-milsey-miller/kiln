@@ -55,6 +55,13 @@ const server = createServer((req, res) => {
 });
 server.listen(Number(process.env.PORT), "127.0.0.1", () => writeFileSync(readyPath, "ready\n"));
 
+// ⚠️ **AND THE WINDOWS CONSOLE EVENT IS CONSUMED, so the control channel below is what ends this.**
+// A real `CTRL_BREAK_EVENT` reaches every process in the console, this one included; a launcher that
+// died of it would never be asked politely, and the polite case — leader exits, descendant does not
+// — is the whole reason this fixture exists. A launcher with its own shutdown handling is also the
+// ordinary case: `next start` installs one.
+if (process.platform === "win32") process.on("SIGBREAK", () => {});
+
 // ⚠️ THE CONTROL CHANNEL IT WAS BUILT TO ANSWER. `stop` on the private pipe, or the pipe closing,
 // and it goes — leaving its child exactly where it is.
 process.stdin.setEncoding("utf-8");

@@ -4,7 +4,8 @@
  *
  * ⚠️ **THE SUPERVISOR HERE IS THE PRODUCTION ONE, AND SO ARE THE PROCESSES.** Nothing about the
  * routing, the readiness rule, the descendant enumeration or the platform's kill mechanism is
- * simulated: real children, real grandchildren, a real port, the real `ps`/`wmic` and the real
+ * simulated: real children, real grandchildren, a real port, the real process table — `ps` on POSIX,
+ * `Get-CimInstance Win32_Process` on Windows, where `wmic` is absent from 26200 — and the real
  * `kill`/`taskkill`. That is what makes the record evidence rather than a restatement of the tests.
  *
  * ⚠️ **IT RUNS AS A SEPARATE PROCESS BECAUSE THE INTERRUPT PATH NEEDS ONE.** A signal is delivered
@@ -13,7 +14,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,9 +50,32 @@ try {
     readyMs: 30_000,
     graceMs: 5000,
     hardMs: 3000,
-    log: (m) => console.log(`[sup] ${m}`),
+    // ⚠️ **TO A FILE WHEN ONE IS NAMED, because the console route has no pipe to read.** The Windows
+    // interrupt harness starts this process with `CreateProcess`, in its own process group and with
+    // its own hidden console: nothing is capturing stdout, and a run that refuses there would leave a
+    // failing CI cell with nothing to read. The variable is set by that harness only.
+    log: (m) => {
+      const line = `[sup] ${m}`;
+      console.log(line);
+      if (process.env.KILN_EVIDENCE_LOG) {
+        try {
+          appendFileSync(process.env.KILN_EVIDENCE_LOG, line + "\n");
+        } catch {
+          /* a log that cannot be written is not a reason to fail the run being observed */
+        }
+      }
+    },
   });
-  record({ ok: true, trigger: result.trigger, agentExit: result.agentExit, shutdown: result.shutdown });
+  // ⚠️ THE RUN ID IS RECORDED BECAUSE THE OWNED FILE IS NAMED AFTER IT. Clause 6 is about the file
+  // THIS invocation created; the observer has to be able to name it without guessing.
+  record({
+    ok: true,
+    runId: result.runId,
+    port: result.port,
+    trigger: result.trigger,
+    agentExit: result.agentExit,
+    shutdown: result.shutdown,
+  });
   process.exit(0);
 } catch (e) {
   // ⚠️ A REFUSAL IS AN OBSERVATION TOO, AND IT IS RECORDED RATHER THAN THROWN AWAY. A shutdown the
