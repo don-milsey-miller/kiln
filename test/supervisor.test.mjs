@@ -61,6 +61,44 @@ function project({ record = { recordVersion: 1, projectId: PROJECT_ID } } = {}) 
   return dir;
 }
 
+/**
+ * A process lister that succeeds and finds nothing — the honest fixture for a stand-in child, which
+ * has no real pid for `ps` to relate anything to.
+ *
+ * ⚠️ **SUPPLIED RATHER THAN LEFT TO THE REAL `ps`, AND THE DIFFERENCE IS RECORDED EITHER WAY.** With
+ * no lister the enumeration genuinely FAILS against a fake pid, and the supervisor rightly reports
+ * the shutdown partial — `descendantsEnumerated: false` is not `no descendants`. That distinction has
+ * its own test below; here it would only be noise.
+ */
+const NO_DESCENDANTS = () => ({ status: 0, stdout: "" });
+
+/**
+ * A stand-in child that exits the way a real one does: the exit event AND `exitCode` together.
+ *
+ * ⚠️ **THE TWO USED TO BE SEPARATE IN THESE FIXTURES, AND THAT MATTERED THE MOMENT THE SHUTDOWN
+ * CHECK GOT STRICTER.** Firing `once("exit")` while leaving `exitCode` at null models a process that
+ * announced its death and is still running — which no process does, and which made every stub tree
+ * read as "never seen to exit" once `treeStopped` began asking. A fixture may simplify; it may not
+ * describe something impossible.
+ */
+function exitingChild({ code = 0, signal = null } = {}) {
+  const child = {
+    exitCode: null,
+    signalCode: null,
+    stdin: null,
+    kill: () => true,
+    once: (event, cb) => {
+      if (event !== "exit") return;
+      setImmediate(() => {
+        child.exitCode = code;
+        child.signalCode = signal;
+        cb(code, signal);
+      });
+    },
+  };
+  return child;
+}
+
 /** Wait for a JSON report file to satisfy `done`, or fail with what it last said. */
 async function until(path, done, why, ms = 25_000) {
   const deadline = Date.now() + ms;
@@ -184,6 +222,7 @@ test("⚠️ an offered port changes no byte of the project, proved through a wh
       launcher: { command: "L", args: [] },
       agent: { command: "A", args: [] },
       env: { PORT: String(wanted) },
+      psRun: NO_DESCENDANTS,
       interactive: true,
       ask: async () => true,
       randomBytes: () => Buffer.alloc(16, 9),
@@ -199,14 +238,7 @@ test("⚠️ an offered port changes no byte of the project, proved through a wh
             stdin: { destroyed: false, write: () => {}, end: () => (launcherExit = 0) },
             once: () => {},
           };
-        return {
-          exitCode: null,
-          signalCode: null,
-          stdin: null,
-          once: (event, cb) => {
-            if (event === "exit") setImmediate(() => cb(0, null));
-          },
-        };
+        return exitingChild();
       },
       fetchImpl: async () => ({
         status: 200,
@@ -550,14 +582,7 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
     // ⚠️ DISPATCHES BY EVENT NAME. A fake that fires every listener made the supervisor's new
     // `error` handler resolve the exit promise with a spawn failure — the fake reporting a defect
     // it invented.
-    return {
-      exitCode: null,
-      signalCode: null,
-      stdin: null,
-      once: (event, cb) => {
-        if (event === "exit") setImmediate(() => cb(0, null));
-      },
-    };
+    return exitingChild();
   };
 
   const dir = project();
@@ -568,6 +593,7 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
     spawn: fakeSpawn,
     env: { PORT: String(await freePort()) },
     randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
     fetchImpl: async () => ({
       status: 200,
       json: async () => ({
@@ -843,12 +869,8 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
     once: () => {},
   };
   const agent = {
-    exitCode: null,
-    signalCode: null,
-    stdin: null,
-    once: (event, cb) => {
-      if (event === "exit") setImmediate(() => cb(0, null)); // Pi exits CLEANLY
-    },
+    ...exitingChild(), // Pi exits CLEANLY
+
   };
 
   const e = await runSupervisor({
@@ -876,8 +898,13 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
   assert.equal(e.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED);
   assert.equal(e.detail.agentExit.code, 0, "even though the agent itself finished cleanly");
-  assert.equal(e.detail.shutdown.escalated, true);
-  assert.equal(e.detail.shutdown.exitObserved, false);
+  // ⚠️ THE RECORD IS THE SEVEN-PART OBSERVATION NOW, not the launcher's alone. The launcher's own
+  // control channel is one fact and the escalation against its tree is another, and this test is
+  // about the second: the stop was asked for, it was not obeyed, and that is reported.
+  assert.equal(e.detail.shutdown.launcher.exitObserved, false, "the control channel never saw it go");
+  assert.equal(e.detail.shutdown.launcherEscalation.escalated, true, "so the tree was escalated against");
+  assert.equal(e.detail.shutdown.launcherEscalation.treeStopped, false, "and it still was not seen to stop");
+  assert.equal(e.detail.shutdown.complete, false);
   assert.match(e.message, new RegExp(`still be listening on 127\.0\.0\.1:${port}`), "and it says where to look");
   rmSync(dir, { recursive: true, force: true });
 });
@@ -1054,6 +1081,8 @@ test("⚠️ an unprotected project is REFUSED, and Pi is never started", async 
         spawn: recordingSpawn(calls),
         env: { PORT: port },
         randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+    psRun: NO_DESCENDANTS,
         fetchImpl: healthyFetch(),
         build: null,
       }),
@@ -1128,6 +1157,7 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
     spawn: recordingSpawn(calls),
     env: { PORT: String(await freePort()) },
     randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
     fetchImpl: healthyFetch(),
     build: null,
   });
@@ -1159,3 +1189,365 @@ test("⚠️ an agent already naming a session directory is refused, never appen
     );
 });
 
+/* ================================ the run loop's shutdown, integrated (ACC-0081) =============== */
+
+/** A signal target the test owns, so nothing is installed on the real process. */
+function fakeSignals() {
+  const handlers = new Map();
+  return {
+    on: (sig, cb) => handlers.set(sig, cb),
+    off: (sig) => handlers.delete(sig),
+    removeListener: (sig) => handlers.delete(sig),
+    raise: (sig) => handlers.get(sig)?.(),
+    installed: () => [...handlers.keys()],
+  };
+}
+
+test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () => {
+  // The race is the point. Awaiting the agent's exit and only then looking for a signal means an
+  // interrupt during a long session is handled when the session ends — which is to say, not handled.
+  // This agent never exits on its own; only the signal can end the run.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const calls = [];
+  // ⚠️ PIDS AND AN INJECTED KILLER, because `stopTree` signals BY PID — it never calls `child.kill()`.
+  // A stub without a pid cannot be stopped by the code under test, and the run would report an agent
+  // tree it never saw go. This models the one thing that actually ends these processes.
+  const byPid = new Map();
+  let nextPid = 4100;
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: nextPid++,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      // ⚠️ BOTH ROUTES, because the code under test uses both: `stopLauncher` escalates through the
+      // child handle it holds, and `stopTree` signals by pid. A stub answering only one of them
+      // fails for a reason that has nothing to do with the behaviour being tested.
+      kill: () => {
+        child.exitCode = 0;
+        child.onExit?.(0, null);
+        return true;
+      },
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    byPid.set(child.pid, child);
+    calls.push({ command, args, options, child });
+    return child;
+  };
+  const end = (pid) => {
+    const child = byPid.get(Number(pid));
+    if (!child) return;
+    child.exitCode = 0;
+    child.onExit?.(0, null);
+  };
+  const kill = (pid, signal) => {
+    // ⚠️ SIGNAL 0 IS A LIVENESS PROBE, NOT A REQUEST TO STOP. `pidAlive` uses it, and a stub that
+    // died from being asked whether it was alive would make every survivor check self-fulfilling.
+    if (signal !== 0) end(pid);
+    return true;
+  };
+  // ⚠️ **AND THE WINDOWS ROUTE, WHICH IS A DIFFERENT MECHANISM ENTIRELY.** There is no graceful
+  // signal there, so `stopTree` shells out to `taskkill /T /F` through the `run` seam rather than
+  // calling `kill`. A fixture that modelled only the POSIX route would pass on Linux and fail on
+  // Windows for a reason that has nothing to do with the race under test.
+  const taskkill = (cmd, args) => {
+    if (cmd === "taskkill") end(args[args.indexOf("/pid") + 1]);
+    return { status: 0, stdout: "" };
+  };
+
+  const run = runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    kill,
+    run: taskkill,
+    signalTarget: signals,
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs: 400,
+    hardMs: 200,
+  });
+
+  // Wait until both children exist, then interrupt.
+  for (let i = 0; i < 200 && calls.length < 2; i++) await sleep(10);
+  assert.equal(calls.length, 2, "both children started");
+  signals.raise("SIGINT");
+
+  const result = await run;
+  assert.equal(result.trigger, "signal", "the record says a signal ended it");
+  assert.equal(result.shutdown.signal, "SIGINT", "recorded where it was handled, not inferred");
+  assert.equal(result.shutdown.complete, true);
+});
+
+test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () => {
+  // The control the previous test could not be. There, the signal handler's teardown killed the
+  // agent, so awaiting its exit resolved anyway and a version that awaited instead of racing looked
+  // identical. Here the agent survives everything — which is precisely the case bounded escalation
+  // exists for — and awaiting it means replacing a hung application with a hung terminal.
+  //
+  // Asserted as a DEADLINE rather than by waiting to see: a hang has no failing assertion of its own.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const calls = [];
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: 7100 + calls.length,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      // The launcher goes when asked; the agent never does, whatever is sent to it.
+      kill: () => {
+        if (command === "L") {
+          child.exitCode = 0;
+          child.onExit?.(0, null);
+        }
+        return true;
+      },
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    calls.push({ command, args, options, child });
+    return child;
+  };
+
+  const started = Date.now();
+  const outcome = await Promise.race([
+    runSupervisor({
+      projectRoot: dir,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: [] },
+      spawn,
+      env: { PORT: String(await freePort()) },
+      randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+      kill: () => true,
+      run: () => ({ status: 0, stdout: "" }),
+      signalTarget: signals,
+      fetchImpl: healthyFetch(),
+      build: null,
+      graceMs: 200,
+      hardMs: 150,
+    }).catch((x) => x),
+    (async () => {
+      for (let i = 0; i < 200 && calls.length < 2; i++) await sleep(10);
+      signals.raise("SIGINT");
+      await sleep(6000);
+      return "HUNG";
+    })(),
+  ]);
+
+  assert.notEqual(outcome, "HUNG", "the supervisor must return rather than wait on a process that will not go");
+  assert.ok(outcome instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(outcome)?.slice(0, 140)}`);
+  assert.equal(outcome.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED);
+  assert.equal(outcome.detail.shutdown.agent.treeStopped, false, "and it says the agent tree was not stopped");
+  assert.equal(outcome.detail.agentExit.observed, false, "rather than inventing an exit it never saw");
+  assert.ok(Date.now() - started < 12_000, "bounded");
+});
+
+test("⚠️ the teardown runs ONCE, however many callers ask for it", async () => {
+  // The signal handler and the agent-exit path both call it, within a tick of each other — the agent
+  // exits BECAUSE the handler's teardown stopped it. Memoising the finished record rather than the
+  // in-flight promise left a window where the second caller saw nothing recorded and began its own,
+  // signalling processes the first was already escalating against.
+  //
+  // Counted through the port probe, because that is the one step of a shutdown that is observable
+  // from outside without changing what it does.
+  // ⚠️ IT HAS TO BE THE SIGNAL PATH. On a clean exit there is only one caller, so a version with no
+  // memoisation at all behaves identically — the test would pass against the bug.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const byPid = new Map();
+  const calls = [];
+  let probes = 0;
+
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: 8100 + calls.length,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      kill: () => {
+        child.exitCode = 0;
+        child.onExit?.(0, null);
+        return true;
+      },
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    byPid.set(child.pid, child);
+    calls.push({ command, args, options, child });
+    return child;
+  };
+  const end = (pid) => {
+    const c = byPid.get(Number(pid));
+    if (!c) return;
+    c.exitCode = 0;
+    c.onExit?.(0, null);
+  };
+
+  const run = runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    kill: (pid, signal) => (signal === 0 ? true : (end(pid), true)),
+    run: (cmd, args) => (cmd === "taskkill" ? (end(args[args.indexOf("/pid") + 1]), { status: 0, stdout: "" }) : { status: 0, stdout: "" }),
+    signalTarget: signals,
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs: 300,
+    hardMs: 200,
+    createServerImpl: () => {
+      probes += 1;
+      return createServer();
+    },
+  });
+
+  for (let i = 0; i < 200 && calls.length < 2; i++) await sleep(10);
+  signals.raise("SIGINT");
+  await run;
+
+  // One probe for the port choice at startup, one for the rebind at shutdown. A second teardown —
+  // the signal handler's and the main path's, which arrive within a tick of each other — adds a third.
+  assert.equal(probes, 2, `expected one startup probe and one shutdown rebind, saw ${probes}`);
+});
+
+test("⚠️ the signal is recorded where it was HANDLED, and a clean exit records none", async () => {
+  // Inferring "we were interrupted" from the processes having gone is unfalsifiable — they exit on
+  // their own all the time. A run Pi ended must carry no signal rather than a plausible one.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const calls = [];
+  const result = await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.equal(result.trigger, "agent-exit");
+  assert.equal(result.shutdown.signal, null, "no signal is fabricated for a run that had none");
+});
+
+test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY TREE", async () => {
+  // ACC-0081's seventh clause: "a descendant enumeration that fails is recorded as unmade, because
+  // an empty list would claim a tree with no children". The lister here fails the way a real one
+  // does — a non-zero status — and the run must refuse rather than report a clean shutdown.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const calls = [];
+
+  const e = await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: () => ({ status: 1, stdout: "" }),
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+  }).catch((x) => x);
+
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 140)}`);
+  assert.equal(e.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED);
+  assert.ok(e.detail.shutdown.notObserved.includes("agent-descendants"), "and it names WHICH observation was not made");
+  assert.match(e.message, /Not observed/);
+});
+
+test("⚠️ the port is proved free by REBINDING it, and a held port fails the run", async () => {
+  // An exit code says the leader is gone and says nothing about a worker still listening. This holds
+  // the port with an unrelated server, so every process record is clean and the rebind is the only
+  // check that can notice.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const port = await freePort();
+  const calls = [];
+
+  const held = createServer((_, res) => res.end());
+  await new Promise((r) => held.listen(port, HOST, r));
+  try {
+    const e = await runSupervisor({
+      projectRoot: dir,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: [] },
+      spawn: recordingSpawn(calls),
+      env: { PORT: String(port) },
+      randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+      signalTarget: fakeSignals(),
+      interactive: false,
+      fetchImpl: healthyFetch(),
+      build: null,
+    }).catch((x) => x);
+
+    // The port is occupied before the run even starts, so this refuses at port selection — which is
+    // the earlier of the two guards and the one that should win.
+    assert.ok(e instanceof SupervisorRefusal);
+    assert.equal(e.reason, REFUSAL.PORT_OCCUPIED);
+  } finally {
+    held.close();
+  }
+});
+
+test("⚠️ the signal handlers are removed when the run ends, on every path", async () => {
+  // A supervisor that returns while still owning the operator's Ctrl+C has not finished.
+  const dir = repoProject();
+  ignoreAll(dir);
+  const signals = fakeSignals();
+  const calls = [];
+
+  await runSupervisor({
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: signals,
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+  assert.deepEqual(signals.installed(), [], "nothing left installed after a clean run");
+
+  // And after a refusal.
+  const bad = repoProject();
+  writeFileSync(join(bad, ".gitignore"), "node_modules/\n", "utf-8");
+  const signals2 = fakeSignals();
+  await runSupervisor({
+    projectRoot: bad,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn([]),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: signals2,
+    fetchImpl: healthyFetch(),
+    build: null,
+  }).catch(() => {});
+  assert.deepEqual(signals2.installed(), [], "nothing left installed after a refusal either");
+});
