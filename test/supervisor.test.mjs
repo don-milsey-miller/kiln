@@ -902,8 +902,8 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   // control channel is one fact and the escalation against its tree is another, and this test is
   // about the second: the stop was asked for, it was not obeyed, and that is reported.
   assert.equal(e.detail.shutdown.launcher.exitObserved, false, "the control channel never saw it go");
-  assert.equal(e.detail.shutdown.launcherEscalation.escalated, true, "so the tree was escalated against");
-  assert.equal(e.detail.shutdown.launcherEscalation.treeStopped, false, "and it still was not seen to stop");
+  assert.equal(e.detail.shutdown.launcherTree.escalated, true, "so the tree was escalated against");
+  assert.equal(e.detail.shutdown.launcherTree.treeStopped, false, "and it still was not seen to stop");
   assert.equal(e.detail.shutdown.complete, false);
   assert.match(e.message, new RegExp(`still be listening on 127\.0\.0\.1:${port}`), "and it says where to look");
   rmSync(dir, { recursive: true, force: true });
@@ -1081,8 +1081,7 @@ test("⚠️ an unprotected project is REFUSED, and Pi is never started", async 
         spawn: recordingSpawn(calls),
         env: { PORT: port },
         randomBytes: () => Buffer.alloc(16, 7),
-      psRun: NO_DESCENDANTS,
-    psRun: NO_DESCENDANTS,
+        psRun: NO_DESCENDANTS,
         fetchImpl: healthyFetch(),
         build: null,
       }),
@@ -1477,17 +1476,20 @@ test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY T
   assert.match(e.message, /Not observed/);
 });
 
-test("⚠️ the port is proved free by REBINDING it, and a held port fails the run", async () => {
-  // An exit code says the leader is gone and says nothing about a worker still listening. This holds
-  // the port with an unrelated server, so every process record is clean and the rebind is the only
-  // check that can notice.
+test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOWN fails the run", async () => {
+  // ⚠️ **THE PREVIOUS VERSION OF THIS ASSERTED THE WRONG GUARD.** It held the port before the run
+  // began, so `choosePort` refused at startup and the shutdown rebind never happened — a test named
+  // for the rebind that could not reach it. The port has to be FREE at selection and HELD at
+  // teardown, which is the state the clause exists for: every process record is clean, the leader's
+  // exit code says nothing about a worker still listening, and the rebind is the only check that
+  // can notice.
   const dir = repoProject();
   ignoreAll(dir);
   const port = await freePort();
   const calls = [];
 
-  const held = createServer((_, res) => res.end());
-  await new Promise((r) => held.listen(port, HOST, r));
+  let probes = 0;
+  let held = null;
   try {
     const e = await runSupervisor({
       projectRoot: dir,
@@ -1501,14 +1503,29 @@ test("⚠️ the port is proved free by REBINDING it, and a held port fails the 
       interactive: false,
       fetchImpl: healthyFetch(),
       build: null,
+      // ⚠️ OCCUPIED BETWEEN THE TWO PROBES, WITH A REAL LISTENER. The first probe is the startup
+      // selection and must succeed; something else takes the port while the run is going, and the
+      // second probe is the rebind. Faking the second probe's answer would test the assertion rather
+      // than the mechanism — `probePort` really has to fail to bind.
+      createServerImpl: () => {
+        probes += 1;
+        if (probes === 2 && !held) {
+          held = createServer((_, res) => res?.end?.());
+          held.listen(port, HOST);
+        }
+        return createServer();
+      },
     }).catch((x) => x);
 
-    // The port is occupied before the run even starts, so this refuses at port selection — which is
-    // the earlier of the two guards and the one that should win.
-    assert.ok(e instanceof SupervisorRefusal);
-    assert.equal(e.reason, REFUSAL.PORT_OCCUPIED);
+    assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 160)}`);
+    assert.equal(e.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED, "the run reached shutdown and failed THERE");
+    assert.equal(e.detail.shutdown.portFree, false, "the rebind is what noticed");
+    assert.equal(e.detail.shutdown.agent.treeStopped, true, "every process record is clean");
+    assert.equal(e.detail.shutdown.launcherTree.treeStopped, true);
+    assert.match(e.message, new RegExp(`listening on 127\.0\.0\.1:${port}`), "and it says where to look");
+    assert.equal(calls.length, 2, "both children really started, so this is a shutdown-time failure");
   } finally {
-    held.close();
+    held?.close();
   }
 });
 

@@ -211,7 +211,12 @@ test("on POSIX the request goes to the process GROUP, not the leader alone", asy
   assert.deepEqual(table.signals, [[-99, "SIGTERM"]], "the negative pid is the group");
   assert.match(r.method, /SIGTERM to the group/);
   assert.equal(r.exitObserved, true);
-  assert.equal(r.descendants, null, "a group needs no enumeration: the mechanism covers the tree");
+  // ⚠️ **THE GROUP IS NO LONGER TRUSTED TO COVER THE TREE, and this assertion is what changed.** It
+  // used to read "a group needs no enumeration: the mechanism covers the tree", which is true only
+  // of processes that stayed in it — a worker that called `setsid`, or one that was re-parented, is
+  // reachable by its own pid alone. The tracked list is resolved and signalled alongside the group
+  // rather than instead of it, so the enumeration now happens on this path too.
+  assert.deepEqual(r.descendants, [], "the tracked list is resolved even for a group, and here it is empty");
 });
 
 test("⚠️ without a group, POSIX signals the process — signalling one would hit the supervisor", async () => {
@@ -262,6 +267,17 @@ test("⚠️ only files this invocation created are removed, proved by one it di
 
 /* ============================================== the whole shutdown, composed =================== */
 
+/**
+ * A process lister that succeeds and finds nothing.
+ *
+ * ⚠️ **THE WIN32 FIXTURES DID NOT NEED THIS UNTIL THE ENUMERATION REACHED WINDOWS, and that is the
+ * point rather than an inconvenience.** Descendants used to be resolved inside the POSIX branch
+ * only, so on Windows no tree was ever enumerated and `descendantsEnumerated` stayed null — which
+ * `notObserved` reads as "nothing to report". ACC-0081 requires each platform's observation to
+ * include a known descendant of each tree; Windows was quietly meeting that by not looking.
+ */
+const NO_DESCENDANTS = () => ({ status: 0, stdout: "" });
+
 test("shutdown keeps all seven observations, and one going does not stand for the other", async () => {
   const dir = scratch();
   try {
@@ -285,6 +301,7 @@ test("shutdown keeps all seven observations, and one going does not stand for th
       createServerImpl: () => fakeServer(true),
       platform: "win32",
       run: () => {},
+      psRun: NO_DESCENDANTS,
       graceMs: 2000,
     });
 
@@ -296,7 +313,10 @@ test("shutdown keeps all seven observations, and one going does not stand for th
     assert.equal(r.launcher.sentStop, true, "the launcher got its own control channel first");
     assert.equal(r.launcher.endRequested, true);
     assert.equal(r.launcher.exitObserved, true, "and its exit seen INDEPENDENTLY of the agent's");
-    assert.equal(r.launcherEscalation, null, "no tree treatment was needed");
+    // ⚠️ THE TREE IS OBSERVED EVEN ON THE POLITE PATH NOW. It used to be skipped whenever the
+    // launcher answered its control channel, which is exactly when a surviving worker went unseen.
+    assert.equal(r.launcherTree.treeStopped, true, "the tree is observed stopped, not assumed");
+    assert.deepEqual(r.launcherTree.descendantsSurviving, [], "and nothing was left behind");
     assert.deepEqual(r.files.removed, [ours]);
     assert.equal(existsSync(theirs), true);
     assert.equal(r.complete, true);
@@ -317,14 +337,15 @@ test("⚠️ a launcher that ignores its control channel is escalated, and the r
     createServerImpl: () => fakeServer(true),
     platform: "win32",
     run: () => {},
+    psRun: NO_DESCENDANTS,
     graceMs: 120,
     hardMs: 80,
   });
 
   assert.equal(r.agent.exitObserved, true);
   assert.equal(r.launcher.exitObserved, false, "the polite path did not work");
-  assert.equal(r.launcherEscalation.escalated, true, "so the tree treatment was tried");
-  assert.equal(r.launcherEscalation.exitObserved, false, "and it still did not go");
+  assert.equal(r.launcherTree.escalated, true, "so the tree treatment was tried");
+  assert.equal(r.launcherTree.exitObserved, false, "and it still did not go");
   // ⚠️ THE AGENT'S CLEAN EXIT DOES NOT MAKE THE SHUTDOWN COMPLETE. That substitution is the one this
   // criterion's third clause exists to forbid.
   assert.equal(r.complete, false);
@@ -503,6 +524,61 @@ test("the session directory is derived, so the existence check cannot be skipped
   }
 });
 
+for (const platform of ["linux", "win32"])
+  test(`⚠️ a launcher that exits politely leaving a tracked worker is NOT a complete shutdown (${platform})`, async () => {
+    // Reproduced: the launcher accepted `stop` and exited, a tracked worker stayed alive, the port
+    // rebound, and shutdown returned `complete: true` with `launcherEscalation: null`. The tree was
+    // only examined when the LEADER failed to exit — so the ordinary, polite path never looked at
+    // the descendants tracked while it lived. An exited leader is not a stopped tree, which the
+    // agent side already knew and the launcher side did not.
+    //
+    // Both platforms, because the mechanism differs and ACC-0081 refuses to let one stand for the
+    // other: `taskkill /T` walks a tree from a root that must still exist, and a POSIX group does
+    // not contain a worker that left it.
+    const alive = new Set([950]);
+    const targeted = [];
+    const launcher = child({ pid: 900, obeys: true });
+    const agent = child({ pid: 901 });
+    setTimeout(() => agent.go(), 20);
+
+    const r = await shutdown({
+      agent,
+      launcher,
+      agentDescendants: { pids: [], enumerated: true },
+      launcherDescendants: { pids: [950], enumerated: true },
+      port: 1,
+      createServerImpl: () => fakeServer(true),
+      platform,
+      graceMs: 200,
+      hardMs: 100,
+      kill: (pid, sig) => {
+        if (sig === 0) {
+          if (alive.has(Math.abs(pid))) return true;
+          const e = new Error("gone");
+          e.code = "ESRCH";
+          throw e;
+        }
+        targeted.push(Math.abs(pid));
+        return true;
+      },
+      run: (cmd, args) => {
+        if (cmd === "taskkill") targeted.push(Number(args[args.indexOf("/pid") + 1]));
+        return { status: 0, stdout: "" };
+      },
+      psRun: NO_DESCENDANTS,
+    });
+
+    assert.equal(r.launcher.exitObserved, true, "the control channel did see the leader go");
+    assert.equal(r.launcherTree.treeStopped, false, "but the TREE was not stopped, and that is a separate fact");
+    assert.deepEqual(r.launcherTree.descendantsSurviving, [950]);
+    assert.ok(r.notObserved.includes("launcher-descendants-survived"), "and it is named");
+    assert.equal(r.complete, false, "a surviving worker is not a complete shutdown, however free the port is");
+
+    // ⚠️ AND THE SURVIVOR WAS ACTUALLY ASKED TO GO, after its parent had exited. On Windows that
+    // needs its own pid: `taskkill /pid <parent> /T` has no tree to walk once the parent is gone.
+    assert.ok(targeted.includes(950), `the tracked survivor must be targeted directly on ${platform}`);
+  });
+
 test("⚠️ the port is its own observation, and an occupied one is not a complete shutdown", async () => {
   // ⚠️ EVERY OTHER RECORD HERE IS ABOUT A PROCESS. `exitCode` says the leader is gone and says
   // nothing about a worker still listening, which is the state the criterion's "the port is free"
@@ -517,6 +593,7 @@ test("⚠️ the port is its own observation, and an occupied one is not a compl
     port: 1,
     platform: "win32",
     run: () => {},
+    psRun: NO_DESCENDANTS,
     graceMs: 2000,
     createServerImpl: () => fakeServer(true),
   });
@@ -532,6 +609,7 @@ test("⚠️ the port is its own observation, and an occupied one is not a compl
     port: 1,
     platform: "win32",
     run: () => {},
+    psRun: NO_DESCENDANTS,
     graceMs: 2000,
     createServerImpl: () => fakeServer(false),
   });
@@ -557,6 +635,7 @@ test("the trigger says whether this was a signal or Pi finishing", async () => {
     createServerImpl: () => fakeServer(true),
     platform: "win32",
     run: () => {},
+    psRun: NO_DESCENDANTS,
   });
   assert.equal(r.trigger, "agent-exit", "the default trigger is Pi finishing");
   assert.equal(r.signal, null, "and no signal is invented to fill the record");
@@ -596,6 +675,7 @@ test("⚠️ the trigger is derived, so it cannot contradict the signal", async 
     createServerImpl: () => fakeServer(true),
     platform: "win32",
     run: () => {},
+    psRun: NO_DESCENDANTS,
   });
   assert.equal(withSignal.trigger, "signal", "the signal decides, and the supplied trigger is discarded");
   assert.equal(withSignal.signal, "SIGINT");
