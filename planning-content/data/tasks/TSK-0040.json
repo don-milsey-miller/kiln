@@ -2,7 +2,7 @@
   "id": "TSK-0040",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Prove the contract with a disposable restricted child before accepting it",
   "statement": "Spawn a throwaway restricted Pi child that resolves the exact provider and model and reports only availability and the auth-source category — never variable names, values, headers or credential-derived fingerprints — and refuse the contract if it cannot.",
@@ -15,7 +15,7 @@
     "REQ-0026"
   ],
   "acceptedBy": [
-    "ACC-0058"
+    "ACC-0104"
   ],
   "dependsOn": [
     "TSK-0024",
