@@ -5,8 +5,8 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "The committed settings file contains no secret and no absolute home path",
-  "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
+  "title": "The settings merge and project record write no secret and no absolute user path",
+  "statement": "The `.pi/settings.json` content produced by the settings merge and the `.pi/kiln.json` content produced by `ensureProjectId` contain no credential value, token, authorisation header or credential-derived fingerprint, and no absolute user path or `~` home reference, asserted over the bytes each produces.",
   "evaluates": [
     "CMP-0024"
   ],

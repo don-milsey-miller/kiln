@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0106",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A complete setup commits no secret and no absolute home path",
+  "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0024"
+  ],
+  "notes": "⚠️ MOVED FROM ACC-0048, WORDING UNCHANGED. ACC-0048 accepted only TSK-0029 but required a complete setup, which is TSK-0060 - and TSK-0060 depends on TSK-0029, so neither could be accepted first. ACC-0048 now asserts the bytes the merge and `ensureProjectId` produce; this criterion keeps the end-to-end assertion with the task that can actually run a complete setup."
+}

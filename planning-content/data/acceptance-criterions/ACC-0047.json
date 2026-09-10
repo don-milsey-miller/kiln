@@ -5,8 +5,8 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "Unrelated settings and package entries survive the merge untouched",
-  "statement": "A settings file carrying third-party packages, unrelated keys and a custom key order is merged with Kiln's four owned fields and every unrelated entry is preserved and not reordered gratuitously. A malformed file, or one declaring an unknown schema version, is refused with the file left unchanged.",
+  "title": "The settings merge preserves unrelated content, refuses invalid input, and is byte-stable",
+  "statement": "Merging Kiln's owned fields into a `.pi/settings.json` that carries third-party packages, unrelated keys and a custom key order preserves every unrelated key and package entry and does not reorder existing keys. A file that is not valid JSON, whose root is not an object, or whose Kiln-owned fields hold invalid values is refused before anything is written, and the file is left byte-identical; unknown Pi and third-party fields are preserved rather than refused. Applying the same desired state again changes no bytes and does not change the file's modification time.",
   "evaluates": [
     "CMP-0024"
   ],
