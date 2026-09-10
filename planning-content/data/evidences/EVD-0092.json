@@ -1,0 +1,57 @@
+{
+  "id": "EVD-0092",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: an unknown or invalidly declared provider is refused, with no name inferred or scanned, both platforms through CI",
+  "kind": "experiment",
+  "summary": "ACC-0058's refusal, no-inference and no-scan clauses, observed on both platforms through CI. GitHub Actions run 34418001574 at commit bb3b9cb, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green: 799 tests, 0 failures in every cell. lib/pi-provider-credentials.mjs and its test file are byte-identical between bb3b9cb and the commit this record was written against, so the run tested the code the criterion describes. SEVEN tests carry the criterion, each checked by name in every cell's log with zero failing results, in both reporter formats: (1) T1 - an unknown provider id is refused under `unsupported-credential-contract` naming the provider, and the refusal says no name is inferred and the environment is never searched. (2) T5 - a custom declaration that fails validation makes the PROVIDER unsupported under that same reason, with the underlying problem kept in `detail.declarationProblem`, because a declaration that failed validation is not a declaration. (3) T2 - no variable name is derived from a provider id. T1 alone would not establish this: it checks what the refusal SAYS. T2 checks what the resolver DOES, against the mutation it exists to defeat - `id.toUpperCase().replace(/[-.]/g, \"_\") + \"_API_KEY\"`, which is right for about half the table. Twelve providers whose variable no such rule produces are asserted individually (moonshotai needs MOONSHOT_API_KEY, huggingface needs HF_TOKEN, github-copilot needs COPILOT_GITHUB_TOKEN), each first checked to be a case the deriver gets wrong so it cannot pass as a witness. The deriver's own outputs are refused as ids too: 'moonshot' is not a provider, but MOONSHOT_API_KEY exists. Replacing the table lookup with that deriver was checked locally before the run and fails 9 of 16 tests in the file as it then stood. (4) T3, structural - the module source, with comments stripped, references no `process.env` and no filesystem read or spawn. (5) T3, behavioural - with credential-shaped decoys present in the process environment, every contract serialises byte-identically to its value without them, and an unknown provider still refuses though a plausible key is now present. Both halves are needed: an implementation that scanned the environment and happened to find nothing would pass the behavioural test alone. (6) The exact declared-name table pins all 39 supported providers and the complete ordered name list of each. The membership assertions that preceded it could not see an ADDITION, which is how two Application Default Credentials variables passed a green suite and a green four-cell run on google-vertex before this commit removed them. (7) T6 - the table agrees with getApiKeyEnvVars read out of the INSTALLED @earendil-works/pi-coding-agent 0.84.4, located by content rather than by the bundle chunk's build-generated file name, so a Pi version that adds or renames a provider fails here rather than being inherited by an 'audited' table. Passing on all four runners confirms the table matches what a clean `npm ci` of the pinned version ships. The criterion's remaining clause - no additional variables inherited - is not observed by this run; it is EVD-0091's, linked beside this record.",
+  "outcome": "success",
+  "observedAt": "2026-09-09",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34418001574",
+      "commit": "bb3b9cb",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 102687064156, success, 799 tests / 796 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 102687064166, success, 799 tests / 796 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 102687064069, success, 799 tests / 798 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 102687063933, success, 799 tests / 798 pass / 0 fail / 1 skipped",
+      "tests-cited": "T1 an unknown provider is refused by name, and the refusal says nothing is inferred; T2 no variable name is derived from a provider id; T3 the module does not read the environment, structurally; T3 the answer does not change when the environment does; T5 an invalid declaration makes the PROVIDER unsupported, under ACC-0058's reason; the declared names are exactly these, for exactly these providers; T6 the table agrees with the pinned Pi package, or this fails on the version bump",
+      "per-cell-result": "all 7 present and 0 failing in each of the four cells",
+      "code-identity": "lib/pi-provider-credentials.mjs and test/pi-provider-credentials.test.mjs unchanged from bb3b9cb",
+      "pinned-pi": "@earendil-works/pi-coding-agent 0.84.4",
+      "refusal-reason": "unsupported-credential-contract",
+      "inheritance-clause": "carried by EVD-0091, not by this run",
+      "under-test": "lib/pi-provider-credentials.mjs resolveProviderCredentials, validateCustomDeclaration and PROVIDER_CREDENTIALS"
+    },
+    "omissions": [
+      {
+        "fact": "refusal-through-setup-or-canary",
+        "state": "not-captured",
+        "reason": "The unsupported-provider refusal is observed at the RESOLVER BOUNDARY - a direct call to resolveProviderCredentials - and not through setup or the TSK-0040 canary, neither of which exists end to end. What is established is that the contract table refuses an unknown or invalidly declared provider and names it. What is not established is that every path which selects a provider actually consults the resolver before acting, so a future caller that bypassed it would not be caught by these tests."
+      },
+      {
+        "fact": "inheritance-observed-in-a-pi-runtime",
+        "state": "not-captured",
+        "reason": "The no-additional-inheritance clause rests on EVD-0091, whose spawned observer is a Node probe process that reports variable names, not a Pi specialist runtime. That record states the limitation in full; it applies here unchanged."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
