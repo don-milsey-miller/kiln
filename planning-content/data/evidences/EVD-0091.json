@@ -1,0 +1,68 @@
+{
+  "id": "EVD-0091",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the child environment boundary and the research-credential gate, both platforms through CI",
+  "kind": "experiment",
+  "summary": "ACC-0057's sentinel boundary and ACC-0059's research-credential gate, observed on both platforms through CI. GitHub Actions run 34420440250 at commit 1207ce1, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green: 813 tests, 0 failures in every cell. All TWENTY-FOUR specialist-contract tests ran in every cell, checked by extracting each test name from the file and matching it against each cell's log in both reporter formats rather than inferring them from a green tick - the node 22 cells emit TAP and the node 24 cells the spec reporter. ACC-0057: children are spawned for real and asked which variable NAMES they can read, never values, because a test that printed values would put them in every CI log. The parent holds three sentinels named as a naive implementation would match them - ACME_API_KEY, SOMETHING_TOKEN and AWS_SECRET_ACCESS_KEY, rather than a private prefix any implementation excludes trivially - plus four unselected providers' keys and the research credential. No sanitised child observed any sentinel or any unselected provider name, in any of the four cells. The POSITIVE CONTROL is what makes that mean something: a control child spawned with the environment INHERITED observed all three sentinels in every cell ('control observed 3 sentinels; sanitised children observed 0'), because a clean result is also what a parent that never held them produces. ACC-0059: the research credential is measured as a 2x2 with the key present in the host in every cell - research+enabled, research+disabled, planning+enabled, planning+disabled, validation+enabled - and TAVILY_API_KEY crosses in exactly one of them. That negative column exists only because researchEnabled is SUPPLIED rather than derived: deriving it from the credential being present would make 'the key crosses only while research is enabled' and 'the key crosses when the host has a key' one sentence. A supplied non-boolean refuses rather than reading as disabled, since \"false\" is truthy and the same value would have opened the gate under a truthiness check. PLATFORM RESULTS DIFFER AND BOTH ARE RECORDED. On POSIX the assertion is exact: what the child observed minus what Kiln passed deep-equals the empty list, so a Linux child receives precisely what it was given. On Windows that assertion is impossible and is not made - AST-0045 measured nine names the OS injects into every child whatever environment it is handed, and both Windows cells reported exactly those nine (HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE, WINDIR) with the 'not among AST-0045's nine' diagnostic never firing. Asserting equality there would report the operating system as a defect and bury a real leak among familiar red lines; what is asserted on both platforms is the claim that survives, that nothing credential-shaped is among what Kiln adds. The stored-route child received 4 names on each Linux cell and 14 on each Windows cell - the base list intersected with what the runner sets, plus the Pi locator, plus the nine on Windows - and no provider credential in either. Four mutations were checked locally before this run: deriving the flag from credential presence kills 2 tests, scanning the host for credential-shaped names kills 5, removing the stored fallback kills 3, and emitting a partial provider set kills 1.",
+  "outcome": "success",
+  "observedAt": "2026-09-09",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34420440250",
+      "commit": "1207ce1",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 102694458832, success, 813 tests / 810 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 102694458623, success, 813 tests / 810 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 102694458878, success, 813 tests / 812 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 102694458854, success, 813 tests / 812 pass / 0 fail / 1 skipped",
+      "tests-per-cell": "24 of 24 specialist-contract tests in every cell, matched by name against each log rather than counted",
+      "named-controls": "D17 a provider with no environment key still builds, on its Pi locator alone; D17 an incomplete environment emits NOTHING, never a partial set; D17 a stored-only contract emits no provider variable even when the host has one; C3 TAVILY_API_KEY crosses only for research AND only while enabled; C4 no sentinel crosses, against a control that shows all of them crossing - all five in all four cells",
+      "posix-exact-set": "observed minus passed deep-equals [] on both ubuntu cells",
+      "windows-injected": "exactly AST-0045's nine on both windows cells: HOMEDRIVE, HOMEPATH, LOGONSERVER, SYSTEMDRIVE, TEMP, USERDOMAIN, USERNAME, USERPROFILE, WINDIR; the 'not among AST-0045's nine' diagnostic did not fire",
+      "stored-route-child": "4 names on each ubuntu cell, 14 on each windows cell, no provider credential in either",
+      "sentinel-control": "control observed 3 sentinels; sanitised children observed 0 - in all four cells",
+      "research-matrix": "5 cells with TAVILY_API_KEY present in the host throughout: research+true crosses; research+false, planning+true, planning+false and validation+true do not",
+      "under-test": "lib/specialists/contract.mjs childEnv, providerNamesFor and the platform base lists"
+    },
+    "omissions": [
+      {
+        "fact": "pi-specialist-runtime-as-the-observer",
+        "state": "not-captured",
+        "reason": "The spawned observer is a Node probe process that prints its own environment variable names, not a Pi specialist runtime. What is established is which variables cross a real process boundary built by childEnv - which is the claim both criteria make - and not how the pinned Pi binary behaves once it holds them. A specialist child running the actual agent is TSK-0040's canary."
+      },
+      {
+        "fact": "research-enablement-derivation",
+        "state": "not-captured",
+        "reason": "researchEnabled is supplied directly to childEnv() by the caller and is proved to gate the credential. It is NOT yet connected to the two facts that should decide it - the committed project choice of Tavily and the host-local research consent. Until that wiring exists, this run shows the gate works and says nothing about whether the right value reaches it."
+      },
+      {
+        "fact": "auth-json-read-and-resolved",
+        "state": "not-captured",
+        "reason": "Stored authentication is established here as a LOCATOR-ONLY environment path: a provider with no environment key builds a child carrying PI_CODING_AGENT_DIR and no provider variable, and an incomplete environment emits nothing rather than a partial set. Nothing in this run reads an auth.json, resolves a credential from one, or observes a child authenticating that way. That is TSK-0040's work."
+      },
+      {
+        "fact": "original-envVarNames-from-the-compatibility-spike",
+        "state": "unavailable",
+        "reason": "The pi-compat probe collects envVarNames, but redaction strips it from the retained records, so the spike proves counts and presence-of-probed-names rather than an exact original set. No new compatibility measurement was taken. What this run observes instead is the exact set the IMPLEMENTED platform lists produce, which is a different and narrower claim: it describes what Kiln now passes, not what the spike passed."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed. Its process-environment behaviour is presumably POSIX-like but nothing here runs on it."
+      }
+    ]
+  }
+}

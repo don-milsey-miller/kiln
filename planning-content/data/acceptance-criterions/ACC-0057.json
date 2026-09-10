@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A sentinel host secret never reaches a child, against a control that shows one crossing",
   "statement": "With unrelated secrets present in the parent environment under names a naive implementation would match, a spawned specialist child's observed environment contains none of them, while a control child spawned with the environment inherited observes all of them. Kiln adds to the child only the measured base variables, the selected provider's declared model-plane names and that role's tool-plane names. The assertion is made over what the child observed, not over what the parent intended.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0024"
   ],
-  "notes": "⚠️ THE CONTROL IS PART OF THE CRITERION, not a nicety. A sentinel test with no control passes identically whether the boundary works or the sentinels were never set. ⚠️ IT IS DELIBERATELY NOT WRITTEN AS 'the child sees only the union', which was the first phrasing and is not achievable: Windows injects nine home and user variables into every child regardless of the environment supplied (AST-0045). What is provable on both platforms is that no secret Kiln did not choose to pass is among what the child receives."
+  "notes": "⚠️ THE CONTROL IS PART OF THE CRITERION, not a nicety. A sentinel test with no control passes identically whether the boundary works or the sentinels were never set. ⚠️ IT IS DELIBERATELY NOT WRITTEN AS 'the child sees only the union', which was the first phrasing and is not achievable: Windows injects nine home and user variables into every child regardless of the environment supplied (AST-0045). What is provable on both platforms is that no secret Kiln did not choose to pass is among what the child receives.",
+  "evidencedBy": [
+    "EVD-0091"
+  ]
 }

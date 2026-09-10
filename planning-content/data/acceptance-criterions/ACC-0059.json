@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Research holds the only tool-plane credential, and only while enabled",
   "statement": "The research child receives the research credential when research is enabled and not otherwise; planning and validation children never receive it in any configuration.",
   "evaluates": [
@@ -12,5 +12,8 @@
   ],
   "verifies": [
     "REQ-0024"
+  ],
+  "evidencedBy": [
+    "EVD-0091"
   ]
 }
