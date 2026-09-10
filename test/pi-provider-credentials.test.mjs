@@ -551,3 +551,70 @@ test("⚠️ T6 the table agrees with the pinned Pi package, or this fails on th
 
   assert.equal(PROVIDER_CREDENTIALS["llama.cpp"].piMapped, false, "the extension provider is not in the map");
 });
+
+
+/* ================================================ F35: prototype-named provider ids ============= */
+
+/**
+ * Every name `Object.prototype` owns.
+ *
+ * ⚠️ **ALL OF THEM, NOT THE FIVE FIRST OBSERVED.** `__proto__`, `constructor`, `toString`, `hasOwnProperty`
+ * and `valueOf` were checked by hand; `__defineGetter__`, `isPrototypeOf`, `toLocaleString` and the rest go
+ * through the same inherited lookup. A fix proven only against the names someone happened to try is a
+ * denylist with extra steps.
+ */
+const PROTOTYPE_NAMES = Object.getOwnPropertyNames(Object.prototype);
+
+/** Plain data all the way down: what a refusal detail must be to reach a log or a report intact. */
+const isJsonSafe = (value) => {
+  if (value === null || ["string", "number", "boolean"].includes(typeof value)) return true;
+  if (Array.isArray(value)) return value.every(isJsonSafe);
+  if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype)
+    return Object.values(value).every(isJsonSafe);
+  return false;
+};
+
+test("⚠️ F35 every Object.prototype name is refused as an ordinary unknown provider", () => {
+  assert.ok(PROTOTYPE_NAMES.length >= 12, `expected the whole prototype surface, got ${PROTOTYPE_NAMES.length}`);
+  for (const name of PROTOTYPE_NAMES) {
+    const e = refusalFrom(() => resolveProviderCredentials(name), CONTRACT_REFUSAL.UNSUPPORTED);
+    // ⚠️ THE ORDINARY REFUSAL, NOT THE DECLINED ONE. Nothing about these ids was ever decided, so there is no
+    // recorded reason for them to carry.
+    assert.deepEqual(e.detail, { provider: name }, `${name}: detail must be the ordinary unknown-provider shape`);
+    assert.ok(!("why" in e.detail), `${name}: an inherited value reached detail.why`);
+    assert.ok(isJsonSafe(e.detail), `${name}: refusal detail is not JSON-safe`);
+    assert.deepEqual(JSON.parse(JSON.stringify(e.detail)), e.detail, `${name}: detail does not survive serialisation`);
+    assert.ok(
+      !/function\s*[\w$]*\s*\(|\[native code\]|\[object /.test(e.message),
+      `${name}: the message carries inherited source: ${e.message}`
+    );
+    assert.match(e.message, /no custom declaration was supplied/, `${name}: must be the unknown-provider message`);
+  }
+});
+
+test("⚠️ F35 a prototype-named id with a valid custom declaration resolves like any other custom provider", () => {
+  // ⚠️ THIS IS WHAT SEPARATES AN OWN-PROPERTY LOOKUP FROM A DENYLIST. A fix that refused these names outright
+  // would pass the refusal test above and fail here: a declared custom provider is entitled to any id, and
+  // `toString` is unusual only to the object holding the table.
+  for (const name of PROTOTYPE_NAMES) {
+    const contract = resolveProviderCredentials(name, { custom: { id: name, apiKey: "$PROTOTYPE_NAMED_KEY" } });
+    assert.equal(typeof contract, "object", `${name}: the resolver returned a ${typeof contract}`);
+    assert.equal(contract.id, name, `${name}: the resolver returned something other than the declared contract`);
+    assert.deepEqual([...contract.authSources], [AUTH_SOURCE.CUSTOM_ENVIRONMENT_KEY], name);
+    assert.deepEqual([...contract.required], ["PROTOTYPE_NAMED_KEY"], name);
+  }
+});
+
+test("F35 the two declined providers keep their recorded reason, and built-ins resolve unchanged", () => {
+  for (const [id, why] of Object.entries(UNSUPPORTED_PROVIDERS)) {
+    const e = refusalFrom(() => resolveProviderCredentials(id), CONTRACT_REFUSAL.UNSUPPORTED);
+    assert.equal(typeof why, "string", `${id}: the recorded reason is a string`);
+    assert.equal(e.detail.why, why, `${id}: the recorded reason must travel unchanged`);
+    assert.ok(e.message.includes(why), `${id}: the message must carry the recorded reason`);
+  }
+  // ⚠️ AND THE FIX ADDED NOTHING TO THAT TABLE: the prototype names are refused by the lookup, not listed.
+  assert.deepEqual(Object.keys(UNSUPPORTED_PROVIDERS).sort(), ["amazon-bedrock", "azure-openai"]);
+
+  for (const id of supportedProviders())
+    assert.equal(resolveProviderCredentials(id), PROVIDER_CREDENTIALS[id], `${id}: must still resolve to its frozen table entry`);
+});
