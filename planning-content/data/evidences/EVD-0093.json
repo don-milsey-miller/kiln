@@ -1,0 +1,78 @@
+{
+  "id": "EVD-0093",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the provider canary confirms the exact model and a permitted auth source, both platforms through CI",
+  "kind": "experiment",
+  "summary": "ACC-0104's provider canary, observed on both platforms through CI. GitHub Actions run 34536865401 at commit b4fc232, matrix ubuntu-latest x windows-latest x node 22 and 24, all four cells green: 837 tests, 0 failures in every cell. All TWENTY-FOUR canary tests ran in every cell, checked by extracting each name from test/pi-provider-canary.test.mjs and matching it against each cell's log in both reporter formats, with zero failing-test lines anywhere in any log. REAL SDK CELLS. Eleven of the twenty-four spawn the actual child, which imports the pinned @earendil-works/pi-coding-agent 0.84.4, builds a ModelRuntime with allowModelNetwork false, constructs no agent session and so exposes no default tools. The six authentication and availability cells: (1) a stored api_key on a built-in provider is available with authSource `stored`, and the operator's auth.json and its directory are byte-identical afterwards; (2) an environment key on a built-in provider is available with `environment-key`; (3) a custom provider through its validated $VAR is available with `custom-environment-key`; (4) no credential is a structured unavailable refusal whose detail is exactly provider, model, available false and authSource null; (5) a stored OAuth credential on a custom provider, with its declared variable also set, is reported `configured` from `stored` while the exact model is absent - and because the source is judged first, the result is canary-auth-source-mismatch rather than a bare unavailable that would hide the undeclared route; (6) a built-in stored api_key with an empty key is `configured` from a PERMITTED `stored` source and the exact model is still absent, so the refusal is canary-model-unavailable carrying authSource `stored` - configured is not availability even when nothing else is wrong. UNSUPPORTED BEFORE SPAWN: an unknown provider refuses with the spawn function never called and no temporary root ever created. EXACT MATCHING: `claude-fable` is not `claude-fable-5`, and a real model id under a provider that does not serve it is not that model; both are unavailable. Pi's own precedence is pinned: with a stored credential and an environment key both present, Pi reports `stored`. SELECTED-ONLY STORED COPY: the operator's file holds anthropic, openai, github-copilot and acme credentials; the child's temporary copy holds exactly ['anthropic'] with that entry unchanged, and none of the three unselected credentials appears in the copy, stdout or stderr, against a positive control that the original file held each of them. A file with no entry for the provider yields a `{}` copy and a complete environment route still authenticates. A malformed file is refused as canary-stored-auth-invalid without forwarding the parser's message, against a positive control proving that on this runtime JSON.parse does quote the malformed input. AUTH SOURCE BEFORE AVAILABILITY: a forbidden source (runtime, models_json_command, fallback, models_json_key), an unknown one and a contract mismatch each keep their own refusal when the model is also unavailable; an available model with no source the runtime can name is refused as unknown. CLOSED REPORT: success is exactly {provider, model, available: true, authSource} and frozen; a child report carrying Pi's `label` of variable names is refused as canary-output-invalid rather than forwarded. SECRET AND FINGERPRINT CONTROLS: a planted credential is absent from every report, refusal message, refusal detail, child stdout and child stderr in ten forms - the value, sha256, a sha256 prefix, sha1, md5, base64, base64url, a tail, a distinctive core and the reversal - each against a positive control that it reached the child: the stored copy held it, the environment carried it, the declared variable reached the custom child. The argv is exactly the interpreter, the child, the pinned SDK entry, the provider and the model, with no --api-key and no print-api-key. CLEANUP: the temporary root is removed on seven exit paths once it exists (missing stored file, environment refusal, non-zero child, spawn failure, non-JSON output, wrong-shape output, timeout); a forced removal failure is canary-cleanup-failed on those seven paths for BOTH a remover that throws and one that returns without removing, the latter caught only because the root's absence is verified, with any earlier refusal kept as priorReason; and a refusal raised before any state exists never attempts a removal. Eleven mutations were run locally before the commit and every one fails at least one test.",
+  "outcome": "success",
+  "observedAt": "2026-09-10",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34536865401",
+      "commit": "b4fc232",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103070408716, success, 837 tests / 834 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103070408896, success, 837 tests / 834 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103070408955, success, 837 tests / 836 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103070408567, success, 837 tests / 836 pass / 0 fail / 1 skipped",
+      "canary-tests-per-cell": "24 of 24 matched by name in every cell; zero failing-test lines in any log",
+      "real-sdk-cells": "P13 stored api_key on a built-in provider; P13 environment key on a built-in provider; P13 custom provider through its validated $VAR; P13 no credential; P13 stored OAuth on a custom provider; P13 a permitted source that is configured still does not make the model available - all six passing in all four cells",
+      "pinned-pi": "@earendil-works/pi-coding-agent 0.84.4, SDK entry read from exports['.'] by resolvePinnedSdk",
+      "sdk-options": "ModelRuntime.create with allowModelNetwork false; no agent session constructed",
+      "availability-rule": "exact provider id and exact model id in ModelRegistry.getAvailable()",
+      "pi-source-precedence": "stored is reported over environment when both are present",
+      "stored-copy": "only { [provider]: entry }, or {} when the file holds nothing for the provider",
+      "fingerprint-forms": "value, sha256, sha256 prefix, sha1, md5, base64, base64url, tail, distinctive core, reversal",
+      "cleanup-coverage": "7 exit paths removed normally; 7 paths x 2 failing removers forced to canary-cleanup-failed; pre-state refusals never remove",
+      "local-mutations": "11 of 11 killed before commit: availability from configured (3), prefix match (1), forbidden sources not refused (4), no-op default remover (16), SDK at operator dir (3), open report shape (1), whole-file copy (2), availability before source (3), priorReason dropped (1), surviving root undetected (1), cleanup failure hidden behind prior refusal (1)",
+      "platform-timing": "real-SDK cells 444-705ms on ubuntu/24, 1.04-1.6s on ubuntu/22 and windows/22, 1.34-2.0s on windows/24; forced-cleanup test 2.5s to 10.0s; outcomes identical, no timeout reached",
+      "readiness-flake-R7": "the readiness test passed in all four cells",
+      "under-test": "lib/pi-provider-canary.mjs runProviderCanary and mapAuthSource; lib/pi-provider-canary-child.mjs; lib/pi-runtime.mjs resolvePinnedSdk, exercised through the canary's fixed-argv assertion"
+    },
+    "omissions": [
+      {
+        "fact": "built-in-oauth-against-a-real-account",
+        "state": "not-captured",
+        "reason": "OAuth for a built-in provider was not validated against a real account. It needs an interactive /login, which is account-bound and cannot run in CI. The limit is sharper than untested: offline, a FAKE stored OAuth credential for the built-in anthropic provider is reported available, so the canary cannot tell a real built-in OAuth token from a bogus one without the network. Its `stored` report for built-in OAuth establishes that Pi resolves a credential of that shape, not that the credential works."
+      },
+      {
+        "fact": "network-request-or-model-completion",
+        "state": "not-captured",
+        "reason": "No network request was made and no model completion was performed: the child runs with allowModelNetwork false and constructs no session. Availability here is catalogue and credential RESOLUTION - that the exact model is selectable with a credential of an acceptable shape - and says nothing about whether the provider accepts that credential or answers."
+      },
+      {
+        "fact": "timeout-crash-and-malformed-output-in-the-real-child",
+        "state": "not-captured",
+        "reason": "The timeout, non-zero exit, spawn failure and malformed-output paths are driven by stub children through the real parent path. What they establish is the parent's decision and its cleanup on each path, not how the pinned SDK behaves when it hangs, crashes or misreports."
+      },
+      {
+        "fact": "naturally-occurring-cleanup-failure",
+        "state": "not-captured",
+        "reason": "Forced cleanup failure uses an injected remover - one that throws and one that returns without removing - rather than a naturally occurring filesystem failure such as a held lock or a permissions error. The detection is real, because the root's absence is verified after removal; the failure that triggers it is simulated."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The eleven mutations, including whole-file copying, were run locally before the commit and not in CI. CI establishes that the tests guarding each behaviour pass on both platforms; that those tests fail when the behaviour is broken is established only by the local runs."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
