@@ -1,0 +1,76 @@
+{
+  "id": "EVD-0100",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: trust is read and recorded through Pi's exported store, and an unapproved project never starts an agent",
+  "kind": "experiment",
+  "summary": "Measurement of the project-trust integration through CI. GitHub Actions run 34652112338 at commit 203c4ed, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 899 tests and 0 failures in every cell, with zero failing-test lines in any log. ALL NINE trust-gate tests and ALL TEN trust-module tests ran in every cell, checked by taking each test name out of test/supervisor.test.mjs and test/pi-trust.test.mjs and matching it against each cell's log. THE STORE, AND THE BOUNDARY DEC-0027 DREW. lib/pi-trust.mjs reads, grants, denies and revokes through `ProjectTrustStore` as exported from the pinned package's ROOT, resolved by the same pinned resolver the CLI uses. A structural test asserts the module names no trust file, writes no file itself, reaches no inner package path, and knows no default agent directory. Three states are kept distinct: `missing` is a project nobody has been asked about and `denied` is an answer the operator gave, asserted both as states and in what the record names. Every write is read back through a SECOND store instance and refused as `trust-not-persisted` if it did not land - provable only because a `storeFactory` seam lets a test make a write appear not to land, which the real store will not do on request. THE KEY IS PI'S OWN RULE. The project directory is canonicalised before every operation with `realpathSync(resolve(cwd))`, which is what Pi's `normalizeCwd` does, so a trailing separator, a `.` and a `..` that comes back all share one decision and a denial through one spelling replaces the decision rather than sitting beside it. THE GATE, AND WHERE IT SITS. runSupervisor asks before anything else it does: the ordering is proved by which refusal arrives, since a project with no `.pi/kiln.json` and an unusable PORT still refuses on trust rather than with `no-project-record` or `port-invalid`, and the `spawn` supplied throws if it is ever reached. `trust-missing` and `trust-denied` are separate codes with different remediation - decide, or change a decision - and both name `bin/start-shell.mjs` in the message and in the detail. A refusal leaves the committed record, the ignore block and the contents of `.pi` byte-identical, and creates no runtime directory. ONE AGENT DIRECTORY, ASKED OF PI AND FORCED DOWNWARD. `resolvePinnedAgentDir` asks the package's root-exported `getAgentDir()` rather than restating Pi's home-directory rules; bin/start-kiln.mjs calls it once, in the process whose environment the children inherit, and runSupervisor requires the answer rather than defaulting one - a run without it refuses `agent-dir-missing` having consulted no store at all. That exact value is what the gate reads the store with, and it is forced into every child as PI_CODING_AGENT_DIR, replacing a stale inherited spelling; both children are asserted to carry it. The Ubuntu cells resolved their POSIX home-derived directory and the Windows cells their Windows home-derived one, and every cell passed the assertion that the value used for the lookup is the identical value handed to the children. TWO CASES RUN THE REAL STORE, NOT AN INJECTED ANSWER, in every cell: an approval granted through lib/pi-trust.mjs reaches the existing launch path and completes the ordinary shutdown contract, and a denial recorded the same way stops the run with the refusal naming the directory it was recorded against. THREE EXISTING HARNESSES NOW RUN THE REAL GATE and still pass in every cell: the stdio-routing fixture, which spawns a real supervisor in its own process, and both shutdown-evidence harnesses, natural and interrupt. Each grants trust through the real store in a temporary agent directory, so what they measure is the production path rather than one with the gate removed. MUTATION CONTROLS, LOCAL ONLY. Nine mutations of the gate and the resolver, and ten of the module, were run before the commits, each alone with the file restored byte-identical, and every one was caught. Two of them survived their first attempt and are worth recording: moving the gate after the project record passed until a test existed whose project had no record, and asking the gate with the raw spelling passed until the test used a spelling `join` does not collapse.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34652112338",
+      "commit": "203c4ed",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103436408716, node v22.23.2, success, 899 tests / 896 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103436408510, node v24.20.0, success, 899 tests / 896 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103436408681, node v22.23.2, success, 899 tests / 898 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103436408657, node v24.20.0, success, 899 tests / 898 pass / 0 fail / 1 skipped",
+      "gate-tests-per-cell": "9 of 9 matched by name in every cell",
+      "trust-module-tests-per-cell": "10 of 10 matched by name in every cell",
+      "real-store-cases": "approved reaches the launch path; a recorded denial stops the run - both through lib/pi-trust.mjs and a real store, in all four cells",
+      "unchanged-harnesses": "stdio routing, shutdown evidence natural, shutdown evidence interrupt - all now passing the real gate, all green in every cell",
+      "ordering": "the gate precedes the project record, the port choice and both spawns, proved by which refusal arrives rather than by reading the source",
+      "refusal-codes": "trust-missing and trust-denied, distinct, each naming bin/start-shell.mjs in message and detail; agent-dir-missing when no directory was resolved",
+      "agent-directory": "asked of the package's root-exported getAgentDir(), resolved once by the command, required by runSupervisor, and forced into every child as PI_CODING_AGENT_DIR",
+      "platform-difference": "Ubuntu used its POSIX home-derived agent directory and Windows its Windows home-derived one; every cell passed the identical-value assertion between the trust lookup and the child environment",
+      "under-test": "lib/pi-trust.mjs, lib/pi-runtime.mjs resolvePinnedAgentDir, lib/supervisor.mjs assertProjectTrusted and runSupervisor, bin/start-kiln.mjs",
+      "local-mutations": "19 run and 19 killed across the two slices, each restored byte-identical",
+      "commits": "5289062 the module and its tests; 203c4ed the gate, the resolver, the launcher and three harnesses"
+    },
+    "omissions": [
+      {
+        "fact": "interactive-setup",
+        "state": "not-captured",
+        "reason": "Displaying the canonical path to an operator, obtaining an approval or a denial interactively, `--trust approve`, the non-interactive refusal when there is neither a decision nor an explicit approval, and reporting a denial as not ready are ACC-0108's, on TSK-0060. There is no setup command yet; nothing here tests or claims any of it."
+      },
+      {
+        "fact": "injected-reader-in-most-supervisor-tests",
+        "state": "not-observable",
+        "reason": "Twenty-two of the supervisor's existing cases supply an already-approved reader and an agent directory that is never opened, because they are about readiness, shutdown, ports and stdio rather than about trust. The gate's own behaviour rests on the nine gate tests, of which two use the real store, plus the three harnesses that now pass the real gate."
+      },
+      {
+        "fact": "store-factory-seam",
+        "state": "not-observable",
+        "reason": "Two module tests inject a `storeFactory` rather than using Pi's store: one counts instances to show a write is verified by a SECOND one, the other makes every later reader disagree so the not-persisted refusal can be observed. A real store will not fail to persist on request, so these two claims are unprovable without the seam. Production passes no factory, and the agent directory is still required before it is consulted."
+      },
+      {
+        "fact": "lazy-import-in-the-gate",
+        "state": "not-captured",
+        "reason": "The gate's default reader is imported inside the function rather than at module load, because lib/pi-trust.mjs reaches the SDK through lib/pi-runtime.mjs, which imports the supervisor's refusal types - a static import would close that cycle at load time. The cycle itself is pre-existing and was not restructured in this task; what is established is that the gate's default still lives in the gate and cannot be omitted by a caller."
+      },
+      {
+        "fact": "windows-case-sensitivity",
+        "state": "not-observable",
+        "reason": "A differently cased Windows path is a DIFFERENT key, because Pi keys its store on realpathSync(resolve(cwd)) and that keeps the case it was handed. Kiln matches Pi rather than folding case: a Kiln that normalised case would stop matching decisions Pi itself records through its own prompt. This is asserted against Pi's own store on Windows and is not a defect to be fixed on Kiln's side alone."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
