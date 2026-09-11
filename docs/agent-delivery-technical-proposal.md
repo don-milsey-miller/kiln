@@ -1141,8 +1141,11 @@ target still resolves where the plan said it did — a junction can appear after
 an edit can. A concurrent edit is
 a refusal/retry, not a stale write. Use same-directory temporary files and atomic replacement for
 settings and records; append `.gitignore` only through its existing re-read-under-lock owner. Merge
-only Kiln-owned fields, preserve unrelated settings and authored planning content, and refuse malformed
-or unknown schema versions. There is no general `--force`.
+only Kiln-owned fields, preserve unrelated settings and authored planning content, and refuse what setup
+cannot safely read: a `.pi/settings.json` that is not a JSON object or holds an invalid value in a
+Kiln-owned field, and a Kiln record that is malformed or declares an unknown schema version. Pi's settings
+format has no version field, so no settings version is checked, and unknown Pi and third-party settings
+are preserved rather than refused. There is no general `--force`.
 
 After the initializer establishes safe local-state handling, maintain a non-secret
 `setup-transaction.json` journal in the selected runtime directory. **It is a planned target like any
