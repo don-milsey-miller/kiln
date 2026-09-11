@@ -1,0 +1,76 @@
+{
+  "id": "EVD-0095",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the settings merge preserves, refuses and holds Pi's lock, on both platforms through CI",
+  "kind": "experiment",
+  "summary": "Measurement of the settings merge through CI. GitHub Actions run 34632506490 at commit f459b2d, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 864 tests and 0 failures in every cell. ALL TWENTY-FOUR settings tests ran in every cell, checked by taking each test name out of test/pi-settings.test.mjs and matching it against each cell's log, with zero failing-test lines in any log. ACC-0047, PRESERVATION AND BYTE STABILITY. A file carrying third-party packages, unrelated keys, a custom key order and unknown fields keeps every unrelated value; ordinary string keys keep their relative order; Kiln's package and skill entries occur exactly once in either Pi form, with an object entry's filters kept and only its source corrected; the trailing-newline style is kept for LF, CRLF and none, and a new file has none; applying the same desired state again returns no bytes and does not change the file's modification time, including against a file indented differently. Malformed JSON, a non-object root and an invalid value in a Kiln-owned field are refused at plan time with the file byte-identical, no lock and no temporary file, and no refusal quoting the parser, a value or a path; unknown fields, including a schemaVersion Pi does not define, are preserved rather than refused. KEY ORDER IS BOUNDED BY PI'S OWN SERIALIZER (D37): a file with integer-like property names is merged by Kiln and saved by a real Pi SettingsManager in a child process, and the two write the unrelated keys in the same order - integer-like names first in ascending order, then string keys in their textual order - at the top level and one level down, with every value intact. ACC-0048, NO SECRET AND NO MACHINE PATH. With ANTHROPIC_API_KEY and TAVILY_API_KEY planted in the environment and asserted present while the merge ran, the bytes written to .pi/settings.json in external and project mode and to .pi/kiln.json by ensureProjectId carry no credential value and no fingerprint of one - raw value, sha256, a 12-character sha256 prefix, sha1, md5, base64, base64url, the last six characters, and the value reversed - and no absolute path, drive letter, home directory or ~ reference, in raw, JSON-escaped and forward-slash spellings. Every detector is exercised against a positive control first, and the input file deliberately carries an absolute sessionDir that external mode removes. THE LOCK, PROVED AGAINST PI ITSELF. The merge takes the same proper-lockfile lock Pi takes, pinned as a direct dependency at 4.1.2, and holds it across the transaction's final identity check and its atomic replacement. A real Pi SettingsManager save in a child process, run while Kiln holds the lock, reports an error and writes nothing, and the same save succeeds once the lock is free while Kiln's fields and a third party's package entry survive it. A Pi writer that takes the lock first and writes is waited for, and Kiln refuses with CONCURRENT_EDIT rather than overwriting it; a lock Pi keeps holding is refused as settings-locked with Pi's lock left alone. The lock being held AT THE MOMENT OF THE WRITE is observed directly rather than inferred: the renameSync that puts the file in place is wrapped, and the lock directory is present at that call. CLEANUP AND A LOST LOCK (D38, A43, A44). A release that fails, or one that returns with Kiln's own lock directory still in place, is refused as settings-lock-cleanup-failed rather than reported as success, keeping an earlier refusal's CODE - never its message - as priorReason. Kiln's lock is identified by device, inode and creation time, so a lock Pi takes immediately after Kiln's release is not reported as Kiln's leftover; that control passed on both platforms. A directory created only to hold the lock is removed only while empty, so another writer's file keeps it, and a directory that cannot be removed for any other reason is refused rather than left silently. A lock lost BEFORE the merge refuses with settings-lock-compromised and writes nothing; a lock lost DURING the write - driven from inside the renameSync wrapper, after the real rename - refuses with the same code and reports the write that completed rather than rolling it back. MUTATION CONTROLS, LOCAL ONLY. Twenty-two mutations of lib/pi-settings.mjs were run before the commit, each alone with the file restored byte-identical afterwards, and every one was caught: twelve on the merge and lock (no lock taken, lock released before the merge, packages replaced wholesale, keys re-sorted, trailing newline forced, no-op detection removed, owned-value checks removed, sessionDir kept in external mode, duplicates kept, portability check removed, lock-only directory not removed, contention not refused), eight on cleanup (failed release swallowed, no check that the lock is gone, presence checked instead of identity, priorReason dropped, priorReason carrying the message, every directory-removal error ignored, recursive removal, cleanup failure never refused), and two on the compromised-lock checks, each killing exactly its own test.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34632506490",
+      "commit": "f459b2d",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103372484489, node v22.23.2, success, 864 tests / 861 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103372484319, node v24.20.0, success, 864 tests / 861 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103372484624, node v22.23.2, success, 864 tests / 863 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103372484568, node v24.20.0, success, 864 tests / 863 pass / 0 fail / 1 skipped",
+      "settings-tests-per-cell": "24 of 24 matched by name in every cell; zero failing-test lines in any log",
+      "under-test": "lib/pi-settings.mjs - mergeSettingsText, readSettings, validateDesired and applyKilnSettings",
+      "pi-under-test": "@earendil-works/pi-coding-agent 0.84.4, its exported SettingsManager saving in a child process",
+      "lock": "proper-lockfile 4.1.2 as a direct pinned dependency, realpath:false, stale 10000ms - the library and options Pi's own lock uses",
+      "owned-keys": "four owned groups covering six keys: the supplied package entry, the skill-override path, the provider, model and thinking defaults, and sessionDir",
+      "refusal-codes": "settings-malformed, settings-not-an-object, settings-invalid-owned-value, settings-invalid-desired-state, settings-not-planned, settings-no-lease, settings-locked, settings-lock-compromised, settings-lock-cleanup-failed",
+      "key-order-boundary": "D37: unrelated values preserved and ordinary string keys keep their relative order; integer-like property names follow Pi's and JavaScript's JSON serialization order, shown by comparing Kiln's merge with a real Pi save of the same file",
+      "local-gates": "full suite 864 tests / 862 pass / 0 fail / 2 skipped on Windows node v24.18.0; lint:shell and lint:plan clean",
+      "local-mutations": "22 of 22 killed before the commit, each restored byte-identical",
+      "planning-commit": "645403a - ACC-0047 and CMP-0024 key-order wording (D37)",
+      "implementation-commit": "f459b2d - lib/pi-settings.mjs, test/pi-settings.test.mjs, package.json, package-lock.json, docs/agent-delivery-technical-proposal.md"
+    },
+    "omissions": [
+      {
+        "fact": "lock-identity-on-every-posix-filesystem",
+        "state": "not-captured",
+        "reason": "Kiln's lock is identified by device, inode and creation time. The control showing that a lock Pi takes straight after Kiln's release is NOT reported as Kiln's leftover passed on GitHub's ubuntu-latest and windows-latest runner filesystems only. A filesystem that reports no creation time and reuses the inode immediately would compare the two directories as one. The consequence is fail-closed - a cleanup refusal, never a deletion of another writer's lock - but it is unproven outside those two runner filesystems."
+      },
+      {
+        "fact": "real-pi-save-test-single-local-failure",
+        "state": "not-captured",
+        "reason": "The test that runs a real Pi save against Kiln's lock failed once locally, taking 18.5s against its usual 3.6s, on the run immediately after the files were edited. Its assertion text was not captured and the failure has not recurred in 14 local file runs, 10 targeted runs or any of the four CI cells. What failed is therefore unknown, and no claim is made about its cause."
+      },
+      {
+        "fact": "coordination-with-an-already-running-pi",
+        "state": "not-observable",
+        "reason": "The lock orders writers that take it. It cannot repair a Pi process that loaded project settings before Kiln's write and holds them in memory: Pi's save merges field by field, so a later save of a field it still holds stale - packages, for instance - would drop Kiln's entry. Setup must finish before Pi starts. Nothing here tests or claims otherwise."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The 22 mutations were run locally on Windows before the commit and not in CI. CI establishes that the tests pass on both platforms; that they fail against a defect is established only by those local runs."
+      },
+      {
+        "fact": "package-entry-normalisation",
+        "state": "not-captured",
+        "reason": "The merge applies whatever package entry it is given, and refuses one that is not a portable relative path. Proving that the portable spelling and the literal one `pi install -l` wrote resolve to the same package directory is TSK-0030's work under ACC-0105, and nothing here establishes it."
+      }
+    ]
+  }
+}
