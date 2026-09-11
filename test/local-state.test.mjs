@@ -14,6 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -641,6 +642,37 @@ test("⚠️ AN UNKNOWN MODE REFUSES — it does not inherit the permissive one"
   }
 });
 
+test("⚠️ DECIDING COVERAGE refuses an unknown mode itself, rather than through whoever called it", () => {
+  // ⚠️ REACHED DIRECTLY, WHICH IS THE WHOLE POINT. `stateRootFor` and `createStateRoot` refuse an
+  // unknown mode as well, so a test that arrived here through either of them passed just as happily
+  // with this function's own guard deleted - which is how a mutation removing it survived the suite.
+  // The layout carries the SAME misspelling as the request, because that is the case the guard exists
+  // for: a matching typo passes the binding check and would otherwise fall through to the permissive
+  // branch, answering `covered: true` under a mode nobody recognises.
+  const dir = project();
+  covered(dir);
+  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: dir });
+
+  // ⚠️ **AND IT IS THIS FUNCTION'S REFUSAL THAT IS ASSERTED, BY NAME.** `assertLayout` runs a few lines
+  // later and refuses an unknown mode with the SAME code, so a test that checked only the code would
+  // pass with this guard deleted — which is exactly what a mutation removing it did. The refusal
+  // carries which check produced it, and a coverage decision must refuse in its own name rather than
+  // be rescued by the next call down.
+  for (const mode of ["projcet", "PROJECT", "Project", " project", "project ", "user ", "anything"])
+    assert.throws(
+      () => coverageState({ projectRoot: dir, mode, roots: { ...roots, mode } }),
+      (e) =>
+        e instanceof LocalStateRefusal &&
+        e.reason === STATE_REFUSAL.UNKNOWN_MODE &&
+        e.detail?.what === "Deciding coverage" &&
+        e.detail?.mode === mode,
+      JSON.stringify(mode)
+    );
+
+  // And the two it knows still answer, so this is a vocabulary check rather than a refusal to work.
+  assert.equal(coverageState({ projectRoot: dir, mode: STATE_MODE.PROJECT, roots }).covered, true);
+});
+
 test("the two known modes are exactly the two the session schema names", () => {
   // If a third is ever added, the check above refuses it until this module is taught it — which is
   // the safe direction, and the reason the containment branch is written as "unless it is `user`".
@@ -978,7 +1010,71 @@ test("⚠️ an INVALID record is a recovery decision — never repaired, never 
   }
 });
 
-test("⚠️ an unreadable record is invalid, not absent", async () => {
+test("⚠️ a record that cannot be READ is invalid, not absent, and the refusal quotes neither the error nor the path", () => {
+  // `absent` invites minting a second identity for a project that already has one, so a read failure
+  // must not look like one. The failure is forced at exactly this path: a file its owner cannot read
+  // is not something the Windows and POSIX runners can both be made to produce.
+  const dir = project();
+  mkdirSync(join(dir, ".pi"), { recursive: true });
+  const path = join(dir, ...PROJECT_RECORD.split("/"));
+  const SECRET = "sk-ant-RECORD-READ-PLANTED-3f9b";
+  writeFileSync(path, JSON.stringify({ recordVersion: 1, projectId: ID_A, token: SECRET }), "utf-8");
+
+  const nodeFs = createRequire(import.meta.url)("node:fs");
+  const originalRead = nodeFs.readFileSync;
+  nodeFs.readFileSync = function (p, ...rest) {
+    // ⚠️ The error carries a path and the file's own content, as a real errno error's message can.
+    if (String(p) === path) throw Object.assign(new Error(`EACCES: permission denied, open '${path}' ${SECRET}`), { code: "EACCES" });
+    return originalRead.call(this, p, ...rest);
+  };
+  syncBuiltinESMExports();
+
+  let refusal = null;
+  try {
+    const state = projectRecordState(dir);
+    assert.equal(state.kind, RECORD.INVALID, "a record that cannot be read is INVALID, never ABSENT");
+    assert.match(state.detail, /cannot be read/);
+    assert.match(state.detail, /EACCES/, "the errno code says what happened");
+    assert.ok(!state.detail.includes(SECRET) && !state.detail.includes(dir), `the detail quotes the error: ${state.detail}`);
+
+    try {
+      readProjectId(dir);
+    } catch (e) {
+      refusal = e;
+    }
+  } finally {
+    nodeFs.readFileSync = originalRead;
+    syncBuiltinESMExports();
+  }
+
+  assert.ok(refusal instanceof LocalStateRefusal && refusal.reason === STATE_REFUSAL.RECORD_INVALID, `got ${refusal}`);
+
+  // ⚠️ **THE WHOLE REFUSAL, NOT ONLY ITS MESSAGE.** A refusal is printed, logged and serialised, and a
+  // machine path or a quoted error in `detail` is disclosed exactly as far as one in the message is.
+  const serialised = JSON.stringify({
+    name: refusal.name,
+    reason: refusal.reason,
+    message: refusal.message,
+    detail: refusal.detail,
+  });
+
+  // Each forbidden string in every spelling a JSON document could hold it: raw, JSON-escaped, and with
+  // forward slashes — on Windows the raw and escaped spellings of a path are not the same bytes.
+  const spellings = (s) => [s, JSON.stringify(s).slice(1, -1), s.replace(/\\/g, "/")];
+  for (const forbidden of [SECRET, dir, path, "permission denied", "EACCES:"])
+    for (const spelling of spellings(forbidden))
+      assert.ok(!serialised.includes(spelling), `the refusal carries ${JSON.stringify(spelling)}: ${serialised}`);
+
+  assert.deepEqual(
+    JSON.parse(serialised).detail,
+    { path: PROJECT_RECORD, detail: "cannot be read (EACCES)" },
+    "what it does carry: the record by its stable relative identifier, and the errno code"
+  );
+  assert.match(refusal.message, /kiln\.json/, "it still names the record, by the path that is the same everywhere");
+  assert.match(refusal.message, /recovery decision/, "and says what it is");
+});
+
+test("⚠️ a record that is not JSON is invalid, not absent", async () => {
   // `absent` invites minting an id, and this file holds an identity other things already key on.
   const dir = project();
   mkdirSync(join(dir, ".pi"), { recursive: true });
