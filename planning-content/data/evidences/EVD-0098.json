@@ -1,0 +1,67 @@
+{
+  "id": "EVD-0098",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the coverage guard refuses in its own name, and the record refusal carries no machine path, both platforms through CI",
+  "kind": "experiment",
+  "summary": "Supplemental to EVD-0097 for ACC-0049 and ACC-0050: the two gaps that record named, now closed, observed on both platforms through CI. GitHub Actions run 34642326014 at commit 76d5254, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 874 tests and 0 failures in every cell. ALL FIFTY-SIX local-state tests ran in every cell, checked by taking each test name out of test/local-state.test.mjs and matching it against each cell's log, with zero failing-test lines anywhere. EVD-0097 stands as recorded; nothing in it is withdrawn. GAP ONE, THE UNKNOWN-MODE GUARD. EVD-0097 recorded a surviving mutation: removing `assertKnownMode` from `coverageState` changed no test result, because every test that passed an unknown mode reached `stateRootFor` or `createStateRoot`, which refuse first. The new test `DECIDING COVERAGE refuses an unknown mode itself, rather than through whoever called it` calls `coverageState` directly with seven misspellings - projcet, PROJECT, Project, ' project', 'project ', 'user ' and anything - each passed in the layout as well as in the request, so the binding check that compares them is cleared and the call reaches the guard. THE FIRST VERSION OF THAT TEST DID NOT KILL THE MUTATION EITHER, and that is the finding worth keeping: `assertLayout` refuses an unknown mode a few lines later with the SAME refusal code, so asserting the code alone passed with the guard deleted. The test now asserts which check refused - the refusal's `detail.what` is `Deciding coverage`, and `detail.mode` is the value passed - and the mutation dies. A shared refusal code can hide a missing guard. GAP TWO, THE READ-FAILURE BRANCH AND WHAT A REFUSAL CARRIES. EVD-0097 recorded that the test named for an unreadable record wrote malformed JSON, leaving the branch that reports a record which cannot be READ with no test. That test is renamed to `a record that is not JSON is invalid, not absent`, which is what it exercises, and a new test forces EACCES at exactly the record path, with the raised error deliberately carrying both the record's absolute path and a credential planted in the file. The record is reported INVALID rather than ABSENT - absent invites minting a second identity for a project that already has one - and the refusal is inspected AS A WHOLE: name, reason, message and detail serialised together, asserted to contain neither the planted secret, nor the project directory, nor the record's absolute path, nor the OS error text, each checked raw, JSON-escaped and with forward slashes, because on Windows those are not the same bytes. What it does carry is asserted positively: detail is exactly { path: '.pi/kiln.json', detail: 'cannot be read (EACCES)' }. THE REFUSAL ITSELF CHANGED TO MAKE THAT TRUE. It quoted the OS error message, V8's parser output - which quotes the file's own bytes around a syntax error - and the record's absolute path, in both the message and the detail. It now names the record by its stable relative identifier and reports the errno code alone. `projectRecordState` still returns the absolute path, which is what a caller acting on the file needs; no caller read the refusal's.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34642326014",
+      "commit": "76d5254",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103404802213, node v22.23.2, success, 874 tests / 871 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103404802293, node v24.20.0, success, 874 tests / 871 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103404802198, node v22.23.2, success, 874 tests / 873 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103404802052, node v24.20.0, success, 874 tests / 873 pass / 0 fail / 1 skipped",
+      "local-state-tests-per-cell": "56 of 56 matched by name in every cell; zero failing-test lines in any log",
+      "new-tests": "DECIDING COVERAGE refuses an unknown mode itself, rather than through whoever called it; a record that cannot be READ is invalid, not absent, and the refusal quotes neither the error nor the path - both ran and passed in all four cells",
+      "renamed-test": "an unreadable record is invalid, not absent -> a record that is not JSON is invalid, not absent",
+      "refusal-contract": "RECORD_INVALID names `.pi/kiln.json` in message and in detail.path, and reports the errno code alone; no OS text, no parser text, no absolute path",
+      "relation-to-EVD-0097": "supplemental: EVD-0097 stands as the record of run 34635305377, including the old test name and the mutation that survived it. Nothing there is withdrawn.",
+      "known-flakes-this-run": "the real-Pi-save test (F45), the readiness tests (R7) and the shutdown-evidence test passed in every cell",
+      "implementation-commit": "76d5254 - lib/local-state.mjs and test/local-state.test.mjs"
+    },
+    "omissions": [
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "Five mutations were run LOCALLY on Windows against test/local-state.test.mjs before the commit, each alone with the file restored byte-identical, and each was killed by exactly the test that exists for it: the unknown-mode guard removed from `coverageState` (killed by the new direct test, and NOT by its first version, which asserted only the refusal code); the read failure quoting the OS error again; the absolute path restored in the refusal's message; the absolute path restored in the refusal's detail; and a read failure reported as ABSENT. CI establishes that the tests pass on both platforms; that they fail against these defects is established only by those local runs."
+      },
+      {
+        "fact": "real-permission-denial",
+        "state": "not-observable",
+        "reason": "The read failure is forced by replacing `readFileSync` for exactly the record's path so it raises EACCES. Denying a file to its owner is not portable across the Windows and POSIX runners, so what is established is that an EACCES from the filesystem is reported as INVALID and refused without quoting anything, not that a particular permission arrangement produces one."
+      },
+      {
+        "fact": "other-refusals-in-this-module",
+        "state": "not-captured",
+        "reason": "Only the project-record refusal was changed. Other refusals in lib/local-state.mjs still name absolute paths in their messages - the coverage refusal names the state root, deliberately, because an operator being told which directory is unprotected needs to see it. Whether that boundary should be the same everywhere is undecided and is not claimed here."
+      },
+      {
+        "fact": "f45-flake",
+        "state": "not-captured",
+        "reason": "The real-Pi-save test in test/pi-settings.test.mjs failed twice locally under full-suite load, at 18.5s and 12.2s against a usual 3.6s, and its failure output was not captured either time. It passed in all four cells of this run and in every isolated local run since. The cause is unknown and nothing here claims one; it is a separate investigation."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
