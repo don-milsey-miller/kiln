@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The package entry is normalised only after canonical equivalence is proved",
   "statement": "The literal package entry that `pi install -l` wrote is rewritten to the portable `../.planning/pi-package` spelling only after both spellings are shown to canonicalise to the same package directory on the running platform, and the rewrite is applied through the settings merge so every third-party package entry and unrelated key is preserved. When equivalence cannot be established - the entry resolves somewhere else, does not resolve, or cannot be read - normalisation is refused and `.pi/settings.json` is left byte-identical.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0024",
     "REQ-0025"
   ],
-  "notes": "⚠️ SPLIT FROM ACC-0047. That criterion accepted both TSK-0029 and TSK-0030, and TSK-0030 depends on TSK-0029, so the merge could not be accepted until normalisation was built as well. ACC-0047 now covers the merge primitive alone; this criterion covers the decision to rewrite the entry, which TSK-0029's merge then applies. ⚠️ PROOF BEFORE REWRITE, NEVER A CONSTRUCTED TARGET. An entry whose equivalence cannot be proved is left exactly as `pi install -l` wrote it; guessing the portable form would point the project at a directory nobody showed was the pinned package."
+  "notes": "⚠️ SPLIT FROM ACC-0047. That criterion accepted both TSK-0029 and TSK-0030, and TSK-0030 depends on TSK-0029, so the merge could not be accepted until normalisation was built as well. ACC-0047 now covers the merge primitive alone; this criterion covers the decision to rewrite the entry, which TSK-0029's merge then applies. ⚠️ PROOF BEFORE REWRITE, NEVER A CONSTRUCTED TARGET. An entry whose equivalence cannot be proved is left exactly as `pi install -l` wrote it; guessing the portable form would point the project at a directory nobody showed was the pinned package.",
+  "evidencedBy": [
+    "EVD-0096"
+  ]
 }

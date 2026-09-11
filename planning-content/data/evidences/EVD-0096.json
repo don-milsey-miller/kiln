@@ -1,0 +1,71 @@
+{
+  "id": "EVD-0096",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the package entry is rewritten only on proved canonical equivalence, on both platforms through CI",
+  "kind": "experiment",
+  "summary": "Measurement of the package-entry normalisation through CI. GitHub Actions run 34635305377 at commit f3fab47, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 872 tests and 0 failures in every cell. ALL EIGHT package-entry tests ran in every cell, checked by taking each test name out of test/pi-package-entry.test.mjs and matching it against each cell's log, with zero failing-test lines in any log. WHAT IS PROVED BEFORE ANYTHING IS REWRITTEN. The literal entry `pi install -l` wrote and the portable `../.planning/pi-package` spelling are each resolved from the directory the settings file lives in, which is how Pi resolves a package path. Each side must be a readable directory - statSync first - and the two canonical paths must be equal, with `.` and `..` resolved, symlinks and junctions followed, and Windows compared case-insensitively. That single comparison is the proof; an earlier device-and-inode comparison was removed as redundant, untestable on its own, and able to refuse falsely where identity reporting is unstable. SPELLINGS PROVED EQUIVALENT, on real directories: the portable spelling itself, an absolute path as `pi install -l` may write, a redundant relative path, and on Windows the backslash spelling. On POSIX the backslash spelling names nothing and is refused, because a backslash is an ordinary character in a name there. THE LINK CASE RAN ON BOTH PLATFORMS: a directory symlink on the two Ubuntu cells and a junction on the two Windows cells, each created for real, the link spelling proved equivalent, and the entry rewritten through the merge. The test reports a diagnostic and skips if a runner will not create one; no cell reported that, and nothing in that file was skipped. WHAT IS REFUSED, each leaving .pi/settings.json byte-identical with no lock and no temporary file: an entry naming another package directory (package-entry-not-equivalent), one that does not resolve or sits below a file (package-entry-missing), one that is a file rather than a directory (package-entry-not-a-directory), one that cannot be read, simulated with EACCES on exactly that path (package-entry-unreadable, carrying the errno code), an empty entry (package-entry-invalid-literal), a caller supplying its own package entry or equivalents (package-entry-already-supplied), and a missing transaction (package-entry-no-transaction). A missing package directory is refused naming the PORTABLE side, so the failure says which spelling could not be resolved. No refusal carries a path: the literal entry may be an absolute home path, and every refusal is asserted not to contain the project directory. THE REWRITE ITSELF GOES THROUGH TSK-0029's MERGE, with the literal spelling passed as an equivalent: the entry is corrected in place and occurs exactly once, third-party packages, unrelated keys, their order and the trailing-newline style are preserved, and normalising again - from the literal spelling, now absent from the file, or from the portable one - changes no bytes and does not change the modification time. MUTATION CONTROLS, LOCAL ONLY. Nine mutations of lib/pi-package-entry.mjs were run before the commit, each alone with the file restored byte-identical afterwards, and every one was caught: the canonical comparison removed, paths compared as written rather than canonicalised (caught only by the link test), a non-directory accepted, unreadable treated as missing, the literal spelling written instead of the portable one, the proved literal not passed as an equivalent, a second package entry accepted, a missing transaction not named, and an empty literal accepted.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34635305377",
+      "commit": "f3fab47",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103381621107, node v22.23.2, success, 872 tests / 869 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103381621417, node v24.20.0, success, 872 tests / 869 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103381621452, node v22.23.2, success, 872 tests / 871 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103381621299, node v24.20.0, success, 872 tests / 871 pass / 0 fail / 1 skipped",
+      "package-entry-tests-per-cell": "8 of 8 matched by name in every cell; zero failing-test lines in any log",
+      "link-case": "ran and passed in all four cells - directory symlink on ubuntu, junction on windows; no runner reported that it could not create one, and nothing in that file was skipped",
+      "skips-in-totals": "pre-existing and unrelated: two POSIX-only cleanup tests and the opt-in live contract spike",
+      "under-test": "lib/pi-package-entry.mjs - provePortablePackageEntry and applyPortablePackageEntry",
+      "proof": "both sides readable directories, then one comparison of canonical paths (symlinks and junctions resolved, Windows case-insensitive)",
+      "refusal-codes": "package-entry-not-equivalent, package-entry-missing, package-entry-unreadable, package-entry-not-a-directory, package-entry-invalid-literal, package-entry-already-supplied, package-entry-no-transaction",
+      "rewrite-path": "TSK-0029's merge, with the literal spelling as packageEntryEquivalents, so the entry is corrected in place and occurs once",
+      "local-gates": "full suite 872 tests / 870 pass / 0 fail / 2 skipped on Windows node v24.18.0; lint:shell and lint:plan clean",
+      "local-mutations": "9 of 9 killed before the commit, each restored byte-identical",
+      "known-flakes-this-run": "the real-Pi-save test, the readiness tests and the win32 shutdown-evidence test all passed in every cell",
+      "implementation-commit": "f3fab47 - lib/pi-package-entry.mjs and test/pi-package-entry.test.mjs"
+    },
+    "omissions": [
+      {
+        "fact": "equivalence-across-a-mount-or-bind",
+        "state": "not-captured",
+        "reason": "Sameness is one comparison of canonical paths. Two directories that are the same through a bind mount, a mapped drive or a substituted drive canonicalise to different paths and would be refused as not equivalent; the reverse, two different directories sharing a canonical path, does not occur. Nothing here builds such a mount - it needs privileges CI does not grant - so the behaviour in that case is reasoned from the comparison, not observed. It is fail-closed: a refusal, never a wrong rewrite."
+      },
+      {
+        "fact": "unreadable-directory-through-real-permissions",
+        "state": "not-observable",
+        "reason": "The unreadable case is driven by replacing statSync for exactly one path so it raises EACCES. Real permissions that deny a directory to its owner cannot be set portably across the Windows and POSIX runners, so what is established is that an EACCES from the filesystem is refused and named, not that any particular permission arrangement produces one."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The nine mutations were run locally on Windows before the commit and not in CI. CI establishes that the tests pass on both platforms; that they fail against a defect is established only by those local runs."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      },
+      {
+        "fact": "entry-written-by-a-real-pi-install",
+        "state": "not-captured",
+        "reason": "The literal spellings under test are the ones `pi install -l` is expected to write - relative with either separator, and absolute - written into the fixture by the test. No run of `pi install -l` produced them here, so what its output looks like on each platform is taken from the earlier spike rather than re-observed."
+      }
+    ]
+  }
+}
