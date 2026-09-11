@@ -1,0 +1,74 @@
+{
+  "id": "EVD-0097",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the coverage gate creates nothing and the external root derives from the committed id, both platforms through CI",
+  "kind": "experiment",
+  "summary": "Measurement of the local-state policy through CI. GitHub Actions run 34635305377 at commit f3fab47, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 872 tests and 0 failures in every cell. ALL FIFTY-FOUR local-state tests ran in every cell, checked by taking each test name out of test/local-state.test.mjs and matching it against each cell's log, with zero failing-test lines in any log. ACC-0049, CLAUSE BY CLAUSE. That a missing block refuses: `with no ignore block, project-local state REFUSES and writes nothing`. Edited: `with the block EDITED, project-local state still refuses`, which also asserts the reported state is `edited`. Partial: `partial coverage is not coverage`, where `.planning/` is ignored and the two runtime paths are not - the state an older Kiln leaves, and the one a check written as `is there a block` would pass - naming `.pi/sessions/` and `.pi/runtime/` as uncovered. Negated: `a negated rule is not coverage either`, where the rules are present and `!.pi/runtime/` follows them. THAT NOTHING IS CREATED IS ASSERTED AS ABSENCE, NOT AS A MESSAGE: each of those tests checks existsSync is false for every directory of the state layout after the refusal, and `deriving a root creates nothing, so setup can show both before the operator chooses` establishes that deciding creates nothing at all, with `creating a state root WITHOUT a lease is refused, and creates nothing` covering the unleased path. THE THREE CHOICES AS DATA: `the refusal carries the three answers, with the block's actual bytes` asserts the ids are exactly fix-ignore, user-state and stop, that the first is available, an append rather than a replacement, and carries the block's bytes rather than a description of them; `over an exact LEGACY block the option is a MIGRATION, and applying it leaves one block` covers the migration case; `over an EDITED block, 'add the block' is offered as unavailable rather than silently` covers the case where setup may not act for the operator. ACC-0050, CLAUSE BY CLAUSE. Platform convention: `the per-user home follows the convention already written down, on both platforms` and `Windows uses LOCALAPPDATA rather than APPDATA, because state must not roam`, with `a platform that will not say where state belongs is a refusal, not a guess` covering the case where the convention is unavailable. Derivation from the committed id: `the external root is keyed by the ID, not by where the project sits`, and `external mode without a committed id refuses rather than inventing one`. Separate roots for separate ids: `two projects on one machine occupy separate external roots`. The id never becoming a path component: `A TRAVERSAL ID NEVER BECOMES A PATH COMPONENT`. A root that is not outside the project being refused rather than used: `EXTERNAL STATE MUST BE PROVED EXTERNAL, not assumed from the mode's name`, `the coverage exemption re-proves it, because it is reachable on its own`, `A CHILD JUNCTION CANNOT REVERSE WHAT THE ROOT PROVED`, and `a project the external root would write INTO is caught, which the root check alone cannot see`. The committed record: `the id lands in the committed record, and the record is exactly what the schema permits` asserts the keys are exactly projectId and recordVersion; `NO COMMITTED FILE HOLDS AN ABSOLUTE USER PATH` asserts the bytes carry no drive letter, /home/, /Users/, AppData or XDG reference, and not the project's own path; `the project id is minted once, and only through a live lease` and `an INVALID record is a recovery decision - never repaired, never a second identity` cover minting and recovery. MUTATION CONTROLS, LOCAL ONLY, AND ONE SURVIVED. Nine mutations of lib/local-state.mjs were run against the suite, each alone with the file restored byte-identical afterwards. Eight were caught: the coverage refusal removed (8 tests), uncovered paths reported but called covered (8), the external exemption granted by the mode's name (7), the project id not checked before it becomes a path component (1), the external root not keyed by the id (3), a platform that says nothing guessed at (1), the state root created without a lease (9), and an invalid record read as though it were valid (1). ONE SURVIVED, and it is recorded as an omission rather than smoothed over: removing `assertKnownMode` from `coverageState` changes no test result, because every test that exercises an unknown mode reaches it through `stateRootFor` or `createStateRoot`, which refuse first. That guard's own comment says it was added because a mode misspelled the same way in two places once fell through to the permissive branch, so it is exactly the kind of default-deny that should not rest on where its callers happen to check.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34635305377",
+      "commit": "f3fab47",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103381621107, node v22.23.2, success, 872 tests / 869 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103381621417, node v24.20.0, success, 872 tests / 869 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103381621452, node v22.23.2, success, 872 tests / 871 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103381621299, node v24.20.0, success, 872 tests / 871 pass / 0 fail / 1 skipped",
+      "local-state-tests-per-cell": "54 of 54 matched by name in every cell; zero failing-test lines in any log",
+      "under-test": "lib/local-state.mjs - coverageState, openStateRoot, stateRootFor, createStateRoot, ensureProjectId, projectRecordState and readProjectId",
+      "coverage-refusal": "refuses on an absent, edited, partial or negated block, and the assertion is that the state root and its runtime paths do not exist afterwards",
+      "three-choices": "fix-ignore, user-state and stop, each marked available or not, with the ignore option carrying the block's own bytes and marked unavailable over an edited block",
+      "external-derivation": "per-user convention (LOCALAPPDATA on win32, XDG_STATE_HOME or ~/.local/state elsewhere) plus projects/<projectId>, with the id validated as 32 lowercase hex before it becomes a path component",
+      "committed-record": ".pi/kiln.json holds exactly projectId and recordVersion, and carries no drive letter, home directory, XDG reference or the project's own path",
+      "launch-time-corroboration": "the supervisor re-checks coverage at launch before the session directory is passed to Pi and before Kiln writes its run file; those supervisor tests ran in the same cells",
+      "local-mutations": "9 run against lib/local-state.mjs, 8 killed, 1 survived (see omissions), each restored byte-identical",
+      "planning-correction": "e4bbe9e - ACC-0049 and ACC-0050 narrowed to this task's library behaviour, with the setup integration moved to ACC-0107"
+    },
+    "omissions": [
+      {
+        "fact": "setup-integration",
+        "state": "not-captured",
+        "reason": "Nothing here exercises a setup command, because there is not one. Interactive setup rendering the three choices, non-interactive setup refusing, minting or reusing the project id in a real run, and external state being offered only once relocation support is established are ACC-0107's, on TSK-0060. This record covers the library that a setup command will call."
+      },
+      {
+        "fact": "unknown-mode-guard-in-coverageState",
+        "state": "not-captured",
+        "reason": "The mutation that removes `assertKnownMode` from `coverageState` survives the suite: every test that passes an unknown mode reaches `stateRootFor` or `createStateRoot`, which refuse first, so no test calls `coverageState` directly with one. The guard is therefore unproven by these tests, although its two known-mode branches are exercised throughout. Nothing was changed to hide this."
+      },
+      {
+        "fact": "relocation-capability",
+        "state": "not-captured",
+        "reason": "That the pinned runtime honours an external session directory is not re-probed here. It is recorded in AST-0047 and measured in EVD-0081 and EVD-0083 on pi 0.84.4. These tests establish where the root is derived, not that Pi writes there."
+      },
+      {
+        "fact": "unreadable-record-and-unusual-filesystems",
+        "state": "not-observable",
+        "reason": "The invalid-record cases are driven by writing malformed JSON and schema-invalid records, which is the reachable half. The branch that reports a record that cannot be READ - a permission or I/O failure on an existing file - is not exercised, because denying a file to its owner is not portable across the Windows and POSIX runners. Junction and symlink redirection of the state root IS exercised for real on both platforms."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The nine mutations were run locally on Windows against test/local-state.test.mjs, not in CI. CI establishes that the tests pass on both platforms; that they fail against a defect is established only by those local runs, and the one survivor is recorded above."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed - including its per-user state convention, which the derivation treats as the POSIX one."
+      }
+    ]
+  }
+}

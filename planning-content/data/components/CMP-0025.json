@@ -14,6 +14,8 @@
   "implementedBy": [
     "schemas/runtime/",
     "lib/runtime-records.mjs",
-    "test/runtime-records.test.mjs"
+    "test/runtime-records.test.mjs",
+    "lib/local-state.mjs",
+    "test/local-state.test.mjs"
   ]
 }

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The external state root derives from the platform convention and the committed project ID",
   "statement": "In external mode the state root is derived from the platform's own convention for per-user state and the stable non-secret project ID: two different IDs on one machine occupy separate roots, an ID that could traverse never becomes a path component, and a root that is not outside the project is refused rather than used. `.pi/kiln.json` holds the ID and the record version and nothing else, and contains no absolute user path, no home directory and not the project's own path.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0027",
     "REQ-0023"
   ],
-  "notes": "⚠️ THE RUNTIME-CAPABILITY GATE MOVED. The criterion said the mode is available only if the pinned runtime supports relocation. Nothing in this library gates availability on a capability check: the mode is a parameter, and relocation support is a property of the pinned runtime, recorded in AST-0047 and measured in EVD-0081 and EVD-0083. Offering the mode only once that support is established belongs with the setup command, and is now part of the criterion on TSK-0060. ⚠️ THE NO-PATH CLAIM IS BOUNDED TO THE RECORD THIS TASK WRITES. `.pi/settings.json` is ACC-0048's, and every committed file a complete setup produces is ACC-0106's."
+  "notes": "⚠️ THE RUNTIME-CAPABILITY GATE MOVED. The criterion said the mode is available only if the pinned runtime supports relocation. Nothing in this library gates availability on a capability check: the mode is a parameter, and relocation support is a property of the pinned runtime, recorded in AST-0047 and measured in EVD-0081 and EVD-0083. Offering the mode only once that support is established belongs with the setup command, and is now part of the criterion on TSK-0060. ⚠️ THE NO-PATH CLAIM IS BOUNDED TO THE RECORD THIS TASK WRITES. `.pi/settings.json` is ACC-0048's, and every committed file a complete setup produces is ACC-0106's.",
+  "evidencedBy": [
+    "EVD-0097"
+  ]
 }
