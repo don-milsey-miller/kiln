@@ -176,7 +176,46 @@ ${steps ? `<h1 style="font-size:1rem">Runbook steps</h1>${steps}` : ""}
 
 /* ------------------------------------------------------------------ server */
 
-export function startServer({ contentRoot, port = 0 } = {}) {
+/**
+ * The ports the Fetch standard tells clients to refuse — `fetch` fails with `bad port` before it
+ * opens a connection, and every browser does the same.
+ *
+ * ⚠️ **AN EPHEMERAL PORT CAN BE ONE OF THESE.** Binding port 0 asks the OS for a free port out of its
+ * dynamic range, and that range is the machine's to configure: a Windows host set to the legacy
+ * `1024`-and-up range hands out 6000 or 10080 as readily as 52000. The page then cannot be opened by
+ * anything that obeys the standard, which is this server's entire audience — so a blocked port is not
+ * usable, and the answer is to bind again rather than to hand back a URL nobody can fetch.
+ */
+export const FETCH_BLOCKED_PORTS = Object.freeze([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
+  111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+]);
+
+const BLOCKED = new Set(FETCH_BLOCKED_PORTS);
+
+/** Whether `fetch` and every standards-following browser will refuse to connect to this port. */
+export const isFetchBlockedPort = (port) => BLOCKED.has(port);
+
+/** No usable port was obtained. Distinct from a listen failure, which is not this server's to retry. */
+export class ServerPortError extends Error {
+  constructor(message, detail = {}) {
+    super(message);
+    this.name = "ServerPortError";
+    this.code = "EPORTUNUSABLE";
+    this.detail = detail;
+  }
+}
+
+/**
+ * @param {object} options
+ * @param {string} [options.contentRoot]
+ * @param {number} [options.port]              0 asks the OS; an explicit port is the caller's choice and is honoured
+ * @param {number} [options.maxPortAttempts]   how many times an OS-assigned blocked port is handed back
+ * @param {(server: import("node:http").Server) => number} [options.portOf]  the port as a client would see it
+ */
+export function startServer({ contentRoot, port = 0, maxPortAttempts = 8, portOf = (server) => server.address().port } = {}) {
   const root = contentRoot ?? resolveContentRoot();
   const ctx = makeContext(root);
   const clients = new Set();
@@ -235,24 +274,53 @@ export function startServer({ contentRoot, port = 0 } = {}) {
     watcher.once("ready", onReady);
     watcher.once("error", onError);
   });
-  return watcherReady
-    .then(() => new Promise((resolve, reject) => {
+  /**
+   * One bind. A listen failure rejects, and is NEVER retried here: `EADDRINUSE` on a port the caller
+   * named, or `EACCES`, is the caller's answer, and quietly binding somewhere else would hide it.
+   */
+  const bindOnce = () =>
+    new Promise((resolve, reject) => {
       const onError = (error) => reject(error);
       server.once("error", onError);
       server.listen(port, "127.0.0.1", () => {
         server.off("error", onError);
-        resolve({
-          server,
-          watcher,
-          port: server.address().port,
-          url: `http://127.0.0.1:${server.address().port}/`,
-          async close() {
-            for (const c of clients) c.end();
-            await watcher.close();
-            await new Promise((r) => server.close(r));
-          },
-        });
+        resolve(portOf(server));
       });
+    });
+
+  /** ⚠️ CLOSED BEFORE THE NEXT ATTEMPT, so a rejected port is released rather than held to the end. */
+  const closeListener = () => new Promise((r) => server.close(r));
+
+  const listenOnUsablePort = async () => {
+    const rejectedPorts = [];
+    for (let attempt = 1; attempt <= maxPortAttempts; attempt += 1) {
+      const bound = await bindOnce();
+      // An explicit port is the caller's decision, blocked or not; only an OS-assigned one is retried.
+      if (port !== 0 || !isFetchBlockedPort(bound)) return { bound, rejectedPorts };
+      rejectedPorts.push(bound);
+      await closeListener();
+    }
+    throw new ServerPortError(
+      `The operating system handed back a port \`fetch\` refuses ${maxPortAttempts} times in a row ` +
+        `(${rejectedPorts.join(", ")}), so this server has no address a browser could open. Nothing is ` +
+        `listening. Narrow the dynamic port range, or pass an explicit port.`,
+      { attempts: maxPortAttempts, rejectedPorts }
+    );
+  };
+
+  return watcherReady
+    .then(listenOnUsablePort)
+    .then(({ bound, rejectedPorts }) => ({
+      server,
+      watcher,
+      port: bound,
+      rejectedPorts,
+      url: `http://127.0.0.1:${bound}/`,
+      async close() {
+        for (const c of clients) c.end();
+        await watcher.close();
+        await new Promise((r) => server.close(r));
+      },
     }))
     .catch(async (error) => {
       await watcher.close().catch(() => {});
