@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0108",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Setup obtains the trust decision for the path it names, and never defaults one",
+  "statement": "Interactive setup displays the canonical project directory the decision applies to and obtains an approval or a denial for it. `--trust approve` records an approval without a prompt. Non-interactive setup neither prompts nor assumes: with no pre-existing decision and no explicit approval it refuses. A denial is reported as not ready - setup does not describe the agent as usable - while the planning scaffold is left intact and valid and the browser-only start remains available.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0023",
+    "REQ-0026"
+  ],
+  "notes": "⚠️ SPLIT FROM ACC-0051, WHICH ASKED TSK-0032 FOR A COMMAND IT DOES NOT OWN. ACC-0051 now covers the store integration and the launch gate; this covers the command that asks the operator and the option that answers for them. ⚠️ DEFAULTING IS THE FAILURE THIS EXISTS TO PREVENT. AST-0042 measured what an unapproved non-interactive child does on 0.84.4: it loads none of the project package's tools and reports no error, no warning and no non-zero exit. A setup that assumed approval would produce exactly that child, and every role boundary in Kiln is enforced by the tools it would be missing. ⚠️ A DENIAL IS AN ANSWER, NOT A FAILURE. The scaffold stays, the browser-only path stays, and setup says plainly that the agent is not ready - so an operator who declines is left with a working project rather than a half-finished one."
+}

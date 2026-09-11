@@ -5,13 +5,14 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "Trust is obtained through a supported route, and a denial stops the agent cleanly",
-  "statement": "Interactive setup displays the canonical project path and obtains the decision through Pi's own supported mechanism. A denial leaves the planning scaffold intact and valid, does not describe the agent as ready, and still permits an explicit browser-only start. Non-interactive setup with no pre-existing decision refuses rather than defaulting to approval.",
+  "title": "The trust decision is read and recorded through Pi's exported store, and an unapproved project never launches an agent",
+  "statement": "The trust decision for this project is read, granted, denied and revoked through `ProjectTrustStore` as exported from the pinned package's root, keyed by the canonical project directory, with no write to Pi's trust file shape and no import of an unexported path. A project with no decision and a project that was denied are distinct outcomes, never collapsed into one. An agent launch over a project whose trust is not approved is refused BEFORE the child is spawned, the planning scaffold is left untouched by that refusal, and the refusal names `bin/start-shell.mjs` as the browser-only way to carry on without an agent.",
   "evaluates": [
     "CMP-0026"
   ],
   "verifies": [
     "REQ-0023",
     "REQ-0026"
-  ]
+  ],
+  "notes": "⚠️ NARROWED TO WHAT TSK-0032 BUILDS. The criterion asked for interactive setup to display the path and obtain the decision, for `--trust approve`, and for a non-interactive refusal - none of which can exist before the setup command does. Those moved to the criterion on TSK-0060. What is left is the module and the launch gate, which are this task's to deliver and can be tested today. ⚠️ THE STORE IS THE BOUNDARY. DEC-0027 withdrew writing `trust.json` directly; depending on the exported class is the whole of the difference, so 'through the exported store' is part of the assertion rather than an implementation note. ⚠️ MISSING IS NOT DENIED. An absent decision is a project nobody has been asked about; a denial is an operator's answer. Setup may ask about the first and must not re-ask about the second, so a module that reported both as 'not trusted' would make that impossible one layer up."
 }
