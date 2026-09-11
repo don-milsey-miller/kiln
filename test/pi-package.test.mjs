@@ -197,6 +197,78 @@ test("⚠️ ACC-0063 a signature version the entry point does not share is refu
   await refusal(validatePackage({ packageRoot: pathAsName }), PACKAGE_REFUSAL.SIGNATURE_INVALID, "a path where a name belongs");
 });
 
+/* ============================================ declared tools vs registered ===================== */
+
+/** Append a registration to the copied entry point, inside its registration function. */
+const registering = (...tools) => ({ root }) => {
+  const path = join(root, "extensions", "kiln.js");
+  const source = readFileSync(path, "utf-8");
+  const calls = tools.map((name) => `  _pi?.registerTool?.({ name: ${JSON.stringify(name)} });`).join("\n");
+  writeFileSync(path, source.replace("export default function register(_pi) {", `export default function register(_pi) {\n${calls}`));
+};
+
+test("⚠️ ACC-0063 the package registers nothing, and its declaration says exactly that", async () => {
+  const { tools, signature } = await validatePackage({ packageRoot: PACKAGE });
+
+  // ⚠️ THE TRUTHFUL EMPTY STATE. `tools` stays empty until a slice adds working wrappers: a name
+  // declared before its wrapper exists would announce a capability the package does not have, and a
+  // placeholder handler would put an unusable tool in front of an operator.
+  assert.deepEqual(tools, [], "registration produced no tools");
+  assert.deepEqual([...signature.tools], [], "and the declaration claims none");
+  assert.equal(signature.signatureVersion, 1, "the declaration's shape has not changed, so its version has not");
+});
+
+test("⚠️ ACC-0063 a tool registered but not declared is refused", async () => {
+  const undeclared = brokenCopy(registering("kiln_project_status"));
+  const e = await refusal(validatePackage({ packageRoot: undeclared }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "one undeclared tool");
+  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_project_status"]);
+
+  const several = brokenCopy(registering("kiln_lint", "kiln_project_status"));
+  const e2 = await refusal(validatePackage({ packageRoot: several }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "several undeclared tools");
+  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_lint", "kiln_project_status"], "named, and in a stable order");
+});
+
+test("⚠️ ACC-0063 a tool declared but never registered is refused", async () => {
+  const promised = brokenCopy(({ signature }) => signature((s) => (s.tools = ["kiln_lint"])));
+  const e = await refusal(validatePackage({ packageRoot: promised }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "declared only");
+  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_lint"]);
+
+  // ⚠️ AND A PARTIAL MATCH IS STILL A MISMATCH: registering one of two declared tools is not agreement.
+  const half = brokenCopy((ctx) => {
+    ctx.signature((s) => (s.tools = ["kiln_lint", "kiln_project_status"]));
+    registering("kiln_lint")(ctx);
+  });
+  const e2 = await refusal(validatePackage({ packageRoot: half }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "half registered");
+  assert.deepEqual(e2.detail.declaredNotRegistered, ["kiln_project_status"]);
+});
+
+test("⚠️ ACC-0063 the same tool registered twice is refused", async () => {
+  const twice = brokenCopy((ctx) => {
+    ctx.signature((s) => (s.tools = ["kiln_lint"]));
+    registering("kiln_lint", "kiln_lint")(ctx);
+  });
+  const e = await refusal(validatePackage({ packageRoot: twice }), PACKAGE_REFUSAL.TOOL_DUPLICATE, "registered twice");
+  assert.deepEqual(e.detail.duplicated, ["kiln_lint"]);
+});
+
+test("⚠️ ACC-0063 agreement is observed by running registration, not by reading the source", async () => {
+  // ⚠️ A SOURCE SCAN WOULD PASS THIS: the file contains `registerTool`, and registers nothing.
+  const conditional = brokenCopy(({ root }) => {
+    const path = join(root, "extensions", "kiln.js");
+    const source = readFileSync(path, "utf-8");
+    writeFileSync(
+      path,
+      source.replace(
+        "export default function register(_pi) {",
+        'export default function register(_pi) {\n  if (String(1) === "2") _pi?.registerTool?.({ name: "kiln_never" });'
+      )
+    );
+  });
+
+  const { tools } = await validatePackage({ packageRoot: conditional });
+  assert.deepEqual(tools, [], "what did not run did not register, and the check saw that");
+});
+
 /* ============================================ what loading it costs ============================ */
 
 /**
