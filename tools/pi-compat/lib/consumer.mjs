@@ -17,7 +17,7 @@
  *   └── planning-content/
  */
 import { execFileSync, execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -172,6 +172,13 @@ export function pinnedPiVersion() {
 export const PROMPT_MARKER = "PROMPT-BODY-MARKER-7C2E";
 
 export function writeProbePackage(pkgDir, extensionSource) {
+  // ⚠️ **CLEARED FIRST, BECAUSE THE CONSUMER ALREADY HAS A REAL `pi-package/` IN IT.** `createConsumer`
+  // copies every tracked file into `.planning/`, and Kiln now ships its own package there. Writing the
+  // probe fixture over it left both present: Pi discovered `kiln-probe` AND `kiln-planning`, and the
+  // skill-override row measured a directory holding two packages' worth of skills. This directory is
+  // inside a throwaway consumer, and what the spike measures is Pi's behaviour against a package it
+  // controls entirely — not against whatever Kiln's package happens to contain this week.
+  rmSync(pkgDir, { recursive: true, force: true });
   mkdirSync(join(pkgDir, "extensions"), { recursive: true });
   mkdirSync(join(pkgDir, "skills", "kiln-probe"), { recursive: true });
   mkdirSync(join(pkgDir, "prompts"), { recursive: true });
