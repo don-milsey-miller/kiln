@@ -5,12 +5,13 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "Every wrapper resolves the canonical content root and preserves the write discipline",
-  "statement": "Each registered mutation tool writes through the existing locked, atomic, validated path with the content root resolved by the shared resolver, returns structured success or refusal, and leaks no credential or absolute home path in its result. Business rules stay in `lib/`; the wrapper adds schema and rendering only.",
+  "title": "Every registered wrapper writes through the existing discipline and adds nothing to it",
+  "statement": "Each registered creation, mutation, activation and stage-attestation tool performs its write through the existing locked, atomic, validated implementation rather than reaching the filesystem itself, and every wrapper - read or write - resolves the content root through the shared resolver rather than deriving one. A wrapper adds only the Pi-facing schema and the rendering of a result: no validation rule, no id allocation, no trace rule and no write path is restated in it. Every result is structured, a refusal is returned as data rather than thrown as prose, and neither carries a credential, a credential-derived value or an absolute user path.",
   "evaluates": [
     "CMP-0032"
   ],
   "verifies": [
     "REQ-0002"
-  ]
+  ],
+  "notes": "⚠️ NARROWED TO TSK-0044. This criterion accepted TSK-0044 AND TSK-0045, which do not depend on each other, so neither could be finished without the other's work also being done - and its wording is about mutation wrappers, which are TSK-0044's, while TSK-0045's adapters mostly write no planning content at all. TSK-0045 now has its own criterion for what its adapters must do. ⚠️ THE WRAPPER IS A BOUNDARY, NOT A SECOND IMPLEMENTATION. Everything it calls already exists in `lib/` with the lock, the atomic write, the schema validation and the id allocator behind it. A wrapper that re-derived the content root, or re-checked a rule, would be a second answer to a question that already has one - which is how the two drift apart without either being obviously wrong."
 }

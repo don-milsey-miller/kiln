@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0110",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The research, validation and delegation adapters call the implementations that already exist",
+  "statement": "Each registered research, validation and delegation tool performs its work by calling the existing implementation in `lib/` rather than restating its rules: no capability decision, retrieval policy, validation rule or delegation boundary is re-implemented in the wrapper. A capability call reports what is available and changes nothing - no planning content, no configuration and no stored state. Every result and every refusal is structured data, and neither carries a credential, a credential-derived value or an absolute user path.",
+  "evaluates": [
+    "CMP-0032"
+  ],
+  "verifies": [
+    "REQ-0002",
+    "REQ-0024"
+  ],
+  "notes": "⚠️ SPLIT FROM ACC-0065, WHICH ACCEPTED TWO TASKS THAT DO NOT DEPEND ON EACH OTHER. That criterion is about the write discipline of mutation wrappers - TSK-0044's work - and would have held TSK-0045 behind it while describing almost none of what TSK-0045 builds. ⚠️ A CAPABILITY CALL IS A READ. `research_capability` and `validation_capability` answer what is available; an adapter that configured something, cached a credential or recorded a choice while answering would make a question into a change, which is the property this states outright rather than leaving to be inferred from the word 'capability'. ⚠️ THE SIGNATURE TOOL IS ACC-0109's, NOT THIS ONE'S. `kiln_capability` returning the package's declaration unchanged is accepted there; this covers the adapters beside it."
+}
