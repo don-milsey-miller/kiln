@@ -14,7 +14,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createRequire, syncBuiltinESMExports } from "node:module";
@@ -403,21 +403,45 @@ test("⚠️ a real Pi save that meets Kiln's lock writes nothing, and a later P
   writeSettings(dir, json({ theme: "dark", packages: ["npm:third-party"] }));
   const sdkUrl = resolvePinnedSdk(ROOT).url;
 
-  const piSave = () => {
-    const r = spawnSync(process.execPath, ["--input-type=module", "-e", PI_SAVE, sdkUrl, dir, agentDir], {
-      encoding: "utf-8",
-      timeout: 60_000,
+  /**
+   * ⚠️ **ASYNCHRONOUS, BECAUSE THE LOCK HAS TO BE RENEWABLE WHILE THIS RUNS.** This save is started
+   * while Kiln holds its lock, and `proper-lockfile` keeps a lock alive by touching its directory from
+   * a timer every five seconds. `spawnSync` blocks the event loop for the child's whole lifetime, so no
+   * timer runs: on a loaded machine a child that took longer than the ten-second stale window left
+   * Kiln's lock looking abandoned, and Pi's own `lockSync` then took it over exactly as the library
+   * says it should. That made the test intermittent for a reason unrelated to what it is asserting.
+   * Awaiting the child keeps the loop free, so what is tested is two cooperating writers rather than a
+   * starved process.
+   */
+  const piSave = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--input-type=module", "-e", PI_SAVE, sdkUrl, dir, agentDir], {
+        timeout: 60_000,
+      });
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (c) => {
+        out += c;
+      });
+      child.stderr.on("data", (c) => {
+        err += c;
+      });
+      child.once("error", reject);
+      child.once("close", (status) => {
+        if (status !== 0) {
+          reject(new Error(`the Pi save process failed (status ${status}): ${err}`));
+          return;
+        }
+        resolve(JSON.parse(out));
+      });
     });
-    assert.equal(r.status, 0, `the Pi save process failed: ${r.stderr}`);
-    return JSON.parse(r.stdout);
-  };
 
   let during = null;
   let bytesAroundPi = null;
   await apply(dir, DESIRED, {
     onLockAcquired: async () => {
       const before = readText(dir);
-      during = piSave();
+      during = await piSave();
       bytesAroundPi = [before, readText(dir)];
     },
   });
@@ -429,7 +453,7 @@ test("⚠️ a real Pi save that meets Kiln's lock writes nothing, and a later P
   assert.ok(afterKiln.packages.includes(PORTABLE) && afterKiln.packages.includes("npm:third-party"));
 
   // With the lock free, Pi's save lands — and Kiln's fields and the third party's entry survive it.
-  const later = piSave();
+  const later = await piSave();
   assert.equal(later.errorCount, 0, "with the lock free, Pi's save succeeds");
   const final = JSON.parse(readText(dir));
   assert.ok(final.packages.includes("npm:pi-saved-package"), "Pi's write landed");
