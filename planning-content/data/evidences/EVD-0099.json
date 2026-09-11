@@ -1,0 +1,61 @@
+{
+  "id": "EVD-0099",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the real-Pi contention control, re-observed with a lock that can be renewed while Pi runs",
+  "kind": "experiment",
+  "summary": "Supplemental to EVD-0095 for ACC-0047: the control that proves a real Pi save cannot write while Kiln holds the settings lock, re-observed after that control was corrected. GitHub Actions run 34646036685 at commit 962e8dc, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 880 tests and 0 failures in every cell, with all TWENTY-FOUR pi-settings tests matched by name in every cell and zero failing-test lines anywhere. EVD-0095 stands as recorded and nothing in it is withdrawn. WHAT THE OLD CONTROL DID, AND WHY IT WAS REPLACED. EVD-0095's contention control started Pi's save with `spawnSync`, which blocks the event loop for the whole lifetime of the child. `proper-lockfile` keeps a lock alive by touching its directory from a timer every half of the stale window, and a blocked loop runs no timers - so while that control ran, Kiln could not renew the lock it was holding. On a loaded machine the child sometimes took longer than the ten-second stale window, at which point Kiln's lock was abandoned by the library's own definition and Pi's `lockSync` took it over and wrote. The test failed twice locally on that path, at 12.2s and 18.5s against a usual 3.6s, and its output was not captured either time. The claim EVD-0095 recorded was never shown false - every CI cell it cites passed - but the control was proving less than it appeared to: a process that cannot renew its lock is not the same as two writers cooperating. WHAT THE CONTROL DOES NOW. The child is spawned asynchronously and awaited, so the event loop stays free and the lock is renewed on schedule while Pi runs. The assertions are unchanged: Pi's own SettingsManager, in a child process, reports an error and writes nothing while Kiln holds the lock; the bytes either side of that save are identical; and once the lock is free the same save succeeds while Kiln's fields and a third party's package entry survive it. The test now runs in about two seconds rather than four, and passed in all four cells here and in three consecutive local runs. THE MECHANISM WAS MEASURED, NOT ASSUMED. Two probes were run locally against the pinned proper-lockfile and Pi's own copy. With the event loop BLOCKED while Kiln held the lock: Pi was refused with ELOCKED at 8s, and took the lock over at 10.5s and at 12s, removing Kiln's directory and writing. With the event loop FREE for 12s: the lock directory had been touched 2.0s before the check and Pi was refused with ELOCKED. That is the difference the correction makes, and it is the reason the flake is gone rather than merely absent.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34646036685",
+      "commit": "962e8dc",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103416932420, node v22.23.2, success, 880 tests / 877 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103416932350, node v24.20.0, success, 880 tests / 877 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103416932429, node v22.23.2, success, 880 tests / 879 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103416932164, node v24.20.0, success, 880 tests / 879 pass / 0 fail / 1 skipped",
+      "pi-settings-tests-per-cell": "24 of 24 matched by name in every cell; zero failing-test lines in any log",
+      "control-before": "EVD-0095's control started Pi's save with spawnSync, which blocks the event loop and therefore blocks proper-lockfile's renewal timer",
+      "control-now": "the same save is spawned asynchronously and awaited, so the loop stays free and the lock is renewed while Pi runs",
+      "assertions-unchanged": "Pi reports an error and writes nothing under Kiln's lock; the bytes either side are identical; with the lock free Pi's save lands and Kiln's fields and a third party's entry survive it",
+      "relation-to-EVD-0095": "supplemental: EVD-0095 stands as the record of run 34632506490 with the control it used. Nothing there is withdrawn, and its cited cells all passed.",
+      "local-runs": "3 consecutive local runs of test/pi-settings.test.mjs after the correction, 24 of 24 each, the contention test at about 2.0s against about 3.8s before"
+    },
+    "omissions": [
+      {
+        "fact": "lock-ownership-under-starvation",
+        "state": "not-observable",
+        "reason": "A lock is only held while its holder can say so. proper-lockfile renews a lock from a timer every half of the stale window, so a holder that is suspended, descheduled, or blocking its own event loop past that window has abandoned it by the library's contract, and another writer may take it and write. This is the same contract that lets Kiln recover from a Pi process that died holding the lock, so it cannot be closed from one side. It is recorded in lib/pi-settings.mjs as an operational property and is deliberately NOT asserted by a test: a ten-second timing test would buy nothing but a slow suite."
+      },
+      {
+        "fact": "blocking-probes-in-ci",
+        "state": "not-captured",
+        "reason": "The probes that measured the takeover - event loop blocked for 8s, 10.5s and 12s, and free for 12s - were run locally on Windows against the pinned proper-lockfile and Pi's own nested copy. They are not part of the suite and did not run in CI. CI establishes that the corrected control passes on both platforms; the takeover threshold is established only by those local probes, on one platform."
+      },
+      {
+        "fact": "original-failure-output",
+        "state": "not-captured",
+        "reason": "Neither of the two local failures was captured: the first was lost to a filtered command and the second never recurred while being watched. The mechanism above fits both - each ran far past the stale window while every passing run sat near 3.8s - but which assertion failed in those two runs is unknown and is not claimed."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
