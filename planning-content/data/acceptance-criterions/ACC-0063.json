@@ -5,13 +5,14 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "The package loads under trust, does not load without it, and reports its signature",
-  "statement": "With the project trusted, a real Pi run loads the package's extensions, tools, skills and start prompt and exposes a capability signature. With trust absent the package does not load — and that state is detected and reported rather than passing silently, which is the control that makes the positive result meaningful.",
+  "title": "The package declares what it owns, loads under trust, and is absent without it",
+  "statement": "`pi-package/package.json` is a valid manifest whose declared extension, skill and prompt resources all exist in the package, and its registration entry point loads without error. A versioned, machine-readable signature declaration is exposed by the package and agrees with that manifest: the resources it names are the resources the manifest declares, neither more nor fewer. A real Pi run over a trusted project discovers those package-owned resources, and the same run over an untrusted project discovers none of them - the control that makes the positive result mean something rather than describing what Pi would have done anyway.",
   "evaluates": [
     "CMP-0031"
   ],
   "verifies": [
     "REQ-0026",
     "REQ-0028"
-  ]
+  ],
+  "notes": "⚠️ NARROWED TO THE PACKAGE ITSELF. The criterion asked for the package's TOOLS to load, which is TSK-0044 and TSK-0045's work on CMP-0032, and those depend on this task - so as written it could not be satisfied until its own dependants were finished. What this asserts is the unit: a manifest whose resources exist, an entry point that loads, a declaration that agrees with the manifest, and Pi finding those resources when the project is trusted and not finding them when it is not. ⚠️ WHAT IT DELIBERATELY DOES NOT CLAIM: the final Kiln tool set (ACC-0064), the write discipline of each wrapper (ACC-0065), that the registered capability tool returns this declaration (the TSK-0045 criterion below), that a child without the signature is refused (ACC-0075), that the canary's record invalidates on drift (ACC-0062), or that a launch over an untrusted project is refused (ACC-0051, already passing). ⚠️ THE UNTRUSTED CONTROL IS NOT OPTIONAL. `pi-compat` measured what an untrusted run does on 0.84.4: it loads no package and reports nothing. A positive result with no control would read the same way whether the package loaded or Pi simply behaved as it always does."
 }

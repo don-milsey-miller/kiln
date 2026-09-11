@@ -2,7 +2,7 @@
   "id": "TSK-0045",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Register the research, validation and delegation adapters",
   "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.",
@@ -14,7 +14,8 @@
     "REQ-0003"
   ],
   "acceptedBy": [
-    "ACC-0065"
+    "ACC-0065",
+    "ACC-0109"
   ],
   "dependsOn": [
     "TSK-0043"
