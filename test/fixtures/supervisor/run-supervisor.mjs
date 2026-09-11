@@ -23,7 +23,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  */
 if (process.argv.length < 4) process.exit(0);
 
-const [, , projectRoot, agentReport, launcherReport, readyFlag, gate, port] = process.argv;
+const [, , projectRoot, agentReport, launcherReport, readyFlag, gate, port, agentDir] = process.argv;
 
 /**
  * ⚠️ **THE PORT IS PASSED IN, BECAUSE THE DEFAULT IS 3000 AND 3000 IS SOMEBODY ELSE'S.** Leaving it
@@ -37,8 +37,19 @@ if (!port) {
   process.exit(2);
 }
 
+/**
+ * The Pi agent directory the trust gate reads and the children are given. Passed in, and pointing at a
+ * temporary directory the harness granted trust in, so this runs the REAL gate rather than an injected
+ * answer - what production does, against a store that is never the operator own.
+ */
+if (!agentDir) {
+  console.error("[sup] no agent directory supplied");
+  process.exit(2);
+}
+
 const result = await runSupervisor({
   projectRoot,
+  agentDir,
   launcher: {
     command: process.execPath,
     args: [join(HERE, "adversary-launcher.mjs"), launcherReport, readyFlag],

@@ -22,7 +22,7 @@ import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
 
 if (process.argv.length < 9) process.exit(0);
 
-const [, , projectRoot, out, port, mode, launcherReport, launcherChild, agentReport, agentChild, readyFlag] =
+const [, , projectRoot, out, port, mode, launcherReport, launcherChild, agentReport, agentChild, readyFlag, agentDir] =
   process.argv;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +35,8 @@ const record = (o) =>
 try {
   const result = await runSupervisor({
     projectRoot,
+    // The harness granted trust in this temporary directory, so the real gate runs and passes.
+    agentDir,
     launcher: {
       command: process.execPath,
       args: [join(HERE, "tree-launcher.mjs"), launcherReport, readyFlag, launcherChild],

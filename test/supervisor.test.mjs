@@ -21,15 +21,17 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
   HOST,
+  BROWSER_ONLY_COMMAND,
   REFUSAL,
   SupervisorRefusal,
+  assertProjectTrusted,
   resolveSelfHost,
   awaitReadiness,
   classifyError,
@@ -47,7 +49,8 @@ import {
   runFilePath,
   writeRunFile,
 } from "../lib/supervisor.mjs";
-import { PINNED_AGENT_NAME, readOwnPin, resolvePinnedAgent } from "../lib/pi-runtime.mjs";
+import { PINNED_AGENT_NAME, readOwnPin, resolvePinnedAgent, resolvePinnedAgentDir } from "../lib/pi-runtime.mjs";
+import { TRUST, denyTrust, grantTrust } from "../lib/pi-trust.mjs";
 import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import { exitStatusFor, parseArgs, stoppedSummary } from "../bin/start-kiln.mjs";
@@ -58,6 +61,15 @@ installReaper();
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(ROOT, "test", "fixtures", "supervisor");
 const PROJECT_ID = "abcdef0123456789abcdef0123456789";
+
+/**
+ * ⚠️ **THE TRUST GATE IS NOT WHAT THE CASES BELOW ARE ABOUT.** Every run now asks whether this project
+ * is trusted before it does anything else, so these supply an already-approved answer and a directory
+ * that is never opened — the injected reader is the only thing that would open one. The gate's own
+ * behaviour, including two cases that run the real store, is asserted in its own section at the end.
+ */
+const AGENT_DIR = join(tmpdir(), "kiln-supervisor-agent-dir");
+const APPROVED = async ({ projectRoot }) => ({ state: "approved", projectRoot, recordedFor: projectRoot });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function project({ record = { recordVersion: 1, projectId: PROJECT_ID } } = {}) {
@@ -224,6 +236,8 @@ test("⚠️ an offered port changes no byte of the project, proved through a wh
   const calls = [];
   try {
     const result = await runSupervisor({
+      agentDir: AGENT_DIR,
+      readTrust: APPROVED,
       projectRoot: dir,
       launcher: { command: "L", args: [] },
       agent: { command: "A", args: [] },
@@ -606,10 +620,15 @@ test("⚠️ the sentinel reaches the agent while an adversary is trying to take
   const port = String(await freePort());
   const SENTINEL = "kiln-sentinel-7f3a\n";
 
+  // ⚠️ THE REAL TRUST GATE, IN A REAL SUPERVISOR PROCESS: granted through the real store in a
+  // temporary agent directory, so this run passes the gate the way a production run would.
+  const trustAgentDir = reapLater(mkdtempSync(join(tmpdir(), "kiln-sentinel-agent-")));
+  await grantTrust({ projectRoot: dir, agentDir: trustAgentDir, toolRoot: ROOT });
+
   // The supervisor inherits THIS pipe as its fd 0 — the harness's stand-in for the terminal.
   const supervisor = spawn(
     process.execPath,
-    [join(FIXTURES, "run-supervisor.mjs"), dir, agentReport, launcherReport, readyFlag, gate, port],
+    [join(FIXTURES, "run-supervisor.mjs"), dir, agentReport, launcherReport, readyFlag, gate, port, trustAgentDir],
     { cwd: ROOT, stdio: ["pipe", "pipe", "pipe"], shell: false }
   );
   let out = "";
@@ -678,6 +697,8 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
 
   const dir = project();
   const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: ["a"] },
     agent: { command: "A", args: ["b"] },
@@ -833,6 +854,8 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
   // The AGENT cannot start: the run must refuse rather than wait.
   let n = 0;
   const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -858,6 +881,8 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
 
   // The LAUNCHER cannot start: readiness must stop rather than poll a process that never existed.
   const e2 = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -965,6 +990,8 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   };
 
   const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1064,6 +1091,8 @@ test("⚠️ every externally reportable error is classified, not quoted", async
     },
   });
   const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1166,6 +1195,8 @@ test("⚠️ an unprotected project is REFUSED, and Pi is never started", async 
   await assert.rejects(
     () =>
       runSupervisor({
+        agentDir: AGENT_DIR,
+        readTrust: APPROVED,
         projectRoot: dir,
         launcher: { command: "L", args: ["a"] },
         agent: { command: "A", args: ["b"] },
@@ -1241,6 +1272,8 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
 
   const calls = [];
   await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: ["a"] },
     agent: { command: "A", args: ["b"] },
@@ -1350,6 +1383,8 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
   };
 
   const run = runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1413,6 +1448,8 @@ test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () =>
   const started = Date.now();
   const outcome = await Promise.race([
     runSupervisor({
+      agentDir: AGENT_DIR,
+      readTrust: APPROVED,
       projectRoot: dir,
       launcher: { command: "L", args: [] },
       agent: { command: "A", args: [] },
@@ -1488,6 +1525,8 @@ test("⚠️ the teardown runs ONCE, however many callers ask for it", async () 
   };
 
   const run = runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1524,6 +1563,8 @@ test("⚠️ the signal is recorded where it was HANDLED, and a clean exit recor
   ignoreAll(dir);
   const calls = [];
   const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1549,6 +1590,8 @@ test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY T
   const calls = [];
 
   const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1583,6 +1626,8 @@ test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOW
   let held = null;
   try {
     const e = await runSupervisor({
+      agentDir: AGENT_DIR,
+      readTrust: APPROVED,
       projectRoot: dir,
       launcher: { command: "L", args: [] },
       agent: { command: "A", args: [] },
@@ -1628,6 +1673,8 @@ test("⚠️ the signal handlers are removed when the run ends, on every path", 
   const calls = [];
 
   await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1646,6 +1693,8 @@ test("⚠️ the signal handlers are removed when the run ends, on every path", 
   writeFileSync(join(bad, ".gitignore"), "node_modules/\n", "utf-8");
   const signals2 = fakeSignals();
   await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: bad,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1707,6 +1756,8 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
   };
 
   const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1779,6 +1830,8 @@ test("⚠️ THE RUN REMOVES THE FILE IT CREATED, AND LEAVES EVERY FILE IT DID N
   let contentAtAgentSpawn = null;
 
   const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1824,6 +1877,8 @@ test("⚠️ a project whose runtime directory is gone still runs, and says it l
   const lines = [];
   const calls = [];
   await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1901,6 +1956,8 @@ test("⚠️ A FILE ALREADY AT THAT NAME IS NOT CLAIMED BY THIS RUN, and survive
   const calls = [];
   const lines = [];
   const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -1967,6 +2024,8 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
   const graceMs = 400;
   const hardMs = 200;
   const outcome = runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -2058,6 +2117,8 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
   };
 
   const run = runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
     projectRoot: dir,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
@@ -2151,7 +2212,7 @@ test("⚠️ the stopped summary reads the record that exists, not the one that 
  * to reach the same checks every other run makes.
  */
 
-const selfHosting = (dir) => ({ toolRoot: dir, projectRoot: dir });
+const selfHosting = (dir) => ({ toolRoot: dir, projectRoot: dir, agentDir: AGENT_DIR, readTrust: APPROVED });
 
 /**
  * The refusal itself, not merely the fact of one. `assert.throws` returns undefined, and what these
@@ -2380,4 +2441,246 @@ test("the command line takes --self-host and refuses anything else", () => {
   // a mistyped flag as "refusing to run in the tool checkout", which reads as the flag not working.
   for (const bad of ["--selfhost", "--self_host", "-s", "--self-host=true", "extra"])
     assert.match(parseArgs([bad]).error ?? "", /Unrecognised argument/, `must refuse ${bad}`);
+});
+
+
+/* ============================================== ACC-0051: the trust gate ======================= */
+
+/** A project that would launch: covered state, a valid record, and a free port to ask for. */
+const trustableProject = async () => {
+  const dir = repoProject();
+  ignoreAll(dir);
+  return dir;
+};
+
+/** The bytes a refusal must not change: the committed record, the ignore block, and what is in .pi. */
+const scaffoldBytes = (dir) => ({
+  record: readFileSync(join(dir, ".pi", "kiln.json"), "utf-8"),
+  ignore: readFileSync(join(dir, ".gitignore"), "utf-8"),
+  pi: readdirSync(join(dir, ".pi")).sort(),
+});
+
+/** Records what the gate asked, and answers with the state it was built for. */
+const trustReader = (state) => {
+  const asked = [];
+  const read = async ({ projectRoot, agentDir, toolRoot }) => {
+    asked.push({ projectRoot, agentDir, toolRoot });
+    return { state, projectRoot, recordedFor: state === TRUST.MISSING ? null : projectRoot };
+  };
+  return { read, asked };
+};
+
+/** A spawn that fails the test if it is ever reached. */
+const forbiddenSpawn = () => {
+  throw new assert.AssertionError({ message: "a child was spawned after a trust refusal" });
+};
+
+const refusedRun = async (options) => {
+  try {
+    await runSupervisor(options);
+  } catch (e) {
+    return e;
+  }
+  assert.fail("expected a trust refusal, and the run proceeded");
+};
+
+test("⚠️ ACC-0051 an unasked project refuses as trust-missing, and a declined one as trust-denied", async () => {
+  for (const [state, reason, remediation] of [
+    [TRUST.MISSING, REFUSAL.TRUST_MISSING, /run setup/i],
+    [TRUST.DENIED, REFUSAL.TRUST_DENIED, /run setup again and approve/i],
+  ]) {
+    const dir = await trustableProject();
+    const { read, asked } = trustReader(state);
+    const before = scaffoldBytes(dir);
+
+    const e = await refusedRun({
+      projectRoot: dir,
+      agentDir: AGENT_DIR,
+      readTrust: read,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: [] },
+      spawn: forbiddenSpawn,
+      // ⚠️ AN UNUSABLE PORT ON PURPOSE: reaching the port check would refuse with PORT_INVALID, so a
+      // trust refusal here proves the gate ran BEFORE a port was chosen rather than after.
+      env: { PORT: "not-a-port" },
+      randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+      fetchImpl: healthyFetch(),
+      build: null,
+    });
+
+    assert.ok(e instanceof SupervisorRefusal && e.reason === reason, `${state}: got ${e?.reason ?? e}`);
+    assert.equal(e.detail.state, state);
+    assert.equal(asked.length, 1, "the gate asked once");
+    assert.match(e.message, remediation, "the refusal says what to do about this particular answer");
+    assert.match(e.message, new RegExp(BROWSER_ONLY_COMMAND.replace(/[./]/g, "\\$&")), "and names the browser-only route");
+    assert.equal(e.detail.browserOnly, BROWSER_ONLY_COMMAND);
+
+    // Nothing was spawned - forbiddenSpawn would have failed the test - and nothing changed on disk.
+    assert.deepEqual(scaffoldBytes(dir), before, `${state}: the scaffold changed`);
+    assert.equal(existsSync(join(dir, ".pi", "runtime")), false, `${state}: a runtime directory appeared`);
+  }
+});
+
+test("⚠️ ACC-0051 the gate is asked BEFORE the project record is read", async () => {
+  // ⚠️ **ORDERING, PROVED BY WHICH REFUSAL ARRIVES.** This project has no `.pi/kiln.json`, so reading
+  // the record would refuse with NO_PROJECT_RECORD. A trust refusal instead is the only way to tell
+  // that the gate ran first — and it must, because "run setup" is useless advice to an operator whose
+  // project the agent may not be started in at all.
+  const dir = repoProject({ record: false });
+  ignoreAll(dir);
+  const { read } = trustReader(TRUST.MISSING);
+
+  const e = await refusedRun({
+    projectRoot: dir,
+    agentDir: AGENT_DIR,
+    readTrust: read,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: forbiddenSpawn,
+    env: { PORT: "not-a-port" },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.equal(e.reason, REFUSAL.TRUST_MISSING, "the trust question came first, before the record and the port");
+});
+
+test("⚠️ ACC-0051 the two refusals are distinct codes, so a caller need not read a detail to tell them apart", () => {
+  assert.notEqual(REFUSAL.TRUST_MISSING, REFUSAL.TRUST_DENIED);
+  assert.equal(REFUSAL.TRUST_MISSING, "trust-missing");
+  assert.equal(REFUSAL.TRUST_DENIED, "trust-denied");
+});
+
+test("⚠️ ACC-0051 the gate is asked with the canonical project root and the exact agent directory", async () => {
+  const dir = await trustableProject();
+  const { read, asked } = trustReader(TRUST.MISSING);
+  const agentDir = join(tmpdir(), "kiln-exact-agent-dir");
+
+  await refusedRun({
+    // ⚠️ A SPELLING `join` WOULD NOT FIX: built by concatenation, because `join(dir, ".")` collapses to
+    // `dir` and would have compared the canonical root against itself.
+    projectRoot: `${dir}${sep}.${sep}`,
+    agentDir,
+    readTrust: read,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: forbiddenSpawn,
+    env: {},
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.equal(asked[0].projectRoot, canonicalPath(dir), "the canonical root, not the spelling passed in");
+  assert.equal(asked[0].agentDir, agentDir, "the exact directory the command resolved, unchanged");
+});
+
+test("⚠️ ACC-0051 a run without a resolved agent directory refuses rather than guessing one", async () => {
+  const dir = await trustableProject();
+  const { read, asked } = trustReader(TRUST.APPROVED);
+
+  for (const agentDir of [undefined, "", "   "]) {
+    const e = await refusedRun({
+      projectRoot: dir,
+      agentDir,
+      readTrust: read,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: [] },
+      spawn: forbiddenSpawn,
+      env: {},
+      randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+      fetchImpl: healthyFetch(),
+      build: null,
+    });
+    assert.equal(e.reason, REFUSAL.AGENT_DIR_MISSING, JSON.stringify(agentDir));
+  }
+  assert.equal(asked.length, 0, "no store was consulted at all");
+});
+
+test("⚠️ ACC-0051 an approved project reaches the launch path, and every child is told that agent directory", async () => {
+  const dir = await trustableProject();
+  const agent = reapLater(mkdtempSync(join(tmpdir(), "kiln-gate-agent-")));
+  // ⚠️ THE REAL MODULE AND THE REAL STORE, in a temporary agent directory: no injected answer.
+  await grantTrust({ projectRoot: dir, agentDir: agent, toolRoot: ROOT });
+
+  const calls = [];
+  const result = await runSupervisor({
+    projectRoot: dir,
+    agentDir: agent,
+    launcher: { command: "L", args: ["a"] },
+    agent: { command: "A", args: ["b"] },
+    spawn: recordingSpawn(calls),
+    // ⚠️ A STALE SPELLING IN THE INHERITED ENVIRONMENT, which every child must have replaced.
+    env: { PORT: String(await freePort()), PI_CODING_AGENT_DIR: join(tmpdir(), "somewhere-else") },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the approved run reached the existing launch path");
+  assert.equal(result.shutdown.complete, true, "and completed the ordinary shutdown contract, gate or no gate");
+  for (const call of calls)
+    assert.equal(call.options.env.PI_CODING_AGENT_DIR, agent, `${call.command} was given the resolved agent directory`);
+});
+
+test("⚠️ ACC-0051 a denial recorded in the real store stops the run, through the real module", async () => {
+  const dir = await trustableProject();
+  const agent = reapLater(mkdtempSync(join(tmpdir(), "kiln-gate-denied-")));
+  await denyTrust({ projectRoot: dir, agentDir: agent, toolRoot: ROOT });
+  const before = scaffoldBytes(dir);
+
+  const e = await refusedRun({
+    projectRoot: dir,
+    agentDir: agent,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: forbiddenSpawn,
+    env: {},
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    fetchImpl: healthyFetch(),
+    build: null,
+  });
+
+  assert.equal(e.reason, REFUSAL.TRUST_DENIED);
+  assert.equal(e.detail.state, TRUST.DENIED);
+  assert.equal(e.detail.recordedFor, canonicalPath(dir), "the refusal names the directory the denial was recorded against");
+  assert.deepEqual(scaffoldBytes(dir), before, "the scaffold is untouched");
+});
+
+test("⚠️ ACC-0051 the gate can be asked on its own, and approves without opening anything else", async () => {
+  const dir = await trustableProject();
+  const agent = reapLater(mkdtempSync(join(tmpdir(), "kiln-gate-direct-")));
+  await grantTrust({ projectRoot: dir, agentDir: agent, toolRoot: ROOT });
+
+  const said = [];
+  const decision = await assertProjectTrusted({ projectRoot: canonicalPath(dir), agentDir: agent, toolRoot: ROOT, log: (m) => said.push(m) });
+
+  assert.equal(decision.state, TRUST.APPROVED);
+  assert.equal(decision.projectRoot, canonicalPath(dir));
+  assert.ok(said.some((m) => /project trust: approved/.test(m)), "an approval is reported rather than silent");
+});
+
+test("⚠️ the pinned package's own agent directory is asked of it, and follows the environment Pi reads", async () => {
+  const resolved = await resolvePinnedAgentDir(ROOT);
+  assert.equal(typeof resolved, "string");
+  assert.ok(resolved.length > 0);
+
+  // ⚠️ getAgentDir() reads process.env itself, which is exactly why the command resolves it in the
+  // process whose environment the children inherit.
+  const saved = process.env.PI_CODING_AGENT_DIR;
+  const chosen = join(tmpdir(), "kiln-agent-dir-from-env");
+  try {
+    process.env.PI_CODING_AGENT_DIR = chosen;
+    assert.equal(await resolvePinnedAgentDir(ROOT), chosen, "the environment Pi reads is the one that decides");
+  } finally {
+    if (saved === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = saved;
+  }
 });

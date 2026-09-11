@@ -35,6 +35,7 @@ import { promisify } from "node:util";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { probePort, pidAlive, runFilePath, SHUTDOWN_MIN_PHASE_MS } from "../lib/supervisor.mjs";
+import { grantTrust } from "../lib/pi-trust.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 installReaper();
@@ -108,6 +109,12 @@ async function observe(mode) {
     ready: join(dir, "ready"),
   };
   const { port } = await probePort(0);
+
+  // ⚠️ THE REAL TRUST GATE RUNS IN THESE PROCESSES TOO: granted through the real store, in a temporary
+  // agent directory, so what is measured is the production path rather than one with the gate removed.
+  const agentDir = reapLater(mkdtempSync(join(tmpdir(), "kiln-shutdown-agent-")));
+  await grantTrust({ projectRoot: dir, agentDir, toolRoot: ROOT });
+
   const argv = [
     join(FIXTURES, "shutdown-evidence.mjs"),
     dir,
@@ -119,6 +126,7 @@ async function observe(mode) {
     paths.agent,
     paths.agentChild,
     paths.ready,
+    agentDir,
   ];
 
   if (mode === "interrupt" && process.platform === "win32") return viaConsoleEvent({ dir, out, argv, paths });

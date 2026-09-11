@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
 import { SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
-import { resolvePinnedAgent } from "../lib/pi-runtime.mjs";
+import { resolvePinnedAgent, resolvePinnedAgentDir } from "../lib/pi-runtime.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -142,6 +142,11 @@ async function main(argv = process.argv.slice(2)) {
     // version checked against this checkout's pin and the path contained inside the package.
     // Guessing an entry point is how you run a different file than the one `pi` would.
     agent: resolvePinnedAgent(TOOL_ROOT),
+    // ⚠️ **ASKED OF PI, ONCE, IN THIS PROCESS.** `getAgentDir()` reads this process's environment and
+    // expands a leading `~`; resolving it here and handing the answer to the supervisor means the store
+    // the trust gate reads and the store the child consults are one directory, without Kiln restating
+    // another tool's home-directory rules. The supervisor forces it into every child's environment.
+    agentDir: await resolvePinnedAgentDir(TOOL_ROOT),
     spawn,
     randomBytes,
     interactive: Boolean(process.stdin.isTTY),
