@@ -1,0 +1,75 @@
+{
+  "id": "EVD-0101",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the package declares what it owns, loads under trust, and is absent without it",
+  "kind": "experiment",
+  "summary": "Measurement of Kiln's Pi package through CI. GitHub Actions run 34656876359 at commit e162336, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 912 tests and 0 failures in every cell, with zero failing-test lines in any log. ALL NINE package-validation tests and ALL FOUR real-load tests ran in every cell, matched by name against test/pi-package.test.mjs and test/pi-package-load.test.mjs. THE PACKAGE AS AUTHORED. `pi-package/package.json` declares one extension file, one skills directory and one prompts directory; every declared resource exists; the entry point loads and exports a registration function; and `signature.json` - authored separately and never derived - declares signatureVersion 1 with extensions [kiln], skills [kiln-planning], prompts [kiln-start] and tools [], deeply frozen and asserted to survive a JSON round trip. The entry point states signature version 1 for itself, a third independent statement, and a mismatch between any two is refused. Refused as well: an absolute or backslashed manifest path, a path climbing out of the package, one path declared twice or under two kinds, a declared resource that is not there, an extension suffix Pi does not load, a declaration naming a resource the package does not have or omitting one it does, a name that is a path, and a repeated name. Importing the entry point reads nothing outside the package, writes no file, starts no process and contacts nothing - asserted in a child whose watchers are then shown to see a read, a write and a spawn the child makes deliberately. THE PACKAGE AS PI LOADS IT. Each load case builds an isolated project and agent directory, copies only `pi-package/` into `<project>/.planning/pi-package/`, writes `packages: [\"../.planning/pi-package\"]` into `.pi/settings.json`, and asks the pinned runtime's own DefaultResourceLoader what it discovered. No provider is configured, no credential exists, no model request is made and no child process is started. TRUSTED, THE EXACT SETS: one extension, resolvedPath `<project>/.planning/pi-package/extensions/kiln.js`, sourceInfo.source `../.planning/pi-package`, scope `project`, with zero tools, zero commands and zero handlers registered and no load errors; skills exactly kiln-planning (project, at `skills/kiln-planning/SKILL.md`) and the control; prompts exactly kiln-start (at `prompts/kiln-start.md`). Compared as exact sets with exact paths, because an `includes` check would pass against a package that also loaded something nobody declared. THE TWO NEGATIVE CASES, EACH WITH THE SAME CONTROL. With no decision recorded, and with an explicit denial, the extension does not load, the prompt is not discovered, the project skill is not discovered, and there is no error - while a user-scoped skill in the agent directory, which project trust does not gate, IS discovered. That control is what makes the empty result mean discovery ran and the package was not loaded, rather than the run having exited early. THE ENTRY POINT IS IMPORTED, NOT MERELY NAMED, AND THAT IS WHAT ANSWERS THE TWO OPEN QUESTIONS. Deleting `signature.json` from the copied package produces exactly one load failure, reported against `extensions/kiln.js` and naming that import - so Pi follows the JSON import attribute (F63). Appending invalid JavaScript produces exactly one load failure against the same path with a parse error - so Pi parses and imports that exact `.js` file rather than reading the manifest alone (F61). In both, the package's skill and prompt are still discovered, which places the failure in the module rather than in the package. A fourth case asserts the file that loaded is the one `pi.extensions[0]` names. PLATFORM DIFFERENCE: COST ONLY. Every assertion held identically on both platforms and both Node versions. Windows runs each load case roughly three to four times slower than Ubuntu - the trusted case 68.7ms against 21.0ms, the entry-point controls 194.6ms against 57.2ms - which is filesystem cost for copying the package and building four fixtures, not a behavioural difference. MUTATION CONTROLS, LOCAL ONLY. Eighteen mutations were run before the commits, each alone with the file restored byte-identical, and every one was caught: twelve against the manifest, the declaration, the entry point and the validator, and six against the loaded package - the manifest naming a different extension file, the skill renamed, the prompt renamed, the entry point registering a tool, the entry point no longer importing its declaration, and the manifest pointing `prompts` at another directory.",
+  "outcome": "success",
+  "observedAt": "2026-09-11",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34656876359",
+      "commit": "e162336",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103451099678, node v22.23.2, success, 912 tests / 909 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103451099619, node v24.20.0, success, 912 tests / 909 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103451099454, node v22.23.2, success, 912 tests / 911 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103451099706, node v24.20.0, success, 912 tests / 911 pass / 0 fail / 1 skipped",
+      "validation-tests-per-cell": "9 of 9 matched by name in every cell (test/pi-package.test.mjs)",
+      "load-tests-per-cell": "4 of 4 matched by name in every cell (test/pi-package-load.test.mjs)",
+      "trusted-extension": "one, resolvedPath <project>/.planning/pi-package/extensions/kiln.js, source ../.planning/pi-package, scope project, 0 tools / 0 commands / 0 handlers, no errors",
+      "trusted-skills": "exactly kiln-planning at skills/kiln-planning/SKILL.md (project scope) and the user-scoped control",
+      "trusted-prompts": "exactly kiln-start at prompts/kiln-start.md",
+      "no-decision-recorded": "no extension, no prompt, no project skill, no error - and the user-scoped control skill still discovered",
+      "explicit-denial": "the same, with a recorded denial rather than an absent decision",
+      "control-resource": "a skill in the agent directory, which project trust does not gate, so the empty package result is discovery having run rather than an early exit",
+      "F61-resolved": "corrupting extensions/kiln.js yields one load failure against that path with a parse error, so Pi parses and imports the .js entry",
+      "F63-resolved": "deleting signature.json yields one load failure against extensions/kiln.js naming that import, so Pi follows the JSON import attribute",
+      "declared-file-loaded": "the resolvedPath that loaded equals the path pi.extensions[0] names",
+      "no-inference": "no provider configured, no credential present, no model request, no child process - the loader never reaches inference",
+      "platform-difference": "cost only: Windows runs each load case about 3-4x slower than Ubuntu; every assertion held identically on both platforms and both Node versions",
+      "local-mutations": "18 run and 18 killed across the two slices, each restored byte-identical",
+      "commits": "1d9ced3 the package, its declaration and the validator; e162336 the real-load harness; 6df440b cleared the compat spike's fixture directory, which the package had contaminated"
+    },
+    "omissions": [
+      {
+        "fact": "in-process-loader-not-the-cli",
+        "state": "not-captured",
+        "reason": "The load cases drive the pinned package's DefaultResourceLoader in this process. They are not a run of Pi's CLI or TUI, so nothing here claims anything about argument parsing, the interactive session, the tool registry a session ends up with, or what a model is told. What is established is what Pi's own resource discovery finds for a project, with and without trust."
+      },
+      {
+        "fact": "trust-policy-restated-by-the-harness",
+        "state": "not-observable",
+        "reason": "The loader applies whatever `resolveProjectTrust` returns, and that part is Pi's - the same project loads or does not on that answer alone. Pi's own `resolveProjectTrusted` is internal, so the callback composes the root exports it is built from: hasTrustRequiringProjectResources, then the ProjectTrustStore decision, and with nothing recorded and no UI, not trusted. That restatement is the one piece of policy that is Kiln's rather than Pi's, which is why both negative cases carry a control proving discovery ran."
+      },
+      {
+        "fact": "negative-controls-match-runtime-wording",
+        "state": "not-observable",
+        "reason": "The two load-failure controls match on the runtime's own error text - the missing module named `signature.json`, and a parse error. A future Pi that reworded either would fail these tests rather than pass silently, which is the safe direction, but the match is on wording nobody promised to keep."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The eighteen mutations were run locally on Windows before the commits, not in CI. CI establishes that the tests pass on both platforms; that they fail against these defects is established only by those local runs."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
