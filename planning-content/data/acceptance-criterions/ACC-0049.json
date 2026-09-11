@@ -5,12 +5,13 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "outcome": "not-evaluated",
-  "title": "No runtime data is written before its protection exists",
-  "statement": "With the Kiln ignore block absent or edited, project-local mode writes no session, consent, compatibility or journal file: interactive setup offers the exact block, external state, or stopping, and non-interactive setup refuses. The check is that the paths do not exist after the refusal, not that a warning was printed.",
+  "title": "No state root or runtime path is created while coverage is missing",
+  "statement": "With the Kiln ignore block absent, edited, partial or negated, deciding project-local state refuses and creates nothing: the state root and every runtime path it would hold do not exist after the refusal, which is what is asserted rather than that a warning was produced. The refusal carries the three choices as data - append the exact ignore block, with the bytes it would add; external state; stop - each marked available or not, and a block that is present but edited marks the append choice unavailable rather than silently composing new bytes over it.",
   "evaluates": [
     "CMP-0025"
   ],
   "verifies": [
     "REQ-0027"
-  ]
+  ],
+  "notes": "⚠️ NARROWED TO WHAT TSK-0031 BUILDS. The criterion asked for interactive setup to OFFER the three choices and for non-interactive setup to REFUSE. There is no setup command yet, so nothing could render them and nothing could be non-interactive about them; what this library produces is the refusal and the choices as data. The integration moved to the criterion on TSK-0060 that owns the setup command. ⚠️ THE ASSERTION IS ABSENCE, NOT A MESSAGE. A warning printed before a directory is created is exactly the failure REQ-0027 names, so the check is that the paths are not there."
 }

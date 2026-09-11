@@ -6,12 +6,12 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "A complete setup commits no secret and no absolute home path",
-  "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
+  "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, every committed file the setup produced or modified is asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path - the set taken from what the setup actually wrote, not from a list fixed in advance - and `.pi/settings.json` and `.pi/kiln.json` are each asserted explicitly by name.",
   "evaluates": [
     "CMP-0039"
   ],
   "verifies": [
     "REQ-0024"
   ],
-  "notes": "⚠️ MOVED FROM ACC-0048, WORDING UNCHANGED. ACC-0048 accepted only TSK-0029 but required a complete setup, which is TSK-0060 - and TSK-0060 depends on TSK-0029, so neither could be accepted first. ACC-0048 now asserts the bytes the merge and `ensureProjectId` produce; this criterion keeps the end-to-end assertion with the task that can actually run a complete setup."
+  "notes": "⚠️ MOVED FROM ACC-0048, WORDING UNCHANGED. ACC-0048 accepted only TSK-0029 but required a complete setup, which is TSK-0060 - and TSK-0060 depends on TSK-0029, so neither could be accepted first. ACC-0048 now asserts the bytes the merge and `ensureProjectId` produce; this criterion keeps the end-to-end assertion with the task that can actually run a complete setup. ⚠️ WIDENED FROM TWO NAMED FILES TO EVERY COMMITTED FILE SETUP TOUCHES. Naming two files made the assertion only as good as the list: a phase that later commits a third file would have been checked by nobody. The set now comes from what the run wrote, and the two files stay named so widening the set cannot quietly drop them."
 }

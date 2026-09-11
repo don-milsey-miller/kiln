@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0107",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Setup mints the project ID, renders the coverage choices, and refuses before writing runtime data",
+  "statement": "A complete setup creates the stable non-secret project ID once and reuses an existing one rather than minting a second identity. Where coverage is missing, interactive setup renders exactly the three choices the state library returns - the exact ignore block with its bytes, external state, and stopping - and non-interactive setup refuses on the same object, with the refusal occurring before setup has written any session, consent, compatibility or journal file, asserted by those paths not existing. External state is offered only once relocation support for the pinned runtime has been established.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0027",
+    "REQ-0022"
+  ],
+  "notes": "⚠️ SPLIT FROM ACC-0049 AND ACC-0050, WHICH ASKED TSK-0031 FOR BEHAVIOUR ONLY A SETUP COMMAND CAN HAVE. ACC-0049 now covers the refusal and the three choices as data; ACC-0050 covers the derivation and the committed record; this criterion covers the command that uses them. ⚠️ LIBRARY-ONLY TESTS CANNOT SATISFY THIS. The review of TSK-0031 recorded four gaps, and each is a thing no test of `lib/local-state.mjs` can close: G1 no production caller selects external mode - `runSupervisor` defaults `stateMode` to project and `bin/start-kiln.mjs` never passes it, so the mode is reachable only from a library caller; G2 `ensureProjectId` has no production caller, so the committed ID external mode derives from is minted only by tests; G3 there is no setup command, so nothing renders the choices and nothing is non-interactive; G4 consent and compatibility records have schemas but no writer, so 'writes no consent or compatibility file' is vacuous until setup writes them. Evidence for this criterion must exercise the command, not the primitives underneath it."
+}
