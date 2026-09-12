@@ -77,6 +77,25 @@ async function projectContext() {
 }
 
 /**
+ * The research tools this host can offer, built when one is first called.
+ *
+ * ⚠️ **BUILT ON INVOCATION, LIKE EVERYTHING ELSE HERE.** Constructing the adapter at registration
+ * would import `lib/` into a package that must load with nothing but itself present, and would do
+ * work for a session that may never ask a research question.
+ *
+ * ⚠️ **THE ADAPTER IS INJECTED INTO THE LIBRARY, NOT CHOSEN BY IT.** Which backend answers is
+ * `lib/research/`'s decision to expose and this file's to pass on; no vendor name appears here, for
+ * the same reason none appears in the library's own contract.
+ */
+async function defaultResearchTools() {
+  const [{ createResearchTools }, { createTavilyAdapter }] = await Promise.all([
+    import("../../lib/research/tools.mjs"),
+    import("../../lib/research/tavily-adapter.mjs"),
+  ]);
+  return createResearchTools(createTavilyAdapter());
+}
+
+/**
  * A path as the operator's project knows it.
  *
  * ⚠️ **RELATIVE, ALWAYS.** A result carrying `C:\Users\someone\...` names the machine it ran on, and
@@ -301,6 +320,56 @@ const MUTATION_TOOL_TABLE = Object.freeze([
 ]);
 
 /**
+ * The research tools, as an explicit table.
+ *
+ * ⚠️ **THE NAMES ARE UNPREFIXED, AND THAT IS A CONTRACT RATHER THAN AN OVERSIGHT.**
+ * `lib/specialists/contract.mjs` requires `research_capability`, `research_search` and
+ * `research_fetch` BY KEY, reads their measured signatures from those keys, and `verifyChild` checks
+ * a child's registry against them. A `kiln_` prefix here would break the specialist contract and the
+ * signature check to satisfy a naming habit nobody wrote down.
+ *
+ * ⚠️ **THE SCHEMAS ARE WRITTEN OUT, AND A TEST HOLDS THEM TO THE MEASURED ONES.** They cannot be
+ * imported: this entry point must load with nothing but the package present - a fixture copies only
+ * `pi-package/` and asks Pi to load it - so reaching into `lib/` at registration would make the
+ * package unloadable on its own. Declaring them here and asserting deep equality against
+ * `RESEARCH_TOOL_SIGNATURES` in a test is the same trade the signature version already makes: two
+ * independent statements that a test compares, rather than one statement agreeing with itself.
+ */
+const RESEARCH_TOOL_TABLE = Object.freeze([
+  {
+    name: "research_capability",
+    label: "Research capability",
+    description:
+      "Report whether research is usable on this host, proven by a live backend probe. Returns available:false with a distinct reason when it is not.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "research_search",
+    label: "Research search",
+    description:
+      "Discover candidate sources for a question. Returns titles, URLs and snippets. DISCOVERY ONLY - not evidence, and not an answer.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", minLength: 1 }, maxResults: { type: "integer", minimum: 1, maximum: 20 } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "research_fetch",
+    label: "Research fetch",
+    description:
+      "Retrieve one public web page as text, through the public-web boundary. Rejects non-HTTP(S) schemes, URL credentials, private and link-local destinations, oversized bodies and unsupported media types, and revalidates every redirect.",
+    parameters: {
+      type: "object",
+      properties: { url: { type: "string" }, maxBytes: { type: "integer", minimum: 1024 } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+]);
+
+/**
  * A refusal built from whatever the typed tool threw.
  *
  * ⚠️ **THE CODE COMES FROM THE ERROR'S OWN NAME, and the text is scrubbed.** A validation message
@@ -325,7 +394,7 @@ const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details
 
 /**
  * @param {object} pi  Pi's extension API.
- * @param {{lintProject?: Function, handoffCompleteness?: Function}} [deps]  the implementations these
+ * @param {{lintProject?: Function, handoffCompleteness?: Function, researchTools?: object}} [deps]  the implementations these
  *   wrappers call. Pi passes one argument, so production always takes the lazy imports below; the only
  *   caller that passes a second is a test that needs to control what a dependency returns, because what
  *   this wrapper must do with a path is its own responsibility whatever the lint hands it.
@@ -417,6 +486,46 @@ export default function register(pi, deps = {}) {
       },
     });
 
+
+  /**
+   * The three research tools, each delegating to the implementation that already exists.
+   *
+   * ⚠️ **THE HANDLERS ARE THE LIBRARY'S, NOT THIS FILE'S.** `createResearchTools` decides what a
+   * capability probe means, what a search may return and what the fetch boundary refuses; every one of
+   * those is a rule with a decision behind it, and a wrapper that re-derived any of them would be a
+   * second answer to a question that already has one. What is added here is a schema and a rendering.
+   *
+   * ⚠️ **A REFUSAL IS PASSED THROUGH, NOT TRANSLATED.** These tools already return structured data
+   * with a reason a machine can switch on - `capability-unavailable` when the backend cannot be used,
+   * `request-refused` when this one URL was out of bounds - and the two are kept apart on purpose. A
+   * wrapper that folded them into its own `{ok:false, code}` would erase the distinction the library
+   * exists to preserve, so the result travels as it was returned.
+   *
+   * ⚠️ **NO CONTENT ROOT IS RESOLVED.** Research reads the public web, not the project. A wrapper that
+   * demanded a project would make a host capability unavailable in a directory that merely lacks
+   * planning content.
+   */
+  for (const { name, label, description, parameters } of RESEARCH_TOOL_TABLE)
+    pi?.registerTool?.({
+      name,
+      label,
+      description,
+      parameters,
+      execute: async (_toolCallId, params) => {
+        const tools = deps.researchTools ?? (await defaultResearchTools());
+        const handler = tools[name];
+        if (typeof handler !== "function")
+          return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
+
+        try {
+          return rendered(await handler(params ?? {}));
+        } catch (e) {
+          // ⚠️ THE MESSAGE IS SCRUBBED OF THIS MACHINE, and of nothing else: the library's own
+          // sanitiser has already taken the credential out of anything it emits.
+          return rendered(refusal("refused", scrub(e?.message ?? String(e), "")));
+        }
+      },
+    });
 
   /**
    * The package's own declaration, handed back exactly as it was authored.

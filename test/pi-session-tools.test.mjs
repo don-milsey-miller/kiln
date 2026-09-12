@@ -339,7 +339,7 @@ async function measure({ allowlist, trusted = true, callTool = null }) {
   }
 }
 
-test("⚠️ ACC-0064 a real session offers exactly the twenty-two declared Kiln tools", async () => {
+test("⚠️ ACC-0064 a real session offers exactly the tools the package declares, and no others", async () => {
   const declared = await piToolAllowlist(ROOT);
   const measured = await measure({ allowlist: true });
 
@@ -350,7 +350,10 @@ test("⚠️ ACC-0064 a real session offers exactly the twenty-two declared Kiln
 
   // ⚠️ THE SESSION'S REGISTRY AGAINST THE PACKAGE'S DECLARATION, which are two different sources.
   assert.deepEqual([...measured.active].sort(), [...declared], "the active set is exactly what the package declares");
-  assert.equal(measured.active.length, 23);
+  // ⚠️ **THE DECLARATION DECIDES THE COUNT, NOT THIS LINE.** A number written here goes stale the
+  // moment a tool is added - it did, which is F83 - and a stale number in a test name is worse than
+  // none, because the next reader trusts it.
+  assert.equal(measured.active.length, declared.length);
   assert.deepEqual([...measured.all].sort(), [...declared], "and the session holds no other tool at all");
 
   for (const builtin of pinnedBuiltinToolNames()) {
@@ -373,7 +376,7 @@ test("⚠️ ACC-0064 the same probe, without the allowlist, measures Pi's own d
   // And the Kiln tools are there too: without an allowlist an extension's tools are active as well,
   // which is precisely the state the launch flag exists to narrow.
   assert.ok(measured.active.includes("kiln_lint"));
-  assert.ok(measured.active.length > 23, `the control set should be larger: ${measured.active.length}`);
+  assert.ok(measured.active.length > 23, `the control adds Pi's own tools to the package's: ${measured.active.length}`);
 });
 
 test("⚠️ ACC-0064 without trust the package is not there to measure, and the session still runs", async () => {

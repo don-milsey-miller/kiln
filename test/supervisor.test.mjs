@@ -2743,7 +2743,9 @@ test("⚠️ ACC-0065 the launch allowlist is the validated declaration, and hol
   assert.deepEqual(tools, validated, "the allowlist is what validation produced");
   assert.deepEqual(tools, [...signature.tools].sort(), "which is what the declaration claims");
   assert.equal(signature.signatureVersion, 1, "and the declaration's shape is unchanged");
-  assert.equal(tools.length, 23);
+  // ⚠️ THE DECLARATION DECIDES THE COUNT (F83). A number written here goes stale the moment a tool
+  // is added, and it did.
+  assert.equal(tools.length, signature.tools.length);
 
   const builtins = pinnedBuiltinToolNames();
   for (const builtin of builtins)

@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +36,9 @@ installReaper();
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_ROOT = join(ROOT, "pi-package");
 const DECLARATION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "signature.json"), "utf-8"));
+
+/** The tools whose subject is not the project: the package's own declaration, and the public web. */
+const PROJECTLESS = new Set(["kiln_capability", "research_capability", "research_search", "research_fetch"]);
 const SCHEMAS = join(ROOT, "schemas");
 const schemas = loadSchemaSet(SCHEMAS);
 const validators = createValidators(SCHEMAS);
@@ -155,6 +158,9 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_unlink_evidence",
       "kiln_unlink_trace",
       "kiln_write_stage_attestation",
+      "research_capability",
+      "research_fetch",
+      "research_search",
     ],
     "every tool this package declares: nine creations, eight mutations, two reads, activation and the two attestations"
   );
@@ -1006,11 +1012,12 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
   process.chdir(empty);
 
   try {
-    // ⚠️ **EVERY TOOL BUT ONE.** `kiln_capability` answers a question about the package, which has the
-    // same answer in every project and in none, so it resolves no content root and has no reason to
-    // refuse. It is asserted below instead - a stronger claim than the sweep could make.
+    // ⚠️ **EVERY TOOL THAT HAS A PROJECT TO RESOLVE.** `kiln_capability` answers a question about the
+    // package, and the research tools read the public web; none of them has a content root to fail to
+    // find, and a wrapper that demanded one would make a host capability unavailable in a directory
+    // that merely lacks planning content. They are asserted below instead.
     for (const tool of registered().values()) {
-      if (tool.name === "kiln_capability") continue;
+      if (PROJECTLESS.has(tool.name)) continue;
       const result = await tool.execute("call-1", {});
       assert.equal(result.details.ok, false, `${tool.name} must refuse`);
       assert.equal(result.details.code, "no-content-root");
@@ -1025,6 +1032,261 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
     process.chdir(cwd);
     if (saved !== undefined) process.env.PLANNING_CONTENT_DIR = saved;
     rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+/* ============================================ the research tools =============================== */
+
+/**
+ * A recording stand-in for the three research handlers.
+ *
+ * ⚠️ **THE SEAM IS HOW THESE ARE TESTED WITHOUT A BACKEND.** The production path builds the real
+ * tools over the real adapter, which is asserted separately; what this controls is what a handler
+ * returns, so the wrapper's own behaviour - what it passes in and what it hands back - can be seen.
+ */
+const withResearch = (researchTools) => {
+  const tools = new Map();
+  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { researchTools });
+  return tools;
+};
+
+/** Invoke a handler with no project in the environment: research needs none. */
+const invokeAnywhere = async (tool, params = {}) => tool.execute("call-1", params);
+
+test("⚠️ ACC-0110 the three research tools register under the contract's names, with its measured schemas", async () => {
+  const { RESEARCH_TOOL_SIGNATURES } = await import("../lib/research/tools.mjs");
+  const { contractFor } = await import("../lib/specialists/contract.mjs");
+  const tools = registered();
+
+  // ⚠️ **THE CONTRACT'S KEYS, NOT A NAMING HABIT.** `verifyChild` checks a child's registry against
+  // these exact names; a `kiln_` prefix would break the contract to satisfy a convention.
+  assert.deepEqual(contractFor("research").requiredCapabilities, ["research_capability", "research_search", "research_fetch"]);
+
+  for (const name of contractFor("research").requiredCapabilities) {
+    const tool = tools.get(name);
+    assert.ok(tool, `${name} is not registered`);
+    // ⚠️ DEEP EQUALITY AGAINST THE MEASURED SIGNATURE. The wrapper writes the schema out because it
+    // cannot import `lib/` at registration; this is what keeps the two statements one.
+    assert.deepEqual(tool.parameters, RESEARCH_TOOL_SIGNATURES[name].input, `${name}'s schema is not the measured one`);
+    assert.equal(tool.description, RESEARCH_TOOL_SIGNATURES[name].description, `${name}'s description is not the measured one`);
+    assert.ok(DECLARATION.tools.includes(name), `${name} is not declared`);
+  }
+});
+
+test("⚠️ ACC-0110 each research tool hands its parameters to the implementation and its answer back unchanged", async () => {
+  const seen = [];
+  const answer = (name) => async (params) => {
+    seen.push({ name, params });
+    return { tool: name, ok: true, kind: "discovery", marker: `answered-by-${name}` };
+  };
+  const tools = withResearch({
+    research_capability: answer("research_capability"),
+    research_search: answer("research_search"),
+    research_fetch: answer("research_fetch"),
+  });
+
+  const searched = await invokeAnywhere(tools.get("research_search"), { query: "what holds", maxResults: 3 });
+  const fetched = await invokeAnywhere(tools.get("research_fetch"), { url: "https://example.invalid/page" });
+  const probed = await invokeAnywhere(tools.get("research_capability"), {});
+
+  // ⚠️ STRAIGHT THROUGH, BOTH WAYS. The wrapper neither reshapes the input nor edits the answer.
+  assert.deepEqual(
+    seen,
+    [
+      { name: "research_search", params: { query: "what holds", maxResults: 3 } },
+      { name: "research_fetch", params: { url: "https://example.invalid/page" } },
+      { name: "research_capability", params: {} },
+    ]
+  );
+  assert.deepEqual(searched.details, { tool: "research_search", ok: true, kind: "discovery", marker: "answered-by-research_search" });
+  assert.equal(fetched.details.marker, "answered-by-research_fetch");
+  assert.equal(probed.details.marker, "answered-by-research_capability");
+});
+
+test("⚠️ ACC-0110 a capability refusal reaches the caller as the library's own data, not as the wrapper's", async () => {
+  // ⚠️ **THE REAL LIBRARY, WITH NO CREDENTIAL AND NO NETWORK.** Without the key the adapter refuses
+  // before it calls anything, so this exercises the production path offline and deterministically.
+  const saved = process.env.TAVILY_API_KEY;
+  delete process.env.TAVILY_API_KEY;
+
+  try {
+    const probed = (await invokeAnywhere(registered().get("research_capability"))).details;
+
+    // The library's shape, kept: available/false with a reason a machine can switch on, and the
+    // instruction to record a gap rather than answer from memory.
+    assert.equal(probed.available, false);
+    assert.equal(probed.reason, "no-credential");
+    assert.equal(probed.mustRecordGap, true);
+    assert.equal(probed.backend, "tavily", "the production path built the real adapter");
+    assert.ok(probed.signatures?.research_search, "the library's measured signatures came through");
+
+    // ⚠️ AND THE WRAPPER DID NOT TURN IT INTO ITS OWN REFUSAL: no `code`, and `ok` is not the
+    // wrapper's false. A capability that is unavailable and a request that was refused are
+    // different facts, and folding them together is what this checks has not happened.
+    assert.equal(probed.code, undefined);
+
+    const searched = (await invokeAnywhere(registered().get("research_search"), { query: "anything" })).details;
+    assert.equal(searched.ok, false);
+    assert.equal(searched.reason, "no-credential");
+    assert.match(searched.instruction, /record the gap/i);
+  } finally {
+    if (saved === undefined) delete process.env.TAVILY_API_KEY;
+    else process.env.TAVILY_API_KEY = saved;
+  }
+});
+
+test("⚠️ ACC-0110 a request the boundary refuses stays a request refusal, and reaches no network", async () => {
+  const calls = [];
+  const { createResearchTools } = await import("../lib/research/tools.mjs");
+  const tools = withResearch(
+    createResearchTools(
+      { name: "stand-in", envVar: "NONE", probe: async () => ({ ok: true }), search: async () => ({ ok: true, results: [] }) },
+      { fetchImpl: async (...args) => { calls.push(args); throw new Error("the boundary let a blocked URL through"); } }
+    )
+  );
+
+  // ⚠️ A PRIVATE DESTINATION IS REFUSED BEFORE ANYTHING IS SENT, and the refusal says which kind it
+  // is: the capability is fine, this one URL was out of bounds.
+  const blocked = (await invokeAnywhere(tools.get("research_fetch"), { url: "http://127.0.0.1/secrets" })).details;
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.kind, "request-refused", JSON.stringify(blocked));
+  assert.equal(blocked.mustRecordGap, false, "a blocked link is not a capability gap");
+  assert.deepEqual(calls, [], "the boundary reached the network");
+});
+
+test("⚠️ ACC-0110 no research result carries the backend credential or a machine path", async () => {
+  const planted = "tvly-PLANTED-CREDENTIAL-7c41";
+  const { createResearchTools } = await import("../lib/research/tools.mjs");
+  const { createTavilyAdapter } = await import("../lib/research/tavily-adapter.mjs");
+
+  // ⚠️ THE KEY IS GIVEN TO THE ADAPTER AND THE BACKEND IS A STAND-IN, so the credential travels the
+  // real path - header, failure, message - without a request leaving this machine.
+  const adapter = createTavilyAdapter({
+    env: { TAVILY_API_KEY: planted },
+    fetchImpl: async () => ({ ok: false, status: 500, text: async () => `upstream said ${planted} was bad`, json: async () => ({}) }),
+  });
+  const tools = withResearch(createResearchTools(adapter, { fetchImpl: async () => ({ ok: false, status: 500 }) }));
+
+  const texts = [
+    JSON.stringify(await invokeAnywhere(tools.get("research_capability"))),
+    JSON.stringify(await invokeAnywhere(tools.get("research_search"), { query: "q" })),
+  ];
+  for (const text of texts) {
+    assert.equal(text.includes(planted), false, `a planted credential reached a research result: ${text.slice(0, 200)}`);
+    assertNoMachinePath(text, [ROOT, homedir()], "a research result");
+  }
+});
+
+test("⚠️ ACC-0110 the research tools answer where there is no project at all", async () => {
+  const saved = process.env.PLANNING_CONTENT_DIR;
+  delete process.env.PLANNING_CONTENT_DIR;
+  const savedKey = process.env.TAVILY_API_KEY;
+  delete process.env.TAVILY_API_KEY;
+  const cwd = process.cwd();
+  const empty = reapLater(mkdtempSync(join(tmpdir(), "kiln-no-project-")));
+  process.chdir(empty);
+
+  try {
+    // ⚠️ THE POINT: a host capability must not depend on standing in a project.
+    for (const name of ["research_capability", "research_search", "research_fetch"]) {
+      const result = await invokeAnywhere(registered().get(name), { query: "q", url: "https://example.invalid/" });
+      assert.notEqual(result.details.code, "no-content-root", `${name} demanded a project`);
+    }
+  } finally {
+    process.chdir(cwd);
+    if (saved !== undefined) process.env.PLANNING_CONTENT_DIR = saved;
+    if (savedKey !== undefined) process.env.TAVILY_API_KEY = savedKey;
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content, configuration or stored state", async () => {
+  // ⚠️ **THE REFUSAL CASES CANNOT PROVE THIS.** Without a credential the adapter refuses before it does
+  // anything, so "nothing changed" there is true for a reason that has nothing to do with the probe.
+  // What ACC-0110 asks is that a probe that RAN and REPORTED AVAILABLE persisted nothing, so this builds
+  // the real `createResearchTools` over a backend that answers, and watches everything it could reach.
+  const { createResearchTools } = await import("../lib/research/tools.mjs");
+
+  const parent = reapLater(mkdtempSync(join(tmpdir(), "kiln-probe-state-")));
+  const sentinels = {
+    "project/planning-content/data/requirements/REQ-0001.json": '{"id":"REQ-0001"}\n',
+    "project/planning-content/project.yaml": "name: sentinel\n",
+    "project/.pi/settings.json": '{"packages":["../.planning/pi-package"]}\n',
+    "agent/settings.json": '{"defaultProvider":"sentinel"}\n',
+    "agent/trust.json": "{}\n",
+    "external/state.json": '{"cached":false}\n',
+  };
+  // ⚠️ BACKDATED, so a rewrite with identical bytes still moves a modification time that can be seen.
+  const past = new Date(Date.now() - 3_600_000);
+  for (const [path, body] of Object.entries(sentinels)) {
+    const full = join(parent, ...path.split("/"));
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, body);
+    utimesSync(full, past, past);
+  }
+
+  /** Every entry under the parent - directories included, so a new empty one is seen too. */
+  const tree = () => {
+    const out = new Map();
+    const walk = (dir) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        const key = relative(parent, full).split(sep).join("/");
+        if (entry.isDirectory()) {
+          out.set(`${key}/`, "dir");
+          walk(full);
+        } else out.set(key, { bytes: readFileSync(full), mtimeMs: statSync(full).mtimeMs });
+      }
+    };
+    walk(parent);
+    return out;
+  };
+
+  let probes = 0;
+  const tools = withResearch(
+    createResearchTools({
+      name: "stand-in",
+      envVar: "NONE",
+      probe: async () => {
+        probes += 1;
+        return { ok: true, quota: { remaining: 999 } };
+      },
+      search: async () => ({ ok: true, results: [] }),
+    })
+  );
+
+  const saved = { dir: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR, cwd: process.cwd() };
+  // ⚠️ POINTED AT THE SENTINELS FROM EVERY DIRECTION A WRITE COULD RESOLVE ONE: the content-root
+  // variable, Pi's agent-directory variable, and the working directory.
+  process.env.PLANNING_CONTENT_DIR = join(parent, "project", "planning-content");
+  process.env.PI_CODING_AGENT_DIR = join(parent, "agent");
+  process.chdir(join(parent, "project"));
+
+  const before = tree();
+  let probed;
+  try {
+    probed = (await invokeAnywhere(tools.get("research_capability"))).details;
+  } finally {
+    process.chdir(saved.cwd);
+    for (const [name, value] of [["PLANNING_CONTENT_DIR", saved.dir], ["PI_CODING_AGENT_DIR", saved.agent]])
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+  }
+  const after = tree();
+
+  // The probe ran, and it succeeded - otherwise the assertion below would prove nothing.
+  assert.equal(probes, 1, "the capability probe did not run");
+  assert.equal(probed.available, true, JSON.stringify(probed));
+  assert.equal(probed.probedLive, true);
+
+  // ⚠️ AND NOTHING UNDER THE PARENT MOVED: the same entries, no new file or directory, every file's
+  // bytes and modification time identical.
+  assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort(), "the probe created or removed an entry");
+  for (const [key, was] of before) {
+    if (was === "dir") continue;
+    const now = after.get(key);
+    assert.deepEqual(now.bytes, was.bytes, `the probe changed ${key}`);
+    assert.equal(now.mtimeMs, was.mtimeMs, `the probe rewrote or touched ${key}`);
   }
 });
 
