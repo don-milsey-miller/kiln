@@ -1,0 +1,93 @@
+{
+  "id": "EVD-0102",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a real Pi session holds exactly Kiln's twenty-two tools and none of Pi's own",
+  "kind": "experiment",
+  "summary": "Measurement of Kiln's Pi tool registration through CI. GitHub Actions run 34699903816 at commit 60e4fe0, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 961 tests and 0 failures in every cell, one attempt, no job retried, and zero failing-test lines in any log. WHAT RAN, BY NAME, IN EVERY CELL. All 5 session-measurement tests (test/pi-session-tools.test.mjs), all 31 wrapper tests (test/pi-package-tools.test.mjs), all 15 package-validation tests (test/pi-package.test.mjs), all 4 package-load tests (test/pi-package-load.test.mjs) and all 80 supervisor tests (test/supervisor.test.mjs) were matched by name against their source files in each of the four cells - 540 name matches, none missing. ACC-0064: WHAT THE SESSION ACTUALLY HOLDS. The production launch composes the agent as withToolAllowlist(resolvePinnedAgent(TOOL_ROOT), await piToolAllowlist(TOOL_ROOT)), which appends `--tools` and one comma-separated value naming the 22 declared tools to the pinned bin.pi entry point - the form Pi parses, since dist/cli/args.js matches `--tools` or `-t` and splits the NEXT argument on commas. That composition is read back out of the real command: a child runs bin/start-kiln.mjs with its supervisor replaced by a recorder and reports the argument array main() built. The measurement itself spawns that pinned entry point against an isolated project holding a copy of pi-package/ named through `packages: [\"../.planning/pi-package\"]`, trusted in a temporary ProjectTrustStore, and reads pi.getActiveTools() and pi.getAllTools() from inside the session on session_start. The reading is the session's own registry - not signature.json, not the registration recorder, not the `--tools` argument, and not the tool definitions in a provider request, which are four different claims. Measured active set: exactly the 22 declared names. Measured configured set: the same 22. All eight of the pinned runtime's built-ins - read, bash, powershell, edit, write, grep, find, ls, extracted from its own allToolNames rather than restated - are absent from both. TWO CONTROLS, BECAUSE EACH READING WOULD OTHERWISE BE COMPATIBLE WITH A BROKEN INSTRUMENT. The same probe, in a session launched without the allowlist, sees read, bash, edit and write active alongside the Kiln tools, 26 in total - so their absence in the measured run is Pi applying the flag rather than the probe being blind. And the same probe, over an untrusted project, sees no name beginning kiln_ at all while Pi's own tools stay active and the session still exits 0 - so the 22-tool difference is package discovery, and the empty Kiln set is a refusal to load a project's package rather than a run that never built a registry. ACC-0065: WHAT EACH WRAPPER DOES, AND WHAT IT DOES NOT DO. Twenty-two tools are registered from three explicit tables and four direct registrations: nine creations over TYPED_TOOLS, eight mutations over MUTATION_TOOLS with a per-row call adapter because the eight operations do not share a signature, activation over PROJECT_TOOLS with the tool root it needs to validate reachability, two stage-attestation operations over lib/attestations.mjs, and the two reads over the lint and the handoff gate. No wrapper allocates an id, validates a field, takes a lock, writes a file or restates a trace rule: each resolves the project through the shared resolveContentRoot and delegates. Every handler is asserted against real artifacts read back from disk - evidence linked into supportedBy and withdrawn, the same for refutedBy, a revision that changes one field and reports which, a lifecycle retired, a question answered with its answer recorded, a trace target added and removed, a review status moved, an activation that rewrites one manifest line while its comments survive, and an attestation written and read back per stage. REFUSALS CHANGE NOTHING, AND SAY SO AS DATA. Ten mutation refusals, four activation refusals and five attestation refusals were each taken with a bytes-and-modification-time snapshot of the whole content root before and after: every file identical, none rewritten or touched. Refusals are returned rather than thrown, with a code from the error's own class - invalid-artifact and artifact-exists for artifacts, invalid-request for activation and attestations, which are not artifacts and would send a model looking for one to correct. Results and refusals carry no credential and no machine path: checked against a planted key and against every spelling a path can reach a JSON result in, since JSON.stringify doubles a backslash and a check that knows one spelling is blind on Windows. THE DECLARATION AND THE REGISTRATION AGREE EXACTLY. signature.json declares 22 names at signatureVersion 1; running the registration function with a recording stub produces exactly those 22; and validatePackage refuses a package where the two differ in either direction, where a name is registered twice, or where the entry point states a different signature version. The launch allowlist consumes that validated set rather than reading the file, so a name reaching the command line is one the package proved it registers. PLATFORM DIFFERENCE: COST ONLY. Every assertion held identically on both platforms and both Node versions. The four real sessions take 340-453ms each on Ubuntu and 830-939ms on Windows, about 2.5x, which is process-spawn cost rather than a behavioural difference. MUTATION CONTROLS, LOCAL ONLY. Thirty mutations were run before the commits, each alone, from a temporary working directory, with the file restored byte-identical: six against the read wrappers and the creation tools, ten against the mutation tools, ten against activation and the attestations, eight against the launch allowlist, and seven against the session measurement. All were killed except one - weakening the exit assertion itself, which cannot be detected while the behaviour is correct, and whose killing mutation is the session killed rather than asked to finish.",
+  "outcome": "success",
+  "observedAt": "2026-09-12",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34699903816",
+      "commit": "60e4fe0",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green, attempt 1, no retries",
+      "cell-ubuntu-22": "job 103569702367, node v22.23.2, success, 961 tests / 958 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103569702297, node v24.20.0, success, 961 tests / 958 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103569702395, node v22.23.2, success, 961 tests / 960 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103569702391, node v24.20.0, success, 961 tests / 960 pass / 0 fail / 1 skipped",
+      "session-tests-per-cell": "5 of 5 matched by name in every cell (test/pi-session-tools.test.mjs)",
+      "wrapper-tests-per-cell": "31 of 31 matched by name in every cell (test/pi-package-tools.test.mjs)",
+      "package-validation-tests-per-cell": "15 of 15 matched by name in every cell (test/pi-package.test.mjs)",
+      "package-load-tests-per-cell": "4 of 4 matched by name in every cell (test/pi-package-load.test.mjs)",
+      "supervisor-tests-per-cell": "80 of 80 matched by name in every cell (test/supervisor.test.mjs)",
+      "launch-allowlist": "bin/start-kiln.mjs composes the agent as withToolAllowlist(resolvePinnedAgent(TOOL_ROOT), await piToolAllowlist(TOOL_ROOT)); the real command's argument array is read back from a child whose supervisor is a recorder, and is [pinned bin.pi entry, --tools, the 22 names comma-joined]",
+      "measured-active-set": "exactly the 22 declared names, read from pi.getActiveTools() inside a real pinned-CLI session",
+      "measured-configured-set": "exactly the same 22, read from pi.getAllTools()",
+      "builtins-absent": "read, bash, powershell, edit, write, grep, find, ls - all eight absent from both the active and the configured set, the list extracted from the pinned runtime's own allToolNames",
+      "default-control": "the same probe with no allowlist sees read, bash, edit and write active alongside the Kiln tools, 26 in total",
+      "untrusted-control": "the same probe over an untrusted project sees zero kiln_ tools while Pi's own stay active and the session still exits 0",
+      "session-completion": "driven over --mode rpc, one get_state answered successfully, stdin closed, exit {code: 0, signal: null}, no error signal on stderr",
+      "no-model-request": "the provider is registered by the probe against a server this test starts on 127.0.0.1, --offline is set, and that server counted 0 requests - with its own positive control proving a request made directly to it is counted",
+      "no-operator-credential": "the child's environment is this process's with every credential-shaped name removed, asserted to contain none; the planted key is not a credential and reaches nothing retained",
+      "wrapper-delegation": "22 tools over TYPED_TOOLS (9), MUTATION_TOOLS (8), PROJECT_TOOLS (1), lib/attestations.mjs (2) and the lint and handoff gate (2); no id allocation, validation, lock, write path or trace rule restated in any wrapper",
+      "shared-content-root": "every handler resolves the project through resolveContentRoot; with none resolvable each of the 22 refuses as data rather than throwing",
+      "refusal-preservation": "19 refusal cases (10 mutation, 4 activation, 5 attestation) each taken with a bytes-and-mtime snapshot of the content root before and after: every file identical, none rewritten or touched",
+      "structured-refusals": "returned not thrown, coded from the error's class - invalid-artifact and artifact-exists for artifacts, invalid-request for activation and attestations, which have no artifact to be invalid",
+      "declaration-agreement": "signature.json declares 22 at signatureVersion 1; registration through a recording stub produces exactly those 22; validatePackage refuses a mismatch in either direction, a duplicate registration, and a disagreeing entry-point version",
+      "F75": "on pinned Pi 0.84.4, --tools narrows the whole configured registry and not only the active subset: under the allowlist getAllTools() returns only the 22, so the built-ins are not merely inactive but not configured. Stronger than the flag's documentation promises, and a later version could narrow only the active set",
+      "platform-difference": "cost only: the four real sessions take 340-453ms each on Ubuntu and 830-939ms on Windows, about 2.5x; every assertion held identically on both platforms and both Node versions",
+      "local-mutations": "30 run across the five slices, 29 killed and 1 survivor that is a weakened assertion rather than a behaviour, each restored byte-identical",
+      "commits": "7591ea7 the agreement mechanism; a29e942 the two read tools; 06b781e the nine creation tools; 8d464ec the eight mutation tools; e936793 activation and the two attestations; ac7327b the launch allowlist; 60e4fe0 the real-session measurement"
+    },
+    "omissions": [
+      {
+        "fact": "instrumentation-arguments",
+        "state": "not-observable",
+        "reason": "The measured session carries four arguments the production launch does not: -e <probe>, --provider and --model, --mode rpc, and --offline. They are how the registry is read, how a model resolves without anyone's endpoint, how the session is driven and finished, and how startup network operations are disabled. The pinned entry point and the --tools policy are production's, unmodified; nothing here claims the interactive TUI path was exercised."
+      },
+      {
+        "fact": "registry-at-session-start-only",
+        "state": "not-captured",
+        "reason": "The reading is taken on session_start, and no model turn occurs. What a later turn would hold is not measured, and nothing in the run calls setActiveTools - so a mid-session change of the active set is outside what this establishes."
+      },
+      {
+        "fact": "failure-diagnostics-are-not-sanitised",
+        "state": "redacted",
+        "reason": "The sanitisation claim covers what a passing measurement retains, which is tool names. The diagnostic printed when a run FAILS includes the child's stderr and absolute paths, deliberately, because a failure is already being read by somebody who needs them."
+      },
+      {
+        "fact": "registration-and-injection-seams",
+        "state": "not-observable",
+        "reason": "Three seams model production boundaries rather than being production itself: the recording stub records only registerTool calls, so a package registering a command or a handler would not be compared; the extension's register(pi, deps) second argument lets a test control lintProject, the typed registries and the attestation module; and bin/start-kiln.mjs's main() takes an injected runSupervisor. None is reachable from an argument or an environment variable, and the real command still selects both programs internally - but each is a place where a test observes a shape production assembles."
+      },
+      {
+        "fact": "path-scrubber-is-broad",
+        "state": "not-observable",
+        "reason": "The wrapper replaces anything that looks like an absolute path with <path> rather than parsing it. That is deliberate - a message can carry a path as prose, and the cost of missing one is disclosure - but it means a result's prose can lose a fragment that merely resembled a path, and the tests assert absence rather than fidelity of what remains."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The thirty mutations were run locally on Windows, from a temporary working directory, before the commits. CI establishes that these tests pass on both platforms; that they fail against these defects is established only by those local runs."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
