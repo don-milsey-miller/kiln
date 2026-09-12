@@ -21,11 +21,21 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
-import register from "../pi-package/extensions/kiln.js";
+import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
+
+/**
+ * The declaration as it sits on disk.
+ *
+ * ⚠️ **READ FROM THE FILE, NOT FROM THE MODULE.** Comparing the tool's answer against the same
+ * import the tool returns would be comparing an object with itself. The file is the thing the
+ * package ships and a consumer compares against.
+ */
 
 installReaper();
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const PACKAGE_ROOT = join(ROOT, "pi-package");
+const DECLARATION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "signature.json"), "utf-8"));
 const SCHEMAS = join(ROOT, "schemas");
 const schemas = loadSchemaSet(SCHEMAS);
 const validators = createValidators(SCHEMAS);
@@ -122,6 +132,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
   assert.deepEqual(
     [...tools.keys()].sort(),
     [
+      "kiln_capability",
       "kiln_create_acceptance_criterion",
       "kiln_create_assertion",
       "kiln_create_component",
@@ -995,16 +1006,80 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
   process.chdir(empty);
 
   try {
+    // ⚠️ **EVERY TOOL BUT ONE.** `kiln_capability` answers a question about the package, which has the
+    // same answer in every project and in none, so it resolves no content root and has no reason to
+    // refuse. It is asserted below instead - a stronger claim than the sweep could make.
     for (const tool of registered().values()) {
+      if (tool.name === "kiln_capability") continue;
       const result = await tool.execute("call-1", {});
       assert.equal(result.details.ok, false, `${tool.name} must refuse`);
       assert.equal(result.details.code, "no-content-root");
       assert.equal(result.details.message.includes(homedir()), false, "the refusal names the operator's home");
       assert.equal(/[A-Za-z]:\\\\/.test(result.details.message), false, "the refusal carries a machine path");
     }
+
+    // ⚠️ THE ONE THAT ANSWERS WITH NO PROJECT AT ALL. Its subject is the package, not the project.
+    const capability = await registered().get("kiln_capability").execute("call-1", {});
+    assert.deepEqual(capability.details, DECLARATION, "the declaration is returned wherever the session stands");
   } finally {
     process.chdir(cwd);
     if (saved !== undefined) process.env.PLANNING_CONTENT_DIR = saved;
     rmSync(empty, { recursive: true, force: true });
   }
+});
+
+/* ============================================ the capability tool ============================== */
+
+test("⚠️ ACC-0109 kiln_capability returns the package's declaration, field for field", async () => {
+  const result = await invoke(registered().get("kiln_capability"), (await project()).contentRoot);
+
+  // ⚠️ **DEEP EQUALITY AGAINST THE FILE, NOT AGAINST A DESCRIPTION OF IT.** A consumer's whole use for
+  // this tool is comparing what a session reports against what the package ships; an assertion that
+  // checked shape rather than content would pass for a declaration that had been rebuilt wrongly.
+  assert.deepEqual(result.details, DECLARATION);
+  assert.equal(result.details.signatureVersion, 1, "adding a tool changes content, not schema");
+  assert.deepEqual(result.details.extensions, DECLARATION.extensions);
+  assert.deepEqual(result.details.skills, DECLARATION.skills);
+  assert.deepEqual(result.details.prompts, DECLARATION.prompts);
+  assert.deepEqual(result.details.tools, DECLARATION.tools);
+  assert.ok(DECLARATION.tools.includes("kiln_capability"), "the tool declares itself");
+
+  // ⚠️ NOTHING ADDED AROUND IT EITHER: the result IS the declaration, not a declaration inside an
+  // envelope, because an envelope is something to unwrap and unwrapping is where a field goes missing.
+  assert.deepEqual(Object.keys(result.details).sort(), Object.keys(DECLARATION).sort());
+
+  // And it is the frozen export itself, handed back rather than rebuilt.
+  assert.equal(result.details, SIGNATURE);
+  assert.equal(Object.isFrozen(result.details), true, "a consumer could edit the declaration it was handed");
+});
+
+test("⚠️ ACC-0109 calling it changes no byte and no modification time", async () => {
+  const { contentRoot } = await project();
+  const before = snapshot(contentRoot);
+  const packageBefore = snapshot(PACKAGE_ROOT);
+
+  await invoke(registered().get("kiln_capability"), contentRoot);
+  await invoke(registered().get("kiln_capability"), contentRoot);
+
+  assertUnchanged(before, snapshot(contentRoot), "a capability call");
+  // ⚠️ AND NOT THE PACKAGE EITHER. The declaration is a file on disk; a tool that rewrote it while
+  // reporting it would agree with itself forever.
+  assertUnchanged(packageBefore, snapshot(PACKAGE_ROOT), "the package the declaration lives in");
+});
+
+test("⚠️ ACC-0109 the declaration it returns carries no credential and no machine path", async () => {
+  const planted = "sk-ant-CAPABILITY-PLANTED-9d3e";
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = planted;
+
+  let text;
+  try {
+    text = JSON.stringify(await invoke(registered().get("kiln_capability"), (await project()).contentRoot));
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+
+  assert.equal(text.includes(planted), false);
+  assertNoMachinePath(text, [ROOT, homedir()], "a capability result");
 });

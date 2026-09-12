@@ -10,6 +10,7 @@
     "kiln-start"
   ],
   "tools": [
+    "kiln_capability",
     "kiln_create_acceptance_criterion",
     "kiln_create_assertion",
     "kiln_create_component",

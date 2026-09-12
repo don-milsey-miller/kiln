@@ -128,6 +128,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
         // ⚠️ WHAT PI ACTUALLY HOLDS after loading: the two read tools, by name, registered into the
         // session rather than merely declared in a file.
         tools: [
+          "kiln_capability",
           "kiln_create_acceptance_criterion",
           "kiln_create_assertion",
           "kiln_create_component",

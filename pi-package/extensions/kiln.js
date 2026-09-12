@@ -417,6 +417,33 @@ export default function register(pi, deps = {}) {
       },
     });
 
+
+  /**
+   * The package's own declaration, handed back exactly as it was authored.
+   *
+   * ⚠️ **RETURNED, NOT REBUILT.** The result IS `SIGNATURE` - the frozen object this module imported
+   * from `signature.json` - and not a copy assembled from it. A consumer's whole use for this tool is
+   * to compare what a session reports against what the package ships, and a wrapper that re-derived
+   * the document would be comparing its own reconstruction. Nothing is added, filtered or reordered
+   * in transit, which is also why the result is the declaration itself rather than a declaration
+   * wrapped in a status envelope: an envelope is something to unwrap, and unwrapping is where a
+   * field goes missing.
+   *
+   * ⚠️ **IT RESOLVES NO PROJECT, AND THAT IS THE POINT.** This answers a question about the package,
+   * which is the same answer in every project and in none. Reaching for a content root would make a
+   * static document depend on where the session happens to be standing, and would give this tool a
+   * failure mode it has no reason to have.
+   */
+  pi?.registerTool?.({
+    name: "kiln_capability",
+    label: "Kiln capability",
+    description:
+      "Return this Kiln package's versioned signature declaration: the extensions, skills, prompts " +
+      "and tools it owns. Reads nothing and changes nothing.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    execute: async () => rendered(SIGNATURE),
+  });
+
   pi?.registerTool?.({
     name: "kiln_project_status",
     label: "Kiln project status",

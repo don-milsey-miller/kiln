@@ -2743,12 +2743,19 @@ test("⚠️ ACC-0065 the launch allowlist is the validated declaration, and hol
   assert.deepEqual(tools, validated, "the allowlist is what validation produced");
   assert.deepEqual(tools, [...signature.tools].sort(), "which is what the declaration claims");
   assert.equal(signature.signatureVersion, 1, "and the declaration's shape is unchanged");
-  assert.equal(tools.length, 22);
+  assert.equal(tools.length, 23);
 
   const builtins = pinnedBuiltinToolNames();
   for (const builtin of builtins)
     assert.equal(tools.includes(builtin), false, `${builtin} is a Pi built-in and must not be requested`);
-  for (const name of tools) assert.match(name, /^kiln_/, `${name} is not one of Kiln's`);
+  // ⚠️ **AN EXACT SET, NOT A PREFIX.** This line used to assert that every declared name began
+  // `kiln_`, which was true of the 22 that existed when it was written and is not a rule of the
+  // package: TSK-0045 registers research_capability, research_search, research_fetch,
+  // validation_capability and validation_run under the names `lib/specialists/contract.mjs`
+  // requires by key. The declaration itself is the thing to compare against, and it is compared
+  // above - so what is left here is the claim a prefix was standing in for: no name Kiln did not
+  // declare, which the built-in check below then makes specific.
+  assert.deepEqual(new Set(tools).size, tools.length, "a name is declared twice");
 });
 
 test("⚠️ ACC-0065 the allowlist is appended as the one flag Pi reads, and reads back as the same names", async () => {

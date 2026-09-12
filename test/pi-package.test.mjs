@@ -36,6 +36,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = packageRootFor(ROOT);
 
 const REGISTERED_TOOLS = Object.freeze([
+  "kiln_capability",
   "kiln_create_acceptance_criterion",
   "kiln_create_assertion",
   "kiln_create_component",

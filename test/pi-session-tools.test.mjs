@@ -26,10 +26,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { createServer } from "node:http";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
@@ -54,6 +54,32 @@ function pinnedBuiltinToolNames() {
     assert.ok(names.includes(expected), `the extracted built-in set is missing ${expected}, so it was not parsed`);
   return names;
 }
+
+/**
+ * Every file under a root, as path -> bytes and modification time.
+ *
+ * ⚠️ **RELATIVE PATHS ONLY.** This fingerprint is compared, reported on failure and retained in a
+ * result; absolute ones would put this machine in all three.
+ */
+const fingerprint = (root) => {
+  const out = new Map();
+  if (!existsSync(root)) return out;
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else out.set(relative(root, full).split(sep).join("/"), `${statSync(full).size}:${statSync(full).mtimeMs}`);
+    }
+  };
+  walk(root);
+  return out;
+};
+
+/** What differs between two fingerprints, by name. */
+const differences = (before, after) => {
+  const names = new Set([...before.keys(), ...after.keys()]);
+  return [...names].filter((n) => before.get(n) !== after.get(n)).sort();
+};
 
 /** A credential-shaped value planted in the child's environment. Nothing retained may carry it. */
 const PLANTED_KEY = "sk-kiln-LOOPBACK-PLANTED-3ba7";
@@ -107,16 +133,64 @@ export default function (pi) {
       JSON.stringify({ active: pi.getActiveTools(), all: pi.getAllTools().map((t) => t.name) })
     );
   });
+
+  // ⚠️ WHAT THE TOOL ACTUALLY RETURNED, as the session saw it. Written only when a turn calls one.
+  pi.on("tool_execution_end", (event) => {
+    writeFileSync(
+      process.env.KILN_CALL_OUT,
+      JSON.stringify({ toolName: event.toolName, isError: event.isError === true, details: event.result?.details ?? null })
+    );
+  });
 }
 `;
 
-/** A server on the loopback interface that answers nothing and counts what reaches it. */
-async function loopback() {
+/** The script that answers with prose instead of a tool call, so a turn can be had without one. */
+const TEXT_ONLY = "text-only";
+
+/** One streamed chunk in the shape the pinned runtime's openai-completions client reads. */
+const chunk = (delta, finish = null) =>
+  `data: ${JSON.stringify({
+    id: "chatcmpl-loopback",
+    object: "chat.completion.chunk",
+    created: 1,
+    model: "loopback-model",
+    choices: [{ index: 0, delta, finish_reason: finish }],
+  })}\n\n`;
+
+/**
+ * A server on the loopback interface that counts what reaches it.
+ *
+ * ⚠️ **BY DEFAULT IT ANSWERS NOTHING**, because most of these runs ask the session for its state and
+ * must be able to say that no model request was made at all. Given `callTool`, it plays a model for
+ * exactly one turn: the first request is answered with a call to that tool - or, for the name
+ * `TEXT_ONLY`, with prose and nothing else - and every later request with a plain stop, so the turn
+ * settles instead of looping. Nothing about the tool's behaviour comes from here: only the decision to
+ * invoke it, which is the model's to make and nobody else's.
+ */
+async function loopback({ callTool = null } = {}) {
   const requests = [];
   const server = createServer((req, res) => {
-    requests.push(req.url ?? "");
-    res.statusCode = 500;
-    res.end("this test makes no model request");
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      requests.push(req.url ?? "");
+      if (!callTool) {
+        res.statusCode = 500;
+        res.end("this test makes no model request");
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "close" });
+      if (requests.length === 1 && callTool !== TEXT_ONLY) {
+        res.write(chunk({ role: "assistant", content: "" }));
+        res.write(chunk({ tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: callTool, arguments: "{}" } }] }));
+        res.write(chunk({}, "tool_calls"));
+      } else {
+        res.write(chunk({ role: "assistant", content: "done" }));
+        res.write(chunk({}, "stop"));
+      }
+      res.write("data: [DONE]\n\n");
+      res.end();
+    });
   });
   await new Promise((done) => server.listen(0, "127.0.0.1", done));
   return { port: server.address().port, requests, close: () => new Promise((done) => server.close(done)) };
@@ -125,20 +199,22 @@ async function loopback() {
 /**
  * One real session, measured.
  *
- * @param {{allowlist: boolean, trusted?: boolean}} options  whether the production allowlist is
- *   applied — without it the run is Pi's own default, which is what makes the measurement's
- *   sensitivity checkable — and whether the project is trusted, which decides whether Pi loads its
- *   package at all.
+ * @param {{allowlist: boolean, trusted?: boolean, callTool?: string}} options  whether the production
+ *   allowlist is applied — without it the run is Pi's own default, which is what makes the
+ *   measurement's sensitivity checkable — whether the project is trusted, which decides whether Pi
+ *   loads its package at all, and optionally a tool the scripted model calls, which is the only way
+ *   to make a session EXECUTE one: no CLI flag and no extension API invokes a registered tool.
  */
-async function measure({ allowlist, trusted = true }) {
+async function measure({ allowlist, trusted = true, callTool = null }) {
   const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-session-")));
   const project = join(base, "project");
   const agentDir = join(base, "agent");
   const sessions = join(base, "sessions");
   const probe = join(base, "probe", "probe.js");
   const out = join(base, "active-tools.json");
+  const calledOut = join(base, "called.json");
 
-  const server = await loopback();
+  const server = await loopback({ callTool });
   let child = null;
 
   try {
@@ -175,12 +251,18 @@ async function measure({ allowlist, trusted = true }) {
       "--offline",
     ];
 
+    // ⚠️ TAKEN AFTER THE FIXTURE IS BUILT AND BEFORE THE SESSION RUNS, so what it sees is the session's
+    // doing and not the harness's.
+    const projectBefore = fingerprint(project);
+    const agentBefore = fingerprint(agentDir);
+
     child = spawn(agent.command, args, {
       cwd: project,
       env: {
         ...environmentWithoutCredentials(),
         PI_CODING_AGENT_DIR: agentDir,
         KILN_PROBE_OUT: out,
+        KILN_CALL_OUT: calledOut,
         KILN_LOOPBACK_KEY: PLANTED_KEY,
         PI_OFFLINE: "1",
       },
@@ -193,11 +275,26 @@ async function measure({ allowlist, trusted = true }) {
       stdout += d;
       // ⚠️ CLOSED ON THE ANSWER, NOT ON A TIMER. Ending stdin is how this session is asked to finish,
       // and doing it when the session has actually answered keeps the run as short as it is honest.
-      if (stdout.includes('"command":"get_state"')) child.stdin.end();
+      // ⚠️ A STATE QUERY IS FINISHED WHEN IT IS ANSWERED, and closing stdin is how such a run is asked
+      // to end.
+      //
+      // ⚠️ **A PROMPTED RUN IS STOPPED RATHER THAN ASKED TO STOP, AND THAT IS F82's DOING.** On Windows,
+      // the pinned runtime aborts with a libuv assertion (`UV_HANDLE_CLOSING`, exit 0xC0000409) when a
+      // session shuts down promptly after a turn THAT EXECUTED A TOOL - on both shutdown paths, three
+      // times out of three, while a text-only turn never does. Rather than sleep past a runtime defect
+      // and assert a clean exit that would be fiction, this run is stopped once the agent settles and
+      // makes no claim about its exit status. The clean-exit claim is the other sessions' to make.
+      if (stdout.includes(callTool ? '"type":"agent_settled"' : '"command":"get_state"'))
+        if (callTool) child.kill();
+        else child.stdin.end();
     });
     child.stderr.on("data", (d) => (stderr += d));
 
-    child.stdin.write(`${JSON.stringify({ id: "1", type: "get_state" })}\n`);
+    child.stdin.write(
+      `${JSON.stringify(
+        callTool ? { id: "1", type: "prompt", message: "Report this package's capability." } : { id: "1", type: "get_state" }
+      )}\n`
+    );
 
     const exit = await new Promise((done) => {
       const timer = setTimeout(() => {
@@ -222,6 +319,11 @@ async function measure({ allowlist, trusted = true }) {
       answered: /"command":"get_state","success":true/.test(stdout),
       sessionDir: { exists: existsSync(sessions), entries: existsSync(sessions) ? readdirSync(sessions).length : 0 },
       providerRequests: server.requests.length,
+      // ⚠️ WHAT THE SESSION CHANGED, BY NAME. An empty list is a stronger statement than a boolean,
+      // and a non-empty one says which file to go and look at.
+      projectChanges: differences(projectBefore, fingerprint(project)),
+      agentChanges: differences(agentBefore, fingerprint(agentDir)),
+      called: existsSync(calledOut) ? JSON.parse(readFileSync(calledOut, "utf-8")) : null,
       // ⚠️ A SIGNAL, NOT THE TEXT. Whatever a failing child writes on stderr names this machine, and
       // this value is retained; the text is used only in the diagnostic below, which exists only on a
       // failure somebody is already reading.
@@ -248,7 +350,7 @@ test("⚠️ ACC-0064 a real session offers exactly the twenty-two declared Kiln
 
   // ⚠️ THE SESSION'S REGISTRY AGAINST THE PACKAGE'S DECLARATION, which are two different sources.
   assert.deepEqual([...measured.active].sort(), [...declared], "the active set is exactly what the package declares");
-  assert.equal(measured.active.length, 22);
+  assert.equal(measured.active.length, 23);
   assert.deepEqual([...measured.all].sort(), [...declared], "and the session holds no other tool at all");
 
   for (const builtin of pinnedBuiltinToolNames()) {
@@ -271,7 +373,7 @@ test("⚠️ ACC-0064 the same probe, without the allowlist, measures Pi's own d
   // And the Kiln tools are there too: without an allowlist an extension's tools are active as well,
   // which is precisely the state the launch flag exists to narrow.
   assert.ok(measured.active.includes("kiln_lint"));
-  assert.ok(measured.active.length > 22, `the control set should be larger: ${measured.active.length}`);
+  assert.ok(measured.active.length > 23, `the control set should be larger: ${measured.active.length}`);
 });
 
 test("⚠️ ACC-0064 without trust the package is not there to measure, and the session still runs", async () => {
@@ -287,10 +389,57 @@ test("⚠️ ACC-0064 without trust the package is not there to measure, and the
     "an untrusted project's package must not reach the session"
   );
 
+  // ⚠️ INCLUDING THE ONE THIS SLICE ADDS. A consumer comparing an expected signature against a
+  // returned one relies on there being no tool to call when the package did not load.
+  assert.equal(measured.all.includes("kiln_capability"), false, "kiln_capability exists without the package");
+  assert.equal(measured.active.includes("kiln_capability"), false);
+
   // ⚠️ AND THE SESSION IS STILL THERE: Pi's own tools are active, so the empty Kiln set is a refusal
   // to load a project's package rather than a run that never got as far as having a registry.
   for (const builtin of ["read", "bash", "edit", "write"])
     assert.equal(measured.active.includes(builtin), true, `the untrusted control lost Pi's own ${builtin}`);
+});
+
+test("⚠️ ACC-0109 a real session calls kiln_capability and gets the package's declaration back", async () => {
+  // ⚠️ **EXECUTED, NOT INSPECTED.** Every other reading here is of the registry; this one is of a tool
+  // that actually ran, because ACC-0109 is about what a caller receives. No flag and no extension API
+  // invokes a registered tool, so the model does it - the scripted loopback answers the first turn with
+  // a call to kiln_capability and the next with a stop.
+  const measured = await measure({ allowlist: true, callTool: "kiln_capability" });
+  const declaration = JSON.parse(readFileSync(join(ROOT, "pi-package", "signature.json"), "utf-8"));
+
+  // ⚠️ NO EXIT ASSERTION HERE, DELIBERATELY - see F82 and the comment in `measure`. What this test is
+  // for is what the caller received, and that is captured while the session is running.
+  assert.ok(measured.called, "the tool was never executed");
+  assert.equal(measured.called.toolName, "kiln_capability");
+  assert.equal(measured.called.isError, false);
+
+  // ⚠️ FIELD FOR FIELD AGAINST THE FILE THE PACKAGE SHIPS, which is what a consumer compares against.
+  assert.deepEqual(measured.called.details, declaration);
+  assert.equal(measured.called.details.signatureVersion, 1);
+  assert.deepEqual(Object.keys(measured.called.details).sort(), Object.keys(declaration).sort(), "nothing added in transit");
+  assert.deepEqual(measured.called.details.tools, declaration.tools);
+  assert.ok(measured.called.details.tools.includes("kiln_capability"));
+
+  // ⚠️ AND THE CALL PERSISTED NOTHING OF ITS OWN. The project is untouched outright - no planning
+  // content, no `.pi/settings.json`, no package file, neither bytes nor modification times.
+  assert.deepEqual(measured.projectChanges, [], "the call changed files in the project");
+
+  // ⚠️ THE AGENT DIRECTORY NEEDS A CONTROL, NOT AN ABSOLUTE. A session that resolves a model writes
+  // Pi's own bookkeeping there whether or not any tool runs, so "nothing changed" would be false for
+  // reasons that have nothing to do with this tool. What must be true is that calling it adds nothing:
+  // the same turn WITHOUT the call touches the same files.
+  const turnAlone = await measure({ allowlist: true, callTool: TEXT_ONLY });
+  assert.equal(turnAlone.called, null, "the control turn called a tool after all");
+  assert.deepEqual(turnAlone.projectChanges, [], "a turn alone changed files in the project");
+  assert.deepEqual(
+    measured.agentChanges,
+    turnAlone.agentChanges,
+    "calling the tool wrote stored state that the same turn without it does not"
+  );
+
+  // Two requests: the turn that called the tool, and the turn that ended after its result.
+  assert.equal(measured.providerRequests, 2, `the scripted model was asked ${measured.providerRequests} times`);
 });
 
 test("⚠️ ACC-0064 the request counter would notice a request, so counting none means none", async () => {
@@ -324,5 +473,9 @@ test("⚠️ ACC-0064 the measurement reaches no provider, and what it keeps nam
   assert.equal(/\/(home|Users)\//.test(retained), false, "a home directory reached the retained reading");
   for (const identity of [homedir(), userInfo().username, tmpdir()])
     assert.equal(retained.includes(identity), false, `the retained reading names ${identity}`);
-  for (const name of measured.all) assert.match(name, /^kiln_[a-z_]+$/, `${name} is not a bare tool name`);
+  // ⚠️ **THE DECLARATION, NOT A PREFIX.** What a retained name must be is one the package declares;
+  // `kiln_` was a property of the set that existed when this was written, and TSK-0045's five
+  // specialist tools are deliberately unprefixed because the specialist contract requires those
+  // exact keys. Comparing against the declaration is both stronger and still true afterwards.
+  assert.deepEqual([...measured.all].sort(), await piToolAllowlist(ROOT), "a measured name is not one the package declares");
 });
