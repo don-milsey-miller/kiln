@@ -135,14 +135,17 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_link_trace",
       "kiln_lint",
       "kiln_project_status",
+      "kiln_read_stage_attestations",
       "kiln_resolve_question",
       "kiln_revise_artifact",
       "kiln_set_lifecycle",
       "kiln_set_review_status",
+      "kiln_set_type_activation",
       "kiln_unlink_evidence",
       "kiln_unlink_trace",
+      "kiln_write_stage_attestation",
     ],
-    "the nine creation tools, the eight mutation tools and the two read tools"
+    "every tool this package declares: nine creations, eight mutations, two reads, activation and the two attestations"
   );
 
   for (const tool of tools.values()) {
@@ -680,6 +683,241 @@ test("⚠️ ACC-0065 the mutation wire names map to the registry entries they c
 
   assert.deepEqual(entries.slice().sort(), Object.keys(MUTATION_TOOLS).sort(), "the eight tools and the registry's operations are the same set");
   assert.deepEqual([...registered().keys()].filter((n) => MUTATION_TOOL_NAMES.includes(n)).sort(), [...MUTATION_TOOL_NAMES]);
+});
+
+
+/* ============================================ activation and attestations ====================== */
+
+/**
+ * A project with a manifest, which activation needs and the other tools do not.
+ *
+ * ⚠️ **THE MANIFEST CARRIES A COMMENT ON PURPOSE.** Activation rewrites one line of it, and a rewrite
+ * that discarded the rest would be an edit rather than an approval.
+ */
+const MANIFEST = (activated) => `name: fixture
+capabilities:
+  # a comment that must survive an approval
+  artifactTypes:
+    activated: [${activated.join(", ")}]
+  sandboxTiers:
+    active:
+      - 1
+`;
+
+async function projectWithManifest(activated = ["requirement", "decision"]) {
+  const made = await project();
+  writeFileSync(join(made.contentRoot, "project.yaml"), MANIFEST(activated));
+  return made;
+}
+
+const manifestOf = (contentRoot) => readFileSync(join(contentRoot, "project.yaml"), "utf-8");
+
+test("⚠️ ACC-0065 activation records the approval, and reports the list the manifest now holds", async () => {
+  const { contentRoot } = await projectWithManifest();
+  const tools = registered();
+
+  const result = (
+    await invoke(tools.get("kiln_set_type_activation"), contentRoot, {
+      type: "component",
+      action: "activate",
+      approvedBy: "the product manager",
+      reason: "components are being authored",
+    })
+  ).details;
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.changed, true);
+  assert.equal(result.type, "component");
+  assert.equal(result.action, "activate");
+  assert.ok(result.activated.includes("component"), "the reported list is the one that was written");
+  assert.equal(result.noChangeBecause, null);
+
+  const manifest = manifestOf(contentRoot);
+  assert.match(manifest, /approved by the product manager/, "the approver is recorded where the list is");
+  assert.match(manifest, /components are being authored/);
+  assert.match(manifest, /a comment that must survive an approval/, "and the rest of the manifest is untouched");
+});
+
+test("⚠️ ACC-0065 deactivation is offered, and a no-op says so rather than claiming a change", async () => {
+  const { contentRoot } = await projectWithManifest(["requirement", "decision"]);
+  const tools = registered();
+  const activate = (type, action) =>
+    invoke(tools.get("kiln_set_type_activation"), contentRoot, { type, action, approvedBy: "pm" });
+
+  const again = (await activate("decision", "activate")).details;
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.equal(again.changed, false, "an activated type is not activated twice");
+  assert.equal(again.noChangeBecause, "already activated");
+
+  const off = (await activate("requirement", "deactivate")).details;
+  assert.equal(off.ok, true, JSON.stringify(off));
+  assert.equal(off.changed, true);
+  assert.equal(off.activated.includes("requirement"), false, "and the manifest no longer lists it");
+});
+
+test("⚠️ ACC-0065 activation refusals are the operation's own, and change nothing", async () => {
+  const { contentRoot } = await projectWithManifest();
+  const tools = registered();
+  const call = (params) => invoke(tools.get("kiln_set_type_activation"), contentRoot, params);
+
+  // An artifact of the type exists, so deactivating it would strand it.
+  const decision = (await invoke(tools.get("kiln_create_decision"), contentRoot, { artifact: MINIMAL.kiln_create_decision })).details;
+  assert.equal(decision.ok, true, JSON.stringify(decision));
+
+  const cases = [
+    ["no approver", { type: "component", action: "activate" }, /who approved/i],
+    ["a type the catalogue does not have", { type: "sprint", action: "activate", approvedBy: "pm" }, /catalogue/i],
+    ["an action that is neither", { type: "component", action: "archive", approvedBy: "pm" }, /activate/i],
+    ["deactivating a type whose artifacts exist", { type: "decision", action: "deactivate", approvedBy: "pm" }, /strand/i],
+  ];
+
+  for (const [label, params, expected] of cases) {
+    const before = snapshot(contentRoot);
+    const result = (await call(params)).details;
+
+    assert.equal(result.ok, false, `${label}: it was accepted`);
+    // ⚠️ NOT `invalid-artifact`: there is no artifact here to be invalid.
+    assert.equal(result.code, "invalid-request", `${label}: ${result.code}`);
+    assert.match(result.message, expected, `${label}: ${result.message}`);
+    assertUnchanged(before, snapshot(contentRoot), label);
+  }
+});
+
+test("⚠️ ACC-0065 an attestation is written and read back, one stage at a time", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  const write = (params) => invoke(tools.get("kiln_write_stage_attestation"), contentRoot, params);
+  const read = (stage) => invoke(tools.get("kiln_read_stage_attestations"), contentRoot, { stage });
+
+  // Nothing recorded yet is an empty answer, not a refusal.
+  const empty = (await read("03-discovery")).details;
+  assert.equal(empty.ok, true, JSON.stringify(empty));
+  assert.equal(empty.count, 0);
+  assert.deepEqual(empty.attestations, []);
+  assert.equal(empty.path, "state/stage-attestations/03-discovery.json", "it says where they would live");
+
+  const written = (await write({ stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "the reviewer" })).details;
+  assert.equal(written.ok, true, JSON.stringify(written));
+  assert.equal(written.result, "satisfied");
+  assert.equal(written.decidedBy, "the reviewer");
+  assert.equal(written.path, "state/stage-attestations/03-discovery.json");
+
+  // On disk, where the gate reads it.
+  const onDisk = JSON.parse(readFileSync(join(contentRoot, "state", "stage-attestations", "03-discovery.json"), "utf-8"));
+  assert.equal(onDisk.stageId, "03-discovery");
+  assert.deepEqual(onDisk.attestations["unknowns-resolved"], { result: "satisfied", decidedBy: "the reviewer" });
+
+  // A second criterion joins the first rather than replacing it.
+  await write({ stage: "03-discovery", criterion: "sources-reconciled", result: "n/a", decidedBy: "the reviewer", reason: "no second source" });
+  const both = (await read("03-discovery")).details;
+  assert.equal(both.count, 2);
+  assert.deepEqual(
+    both.attestations.map((a) => [a.criterion, a.result, a.reason]).sort(),
+    [
+      ["sources-reconciled", "n/a", "no second source"],
+      ["unknowns-resolved", "satisfied", null],
+    ]
+  );
+
+  // And another stage's file is its own.
+  const other = (await read("04-requirement-gaps")).details;
+  assert.equal(other.count, 0, "one stage's evaluations do not appear under another's");
+});
+
+test("⚠️ ACC-0065 every attestation refusal leaves every byte and modification time alone", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  await invoke(tools.get("kiln_write_stage_attestation"), contentRoot, {
+    stage: "03-discovery",
+    criterion: "unknowns-resolved",
+    result: "satisfied",
+    decidedBy: "the reviewer",
+  });
+
+  const cases = [
+    // ⚠️ SEEING A CRITERION IS NOT A VERDICT ON IT. There is deliberately no "acknowledged" result.
+    ["a result that is not a verdict", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "acknowledged", decidedBy: "r" }],
+    ["nobody deciding it", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "" }],
+    ["n/a with no reason", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "n/a", decidedBy: "r" }],
+    ["a stage id that is not one", "kiln_write_stage_attestation", { stage: "discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "r" }],
+    ["reading a stage id that is not one", "kiln_read_stage_attestations", { stage: "3-discovery" }],
+  ];
+
+  for (const [label, name, params] of cases) {
+    const before = snapshot(contentRoot);
+    const result = (await invoke(tools.get(name), contentRoot, params)).details;
+
+    assert.equal(result.ok, false, `${label}: it was accepted`);
+    assert.ok(result.message.length > 0, `${label}: the refusal says something`);
+    assertUnchanged(before, snapshot(contentRoot), label);
+  }
+});
+
+test("⚠️ ACC-0065 a malformed attestations file is refused, with no machine path in the refusal", async () => {
+  const { contentRoot } = await project();
+  const dir = join(contentRoot, "state", "stage-attestations");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "05-solution-design.json"), "{ not json");
+
+  const result = (await invoke(registered().get("kiln_read_stage_attestations"), contentRoot, { stage: "05-solution-design" })).details;
+
+  assert.equal(result.ok, false);
+  assertNoMachinePath(JSON.stringify(result), [contentRoot, homedir()], "a malformed attestations refusal");
+});
+
+test("⚠️ ACC-0065 an activation result and an attestation result carry no credential and no machine path", async () => {
+  const { contentRoot } = await projectWithManifest();
+  const planted = "sk-ant-PROJECT-STATE-PLANTED-4c2b";
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = planted;
+
+  let texts;
+  try {
+    const tools = registered();
+    texts = [
+      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate", approvedBy: "pm" })),
+      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "sprint", action: "activate", approvedBy: "pm" })),
+      JSON.stringify(await invoke(tools.get("kiln_write_stage_attestation"), contentRoot, { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "r" })),
+      JSON.stringify(await invoke(tools.get("kiln_read_stage_attestations"), contentRoot, { stage: "03-discovery" })),
+    ];
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+
+  for (const text of texts) {
+    assert.equal(text.includes(planted), false, "a planted credential reached a project-state result");
+    assertNoMachinePath(text, [contentRoot, homedir()], "a project-state result");
+  }
+});
+
+test("⚠️ ACC-0065 activation goes through the project registry, not around it", async () => {
+  const { PROJECT_TOOLS } = await import("../lib/tools/registry.mjs");
+
+  // ⚠️ THE REGISTRY KEEPS THIS SEPARATE FROM THE MUTATION TOOLS, and so does the wrapper: the manifest
+  // is not an artifact, and an operation on it does not belong in a list of operations on artifacts.
+  assert.deepEqual(Object.keys(PROJECT_TOOLS), ["setTypeActivation"]);
+
+  const called = [];
+  const tools = new Map();
+  register(
+    { registerTool: (tool) => tools.set(tool.name, tool) },
+    {
+      PROJECT_TOOLS: {
+        setTypeActivation: (type, action, options) => {
+          called.push({ type, action, toolRoot: typeof options.toolRoot, approvedBy: options.approvedBy });
+          return { type, action, changed: true, activated: [type] };
+        },
+      },
+    }
+  );
+
+  const { contentRoot } = await projectWithManifest();
+  await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate", approvedBy: "pm" });
+
+  // ⚠️ `toolRoot` IS THE ONE ARGUMENT THE OPERATION CANNOT DO WITHOUT: the stage definitions live under
+  // it, and without them activation refuses rather than checking that a stage produces the type.
+  assert.deepEqual(called, [{ type: "component", action: "activate", toolRoot: "string", approvedBy: "pm" }]);
 });
 
 /* ============================================ the wrapper's own boundary ======================== */

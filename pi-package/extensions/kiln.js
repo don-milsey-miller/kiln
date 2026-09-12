@@ -311,6 +311,15 @@ const REFUSAL_CODES = Object.freeze({
   ArtifactExistsError: "artifact-exists",
 });
 
+/**
+ * The same idea for the operations that are not about an artifact.
+ *
+ * ⚠️ **`invalid-artifact` WOULD BE A WRONG ANSWER HERE.** Activation writes the project manifest and
+ * an attestation is planning state; neither has an artifact to be invalid. A model told its artifact
+ * was rejected would look for one to correct, and there is none.
+ */
+const PROJECT_REFUSAL_CODES = Object.freeze({ ValidationError: "invalid-request" });
+
 /** Pi wants a string to show; the structured result travels beside it as details. */
 const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details: result });
 
@@ -487,6 +496,174 @@ export default function register(pi, deps = {}) {
           path: relativeTo(context.contentRoot, f.path ?? f.file ?? null),
         })),
       });
+    },
+  });
+
+  /**
+   * Activation, which is an approval rather than an edit.
+   *
+   * ⚠️ **`approvedBy` IS REQUIRED ON THE WIRE BECAUSE IT IS REQUIRED BY THE OPERATION.** Activation is
+   * a PM approval, and the operation refuses without a name; a wrapper that supplied a default would be
+   * signing the approval on somebody else's behalf. The schema asks for it so the model asks the
+   * operator.
+   *
+   * ⚠️ **`toolRoot` IS PASSED, AND THAT IS NOT DECORATION.** Activation validates reachability against
+   * the stage definitions, which live under the tool root; without it the operation cannot tell whether
+   * any stage produces the type, and refuses rather than guessing.
+   */
+  pi?.registerTool?.({
+    name: "kiln_set_type_activation",
+    label: "Kiln set type activation",
+    description:
+      "Activate or deactivate an artifact type for this project. Activation is a PM approval and " +
+      "records who gave it. It validates the type against the catalogue, its schema, its typed tool " +
+      "and the stage that produces it; it never edits the catalogue, the schemas or the stages.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact type, such as component or task." },
+        action: { type: "string", enum: ["activate", "deactivate"] },
+        approvedBy: { type: "string", description: "Who approved this change. Recorded in the project manifest." },
+        reason: { type: "string", description: "Why it was approved. Recorded beside the approval." },
+      },
+      required: ["type", "action", "approvedBy"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params) => {
+      let context;
+      try {
+        context = await projectContext();
+      } catch (e) {
+        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const projectTools = deps.PROJECT_TOOLS ?? (await import("../../lib/tools/registry.mjs")).PROJECT_TOOLS;
+      const setTypeActivation = projectTools?.setTypeActivation;
+      if (typeof setTypeActivation !== "function")
+        return rendered(refusal("unknown-operation", "This project has no setTypeActivation operation."));
+
+      try {
+        const result = await setTypeActivation(params?.type, params?.action, {
+          ...context.options,
+          toolRoot: context.toolRoot,
+          approvedBy: params?.approvedBy,
+          reason: params?.reason,
+        });
+        return rendered({
+          ok: true,
+          type: result?.type ?? params?.type ?? null,
+          action: result?.action ?? params?.action ?? null,
+          changed: result?.changed === true,
+          activated: Array.isArray(result?.activated) ? result.activated : [],
+          // ⚠️ Named for what it is. The operation reports `reason` on a no-op, and the input has a
+          // `reason` of its own meaning why the change was approved; one word for both would read as
+          // agreement between two unrelated things.
+          noChangeBecause: result?.changed === true ? null : (result?.reason ?? null),
+        });
+      } catch (e) {
+        return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+      }
+    },
+  });
+
+  /**
+   * The stage attestations, read and written.
+   *
+   * ⚠️ **NOT THROUGH THE TYPED REGISTRY, BECAUSE AN ATTESTATION IS NOT AN ARTIFACT.** It is planning
+   * state that gates a stage transition: no id, no schema, no lifecycle. The registry governs
+   * artifacts, and filing these there would make two different kinds of thing look like one.
+   *
+   * ⚠️ **THERE IS NO "ACKNOWLEDGED" RESULT, AND THE WRAPPER DOES NOT ADD ONE.** The three the operation
+   * accepts are the three a human gate can return; seeing a criterion is not a verdict on it.
+   */
+  pi?.registerTool?.({
+    name: "kiln_read_stage_attestations",
+    label: "Kiln read stage attestations",
+    description:
+      "Return the recorded human evaluations for one stage's exit criteria. Reads only; changes nothing.",
+    parameters: {
+      type: "object",
+      properties: {
+        stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 03-discovery." },
+      },
+      required: ["stage"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params) => {
+      let context;
+      try {
+        context = await projectContext();
+      } catch (e) {
+        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
+      try {
+        const recorded = attestations.loadStageAttestations(context.contentRoot, params?.stage);
+        const entries = Object.entries(recorded ?? {});
+        return rendered({
+          ok: true,
+          stage: params?.stage ?? null,
+          path: relativeTo(context.contentRoot, attestations.stageAttestationsPath(context.contentRoot, params?.stage)),
+          count: entries.length,
+          attestations: entries.map(([criterion, value]) => ({
+            criterion,
+            result: value?.result ?? null,
+            decidedBy: value?.decidedBy ?? null,
+            reason: typeof value?.reason === "string" ? scrub(value.reason, context.contentRoot) : null,
+          })),
+        });
+      } catch (e) {
+        return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+      }
+    },
+  });
+
+  pi?.registerTool?.({
+    name: "kiln_write_stage_attestation",
+    label: "Kiln write stage attestation",
+    description:
+      "Record one human evaluation of a stage exit criterion: satisfied, not-satisfied, or n/a with a " +
+      "reason. It must say who decided it.",
+    parameters: {
+      type: "object",
+      properties: {
+        stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 03-discovery." },
+        criterion: { type: "string", pattern: "^[a-z0-9-]+$", description: "The exit criterion's id, such as unknowns-resolved." },
+        result: { type: "string", enum: ["satisfied", "not-satisfied", "n/a"] },
+        decidedBy: { type: "string", description: "Who evaluated it." },
+        reason: { type: "string", description: "Why. Required when the result is n/a." },
+      },
+      required: ["stage", "criterion", "result", "decidedBy"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params) => {
+      let context;
+      try {
+        context = await projectContext();
+      } catch (e) {
+        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
+      try {
+        const written = await attestations.writeStageAttestation(context.contentRoot, params?.stage, params?.criterion, {
+          result: params?.result,
+          decidedBy: params?.decidedBy,
+          reason: params?.reason,
+        });
+        return rendered({
+          ok: true,
+          stage: params?.stage ?? null,
+          criterion: params?.criterion ?? null,
+          result: written?.result ?? null,
+          decidedBy: written?.decidedBy ?? null,
+          reason: typeof written?.reason === "string" ? scrub(written.reason, context.contentRoot) : null,
+          path: relativeTo(context.contentRoot, attestations.stageAttestationsPath(context.contentRoot, params?.stage)),
+        });
+      } catch (e) {
+        return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+      }
     },
   });
 }

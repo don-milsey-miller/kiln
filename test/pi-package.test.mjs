@@ -48,12 +48,15 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_link_trace",
   "kiln_lint",
   "kiln_project_status",
+  "kiln_read_stage_attestations",
   "kiln_resolve_question",
   "kiln_revise_artifact",
   "kiln_set_lifecycle",
   "kiln_set_review_status",
+  "kiln_set_type_activation",
   "kiln_unlink_evidence",
   "kiln_unlink_trace",
+  "kiln_write_stage_attestation",
 ]);
 
 /** A throwaway copy of the real package, for the cases that must break it. */
@@ -251,19 +254,22 @@ test("⚠️ ACC-0063 what the package registers is exactly what its declaration
 });
 
 test("⚠️ ACC-0063 a tool registered but not declared is refused", async () => {
-  const undeclared = brokenCopy(registering("kiln_set_type_activation"));
+  // ⚠️ AN INVENTED NAME, BECAUSE EVERY DECLARED NAME NOW HAS A HANDLER. These fixtures used to borrow
+  // the next slice's tools; there is no next slice's tool left to borrow, and a name the package does
+  // register would test nothing.
+  const undeclared = brokenCopy(registering("kiln_not_a_tool"));
   const e = await refusal(validatePackage({ packageRoot: undeclared }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "one undeclared tool");
-  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_set_type_activation"]);
+  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_not_a_tool"]);
 
-  const several = brokenCopy(registering("kiln_set_type_activation", "kiln_write_stage_attestation"));
+  const several = brokenCopy(registering("kiln_not_a_tool", "kiln_nor_is_this"));
   const e2 = await refusal(validatePackage({ packageRoot: several }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "several undeclared tools");
-  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_set_type_activation", "kiln_write_stage_attestation"], "named, and in a stable order");
+  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_nor_is_this", "kiln_not_a_tool"], "named, and in a stable order");
 });
 
 test("⚠️ ACC-0063 a tool declared but never registered is refused", async () => {
-  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_read_stage_attestations")));
+  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_not_a_tool")));
   const e = await refusal(validatePackage({ packageRoot: promised }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "declared only");
-  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_read_stage_attestations"]);
+  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_not_a_tool"]);
 
   // ⚠️ AND A PARTIAL MATCH IS STILL A MISMATCH: one of the two declared tools registering is not agreement.
   const half = brokenCopy(({ root }) => {
@@ -287,11 +293,15 @@ test("⚠️ ACC-0063 agreement is observed by running registration, not by read
   const conditional = brokenCopy(({ root }) => {
     const path = join(root, "extensions", "kiln.js");
     const source = readFileSync(path, "utf-8");
+    // ⚠️ THE ANCHOR IS ASSERTED, for the second time and the same reason: this fixture named an older
+    // signature of the registration function, matched nothing, and left the copy identical to the
+    // real package — so it passed while checking nothing at all.
+    assert.equal(source.split(REGISTER_ANCHOR).length, 2, "the fixture could not find the registration function to extend");
     writeFileSync(
       path,
       source.replace(
-        "export default function register(_pi) {",
-        'export default function register(_pi) {\n  if (String(1) === "2") _pi?.registerTool?.({ name: "kiln_never" });'
+        REGISTER_ANCHOR,
+        `${REGISTER_ANCHOR}\n  if (String(1) === "2") pi?.registerTool?.({ name: "kiln_never" });`
       )
     );
   });
