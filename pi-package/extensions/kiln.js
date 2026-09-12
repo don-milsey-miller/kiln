@@ -139,6 +139,167 @@ const CREATION_TOOLS = Object.freeze([
   { name: "kiln_create_task", type: "task", noun: "task" },
 ]);
 
+
+/**
+ * The mutation tools, as an explicit table.
+ *
+ * ⚠️ **EACH ROW NAMES ITS REGISTRY ENTRY, AND SAYS HOW THAT ENTRY IS CALLED.** The eight operations do
+ * not share a signature — linking evidence takes a polarity, revising takes a change set, resolving a
+ * question takes what settled it — so the adapter cannot guess. A row is a wire name, the entry it
+ * delegates to, the parameters a model may send, and the one line that turns the second into the third.
+ *
+ * ⚠️ **`reviseArtifact` IS NOT A ROUTE TO TRACE FIELDS, AND THAT IS THE REGISTRY'S RULE, NOT THIS
+ * TABLE'S.** `linkTrace`, `unlinkTrace`, `linkEvidence` and `resolveQuestion` exist because a
+ * judgement about what points at what needs its own operation; the reviser refuses those fields
+ * itself, and the wrapper simply does not paper over the refusal.
+ */
+const MUTATION_TOOL_TABLE = Object.freeze([
+  {
+    name: "kiln_link_evidence",
+    entry: "linkEvidence",
+    label: "Kiln link evidence",
+    description: "Link an evidence record to an assertion as supporting or refuting it.",
+    parameters: {
+      type: "object",
+      properties: {
+        assertion: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        evidence: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        polarity: { type: "string", enum: ["support", "refute"], description: "Whether the evidence supports or refutes the assertion." },
+      },
+      required: ["assertion", "evidence", "polarity"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.assertion, p.evidence, p.polarity, options),
+  },
+  {
+    name: "kiln_unlink_evidence",
+    entry: "unlinkEvidence",
+    label: "Kiln unlink evidence",
+    description: "Remove an evidence link from an assertion. A link is a judgement, and a judgement may be withdrawn.",
+    parameters: {
+      type: "object",
+      properties: {
+        assertion: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        evidence: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        polarity: { type: "string", enum: ["support", "refute"], description: "Which side the link was recorded on." },
+      },
+      required: ["assertion", "evidence", "polarity"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.assertion, p.evidence, p.polarity, options),
+  },
+  {
+    name: "kiln_revise_artifact",
+    entry: "reviseArtifact",
+    label: "Kiln revise artifact",
+    description:
+      "Change an artifact's own fields. Identity, lifecycle and review status are not revisable here, " +
+      "and trace fields have their own operations.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact's type, such as requirement or evidence." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        changes: { type: "object", description: "The fields to change, as that type's schema defines them." },
+      },
+      required: ["type", "id", "changes"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.type, p.id, p.changes, options),
+  },
+  {
+    name: "kiln_set_lifecycle",
+    entry: "setLifecycle",
+    label: "Kiln set lifecycle",
+    description: "Mark an artifact active, superseded or retired. Superseding requires naming what replaced it.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact's type." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        lifecycle: { type: "string", enum: ["active", "superseded", "retired"] },
+        supersededBy: { type: "array", items: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." }, description: "What replaced it. Required when superseding." },
+      },
+      required: ["type", "id", "lifecycle"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.type, p.id, p.lifecycle, { ...options, supersededBy: p.supersededBy }),
+  },
+  {
+    name: "kiln_resolve_question",
+    entry: "resolveQuestion",
+    label: "Kiln resolve question",
+    description:
+      "Settle an open question as answered, deferred or moot. Answering requires the answer, what " +
+      "settled it, or both.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        resolution: { type: "string", enum: ["answered", "deferred", "moot"] },
+        answer: { type: "string", description: "What the answer is." },
+        answeredBy: { type: "array", items: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." }, description: "What settled it." },
+      },
+      required: ["id", "resolution"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.id, p.resolution, { ...options, answer: p.answer, answeredBy: p.answeredBy }),
+  },
+  {
+    name: "kiln_link_trace",
+    entry: "linkTrace",
+    label: "Kiln link trace",
+    description: "Add references to one of an artifact's trace fields.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact's type." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        field: { type: "string", description: "The trace field, such as evaluates or acceptedBy." },
+        targets: { type: "array", items: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." }, minItems: 1 },
+      },
+      required: ["type", "id", "field", "targets"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.type, p.id, p.field, p.targets, options),
+  },
+  {
+    name: "kiln_unlink_trace",
+    entry: "unlinkTrace",
+    label: "Kiln unlink trace",
+    description: "Remove references from one of an artifact's trace fields.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact's type." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        field: { type: "string", description: "The trace field." },
+        targets: { type: "array", items: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." }, minItems: 1 },
+      },
+      required: ["type", "id", "field", "targets"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.type, p.id, p.field, p.targets, options),
+  },
+  {
+    name: "kiln_set_review_status",
+    entry: "setReviewStatus",
+    label: "Kiln set review status",
+    description: "Move an artifact through review: draft, in-review, approved or amended.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "The artifact's type." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        reviewStatus: { type: "string", enum: ["draft", "in-review", "approved", "amended"] },
+      },
+      required: ["type", "id", "reviewStatus"],
+      additionalProperties: false,
+    },
+    call: (fn, p, options) => fn(p.type, p.id, p.reviewStatus, options),
+  },
+]);
+
 /**
  * A refusal built from whatever the typed tool threw.
  *
@@ -207,6 +368,41 @@ export default function register(pi, deps = {}) {
           });
         } catch (e) {
           // ⚠️ RETURNED, NOT THROWN: a refusal is an answer the model can act on.
+          return rendered(refusal(REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+        }
+      },
+    });
+
+  // ⚠️ THE SAME SHAPE AGAIN: resolve, delegate, render. What differs per row is the call line above.
+  for (const { name, entry, label, description, parameters, call } of MUTATION_TOOL_TABLE)
+    pi?.registerTool?.({
+      name,
+      label,
+      description,
+      parameters,
+      execute: async (_toolCallId, params) => {
+        let context;
+        try {
+          context = await projectContext();
+        } catch (e) {
+          return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        }
+
+        const mutationTools = deps.MUTATION_TOOLS ?? (await import("../../lib/tools/registry.mjs")).MUTATION_TOOLS;
+        const operation = mutationTools[entry];
+        if (typeof operation !== "function")
+          return rendered(refusal("unknown-operation", `This project has no ${entry} operation.`));
+
+        try {
+          const result = await call(operation, params ?? {}, context.options);
+          return rendered({
+            ok: true,
+            id: result?.artifact?.id ?? result?.id ?? params?.id ?? null,
+            type: result?.artifact?.type ?? params?.type ?? null,
+            path: relativeTo(context.contentRoot, result?.path ?? null),
+            changedFields: Array.isArray(result?.changedFields) ? result.changedFields.map((c) => c?.field ?? String(c)) : null,
+          });
+        } catch (e) {
           return rendered(refusal(REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
         }
       },

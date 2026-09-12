@@ -131,10 +131,18 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_create_requirement",
       "kiln_create_runbook_step",
       "kiln_create_task",
+      "kiln_link_evidence",
+      "kiln_link_trace",
       "kiln_lint",
       "kiln_project_status",
+      "kiln_resolve_question",
+      "kiln_revise_artifact",
+      "kiln_set_lifecycle",
+      "kiln_set_review_status",
+      "kiln_unlink_evidence",
+      "kiln_unlink_trace",
     ],
-    "the nine creation tools and the two read tools"
+    "the nine creation tools, the eight mutation tools and the two read tools"
   );
 
   for (const tool of tools.values()) {
@@ -467,6 +475,211 @@ test("⚠️ ACC-0065 the wire names map to the registry entries they claim, one
     "the nine tools and the registry's types are the same set"
   );
   assert.equal(new Set(Object.values(CREATED_TYPE)).size, 9, "and no two tools claim the same type");
+});
+
+
+/* ============================================ the mutation tools =============================== */
+
+const MUTATION_TOOL_NAMES = Object.freeze([
+  "kiln_link_evidence",
+  "kiln_link_trace",
+  "kiln_resolve_question",
+  "kiln_revise_artifact",
+  "kiln_set_lifecycle",
+  "kiln_set_review_status",
+  "kiln_unlink_evidence",
+  "kiln_unlink_trace",
+]);
+
+/** The artifact on disk, read back as the project holds it. */
+const artifact = (contentRoot, path) => JSON.parse(readFileSync(join(contentRoot, path.split("/").join(sep)), "utf-8"));
+
+/** A project with the artifacts these operations need, created through the tools themselves. */
+async function mutableProject() {
+  const made = await project();
+  const tools = registered();
+  const create = async (name, fields) => (await invoke(tools.get(name), made.contentRoot, { artifact: fields })).details;
+
+  const question = await create("kiln_create_question", MINIMAL.kiln_create_question);
+  const decision = await create("kiln_create_decision", MINIMAL.kiln_create_decision);
+  const component = await create("kiln_create_component", MINIMAL.kiln_create_component);
+  const criterion = await create("kiln_create_acceptance_criterion", MINIMAL.kiln_create_acceptance_criterion);
+  // ⚠️ A SECOND COMPONENT, because the criterion already evaluates CMP-0001 and `evaluates` may not be
+  // emptied: unlinking the only entry is refused by the schema, correctly, and would test nothing here.
+  const other = await create("kiln_create_component", { ...MINIMAL.kiln_create_component, title: "Another component" });
+  return { ...made, question, decision, component, criterion, other };
+}
+
+test("⚠️ ACC-0065 the eight mutation tools are registered, each with a closed schema", () => {
+  const tools = registered();
+  for (const name of MUTATION_TOOL_NAMES) {
+    const tool = tools.get(name);
+    assert.ok(tool, `${name} is registered`);
+    assert.equal(tool.parameters.additionalProperties, false, `${name} accepts unknown parameters`);
+    assert.ok(Array.isArray(tool.parameters.required) && tool.parameters.required.length > 0, `${name} requires its inputs`);
+  }
+});
+
+test("⚠️ ACC-0065 each mutation tool makes exactly its own change, on disk", async () => {
+  const made = await mutableProject();
+  const { contentRoot } = made;
+  const tools = registered();
+  const call = (name, params) => invoke(tools.get(name), contentRoot, params);
+
+  // 1. linkEvidence, then unlinkEvidence, on the assertion and evidence the fixture created.
+  const claim = artifact(contentRoot, "data/assertions/AST-0001.json");
+  const linked = await call("kiln_link_evidence", { assertion: claim.id, evidence: made.ids.evidence, polarity: "support" });
+  assert.equal(linked.details.ok, true, JSON.stringify(linked.details));
+  assert.deepEqual(
+    artifact(contentRoot, "data/assertions/AST-0001.json").supportedBy,
+    [made.ids.evidence],
+    "the evidence is linked as supporting, and only that"
+  );
+
+  const unlinked = await call("kiln_unlink_evidence", { assertion: claim.id, evidence: made.ids.evidence, polarity: "support" });
+  assert.equal(unlinked.details.ok, true, JSON.stringify(unlinked.details));
+  assert.deepEqual(artifact(contentRoot, "data/assertions/AST-0001.json").supportedBy ?? [], [], "and withdrawing it leaves none");
+
+  // ⚠️ **THE OTHER POLARITY, BECAUSE ONE OF THEM PROVES NOTHING ABOUT THE ARGUMENT.** A wrapper that
+  // passed a fixed "support" would satisfy every case above; refuting is where that shows.
+  const refuted = await call("kiln_link_evidence", { assertion: claim.id, evidence: made.ids.evidence, polarity: "refute" });
+  assert.equal(refuted.details.ok, true, JSON.stringify(refuted.details));
+  const contested = artifact(contentRoot, "data/assertions/AST-0001.json");
+  assert.deepEqual(contested.refutedBy, [made.ids.evidence], "the evidence is linked as refuting");
+  assert.deepEqual(contested.supportedBy ?? [], [], "and not as supporting");
+
+  const unrefuted = await call("kiln_unlink_evidence", { assertion: claim.id, evidence: made.ids.evidence, polarity: "refute" });
+  assert.equal(unrefuted.details.ok, true, JSON.stringify(unrefuted.details));
+  assert.deepEqual(artifact(contentRoot, "data/assertions/AST-0001.json").refutedBy ?? [], [], "and it can be withdrawn again");
+
+  // 2. reviseArtifact changes the field it was given, and nothing else.
+  const before = artifact(contentRoot, made.decision.path);
+  const revised = await call("kiln_revise_artifact", { type: "decision", id: made.decision.id, changes: { title: "A revised decision" } });
+  assert.equal(revised.details.ok, true, JSON.stringify(revised.details));
+  const after = artifact(contentRoot, made.decision.path);
+  assert.equal(after.title, "A revised decision");
+  assert.deepEqual({ ...after, title: null }, { ...before, title: null }, "nothing else moved");
+  assert.deepEqual(revised.details.changedFields, ["title"], "and the result says which field changed");
+
+  // 3. setLifecycle, with the successor it requires.
+  const retired = await call("kiln_set_lifecycle", { type: "decision", id: made.decision.id, lifecycle: "retired" });
+  assert.equal(retired.details.ok, true, JSON.stringify(retired.details));
+  assert.equal(artifact(contentRoot, made.decision.path).lifecycle, "retired");
+
+  // 4. resolveQuestion records what settled it.
+  const resolved = await call("kiln_resolve_question", { id: made.question.id, resolution: "answered", answer: "It holds." });
+  assert.equal(resolved.details.ok, true, JSON.stringify(resolved.details));
+  const question = artifact(contentRoot, made.question.path);
+  assert.equal(question.resolution, "answered");
+  assert.equal(question.answer, "It holds.");
+
+  // 5. linkTrace and unlinkTrace on a trace field.
+  const traced = await call("kiln_link_trace", { type: "acceptance-criterion", id: made.criterion.id, field: "evaluates", targets: [made.other.id] });
+  assert.equal(traced.details.ok, true, JSON.stringify(traced.details));
+  assert.ok(
+    artifact(contentRoot, made.criterion.path).evaluates.includes(made.other.id),
+    "the trace target is there"
+  );
+
+  const untraced = await call("kiln_unlink_trace", { type: "acceptance-criterion", id: made.criterion.id, field: "evaluates", targets: [made.other.id] });
+  assert.equal(untraced.details.ok, true, JSON.stringify(untraced.details));
+  assert.equal(
+    artifact(contentRoot, made.criterion.path).evaluates.includes(made.other.id),
+    false,
+    "and withdrawing it removes exactly that one"
+  );
+
+  // 6. setReviewStatus moves review, and only review.
+  const reviewed = await call("kiln_set_review_status", { type: "component", id: made.component.id, reviewStatus: "in-review" });
+  assert.equal(reviewed.details.ok, true, JSON.stringify(reviewed.details));
+  assert.equal(artifact(contentRoot, made.component.path).reviewStatus, "in-review");
+});
+
+test("⚠️ ACC-0065 a trace field can be changed only by its own operation, never by revising", async () => {
+  const made = await mutableProject();
+  const tools = registered();
+  const before = snapshot(made.contentRoot);
+
+  // ⚠️ THE REGISTRY'S RULE, NOT THE WRAPPER'S: the reviser refuses trace fields, and the wrapper
+  // neither smuggles them through nor swallows the refusal.
+  const refused = await invoke(tools.get("kiln_revise_artifact"), made.contentRoot, {
+    type: "acceptance-criterion",
+    id: made.criterion.id,
+    changes: { evaluates: [made.component.id] },
+  });
+
+  assert.equal(refused.details.ok, false, "revising a trace field must be refused");
+  assert.match(refused.details.message, /trace|linkTrace|evaluates/i, refused.details.message);
+  assertUnchanged(before, snapshot(made.contentRoot), "a refused trace revision");
+
+  // And the dedicated operation does what the reviser would not.
+  const allowed = await invoke(tools.get("kiln_link_trace"), made.contentRoot, {
+    type: "acceptance-criterion",
+    id: made.criterion.id,
+    field: "evaluates",
+    targets: [made.component.id],
+  });
+  assert.equal(allowed.details.ok, true, JSON.stringify(allowed.details));
+});
+
+test("⚠️ ACC-0065 every mutation refusal leaves every byte and modification time alone", async () => {
+  const made = await mutableProject();
+  const { contentRoot } = made;
+  const tools = registered();
+
+  const cases = [
+    ["an unknown property", "kiln_revise_artifact", { type: "decision", id: made.decision.id, changes: { notAField: 1 } }],
+    ["a malformed id", "kiln_revise_artifact", { type: "decision", id: "DEC-1", changes: { title: "x" } }],
+    ["an artifact that is not there", "kiln_set_review_status", { type: "decision", id: "DEC-9999", reviewStatus: "approved" }],
+    ["an unknown review status", "kiln_set_review_status", { type: "decision", id: made.decision.id, reviewStatus: "blessed" }],
+    ["an unknown lifecycle", "kiln_set_lifecycle", { type: "decision", id: made.decision.id, lifecycle: "mothballed" }],
+    ["superseding with no successor", "kiln_set_lifecycle", { type: "decision", id: made.decision.id, lifecycle: "superseded" }],
+    ["answering with nothing recorded", "kiln_resolve_question", { id: made.question.id, resolution: "answered" }],
+    ["reopening a question", "kiln_resolve_question", { id: made.question.id, resolution: "unanswered" }],
+    ["a trace field that does not exist", "kiln_link_trace", { type: "decision", id: made.decision.id, field: "inventedField", targets: ["CMP-0001"] }],
+    ["linking evidence that is not there", "kiln_link_evidence", { assertion: "AST-0001", evidence: "EVD-9999", polarity: "support" }],
+  ];
+
+  for (const [label, name, params] of cases) {
+    const before = snapshot(contentRoot);
+    const result = await invoke(tools.get(name), contentRoot, params);
+
+    assert.equal(result.details.ok, false, `${label}: ${name} accepted it`);
+    assert.ok(result.details.message.length > 0, `${label}: the refusal says something`);
+    assertUnchanged(before, snapshot(contentRoot), label);
+  }
+});
+
+test("⚠️ ACC-0065 a mutation result and a mutation refusal carry no credential and no machine path", async () => {
+  const made = await mutableProject();
+  const planted = "sk-ant-MUTATE-PLANTED-6f1a";
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = planted;
+
+  let texts;
+  try {
+    const tools = registered();
+    texts = [
+      JSON.stringify(await invoke(tools.get("kiln_set_review_status"), made.contentRoot, { type: "component", id: made.component.id, reviewStatus: "in-review" })),
+      JSON.stringify(await invoke(tools.get("kiln_revise_artifact"), made.contentRoot, { type: "decision", id: made.decision.id, changes: { notAField: 1 } })),
+    ];
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+
+  for (const text of texts) {
+    assert.equal(text.includes(planted), false, "a planted credential reached a mutation result");
+    assertNoMachinePath(text, [made.contentRoot, homedir()], "a mutation result");
+  }
+});
+
+test("⚠️ ACC-0065 the mutation wire names map to the registry entries they claim, one to one", async () => {
+  const { MUTATION_TOOLS } = await import("../lib/tools/registry.mjs");
+  const entries = ["linkEvidence", "unlinkEvidence", "reviseArtifact", "setLifecycle", "resolveQuestion", "linkTrace", "unlinkTrace", "setReviewStatus"];
+
+  assert.deepEqual(entries.slice().sort(), Object.keys(MUTATION_TOOLS).sort(), "the eight tools and the registry's operations are the same set");
+  assert.deepEqual([...registered().keys()].filter((n) => MUTATION_TOOL_NAMES.includes(n)).sort(), [...MUTATION_TOOL_NAMES]);
 });
 
 /* ============================================ the wrapper's own boundary ======================== */

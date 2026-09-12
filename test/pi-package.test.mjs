@@ -44,8 +44,16 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_create_requirement",
   "kiln_create_runbook_step",
   "kiln_create_task",
+  "kiln_link_evidence",
+  "kiln_link_trace",
   "kiln_lint",
   "kiln_project_status",
+  "kiln_resolve_question",
+  "kiln_revise_artifact",
+  "kiln_set_lifecycle",
+  "kiln_set_review_status",
+  "kiln_unlink_evidence",
+  "kiln_unlink_trace",
 ]);
 
 /** A throwaway copy of the real package, for the cases that must break it. */
@@ -243,19 +251,19 @@ test("⚠️ ACC-0063 what the package registers is exactly what its declaration
 });
 
 test("⚠️ ACC-0063 a tool registered but not declared is refused", async () => {
-  const undeclared = brokenCopy(registering("kiln_revise_artifact"));
+  const undeclared = brokenCopy(registering("kiln_set_type_activation"));
   const e = await refusal(validatePackage({ packageRoot: undeclared }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "one undeclared tool");
-  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_revise_artifact"]);
+  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_set_type_activation"]);
 
-  const several = brokenCopy(registering("kiln_revise_artifact", "kiln_set_lifecycle"));
+  const several = brokenCopy(registering("kiln_set_type_activation", "kiln_write_stage_attestation"));
   const e2 = await refusal(validatePackage({ packageRoot: several }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "several undeclared tools");
-  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_revise_artifact", "kiln_set_lifecycle"], "named, and in a stable order");
+  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_set_type_activation", "kiln_write_stage_attestation"], "named, and in a stable order");
 });
 
 test("⚠️ ACC-0063 a tool declared but never registered is refused", async () => {
-  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_write_stage_attestation")));
+  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_read_stage_attestations")));
   const e = await refusal(validatePackage({ packageRoot: promised }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "declared only");
-  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_write_stage_attestation"]);
+  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_read_stage_attestations"]);
 
   // ⚠️ AND A PARTIAL MATCH IS STILL A MISMATCH: one of the two declared tools registering is not agreement.
   const half = brokenCopy(({ root }) => {

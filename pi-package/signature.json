@@ -10,16 +10,24 @@
     "kiln-start"
   ],
   "tools": [
-    "kiln_create_requirement",
-    "kiln_create_assertion",
-    "kiln_create_evidence",
-    "kiln_create_runbook_step",
-    "kiln_create_question",
-    "kiln_create_decision",
-    "kiln_create_component",
     "kiln_create_acceptance_criterion",
+    "kiln_create_assertion",
+    "kiln_create_component",
+    "kiln_create_decision",
+    "kiln_create_evidence",
+    "kiln_create_question",
+    "kiln_create_requirement",
+    "kiln_create_runbook_step",
     "kiln_create_task",
+    "kiln_link_evidence",
+    "kiln_link_trace",
+    "kiln_lint",
     "kiln_project_status",
-    "kiln_lint"
+    "kiln_resolve_question",
+    "kiln_revise_artifact",
+    "kiln_set_lifecycle",
+    "kiln_set_review_status",
+    "kiln_unlink_evidence",
+    "kiln_unlink_trace"
   ]
 }
