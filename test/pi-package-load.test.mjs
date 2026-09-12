@@ -88,7 +88,7 @@ async function discover({ project, agentDir }, decision) {
       resolvedPath: e.resolvedPath,
       source: e.sourceInfo?.source ?? null,
       scope: e.sourceInfo?.scope ?? null,
-      tools: e.tools.size,
+      tools: [...e.tools.keys()].sort(),
       commands: e.commands.size,
       handlers: e.handlers.size,
     })),
@@ -125,8 +125,9 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
         resolvedPath: join(fixture.pkg, "extensions", "kiln.js"),
         source: PORTABLE_PACKAGE_ENTRY,
         scope: "project",
-        // The entry point registers nothing at this stage, and the loaded extension shows it.
-        tools: 0,
+        // ⚠️ WHAT PI ACTUALLY HOLDS after loading: the two read tools, by name, registered into the
+        // session rather than merely declared in a file.
+        tools: ["kiln_lint", "kiln_project_status"],
         commands: 0,
         handlers: 0,
       },

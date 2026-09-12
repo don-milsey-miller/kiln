@@ -80,12 +80,13 @@ test("⚠️ ACC-0063 the real package validates: its declared resources exist a
   assert.deepEqual([...signature.prompts], resources.prompts);
   assert.equal(typeof register, "function");
 
-  // ⚠️ NO TOOLS YET, DECLARED AS AN EMPTY LIST rather than left out: TSK-0044 and TSK-0045 register them.
-  assert.deepEqual([...signature.tools], [], "this package registers no tools yet, and says so");
+  // ⚠️ THE READ TOOLS, AND ONLY THOSE. The mutation and attestation wrappers are later slices of
+  // TSK-0044, and TSK-0045's adapters are later still; each name arrives with its handler.
+  assert.deepEqual([...signature.tools].sort(), ["kiln_lint", "kiln_project_status"]);
 
   const calls = [];
-  register({ registerTool: (t) => calls.push(t), registerCommand: (c) => calls.push(c) });
-  assert.deepEqual(calls, [], "the entry point registers nothing at this stage");
+  register({ registerTool: (t) => calls.push(t.name) });
+  assert.deepEqual(calls.sort(), ["kiln_lint", "kiln_project_status"], "the entry point registers exactly those");
 });
 
 test("⚠️ ACC-0063 the signature is immutable and JSON-safe", async () => {
@@ -199,54 +200,61 @@ test("⚠️ ACC-0063 a signature version the entry point does not share is refu
 
 /* ============================================ declared tools vs registered ===================== */
 
-/** Append a registration to the copied entry point, inside its registration function. */
+/**
+ * Append a registration to the copied entry point, inside its registration function.
+ *
+ * ⚠️ THE ANCHOR IS ASSERTED. A rename in the entry point once made this a silent no-op, and the
+ * fixtures then proved that a package registering nothing extra is accepted — which is true and not
+ * what they exist to check.
+ */
+const REGISTER_ANCHOR = "export default function register(pi, deps = {}) {";
 const registering = (...tools) => ({ root }) => {
   const path = join(root, "extensions", "kiln.js");
   const source = readFileSync(path, "utf-8");
-  const calls = tools.map((name) => `  _pi?.registerTool?.({ name: ${JSON.stringify(name)} });`).join("\n");
-  writeFileSync(path, source.replace("export default function register(_pi) {", `export default function register(_pi) {\n${calls}`));
+  assert.equal(source.split(REGISTER_ANCHOR).length, 2, "the fixture could not find the registration function to extend");
+  const calls = tools.map((name) => `  pi?.registerTool?.({ name: ${JSON.stringify(name)} });`).join("\n");
+  writeFileSync(path, source.replace(REGISTER_ANCHOR, `${REGISTER_ANCHOR}\n${calls}`));
 };
 
-test("⚠️ ACC-0063 the package registers nothing, and its declaration says exactly that", async () => {
+test("⚠️ ACC-0063 what the package registers is exactly what its declaration claims", async () => {
   const { tools, signature } = await validatePackage({ packageRoot: PACKAGE });
 
-  // ⚠️ THE TRUTHFUL EMPTY STATE. `tools` stays empty until a slice adds working wrappers: a name
-  // declared before its wrapper exists would announce a capability the package does not have, and a
-  // placeholder handler would put an unusable tool in front of an operator.
-  assert.deepEqual(tools, [], "registration produced no tools");
-  assert.deepEqual([...signature.tools], [], "and the declaration claims none");
+  // ⚠️ A NAME ARRIVES WITH ITS WORKING HANDLER, NEVER BEFORE IT. Declaring one earlier would announce
+  // a capability the package does not have, and a placeholder handler would put an unusable tool in
+  // front of an operator. These two are the read tools, and their handlers are tested beside them.
+  assert.deepEqual(tools, ["kiln_lint", "kiln_project_status"], "registration produced exactly these");
+  assert.deepEqual([...signature.tools].sort(), tools, "and the declaration claims exactly the same");
   assert.equal(signature.signatureVersion, 1, "the declaration's shape has not changed, so its version has not");
 });
 
 test("⚠️ ACC-0063 a tool registered but not declared is refused", async () => {
-  const undeclared = brokenCopy(registering("kiln_project_status"));
+  const undeclared = brokenCopy(registering("kiln_create_task"));
   const e = await refusal(validatePackage({ packageRoot: undeclared }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "one undeclared tool");
-  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_project_status"]);
+  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_create_task"]);
 
-  const several = brokenCopy(registering("kiln_lint", "kiln_project_status"));
+  const several = brokenCopy(registering("kiln_create_task", "kiln_revise_artifact"));
   const e2 = await refusal(validatePackage({ packageRoot: several }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "several undeclared tools");
-  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_lint", "kiln_project_status"], "named, and in a stable order");
+  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_create_task", "kiln_revise_artifact"], "named, and in a stable order");
 });
 
 test("⚠️ ACC-0063 a tool declared but never registered is refused", async () => {
-  const promised = brokenCopy(({ signature }) => signature((s) => (s.tools = ["kiln_lint"])));
+  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_write_stage_attestation")));
   const e = await refusal(validatePackage({ packageRoot: promised }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "declared only");
-  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_lint"]);
+  assert.deepEqual(e.detail.declaredNotRegistered, ["kiln_write_stage_attestation"]);
 
-  // ⚠️ AND A PARTIAL MATCH IS STILL A MISMATCH: registering one of two declared tools is not agreement.
-  const half = brokenCopy((ctx) => {
-    ctx.signature((s) => (s.tools = ["kiln_lint", "kiln_project_status"]));
-    registering("kiln_lint")(ctx);
+  // ⚠️ AND A PARTIAL MATCH IS STILL A MISMATCH: one of the two declared tools registering is not agreement.
+  const half = brokenCopy(({ root }) => {
+    const path = join(root, "extensions", "kiln.js");
+    const source = readFileSync(path, "utf-8");
+    // The lint tool's registration is removed while its name stays declared.
+    writeFileSync(path, source.replace(/  pi\?\.registerTool\?\.\(\{\n    name: "kiln_lint",[\s\S]*?\n  \}\);\n/, ""));
   });
   const e2 = await refusal(validatePackage({ packageRoot: half }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "half registered");
-  assert.deepEqual(e2.detail.declaredNotRegistered, ["kiln_project_status"]);
+  assert.deepEqual(e2.detail.declaredNotRegistered, ["kiln_lint"]);
 });
 
 test("⚠️ ACC-0063 the same tool registered twice is refused", async () => {
-  const twice = brokenCopy((ctx) => {
-    ctx.signature((s) => (s.tools = ["kiln_lint"]));
-    registering("kiln_lint", "kiln_lint")(ctx);
-  });
+  const twice = brokenCopy(registering("kiln_lint"));
   const e = await refusal(validatePackage({ packageRoot: twice }), PACKAGE_REFUSAL.TOOL_DUPLICATE, "registered twice");
   assert.deepEqual(e.detail.duplicated, ["kiln_lint"]);
 });
@@ -266,41 +274,46 @@ test("⚠️ ACC-0063 agreement is observed by running registration, not by read
   });
 
   const { tools } = await validatePackage({ packageRoot: conditional });
-  assert.deepEqual(tools, [], "what did not run did not register, and the check saw that");
+  assert.deepEqual(tools, ["kiln_lint", "kiln_project_status"], "what did not run did not register, and the check saw that");
 });
 
 /* ============================================ what loading it costs ============================ */
 
 /**
- * Importing the entry point in a child, with the filesystem, the network and process spawning
- * watched. What is asserted is a NEGATIVE, so the watchers are proved to work first: the same child
- * performs one read, one write and one spawn of its own and sees all three recorded.
+ * Loading AND registering the extension in a child, with the filesystem, the network and process
+ * spawning watched, and a project sitting where the shared resolver would find one.
+ *
+ * ⚠️ **THE BOUNDARY THIS ENFORCES.** Importing and registering may load code and this package's
+ * declaration. It must not resolve or read planning content, inspect credentials, write files, spawn
+ * processes, or contact a network. Project access begins only when an invoked handler resolves the
+ * content root through the shared resolver — so the child registers the tools and calls none of them.
+ *
+ * ⚠️ **THE PROJECT IS REAL AND REACHABLE**, named in PLANNING_CONTENT_DIR and sitting under the
+ * child's working directory, with a planted credential in the environment. An entry point that
+ * resolved the content root at registration would read it, and this would see that.
  */
 const PURITY_CHILD = `
 import { createRequire, syncBuiltinESMExports } from "node:module";
-import { writeFileSync } from "node:fs";
 
-const [entry, packageRoot, scratch] = process.argv.slice(-3);
+const [entry, packageRoot, contentRoot, scratch] = process.argv.slice(-4);
 const fs = createRequire(import.meta.url)("node:fs");
 const cp = createRequire(import.meta.url)("node:child_process");
-const seen = { reads: [], writes: [], spawns: [], network: [] };
+const seen = { reads: [], writes: [], spawns: [], network: [], env: [] };
 
-const watchRead = (name) => {
+for (const name of ["readFileSync", "readdirSync", "openSync", "statSync", "existsSync"]) {
   const original = fs[name];
   fs[name] = function (path, ...rest) {
     seen.reads.push(String(path));
     return original.call(this, path, ...rest);
   };
-};
-const watchWrite = (name) => {
+}
+for (const name of ["writeFileSync", "appendFileSync", "mkdirSync", "rmSync", "unlinkSync"]) {
   const original = fs[name];
   fs[name] = function (path, ...rest) {
     seen.writes.push(String(path));
     return original.call(this, path, ...rest);
   };
-};
-for (const name of ["readFileSync", "readdirSync", "openSync"]) watchRead(name);
-for (const name of ["writeFileSync", "appendFileSync", "mkdirSync", "rmSync", "unlinkSync"]) watchWrite(name);
+}
 for (const name of ["spawnSync", "execSync", "spawn", "exec", "execFile"]) {
   const original = cp[name];
   cp[name] = function (...args) {
@@ -312,53 +325,87 @@ globalThis.fetch = async (url) => {
   seen.network.push(String(url));
   throw new Error("network reached");
 };
+// Reading a credential is watched the same way: any access to one of these names is recorded.
+const realEnv = process.env;
+process.env = new Proxy(realEnv, {
+  get(target, prop) {
+    if (typeof prop === "string") seen.env.push(prop);
+    return target[prop];
+  },
+});
 syncBuiltinESMExports();
 
-const before = JSON.parse(JSON.stringify(seen));
 const module = await import(entry);
+const registered = [];
+module.default({ registerTool: (tool) => registered.push(tool.name) });
 const after = JSON.parse(JSON.stringify(seen));
 
 // The watchers must be able to see something, or the empty result above means nothing.
 fs.readFileSync(process.execPath, { encoding: null });
 fs.writeFileSync(scratch, "control");
 cp.spawnSync(process.execPath, ["-e", "0"]);
-const control = { reads: seen.reads.length > after.reads.length, writes: seen.writes.length > after.writes.length, spawns: seen.spawns.length > after.spawns.length };
+void realEnv.PLANNING_CONTENT_DIR;
+const control = {
+  reads: seen.reads.length > after.reads.length,
+  writes: seen.writes.length > after.writes.length,
+  spawns: seen.spawns.length > after.spawns.length,
+};
 
 process.stdout.write(JSON.stringify({
-  before,
   after,
   control,
-  registers: typeof module.default === "function",
+  registered: registered.sort(),
   signatureVersion: module.SIGNATURE_VERSION ?? null,
   packageRoot,
+  contentRoot,
 }));
 `;
 
-test("⚠️ ACC-0063 importing the entry point reads no project content, writes nothing, and contacts nothing", () => {
-  const scratch = join(reapLater(mkdtempSync(join(tmpdir(), "kiln-pkg-purity-"))), "control.txt");
+test("⚠️ ACC-0063 loading and registering touches no project, no credential, no file and no network", () => {
+  const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-pkg-purity-")));
+  const contentRoot = join(base, "planning-content");
+  mkdirSync(join(contentRoot, "data"), { recursive: true });
+  writeFileSync(join(contentRoot, "data", "marker.json"), JSON.stringify({ id: "REQ-0001" }));
+  const scratch = join(base, "control.txt");
   const entry = pathToFileUrl(join(PACKAGE, "extensions", "kiln.js"));
 
-  const r = spawnSync(process.execPath, ["--input-type=module", "-e", PURITY_CHILD, entry, PACKAGE, scratch], {
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", PURITY_CHILD, entry, PACKAGE, contentRoot, scratch], {
+    cwd: base,
     encoding: "utf-8",
     timeout: 60_000,
-    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot ?? "" },
+    env: {
+      PATH: process.env.PATH,
+      SystemRoot: process.env.SystemRoot ?? "",
+      // ⚠️ BOTH PLANTED: a content root the resolver would accept, and a credential to be tempted by.
+      PLANNING_CONTENT_DIR: contentRoot,
+      ANTHROPIC_API_KEY: "sk-ant-REGISTRATION-PLANTED-2c9f",
+    },
   });
   assert.equal(r.status, 0, `the purity child failed: ${r.stderr}`);
   const seen = JSON.parse(r.stdout);
 
-  assert.equal(seen.registers, true, "the entry point loaded and exports a registration function");
-  assert.equal(seen.signatureVersion, 1, "and states its signature version");
+  assert.deepEqual(seen.registered, ["kiln_lint", "kiln_project_status"], "registration ran and produced the read tools");
+  assert.equal(seen.signatureVersion, 1);
 
-  assert.deepEqual(seen.after.writes, [], "importing wrote a file");
-  assert.deepEqual(seen.after.spawns, [], "importing started a process");
-  assert.deepEqual(seen.after.network, [], "importing contacted something");
-  // ⚠️ THE LOADER RECORDS A `file://` URL, not a path, and Windows compares paths case-insensitively.
+  assert.deepEqual(seen.after.writes, [], "registration wrote a file");
+  assert.deepEqual(seen.after.spawns, [], "registration started a process");
+  assert.deepEqual(seen.after.network, [], "registration contacted something");
+
+  // ⚠️ CODE MAY BE LOADED; THE PROJECT MAY NOT BE TOUCHED.
   const asPath = (recorded) => (recorded.startsWith("file:") ? fileURLToPath(recorded) : recorded);
   const key = (p) => (process.platform === "win32" ? p.toLowerCase() : p);
   for (const recorded of seen.after.reads)
-    assert.ok(key(asPath(recorded)).startsWith(key(seen.packageRoot)), `importing read outside the package: ${recorded}`);
+    assert.equal(
+      key(asPath(recorded)).startsWith(key(seen.contentRoot)),
+      false,
+      `registration read planning content: ${recorded}`
+    );
 
-  // ⚠️ THE CONTROL: the same watchers DID see a read, a write and a spawn when the child made them.
+  // No credential name was read, and neither was the variable that would resolve the project.
+  for (const name of ["ANTHROPIC_API_KEY", "PLANNING_CONTENT_DIR"])
+    assert.equal(seen.after.env.includes(name), false, `registration read ${name}`);
+
+  // ⚠️ THE CONTROLS: the same watchers DID see a read, a write and a spawn the child made itself.
   assert.deepEqual(seen.control, { reads: true, writes: true, spawns: true }, "the watchers see nothing at all, so the negative proves nothing");
 });
 

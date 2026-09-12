@@ -1,7 +1,16 @@
 {
   "signatureVersion": 1,
-  "extensions": ["kiln"],
-  "skills": ["kiln-planning"],
-  "prompts": ["kiln-start"],
-  "tools": []
+  "extensions": [
+    "kiln"
+  ],
+  "skills": [
+    "kiln-planning"
+  ],
+  "prompts": [
+    "kiln-start"
+  ],
+  "tools": [
+    "kiln_project_status",
+    "kiln_lint"
+  ]
 }
