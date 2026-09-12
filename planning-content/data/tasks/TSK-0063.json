@@ -2,10 +2,10 @@
   "id": "TSK-0063",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build the clean-consumer end-to-end journey test",
-  "statement": "Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform.",
+  "statement": "Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform. Include one run that cannot be automated and must be performed at a real terminal: on Windows and Node 24, quit the interactive session IMMEDIATELY after a completed tool call, and record what the process and the supervisor did.",
   "role": "platform",
   "implements": [
     "CMP-0040"

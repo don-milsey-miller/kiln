@@ -6,11 +6,12 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "Shutdown is clean and a rerun resumes rather than restarting",
-  "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes.",
+  "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes. One of the runs is a real interactive session on Windows and Node 24 quit immediately after a completed tool call: it exits cleanly through the supervisor, its process exit status and the supervisor's shutdown record are retained, and it leaves no child, no bound port and no temporary file of that invocation behind.",
   "evaluates": [
     "CMP-0040"
   ],
   "verifies": [
     "REQ-0022"
-  ]
+  ],
+  "notes": "⚠️ THE IMMEDIATE-QUIT RUN EXISTS BECAUSE OF F82 (2026-09-12), AND IT IS THE ONE CELL NOTHING ELSE CAN OBSERVE. WHAT WAS MEASURED: over 98 runs against the pinned runtime on Windows, `--mode rpc` on Node 24.18.0 aborts with a libuv assertion - `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\\win\\async.c, line 94`, exit 3221226505 (0xC0000409) - when shutdown begins within 50ms of a SECOND OR LATER turn settling. WHAT WAS NOT THE CAUSE: it is not tool execution. A tool call forces a second provider request, and two text-only turns abort identically; one turn never does. Forcing a fresh connection per request and disabling session persistence each still abort. THE CONTROLS WERE CLEAN: Node 22.23.2 in every configuration, print mode with and without a tool call, terminating the child rather than asking it to stop, and every shutdown delayed 50ms or more. WHY IT IS NOT A TASK: Kiln's launch never passes `--mode`, so production runs interactive or, without a TTY, print - and print was clean. No Kiln code is on that stack, and no delay, flag or dependency patch is justified by evidence that does not reach production. WHAT REMAINS UNOBSERVED: the interactive path. It ends in the same `process.exit(0)` as RPC, with an awaited terminal drain in front of it, and it cannot be automated - Pi requires stdin and stdout to be TTYs and Node cannot allocate a pseudo-terminal, so any substitute measures print mode instead. That is why this criterion asks for a human to do it once. IF IT FAILS: a dedicated defect and an upstream report are opened before this criterion is accepted. A delay is a diagnostic control and is not a fix."
 }
