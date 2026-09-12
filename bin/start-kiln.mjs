@@ -23,7 +23,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
-import { SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
+import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
+import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir } from "../lib/pi-runtime.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -109,7 +110,95 @@ export function parseArgs(argv) {
   return out;
 }
 
-async function main(argv = process.argv.slice(2)) {
+/**
+ * The flag Pi reads an allowlist from, and the alias that means the same thing.
+ *
+ * ⚠️ **THE ALIAS IS LISTED BECAUSE PI ACCEPTS IT.** `dist/cli/args.js` matches `--tools` or `-t` and
+ * takes the NEXT argument, comma separated. An argument list already carrying either has a tool
+ * policy in it, whichever spelling was used, and `--tools=…` is worse than a conflict: Pi does not
+ * match that form at all, so it reads as a policy and is silently nothing.
+ */
+export const TOOLS_FLAG = "--tools";
+export const TOOLS_FLAG_SPELLINGS = ["--tools", "-t"];
+
+/**
+ * Pi launched with exactly the tools this package declares, and no others.
+ *
+ * ⚠️ **AN ALLOWLIST, NOT A DENYLIST.** `--exclude-tools` would need this file to know every built-in
+ * Pi has, today and after the next upgrade; naming what may run needs it to know only what Kiln
+ * offers. `bash`, `edit`, `write` and the rest are absent because nothing put them in, which is the
+ * one form of absence an upgrade cannot undo.
+ *
+ * ⚠️ **THE NAMES ARE THE VALIDATED DECLARATION'S**, handed in rather than written here. This file
+ * says what runs; what Kiln offers is the package's to state, and it has just been checked against
+ * what registration produces.
+ *
+ * ⚠️ **AN ARGUMENT LIST THAT ALREADY NAMES TOOLS IS A REFUSAL, NOT AN APPEND** — the same rule
+ * `withSessionDir` applies to the transcript location and for the same reason. Two tool policies in
+ * one command line leave the boundary to whichever Pi prefers, and this one exists to be stated.
+ * The pinned agent's own argument list is one entry point path, so reaching this is a programming
+ * error or a changed pin rather than something an operator can do. It refuses anyway.
+ *
+ * @param {{command: string, args: string[]}} agent
+ * @param {string[]} tools
+ */
+export function withToolAllowlist(agent, tools) {
+  const args = agent.args ?? [];
+
+  if (!Array.isArray(tools) || tools.length === 0)
+    throw new SupervisorRefusal(
+      REFUSAL.TOOL_ALLOWLIST_MISSING,
+      `No tool allowlist was resolved, so Pi would start with its built-in tools active. Refusing ` +
+        `rather than handing the operator's terminal an agent whose boundary nobody stated.`,
+      { tools: tools ?? null }
+    );
+
+  // ⚠️ A COMMA INSIDE A NAME IS TWO NAMES BY THE TIME PI READS IT, and an empty one is a name that
+  // matches nothing. Either would make the list Kiln passed and the list Pi applied different lists.
+  const malformed = tools.filter((name) => typeof name !== "string" || name.trim().length === 0 || /[,\s]/.test(name));
+  if (malformed.length > 0)
+    throw new SupervisorRefusal(
+      REFUSAL.TOOL_ALLOWLIST_MISSING,
+      `A tool name in the allowlist would not survive the command line: Pi splits this argument on ` +
+        `commas, so a name containing one or made only of spaces is not the name that was declared.`,
+      { malformed }
+    );
+
+  const conflict = args.findIndex(
+    (a) => TOOLS_FLAG_SPELLINGS.includes(String(a)) || TOOLS_FLAG_SPELLINGS.some((f) => String(a).startsWith(`${f}=`))
+  );
+  if (conflict !== -1)
+    throw new SupervisorRefusal(
+      REFUSAL.TOOL_ALLOWLIST_CONFLICT,
+      `The agent's argument list already names a tool policy at position ${conflict}, and this command ` +
+        `must supply it: two of them leave the boundary to whichever Pi prefers, and the point of ` +
+        `naming the tools is that Kiln can say what the agent may do.`,
+      { args, tools }
+    );
+
+  return { ...agent, args: [...args, TOOLS_FLAG, tools.join(",")] };
+}
+
+/**
+ * The allowlist for this checkout: the package's declared tools, validated first.
+ *
+ * ⚠️ **VALIDATION IS THE POINT, NOT A PRECAUTION.** `declaredToolNames` refuses when the declaration
+ * and the registration disagree, so a name reaching the command line is one the package proved it
+ * registers. Reading `signature.json` directly would put an unregistered name in front of a model.
+ */
+export async function piToolAllowlist(toolRoot = TOOL_ROOT) {
+  return declaredToolNames({ packageRoot: packageRootFor(toolRoot) });
+}
+
+/**
+ * @param {string[]} argv  the arguments after the script name
+ * @param {{runSupervisor?: Function}} [deps]  ⚠️ **THE ONE SEAM, AND IT NAMES NO PROGRAM.** Which
+ *   launcher and which agent run are still resolved here and here only; this replaces the supervisor
+ *   with a recorder so that what this file builds can be read back. Without it the tool allowlist
+ *   could only be checked by testing the helper that composes it, which is not the same claim as the
+ *   command applying it. It is reachable from neither an argument nor an environment variable.
+ */
+export async function main(argv = process.argv.slice(2), { runSupervisor: supervise = runSupervisor } = {}) {
   const args = parseArgs(argv);
   if (args.error) {
     for (const line of args.error.split("\n")) console.error(`[kiln] ${line}`);
@@ -126,7 +215,7 @@ async function main(argv = process.argv.slice(2)) {
 
   const projectRoot = canonicalPath(resolveProjectRoot());
 
-  const result = await runSupervisor({
+  const result = await supervise({
     projectRoot,
     // ⚠️ **THE TOOL ROOT IS PASSED RATHER THAN LEFT TO THE SUPERVISOR'S DEFAULT.** This file already
     // resolved it canonically to pick the launcher and the agent out of THIS checkout, and the
@@ -141,7 +230,11 @@ async function main(argv = process.argv.slice(2)) {
     // ⚠️ Resolved from the installed package's OWN `bin.pi` declaration, with its name and
     // version checked against this checkout's pin and the path contained inside the package.
     // Guessing an entry point is how you run a different file than the one `pi` would.
-    agent: resolvePinnedAgent(TOOL_ROOT),
+    // ⚠️ **THE ALLOWLIST IS PART OF WHAT RUNS, WHICH IS THIS FILE'S JOB.** The supervisor takes a
+    // command and an argument array because the choice of program is the security boundary; the
+    // choice of what that program may do is the same boundary, so it is made in the same place and
+    // not left to a default inside the supervisor.
+    agent: withToolAllowlist(resolvePinnedAgent(TOOL_ROOT), await piToolAllowlist(TOOL_ROOT)),
     // ⚠️ **ASKED OF PI, ONCE, IN THIS PROCESS.** `getAgentDir()` reads this process's environment and
     // expands a leading `~`; resolving it here and handing the answer to the supervisor means the store
     // the trust gate reads and the store the child consults are one directory, without Kiln restating

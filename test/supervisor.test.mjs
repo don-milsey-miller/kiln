@@ -53,7 +53,15 @@ import { PINNED_AGENT_NAME, readOwnPin, resolvePinnedAgent, resolvePinnedAgentDi
 import { TRUST, denyTrust, grantTrust } from "../lib/pi-trust.mjs";
 import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
-import { exitStatusFor, parseArgs, stoppedSummary } from "../bin/start-kiln.mjs";
+import {
+  TOOLS_FLAG,
+  exitStatusFor,
+  parseArgs,
+  piToolAllowlist,
+  stoppedSummary,
+  withToolAllowlist,
+} from "../bin/start-kiln.mjs";
+import { validatePackage } from "../lib/pi-package.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
 
 installReaper();
@@ -758,7 +766,14 @@ test("⚠️ bin/start-kiln.mjs exposes no way to name a different program", () 
   // refusal rather than a return — so a launcher still holding the port cannot leave here as exit 0.
   assert.match(src, /if \(e instanceof ContentRootError \|\| e instanceof SupervisorRefusal\)[\s\S]*?process\.exit\(2\)/);
   assert.ok(!/agentExit\.code \?\? 0/.test(src), "a signal kill must not be reported as success");
-  assert.match(src, /agent: resolvePinnedAgent\(TOOL_ROOT\)/, "the agent comes from the pinned-package resolver");
+  // ⚠️ THE RESOLVER, AND THE ALLOWLIST AROUND IT. Both halves are the security boundary: which
+  // program runs, and what that program may do. A composition that dropped either would still read
+  // as a launch, and the operator would not be able to tell from the outside.
+  assert.match(
+    src,
+    /agent: withToolAllowlist\(resolvePinnedAgent\(TOOL_ROOT\), await piToolAllowlist\(TOOL_ROOT\)\)/,
+    "the agent comes from the pinned-package resolver, constrained to the declared tools"
+  );
   assert.ok(!/dist[\/](bundle[\/])?cli\.js/.test(src), "and the wrapper names no entry-point path of its own");
 });
 
@@ -2683,4 +2698,160 @@ test("⚠️ the pinned package's own agent directory is asked of it, and follow
     if (saved === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = saved;
   }
+});
+
+/* ====================================== ACC-0065: what the agent may do ======================== */
+
+/**
+ * Pi's own built-in tool names, read out of the pinned runtime rather than written down here.
+ *
+ * ⚠️ **A HANDWRITTEN LIST WOULD GO STALE SILENTLY**, and the assertion it feeds would then pass by
+ * knowing less than the runtime does. The set is not reachable through the package's `exports` map,
+ * so it is read as data from the file that declares it, and the extraction is checked before it is
+ * trusted: an empty or partial parse would make every "no built-in survived" assertion vacuous.
+ */
+function pinnedBuiltinToolNames() {
+  const source = readFileSync(
+    join(ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "core", "tools", "index.js"),
+    "utf-8"
+  );
+  const declared = source.match(/allToolNames\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
+  assert.ok(declared, "the pinned runtime no longer declares allToolNames where this test reads it");
+  const names = [...declared[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  for (const expected of ["read", "bash", "edit", "write"])
+    assert.ok(names.includes(expected), `the extracted built-in set is missing ${expected}, so it was not parsed`);
+  return names;
+}
+
+/** The refusal a call makes, so a test reads its reason and its detail rather than only its text. */
+const refusalOf = (fn) => {
+  try {
+    fn();
+  } catch (e) {
+    assert.ok(e instanceof SupervisorRefusal, `not a refusal: ${e}`);
+    return e;
+  }
+  assert.fail("the call was expected to refuse and returned instead");
+};
+
+test("⚠️ ACC-0065 the launch allowlist is the validated declaration, and holds no Pi built-in", async () => {
+  const tools = await piToolAllowlist(ROOT);
+  const { tools: validated, signature } = await validatePackage({ packageRoot: join(ROOT, "pi-package") });
+
+  // ⚠️ THE SAME LIST, NOT A COPY OF IT. A second handwritten table is a second answer to what Kiln
+  // offers, and the two disagree the first time one is edited alone.
+  assert.deepEqual(tools, validated, "the allowlist is what validation produced");
+  assert.deepEqual(tools, [...signature.tools].sort(), "which is what the declaration claims");
+  assert.equal(signature.signatureVersion, 1, "and the declaration's shape is unchanged");
+  assert.equal(tools.length, 22);
+
+  const builtins = pinnedBuiltinToolNames();
+  for (const builtin of builtins)
+    assert.equal(tools.includes(builtin), false, `${builtin} is a Pi built-in and must not be requested`);
+  for (const name of tools) assert.match(name, /^kiln_/, `${name} is not one of Kiln's`);
+});
+
+test("⚠️ ACC-0065 the allowlist is appended as the one flag Pi reads, and reads back as the same names", async () => {
+  const tools = await piToolAllowlist(ROOT);
+  const agent = { command: "A", args: ["entry.js"], entry: "entry.js", version: "0.84.4" };
+  const constrained = withToolAllowlist(agent, tools);
+
+  assert.equal(constrained.command, "A", "the pinned command is untouched");
+  assert.equal(constrained.entry, "entry.js", "and so is everything else the resolver reported");
+  assert.deepEqual(constrained.args.slice(0, 1), ["entry.js"], "the arguments it already had come first");
+  assert.deepEqual(constrained.args.slice(1, 2), [TOOLS_FLAG], "then the flag");
+  assert.equal(constrained.args.length, 3, "one flag and one value, nothing else");
+  assert.deepEqual(agent.args, ["entry.js"], "and the caller's array is not mutated");
+
+  // ⚠️ READ BACK THE WAY PI READS IT: `dist/cli/args.js` takes the NEXT argument and splits it on
+  // commas, trimming each. A value that needed different handling would not be this flag's value.
+  const asPiWouldRead = constrained.args[2]
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  assert.deepEqual(asPiWouldRead, tools, "Pi's own splitting returns exactly the declared names");
+});
+
+test("⚠️ ACC-0065 the session directory is still the supervisor's, and lands after the allowlist", async () => {
+  const tools = await piToolAllowlist(ROOT);
+  const constrained = withToolAllowlist({ command: "A", args: ["entry.js"] }, tools);
+  const session = withSessionDir(constrained, "/s/sessions", {});
+
+  // ⚠️ TWO OWNERS, ONE ARRAY, AND NEITHER OVERWRITES THE OTHER. What the agent may do is this
+  // command's to state; where the transcripts go is the supervisor's, because the coverage gate is
+  // only meaningful if Kiln knows the location.
+  assert.deepEqual(session.args, ["entry.js", TOOLS_FLAG, tools.join(","), SESSION_DIR_FLAG, "/s/sessions"]);
+  assert.equal(session.env[SESSION_DIR_ENV], "/s/sessions");
+});
+
+test("⚠️ ACC-0065 an argument list that already names a tool policy is refused, in every spelling Pi accepts", async () => {
+  const tools = await piToolAllowlist(ROOT);
+
+  // ⚠️ `-t` IS THE SAME FLAG, and `--tools=…` is worse than a duplicate: Pi matches neither that form
+  // nor `-t=…`, so an argument list carrying one has a policy in it that would silently do nothing.
+  for (const existing of [["--tools", "bash"], ["-t", "bash"], ["--tools=bash"], ["-t=bash"]]) {
+    const e = refusalOf(() => withToolAllowlist({ command: "A", args: ["entry.js", ...existing] }, tools));
+    assert.equal(e.reason, REFUSAL.TOOL_ALLOWLIST_CONFLICT, `${existing.join(" ")}: ${e.reason} — ${e.message}`);
+    assert.deepEqual(e.detail.tools, tools, "and the refusal carries the list it was asked to apply");
+  }
+
+  // And a flag that merely looks similar is not a conflict: refusing it would be refusing a launch
+  // for an argument Pi reads as something else entirely.
+  const fine = withToolAllowlist({ command: "A", args: ["entry.js", "--exclude-tools", "ask_question"] }, tools);
+  assert.deepEqual(fine.args.slice(-2), [TOOLS_FLAG, tools.join(",")]);
+});
+
+test("⚠️ ACC-0065 no allowlist is a refusal, not a launch with Pi's built-ins active", () => {
+  for (const nothing of [undefined, null, [], "kiln_lint"]) {
+    const e = refusalOf(() => withToolAllowlist({ command: "A", args: [] }, nothing));
+    assert.equal(e.reason, REFUSAL.TOOL_ALLOWLIST_MISSING, `${JSON.stringify(nothing)}: ${e.reason}`);
+    assert.match(e.message, /built-in|boundary/i);
+  }
+
+  // ⚠️ A NAME THAT WOULD NOT SURVIVE THE COMMAND LINE IS ALSO NOT AN ALLOWLIST. Pi splits this value
+  // on commas, so a name carrying one arrives as two names, neither of which Kiln registered.
+  for (const malformed of [["kiln_lint,bash"], ["kiln_lint", ""], ["kiln_lint", "   "], ["kiln lint"]]) {
+    const e = refusalOf(() => withToolAllowlist({ command: "A", args: [] }, malformed));
+    assert.equal(e.reason, REFUSAL.TOOL_ALLOWLIST_MISSING, `${JSON.stringify(malformed)}: ${e.reason}`);
+  }
+});
+
+test("⚠️ ACC-0065 the real command constrains the agent it hands the supervisor", () => {
+  // ⚠️ **THE HELPER TESTS ABOVE CANNOT SEE THIS.** They prove that a composer composes; this proves
+  // that the command calls it, over the pinned agent this checkout resolves, with the package this
+  // checkout declares. The supervisor is replaced by a recorder because the alternative is attaching
+  // the operator's terminal to Pi.
+  const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-launch-")));
+  const contentRoot = join(base, "planning-content");
+  mkdirSync(contentRoot, { recursive: true });
+
+  const r = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "start-kiln", "capture-launch.mjs")], {
+    env: { ...process.env, PLANNING_CONTENT_DIR: contentRoot, KILN_CAPTURE_LAUNCH: "1" },
+    encoding: "utf-8",
+    cwd: ROOT,
+  });
+
+  const line = `${r.stdout}`.split("\n").find((l) => l.startsWith("KILN_LAUNCH "));
+  assert.ok(line, `the command did not reach the supervisor: ${r.stdout}${r.stderr}`);
+  const launch = JSON.parse(line.slice("KILN_LAUNCH ".length));
+
+  const pinned = resolvePinnedAgent(ROOT);
+  const declared = JSON.parse(readFileSync(join(ROOT, "pi-package", "signature.json"), "utf-8")).tools.slice().sort();
+
+  assert.equal(launch.agentCommand, pinned.command, "the pinned command is what runs");
+  assert.deepEqual(
+    launch.agentArgs,
+    [...pinned.args, TOOLS_FLAG, declared.join(",")],
+    "the pinned entry point, then the allowlist, and nothing else"
+  );
+  assert.equal(launch.agentArgs.includes(SESSION_DIR_FLAG), false, "the session directory is still the supervisor's to add");
+  assert.deepEqual(launch.launcherArgs, [join(ROOT, "bin", "start-shell.mjs")], "the launcher is unchanged");
+  assert.equal(launch.agentDir, "string", "and the pinned agent directory is still resolved and passed");
+
+  for (const builtin of pinnedBuiltinToolNames())
+    assert.equal(
+      launch.agentArgs[launch.agentArgs.length - 1].split(",").includes(builtin),
+      false,
+      `${builtin} reached the real command line`
+    );
 });

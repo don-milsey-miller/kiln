@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
+  declaredToolNames,
   PACKAGE_REFUSAL,
   PackageRefusal,
   packageRootFor,
@@ -280,6 +281,19 @@ test("⚠️ ACC-0063 a tool declared but never registered is refused", async ()
   });
   const e2 = await refusal(validatePackage({ packageRoot: half }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "half registered");
   assert.deepEqual(e2.detail.declaredNotRegistered, ["kiln_lint"]);
+});
+
+test("⚠️ ACC-0063 the names a launch may request come from validation, not from reading the file", async () => {
+  // ⚠️ **THE DIFFERENCE IS WHAT HAPPENS WHEN THE TWO DISAGREE.** Reading `signature.json` returns a
+  // name the package does not register, and a launch would then ask Pi to enable a tool no session
+  // would hold. Validating first turns that into a refusal.
+  assert.deepEqual(await declaredToolNames({ packageRoot: PACKAGE }), [...REGISTERED_TOOLS]);
+
+  const promised = brokenCopy(({ signature }) => signature((s) => s.tools.push("kiln_not_a_tool")));
+  await refusal(declaredToolNames({ packageRoot: promised }), PACKAGE_REFUSAL.TOOL_NOT_REGISTERED, "a declared name nothing registers");
+
+  const extra = brokenCopy(registering("kiln_not_a_tool"));
+  await refusal(declaredToolNames({ packageRoot: extra }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "a registered name nothing declares");
 });
 
 test("⚠️ ACC-0063 the same tool registered twice is refused", async () => {
