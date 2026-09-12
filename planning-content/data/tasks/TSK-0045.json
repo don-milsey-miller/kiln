@@ -5,7 +5,7 @@
   "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Register the research, validation and delegation adapters",
-  "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.",
+  "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run` and the Kiln capability signature `kiln_capability` over the existing `lib/research/` and `lib/validation/` implementations without restating their rules. Delegation is NOT registered here: the delegation runtime is CMP-0036's and does not exist yet, so TSK-0053 registers `kiln_delegate` beside the runtime it builds.",
   "role": "platform",
   "implements": [
     "CMP-0032"

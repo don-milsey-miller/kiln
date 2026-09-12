@@ -1,0 +1,18 @@
+{
+  "id": "ACC-0111",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The delegation tool adds a schema and a rendering, and no rule of its own",
+  "statement": "The registered `kiln_delegate` tool performs a delegation by calling the delegation runtime it is registered beside, and restates none of that runtime's rules: not the child's launch arguments, not the task binding, not model or thinking-level inheritance, not the intersected tool allowlist, not the timeout, not the abort propagated to the process tree, and not the cleanup of temporary material. The wrapper adds only the Pi-facing schema and the rendering of a result. Every result and every refusal is structured data returned to the caller rather than thrown as prose, and neither carries a credential, a credential-derived value or an absolute user path.",
+  "evaluates": [
+    "CMP-0032"
+  ],
+  "verifies": [
+    "REQ-0026",
+    "REQ-0024"
+  ],
+  "notes": "⚠️ REGISTRATION MOVED HERE FROM TSK-0045 (F80, 2026-09-12). TSK-0045 promised to register a delegation adapter over an implementation that does not exist: the delegation runtime is CMP-0036's, TSK-0045 depends only on TSK-0043, and its criterion required each adapter to call \"the existing implementation in `lib/`\". The registration now sits with the runtime it wraps. ⚠️ WHAT THIS DOES NOT COVER. Whether the runtime's own rules hold is ACC-0076's; whether a child without the Kiln capability signature is refused is ACC-0075's. This covers only the boundary between Pi and that runtime - which is why it evaluates CMP-0032 rather than CMP-0036."
+}
