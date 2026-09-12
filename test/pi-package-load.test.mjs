@@ -127,7 +127,19 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
         scope: "project",
         // ⚠️ WHAT PI ACTUALLY HOLDS after loading: the two read tools, by name, registered into the
         // session rather than merely declared in a file.
-        tools: ["kiln_lint", "kiln_project_status"],
+        tools: [
+          "kiln_create_acceptance_criterion",
+          "kiln_create_assertion",
+          "kiln_create_component",
+          "kiln_create_decision",
+          "kiln_create_evidence",
+          "kiln_create_question",
+          "kiln_create_requirement",
+          "kiln_create_runbook_step",
+          "kiln_create_task",
+          "kiln_lint",
+          "kiln_project_status",
+        ],
         commands: 0,
         handlers: 0,
       },

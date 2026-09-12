@@ -34,6 +34,20 @@ installReaper();
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = packageRootFor(ROOT);
 
+const REGISTERED_TOOLS = Object.freeze([
+  "kiln_create_acceptance_criterion",
+  "kiln_create_assertion",
+  "kiln_create_component",
+  "kiln_create_decision",
+  "kiln_create_evidence",
+  "kiln_create_question",
+  "kiln_create_requirement",
+  "kiln_create_runbook_step",
+  "kiln_create_task",
+  "kiln_lint",
+  "kiln_project_status",
+]);
+
 /** A throwaway copy of the real package, for the cases that must break it. */
 const brokenCopy = (mutate) => {
   const root = join(reapLater(mkdtempSync(join(tmpdir(), "kiln-pkg-"))), "pi-package");
@@ -80,13 +94,14 @@ test("⚠️ ACC-0063 the real package validates: its declared resources exist a
   assert.deepEqual([...signature.prompts], resources.prompts);
   assert.equal(typeof register, "function");
 
-  // ⚠️ THE READ TOOLS, AND ONLY THOSE. The mutation and attestation wrappers are later slices of
-  // TSK-0044, and TSK-0045's adapters are later still; each name arrives with its handler.
-  assert.deepEqual([...signature.tools].sort(), ["kiln_lint", "kiln_project_status"]);
+  // ⚠️ THE NINE CREATION TOOLS AND THE TWO READ TOOLS. The mutation, activation and attestation
+  // wrappers are later slices of TSK-0044, and TSK-0045's adapters later still; each name arrives with
+  // its handler and never before it.
+  assert.deepEqual([...signature.tools].sort(), [...REGISTERED_TOOLS]);
 
   const calls = [];
   register({ registerTool: (t) => calls.push(t.name) });
-  assert.deepEqual(calls.sort(), ["kiln_lint", "kiln_project_status"], "the entry point registers exactly those");
+  assert.deepEqual(calls.sort(), [...REGISTERED_TOOLS], "the entry point registers exactly those");
 });
 
 test("⚠️ ACC-0063 the signature is immutable and JSON-safe", async () => {
@@ -222,19 +237,19 @@ test("⚠️ ACC-0063 what the package registers is exactly what its declaration
   // ⚠️ A NAME ARRIVES WITH ITS WORKING HANDLER, NEVER BEFORE IT. Declaring one earlier would announce
   // a capability the package does not have, and a placeholder handler would put an unusable tool in
   // front of an operator. These two are the read tools, and their handlers are tested beside them.
-  assert.deepEqual(tools, ["kiln_lint", "kiln_project_status"], "registration produced exactly these");
+  assert.deepEqual(tools, [...REGISTERED_TOOLS], "registration produced exactly these");
   assert.deepEqual([...signature.tools].sort(), tools, "and the declaration claims exactly the same");
   assert.equal(signature.signatureVersion, 1, "the declaration's shape has not changed, so its version has not");
 });
 
 test("⚠️ ACC-0063 a tool registered but not declared is refused", async () => {
-  const undeclared = brokenCopy(registering("kiln_create_task"));
+  const undeclared = brokenCopy(registering("kiln_revise_artifact"));
   const e = await refusal(validatePackage({ packageRoot: undeclared }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "one undeclared tool");
-  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_create_task"]);
+  assert.deepEqual(e.detail.registeredNotDeclared, ["kiln_revise_artifact"]);
 
-  const several = brokenCopy(registering("kiln_create_task", "kiln_revise_artifact"));
+  const several = brokenCopy(registering("kiln_revise_artifact", "kiln_set_lifecycle"));
   const e2 = await refusal(validatePackage({ packageRoot: several }), PACKAGE_REFUSAL.TOOL_UNDECLARED, "several undeclared tools");
-  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_create_task", "kiln_revise_artifact"], "named, and in a stable order");
+  assert.deepEqual(e2.detail.registeredNotDeclared, ["kiln_revise_artifact", "kiln_set_lifecycle"], "named, and in a stable order");
 });
 
 test("⚠️ ACC-0063 a tool declared but never registered is refused", async () => {
@@ -274,7 +289,7 @@ test("⚠️ ACC-0063 agreement is observed by running registration, not by read
   });
 
   const { tools } = await validatePackage({ packageRoot: conditional });
-  assert.deepEqual(tools, ["kiln_lint", "kiln_project_status"], "what did not run did not register, and the check saw that");
+  assert.deepEqual(tools, [...REGISTERED_TOOLS], "what did not run did not register, and the check saw that");
 });
 
 /* ============================================ what loading it costs ============================ */
@@ -384,7 +399,7 @@ test("⚠️ ACC-0063 loading and registering touches no project, no credential,
   assert.equal(r.status, 0, `the purity child failed: ${r.stderr}`);
   const seen = JSON.parse(r.stdout);
 
-  assert.deepEqual(seen.registered, ["kiln_lint", "kiln_project_status"], "registration ran and produced the read tools");
+  assert.deepEqual(seen.registered, [...REGISTERED_TOOLS], "registration ran and produced every declared tool");
   assert.equal(seen.signatureVersion, 1);
 
   assert.deepEqual(seen.after.writes, [], "registration wrote a file");

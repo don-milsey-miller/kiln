@@ -65,15 +65,14 @@ async function projectContext() {
   const contentRoot = resolveContentRoot();
   const tool = toolRoot();
   const schemasDir = join(tool, "schemas");
+  const schemas = loadSchemaSet(schemasDir);
+  const validators = createValidators(schemasDir);
   return {
-    ctx: {
-      contentRoot,
-      schemas: loadSchemaSet(schemasDir),
-      validators: createValidators(schemasDir),
-      activated: readActivatedTypes(contentRoot),
-    },
+    ctx: { contentRoot, schemas, validators, activated: readActivatedTypes(contentRoot) },
     contentRoot,
     toolRoot: tool,
+    // What the typed tools take: the same schemas and validators, not a second set.
+    options: { contentRoot, schemasDir, schemas, validators },
   };
 }
 
@@ -120,6 +119,37 @@ const scrub = (text, root) => {
 /** A refusal a model can act on, with no exception text and no machine path in it. */
 const refusal = (code, message) => ({ ok: false, code, message });
 
+/**
+ * The creation tools, as an explicit table.
+ *
+ * ⚠️ **WRITTEN OUT, NEVER DERIVED FROM THE NAME.** `kiln_create_acceptance_criterion` maps to
+ * `acceptance-criterion` and `kiln_create_runbook_step` to `runbook-step`: a rule that turned one
+ * into the other would also turn a future `kiln_create_api_spec` into `api-spec`, quietly, for a type
+ * nobody registered. A wrong row here is a wrong tool, and a wrong row is visible.
+ */
+const CREATION_TOOLS = Object.freeze([
+  { name: "kiln_create_requirement", type: "requirement", noun: "requirement" },
+  { name: "kiln_create_assertion", type: "assertion", noun: "assertion" },
+  { name: "kiln_create_evidence", type: "evidence", noun: "evidence record" },
+  { name: "kiln_create_runbook_step", type: "runbook-step", noun: "runbook step" },
+  { name: "kiln_create_question", type: "question", noun: "open question" },
+  { name: "kiln_create_decision", type: "decision", noun: "decision" },
+  { name: "kiln_create_component", type: "component", noun: "component" },
+  { name: "kiln_create_acceptance_criterion", type: "acceptance-criterion", noun: "acceptance criterion" },
+  { name: "kiln_create_task", type: "task", noun: "task" },
+]);
+
+/**
+ * A refusal built from whatever the typed tool threw.
+ *
+ * ⚠️ **THE CODE COMES FROM THE ERROR'S OWN NAME, and the text is scrubbed.** A validation message
+ * names fields and schema rules, which is what a model needs; it must not name this machine.
+ */
+const REFUSAL_CODES = Object.freeze({
+  ValidationError: "invalid-artifact",
+  ArtifactExistsError: "artifact-exists",
+});
+
 /** Pi wants a string to show; the structured result travels beside it as details. */
 const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details: result });
 
@@ -131,6 +161,57 @@ const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details
  *   this wrapper must do with a path is its own responsibility whatever the lint hands it.
  */
 export default function register(pi, deps = {}) {
+  // ⚠️ ONE SHAPE, NINE ROWS. Each tool differs only in which registry entry it delegates to, so the
+  // adapter is written once: a per-tool copy is nine places for one rule to drift.
+  for (const { name, type, noun } of CREATION_TOOLS)
+    pi?.registerTool?.({
+      name,
+      label: `Kiln create ${noun}`,
+      description:
+        `Create a ${noun} in this project's planning content. The fields are validated against the ` +
+        `${type} schema; id, type, schemaVersion, reviewStatus and lifecycle are assigned by Kiln and ` +
+        `must not be supplied.`,
+      parameters: {
+        type: "object",
+        properties: {
+          artifact: {
+            type: "object",
+            description: `The ${noun}'s own fields, as the ${type} schema defines them.`,
+          },
+        },
+        required: ["artifact"],
+        additionalProperties: false,
+      },
+      execute: async (_toolCallId, params) => {
+        let context;
+        try {
+          context = await projectContext();
+        } catch (e) {
+          return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        }
+
+        // ⚠️ THROUGH THE REGISTRY, WHICH IS THE ONLY LEGAL WRITER. Nothing here allocates an id,
+        // validates, takes a lock or touches a file: every one of those already happens behind this call.
+        const typedTools = deps.TYPED_TOOLS ?? (await import("../../lib/tools/registry.mjs")).TYPED_TOOLS;
+        const create = typedTools[type];
+        if (typeof create !== "function")
+          return rendered(refusal("unknown-artifact-type", `This project has no typed tool for a ${type}.`));
+
+        try {
+          const made = await create(params?.artifact, context.options);
+          return rendered({
+            ok: true,
+            id: made.id,
+            type,
+            path: relativeTo(context.contentRoot, made.path),
+          });
+        } catch (e) {
+          // ⚠️ RETURNED, NOT THROWN: a refusal is an answer the model can act on.
+          return rendered(refusal(REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+        }
+      },
+    });
+
   pi?.registerTool?.({
     name: "kiln_project_status",
     label: "Kiln project status",
