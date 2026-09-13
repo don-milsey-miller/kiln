@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The capability tool returns exactly the package's declared signature",
   "statement": "The registered Kiln capability tool, called in a session that loaded the package, returns the package's own versioned signature declaration unchanged: the same version and the same resource names the package declares, with nothing added, dropped or rewritten in transit. A session that did not load the package has no such tool to call, and that difference is what a consumer comparing an expected signature against a returned one relies on.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0026",
     "REQ-0028"
   ],
-  "notes": "⚠️ TSK-0045's STATEMENT ALREADY PROMISED THIS AND NOTHING ACCEPTED IT. That task registers the research and validation adapters, delegation, AND the Kiln capability signature, but its only criterion was ACC-0065, which is about the write discipline of mutation wrappers. The capability tool could have been registered wrongly, or not at all, without a single criterion noticing. ⚠️ THE PACKAGE DECLARES, THE TOOL RETURNS, A CONSUMER COMPARES. ACC-0063 covers the declaration agreeing with the manifest; this covers the tool handing that declaration back intact; ACC-0075 covers a delegation refusing a child whose signature is absent or drifted. Three criteria, three owners, one chain - and no single one of them is the whole claim."
+  "notes": "⚠️ TSK-0045's STATEMENT ALREADY PROMISED THIS AND NOTHING ACCEPTED IT. That task registers the research and validation adapters, delegation, AND the Kiln capability signature, but its only criterion was ACC-0065, which is about the write discipline of mutation wrappers. The capability tool could have been registered wrongly, or not at all, without a single criterion noticing. ⚠️ THE PACKAGE DECLARES, THE TOOL RETURNS, A CONSUMER COMPARES. ACC-0063 covers the declaration agreeing with the manifest; this covers the tool handing that declaration back intact; ACC-0075 covers a delegation refusing a child whose signature is absent or drifted. Three criteria, three owners, one chain - and no single one of them is the whole claim.",
+  "evidencedBy": [
+    "EVD-0103"
+  ]
 }

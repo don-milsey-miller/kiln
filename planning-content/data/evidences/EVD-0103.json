@@ -1,0 +1,95 @@
+{
+  "id": "EVD-0103",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the capability tool and the five specialist adapters, over the implementations that already exist",
+  "kind": "experiment",
+  "summary": "Measurement of TSK-0045's Pi adapters through CI. GitHub Actions run 34727690408 at commit c59d3e5, one attempt with no previous attempt and no job retried, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 982 tests and 0 failures in every cell, zero failing-test lines in the log. The live Pi compatibility step on ubuntu-latest node 24 ran 5 tests and passed 5. WHAT RAN, BY NAME, IN EVERY CELL. All 51 tool-registration tests (test/pi-package-tools.test.mjs), all 15 package-validation tests (test/pi-package.test.mjs), all 6 session tests (test/pi-session-tools.test.mjs) and all 4 package-load tests (test/pi-package-load.test.mjs) were matched by name against their source files in each of the four cells - 304 name matches, none missing. ACC-0109: THE CAPABILITY TOOL RETURNS THE PACKAGE'S OWN DECLARATION. kiln_capability is registered and declared: signature.json declares 28 tools at signatureVersion 1, registration through a recording stub produces exactly those 28, and the launch allowlist consumes the validated set. Its handler returns the frozen SIGNATURE object imported from signature.json - asserted by identity, by Object.isFrozen, and by deep equality against the file read separately from disk, field for field: signatureVersion, extensions, skills, prompts, the complete tool list, and the key set, so nothing is added around it. A real trusted pinned-CLI session executes it: the loopback provider is scripted to answer the first turn with a call to kiln_capability and the next with a stop, and what the tool returned is read from the session's own tool_execution_end event and deep-equals the shipped declaration with exactly two provider requests. The trusted registry holds exactly the declared tools, and the untrusted control holds no kiln_ tool at all - kiln_capability by name in neither the active nor the configured set - while Pi's own tools stay active and the session still exits 0. Calling it changes no byte or modification time in the project, and adds no stored state in the agent directory beyond a text-only turn through the same harness. ACC-0110: THE FIVE SPECIALIST ADAPTERS CALL THE IMPLEMENTATIONS THAT ALREADY EXIST. research_capability, research_search, research_fetch, validation_capability and validation_run are registered and declared under exactly the names lib/specialists/contract.mjs requires by key, compared against contractFor(\"research\") and contractFor(\"validation\"). Each schema and description is written out in the wrapper, because the package must load on its own, and deep-equals RESEARCH_TOOL_SIGNATURES or VALIDATION_TOOL_SIGNATURES. Handlers delegate to createResearchTools over the Tavily adapter and to createValidationTools, built lazily on first invocation and resolving no planning-content root: every adapter answers from a directory with no PLANNING_CONTENT_DIR. Parameters reach the implementation unchanged. Refusals pass through as the libraries' own structured data - capability-unavailable with mustRecordGap, request-refused for an out-of-bounds URL, not-configured and above-approved-ceiling from the controller - and the wrapper adds no refusal code of its own. With no credential the real Tavily adapter refuses as no-credential before calling anything, and a private destination is refused before the network is reached. A SUCCESSFUL PROBE PERSISTS NOTHING. For research over a backend that answers, and for validation over a real interpreter that answers --version, the probe is run with the content-root variable, Pi's agent-directory variable and the working directory all pointed into a parent of six backdated sentinels - planning content, .pi/settings.json, agent settings and trust, and external state - and every entry keeps its bytes and modification time, directories included, with no file or directory added. VALIDATION RESULTS DISCLOSE NO MACHINE PATH, AND THE CONTROLLER'S RECORD IS UNTOUCHED. All four measured routes by which the real controller returns absolute paths were exercised on Windows and Ubuntu, node 22 and 24: failure.message from a genuine provisioning failure, destroy.retainedPath and the retained-workspace omission reason in the default location and under a nested base directory, and a job's own stderr and stdout through raw, forward-slash and JSON-escaped spellings at every level of nesting. The wrapper renders a copy in which the exact workspace root becomes <workspace> with its relative tail kept - File \"<workspace>/check.py\", line 1 - and the interpreter, temporary directory and home become <path>; a retained workspace is still reported retained, at <workspace>, with evidencePreserved true. In every case the controller's own result stays deep-equal to a copy taken the moment it was returned. A credential planted in the host environment reaches neither the controller's result nor the rendered one, because the controller constructs the allowlisted child environment. The production path is proven offline by pointing PATH at an empty directory, where the real controller refuses as not-configured on every cell whether or not the host has Python; node stands in as the interpreter elsewhere, because it answers --version and rejects -m venv, so a real successful probe and a real provisioning failure are deterministic. PLATFORM DIFFERENCE: NONE IN OUTCOME. Every assertion held identically on both platforms and both Node versions. MUTATION CONTROLS, LOCAL ONLY. Thirty-three mutations were run before the commits, each alone from a temporary working directory with the file restored byte-identical, and all were killed: eight against kiln_capability, eight against the research adapters, three writes in the research capability path, and fourteen against the validation adapters and their renderer. One validation mutant - the exact retained root unused - first survived and was killed only after a test for a workspace outside the default location was added; one first anchor matched nothing, made no claim, and its corrected rerun was killed.",
+  "outcome": "success",
+  "observedAt": "2026-09-13",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34727690408",
+      "commit": "c59d3e5",
+      "attempts": "attempt 1, no previous attempt, no job retried",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-ubuntu-22": "job 103644664086, node v22.23.2, success, 982 tests / 979 pass / 0 fail / 3 skipped",
+      "cell-ubuntu-24": "job 103644664113, node v24.20.0, success, 982 tests / 979 pass / 0 fail / 3 skipped; live Pi compatibility 5 / 5",
+      "cell-windows-22": "job 103644663976, node v22.23.2, success, 982 tests / 981 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103644664070, node v24.20.0, success, 982 tests / 981 pass / 0 fail / 1 skipped",
+      "name-matches": "304 - 51 tool, 15 package, 6 session and 4 load tests matched by name in each of the four cells, none missing",
+      "declared-tools": "28 declared at signatureVersion 1, 28 registered, 28 allowlisted, the three sets identical",
+      "kiln-capability-registration": "registered and declared; returns the frozen SIGNATURE object itself, asserted by identity and Object.isFrozen",
+      "kiln-capability-equality": "deep-equal to signature.json read from disk: signatureVersion, extensions, skills, prompts, the complete tool list and the key set",
+      "kiln-capability-real-session": "executed in a real trusted pinned-CLI session through a scripted loopback model; the result read from tool_execution_end deep-equals the declaration, with 2 provider requests",
+      "trusted-untrusted": "trusted registry holds exactly the declared tools; untrusted holds no kiln_ tool and kiln_capability in neither set, while Pi's own tools stay active and the session exits 0",
+      "specialist-names": "research_capability, research_search, research_fetch, validation_capability, validation_run - equal to contractFor(research) and contractFor(validation) requiredCapabilities",
+      "schema-agreement": "each schema and description deep-equals RESEARCH_TOOL_SIGNATURES or VALIDATION_TOOL_SIGNATURES",
+      "delegation": "handlers are createResearchTools over the Tavily adapter and createValidationTools; parameters pass unchanged; construction is lazy on first invocation",
+      "project-independence": "no planning-content root is resolved; every adapter answers with no PLANNING_CONTENT_DIR",
+      "capability-non-mutation": "a successful research probe and a successful validation probe each leave six backdated sentinels byte- and timestamp-identical, directories included, nothing added",
+      "refusal-pass-through": "capability-unavailable, request-refused, not-configured and above-approved-ceiling arrive as the libraries' own data, with no wrapper refusal code",
+      "offline-production-routes": "the real Tavily adapter refuses as no-credential before calling anything; PATH pointed at an empty directory makes the real controller refuse as not-configured on every cell",
+      "validation-path-routes": "failure.message, destroy.retainedPath, the retained-workspace omission reason, and executions[].stderr/stdout - all rendered to <workspace> or <path> on Windows and Ubuntu, node 22 and 24",
+      "controller-results-unchanged": "the controller's result is deep-equal to a copy taken when it returned, in every route test",
+      "credential-boundary": "a planted host credential reaches neither the controller result nor the rendered result",
+      "platform-difference": "none in outcome: every assertion held identically on both platforms and both Node versions",
+      "local-mutations": "33 run and 33 killed across the three slices, each restored byte-identical; one survived until a non-default-location test was added, one first anchor made no claim and its rerun was killed",
+      "commits": "66ac2c0 moved delegation to TSK-0053; 2c59e11 kiln_capability; 0dbafc8 F82 recorded in the shutdown gate; b457940 the research adapters; 69f6c64 the disclosure boundary and credential boundary; c59d3e5 the validation adapters"
+    },
+    "omissions": [
+      {
+        "fact": "tavily-success-through-the-wrapper",
+        "state": "not-captured",
+        "reason": "No successful Tavily request was made through the Pi wrapper. Every successful research path in these tests used a stand-in backend; the production route that ran in CI was the real Tavily adapter refusing as no-credential before any network access. Whether a live search through the wrapper succeeds against the real backend is not established here."
+      },
+      {
+        "fact": "complete-real-python-validation-in-ci",
+        "state": "not-captured",
+        "reason": "A complete validation run with a real Python interpreter was observed locally only, on Windows with Python 3.12.10: a job exiting 0 in about 4.4s and a failing job exiting 1 in about 4.2s, both with the workspace destroyed and nothing leaked in the rendered results. CI does not set up Python, so no cell provisioned a virtual environment or executed a real job; the CI routes use node as the interpreter and an unresolvable PATH."
+      },
+      {
+        "fact": "controller-internal-paths",
+        "state": "redacted",
+        "reason": "The validation controller deliberately retains precise internal paths - workspace, interpreter, retained directory, a job's own output - as diagnostics for its own callers, and those values exist in its results. The Pi wrapper is the disclosure boundary and suppresses them in what a model receives. A consumer that bypassed the wrapper would see them; none exists today."
+      },
+      {
+        "fact": "path-scrubber-is-broad",
+        "state": "not-observable",
+        "reason": "After the exact workspace root and the known machine roots, a general absolute-path scrub replaces anything path-shaped with <path>. That is deliberate - the cost of missing a path is disclosure - but it means a job's output can lose a fragment that merely resembled a path, and the tests assert the absence of machine paths and the survival of chosen content rather than full fidelity of everything else."
+      },
+      {
+        "fact": "dependency-injection-seams",
+        "state": "not-observable",
+        "reason": "Most adapter tests supply the implementation through register(pi, deps) - stand-in research backends, node as the validation interpreter, forced cleanup behaviour, recording wrappers around the real controller. These seams model the production boundaries rather than being them; the production wiring itself is exercised only through the no-credential and unresolvable-PATH routes, and the seam is not reachable from Pi, an argument or an environment variable."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The thirty-three mutations were run locally on Windows before the commits. CI establishes that these tests pass on both platforms; that they fail against these defects is established only by those local runs."
+      },
+      {
+        "fact": "tool-calling-session-exit",
+        "state": "not-observable",
+        "reason": "F82: on Windows and Node 24 the pinned runtime can abort in RPC mode when shutdown begins within 50ms of a second-or-later turn. The real-session kiln_capability test therefore stops the child once the agent settles and makes no claim about its exit status, and no CI cell enters that window, so this harness cannot observe F82 on any platform. The interactive production path is owned by ACC-0088's human check."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
