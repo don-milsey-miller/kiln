@@ -2,10 +2,10 @@
   "id": "TSK-0046",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build the stage-skill generator and its check mode",
-  "statement": "Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.",
+  "statement": "Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>` at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, carrying the stage's purpose, decision owner, outputs and exit criteria exactly as `stages/*.json` declares them, with deterministic generated-file metadata; and a `--check` mode that writes nothing and fails, naming each stale, missing or orphaned skill. Method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary are NOT generated here, because no canonical definition carries them yet: TSK-0071 adds them to the definitions first.",
   "role": "platform",
   "implements": [
     "CMP-0033"
@@ -18,5 +18,6 @@
   ],
   "dependsOn": [
     "TSK-0043"
-  ]
+  ],
+  "notes": "⚠️ NARROWED 2026-09-13 (O1). The original statement promised ten things and the canonical definitions support four. The six without a source moved to TSK-0071, which adds them to `stages/*.json` before anything generates them, so this task never has to invent methodology in a template."
 }

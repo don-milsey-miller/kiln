@@ -21,5 +21,6 @@
   "dependsOn": [
     "TSK-0044",
     "TSK-0046"
-  ]
+  ],
+  "notes": "⚠️ F87 (2026-09-13), TO BE FIXED BEFORE THE FIRST REAL ORCHESTRATOR SESSION. The handwritten `pi-package/skills/kiln-planning/SKILL.md` still says the typed tools 'are registered by later work' and are not implemented, and `pi-package/prompts/kiln-start.md` tells the session to say the tools are not registered and take no other action. Both have been false since TSK-0044 and TSK-0045 registered the tools. A session started with them would tell the operator the tools do not exist and then refuse to use them."
 }

@@ -5,9 +5,9 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Stage skill generation and overrides",
-  "responsibility": "Generate one packaged skill per canonical stage definition so that stage purpose, outputs and exit criteria are never hand-maintained twice, fail a check when the packaged skills are stale relative to `stages/`, and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.",
+  "responsibility": "Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>`, so that stage purpose, decision owner, outputs and exit criteria are never hand-maintained twice; fail a check that writes nothing when a packaged stage skill is stale, missing or orphaned relative to `stages/`; and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.",
   "satisfies": [
     "REQ-0022"
   ],
-  "notes": "⚠️ THE GENERATOR EXISTS TO PREVENT ONE SPECIFIC DRIFT: the agent working confidently to exit criteria the application is not checking. Two hand-maintained descriptions of one pipeline disagree, and the disagreement is invisible from either side."
+  "notes": "⚠️ THE GENERATOR EXISTS TO PREVENT ONE SPECIFIC DRIFT: the agent working confidently to exit criteria the application is not checking. Two hand-maintained descriptions of one pipeline disagree, and the disagreement is invisible from either side. ⚠️ THE NAMING RULE IS A CONTRACT (2026-09-13). Every generated skill is `kiln-stage-<stage-id>`, at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, with that name in its frontmatter - for example `kiln-stage-01-intake` and `kiln-stage-09-handoff`. The prefix keeps them from colliding with a consumer's own skills, and the full name is the identity a consumer override must match, so it does not change without a migration. ⚠️ GENERATED AND HANDWRITTEN ARE KEPT APART. The generator owns exactly the `kiln-stage-*` skills and nothing else under `pi-package/skills/`. `kiln-planning` is handwritten, and generation and the check must never adopt it, rewrite it, report it as orphaned, or delete it; a skill directory the generator did not produce is not the generator's to judge."
 }

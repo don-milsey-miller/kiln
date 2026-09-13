@@ -6,11 +6,12 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "Packaged skills are generated, and staleness fails a check",
-  "statement": "Each packaged stage skill carries the purpose, outputs and exit criteria of its canonical definition, produced by a generator rather than hand-maintained. Editing a stage definition without regenerating makes the check mode fail in CI, naming the stale skill.",
+  "statement": "The generator produces exactly nine packaged stage skills, one per canonical stage definition - `kiln-stage-01-intake`, `kiln-stage-02-intent-decomposition`, `kiln-stage-03-discovery`, `kiln-stage-04-requirement-gaps`, `kiln-stage-05-solution-design`, `kiln-stage-06-risk-feasibility`, `kiln-stage-07-acceptance-criteria`, `kiln-stage-08-implementation-plan`, `kiln-stage-09-handoff` - each at `pi-package/skills/<name>/SKILL.md` with that name in its frontmatter, and each carrying its definition's purpose, decision owner, outputs and exit criteria. Generation is deterministic: the same definitions produce byte-identical files on every run and on every platform, with no timestamp and no machine-specific content. The check mode writes nothing, and fails naming each skill by name that is stale (its content differs from what the definitions generate), missing (a definition has no generated skill) or orphaned (a generated skill has no definition). The check runs in CI on Windows and on Ubuntu. The handwritten `kiln-planning` skill is neither adopted nor removed by generation or by the check.",
   "evaluates": [
     "CMP-0033"
   ],
   "verifies": [
     "REQ-0001"
-  ]
+  ],
+  "notes": "⚠️ EXPANDED 2026-09-13 TO WHAT TSK-0046 NOW PROMISES, AND NO FURTHER. The criterion originally accepted purpose, outputs and exit criteria and a staleness failure; it now also fixes the decision owner, the nine identities and their paths, byte determinism, the three drift classes by name, a check that writes nothing, and both CI platforms. Method, next activity, delegations, boundaries and the completion summary are accepted by the follow-up criterion instead, because their canonical fields do not exist yet. ⚠️ MISSING AND ORPHANED ARE STALENESS TOO. A definition added without regenerating, and a definition removed while its skill stays packaged, are the same drift as an edited one; a check that only compared the files that exist on both sides would pass both. ⚠️ BYTE DETERMINISM IS WHAT MAKES THE CHECK MEAN ANYTHING. A generator whose output varies with line endings, key order or the clock makes every check stale on some platform, and a check that is always stale is one nobody reads."
 }
