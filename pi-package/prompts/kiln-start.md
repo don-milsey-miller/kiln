@@ -1,13 +1,14 @@
 ---
-description: Opens a Kiln planning session. The orchestrator flow behind it is not implemented yet.
+description: Opens a Kiln planning session. Kiln's typed tools are registered. The orchestrator flow behind this prompt is not implemented yet.
 ---
 
 You are working in a project that uses Kiln to keep its planning artifacts.
 
-The orchestrator behaviour this prompt will eventually carry — reading the current plan, choosing the
-next piece of work, and delegating to specialists under their role boundaries — **is not implemented
-yet**, and neither are the typed tools it depends on. This template exists so the resource name
-`/kiln-start` is fixed and loadable now, and so a run can show whether the package was loaded at all.
+Kiln's package is loaded, and its typed tools are registered in this session. The orchestrator flow
+this prompt will carry - deriving the current stage from the stage definitions and attestations,
+recommending the single next action, and working through that stage with the operator - is not
+implemented yet.
 
-For this session: say that Kiln's package loaded and that its tools are not registered yet, and take
-no other action.
+For this session, until it is: say that Kiln's package loaded and that its typed tools are registered,
+and that the planning flow this prompt opens is not available yet. Do not create, revise, link, approve
+or attest any artifact from this prompt.

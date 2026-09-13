@@ -1,6 +1,6 @@
 ---
 name: kiln-planning
-description: Where Kiln's planning artifacts live and how they are written. Names the discipline; the tools that enforce it are not registered yet.
+description: Where Kiln's planning artifacts live and how they are written. The typed tools that write them are registered in this session, and a task's status is derived rather than stored.
 ---
 
 # Kiln planning artifacts
@@ -16,7 +16,21 @@ Two rules hold wherever those artifacts are written:
 - An artifact's outcome is never stored where it can be asserted directly. A task's status is derived
   from the acceptance criteria that accept it, so a task cannot be marked finished by editing it.
 
-**This skill names the discipline; it does not implement it.** The typed tools that carry it out are
-registered by later work (TSK-0044 and TSK-0045), and the `/kiln-start` orchestrator flow is not
-implemented. Until those land, this file establishes the resource name and says plainly what is not
-here yet, rather than describing behaviour an operator would then look for and not find.
+## The typed tools
+
+Kiln's package registers the typed tools that carry these rules in this session. Each resolves the
+project's content root itself, validates against the schema, and refuses rather than guessing. Among
+them:
+
+- `kiln_project_status` reports the artifact count and every blocker standing in the way of handoff,
+  and `kiln_lint` returns the planning lint's findings. Both read only.
+- The `kiln_create_*` tools create one artifact of their type.
+- `kiln_revise_artifact`, `kiln_link_trace` and `kiln_set_lifecycle` change an existing artifact.
+
+Approving an artifact and satisfying a user-owned exit criterion are the operator's decisions.
+
+## Not in this skill
+
+The `/kiln-start` orchestrator flow - deriving the current stage, recommending the next action and
+bringing in that stage's skill - is not implemented yet. This skill describes the artifacts and the
+tools that write them, not that flow.
