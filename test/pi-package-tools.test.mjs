@@ -62,6 +62,9 @@ async function project() {
   const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-tools-")));
   const contentRoot = join(base, "planning-content");
   mkdirSync(contentRoot, { recursive: true });
+  // `kiln_project_status` supplies the Stage 1 document and refuses without it (D19), as a real project has it.
+  mkdirSync(join(contentRoot, "stages"), { recursive: true });
+  writeFileSync(join(contentRoot, "stages", "01-intake.md"), "# Stage 01 - Intake\n");
   const o = { contentRoot, schemasDir: SCHEMAS, validators, schemas };
 
   const claim = await createAssertion(

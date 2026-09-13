@@ -551,6 +551,193 @@ async function renderValidationResult(result) {
 }
 
 /**
+ * Anything `kiln_project_status` returns, as a model may see it - G3a, F101, F103, F105.
+ *
+ * ⚠️ **EVERY STRING VALUE, RECURSIVELY; NO PROPERTY NAME.** A result's shape is this file's own, and its keys
+ * are what a caller reads by; the values are where project-authored text, identifiers and loader output
+ * arrive. Path fields are reduced to the content root, or to `null`, before this runs.
+ *
+ * ⚠️ **ROOTS FIRST, BY THEIR EXACT SPELLING, THEN CREDENTIALS, THEN THE PATH BACKSTOP.** The content root and
+ * the tool root become `<content-root>` and `<tool-root>` with their relative tail kept, because
+ * `<content-root>/data/notes.md` still tells a model something; the interpreter, the temporary directory and
+ * home become `<path>`. Credential-shaped text becomes `<credential>`. Whatever still looks like an absolute
+ * path becomes `<path>`.
+ *
+ * ⚠️ **CREDENTIAL REDACTION HERE IS PATTERN-BASED, AND THAT HAS TWO LIMITS.** This entry point may not read the
+ * environment, so it cannot compare against the credentials this machine actually holds. It recognises the
+ * formats below - common provider key prefixes, JSON web tokens, private-key blocks, and long unbroken runs of
+ * letters and digits together - and nothing else, so a credential in another format passes. And it will
+ * redact legitimate text that happens to match: a 40-character commit hash, a long base64 value, an opaque id.
+ */
+const CREDENTIAL = "<credential>";
+const CREDENTIAL_PATTERNS = Object.freeze([
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/g,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  /\bsk-[A-Za-z0-9][A-Za-z0-9_-]{15,}/g,
+  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\bxox[abeprs]-[A-Za-z0-9-]{10,}/g,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  /\bAIza[0-9A-Za-z_-]{35}/g,
+  /\btvly-[A-Za-z0-9_-]{16,}/g,
+]);
+/** A long unbroken run, redacted only when it mixes letters and digits. Hyphens and slashes end it, so ids and relative paths survive. */
+const LONG_RUN = /[A-Za-z0-9_+=]{32,}/g;
+
+/**
+ * Absolute paths in text, removed fail-closed - G3a.
+ *
+ * ⚠️ **ONCE A PATH HAS STARTED, IT RUNS TO THE NEXT HARD DELIMITER.** Nothing about a path's own text says where
+ * it ends: folders and file names can hold spaces and dots, and a file name need not have an extension. Every
+ * attempt to infer the end from the words left a trailing piece behind - `Documents\x.txt`, ` notes`. So a
+ * recognised start consumes everything up to a quote or backtick, a line break, `,` `;` `)` `]` `}`, or `< > |`.
+ * A space, a tab, a dot and a colon never end a path.
+ *
+ * ⚠️ **THE STARTS.** A drive letter and a separator; two or more separators, which is a UNC path, a
+ * forward-slash UNC path, a JSON-escaped one, or a `\\?\` extended path; a single slash before a non-space,
+ * which is a POSIX path of any depth, `/secret` included; and a single backslash before a path character, which
+ * is a Windows path from the root of the current drive, `\Users\someone\x.txt`. None of them may follow a letter,
+ * a digit or another path character, so `and/or`, `A\B`, `1/2`, `2026/09/13` and the `//` and paths of a URL are
+ * not starts, and a backslash straight before a delimiter - an escaped quote - is not one either.
+ *
+ * ⚠️ **ACCEPTED LIMITATION: PROSE ATTACHED TO AN UNQUOTED PATH IS REMOVED WITH IT.** `See C:\x.txt and more.`
+ * becomes `See <path>`. This is a model-facing boundary, and a readable sentence is worth less than a leaked
+ * path. Quoting a path, or following it with a delimiter, keeps what comes after.
+ *
+ * ⚠️ **NOT THE VALIDATION RENDERER'S PATTERNS.** Its `DRIVE_PATH` and `POSIX_PATH` stop at a space, and
+ * `DRIVE_PATH` at its first separator (F110). They belong to that wrapper and are left as they are.
+ */
+const isSeparator = (ch) => ch === "\\" || ch === "/";
+const isHardDelimiter = (ch) => /["'`\r\n,;)\]}<>|]/.test(ch) || ch.charCodeAt(0) === 1;
+
+/** The index of the next hard delimiter at or after `from`, or the end of the text. */
+function pathEnd(text, from) {
+  let i = from;
+  while (i < text.length && !isHardDelimiter(text[i])) i += 1;
+  return i;
+}
+
+/** `text` with each match of a root pattern, and everything after it up to a hard delimiter, handed to `replace`. */
+function replaceRoot(text, pattern, replace) {
+  pattern.lastIndex = 0;
+  let out = "";
+  let last = 0;
+  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
+    const rootEnd = match.index + match[0].length;
+    const tailEnd = pathEnd(text, rootEnd);
+    out += text.slice(last, match.index) + replace(text.slice(rootEnd, tailEnd));
+    last = tailEnd;
+    pattern.lastIndex = Math.max(tailEnd, match.index + 1);
+  }
+  return out + text.slice(last);
+}
+
+const PATH_STARTS = Object.freeze([
+  /(?<![A-Za-z0-9])[A-Za-z]:[\\/]/g,
+  /(?<![\w:\\\/.~-])(?:\\{2,}|\/{2,})(?=[^\s\\\/])/g,
+  /(?<![\w.~\/\\:-])\/(?=[^\s\/\\])/g,
+  /(?<![\w:\\\/.~-])\\(?=[^\s\\\/"'`\r\n,;)\]}<>|])/g,
+]);
+
+/** `text` with every absolute path no known root accounted for replaced by `<path>`, through its delimiter. */
+function replaceUnknownPaths(text) {
+  let out = "";
+  let last = 0;
+  let at = 0;
+  for (;;) {
+    let next = null;
+    for (const start of PATH_STARTS) {
+      start.lastIndex = at;
+      const match = start.exec(text);
+      if (match && (next === null || match.index < next.index)) next = match;
+    }
+    if (next === null) break;
+    // A separator straight after a held rendering continues that rendering; it is not a new path.
+    if (text.charCodeAt(next.index - 1) === 1) {
+      at = next.index + 1;
+      continue;
+    }
+    const end = pathEnd(text, next.index);
+    out += `${text.slice(last, next.index)}<path>`;
+    last = end;
+    at = end;
+  }
+  return out + text.slice(last);
+}
+
+/**
+ * What follows a kept root (the content root, the tool root): the separators joining it, then the rest of that
+ * run of text with every absolute path and credential in it removed, and its separators written as `/`.
+ */
+function cleanRootTail(tail) {
+  const joining = /^[\\/]*/.exec(tail)[0];
+  const rest = redactCredentials(replaceUnknownPaths(tail.slice(joining.length)));
+  return (joining.length > 0 ? "/" : "") + rest.replace(/[\\/]+/g, "/");
+}
+
+const redactCredentials = (text) => {
+  let out = text;
+  for (const pattern of CREDENTIAL_PATTERNS) out = out.replace(pattern, CREDENTIAL);
+  return out.replace(LONG_RUN, (run) => (/[A-Za-z]/.test(run) && /\d/.test(run) ? CREDENTIAL : run));
+};
+
+async function renderForModel(value, { contentRoot = null, toolRoot = null } = {}) {
+  const { homedir, tmpdir } = await import("node:os");
+  const flags = process.platform === "win32" ? "gi" : "g";
+
+  // ⚠️ LONGEST ROOT FIRST, so a content root inside the temporary directory is named as the content root.
+  const roots = [
+    ...[
+      [contentRoot, "<content-root>"],
+      [toolRoot, "<tool-root>"],
+    ].map(([root, label]) => ({ root, label, keepTail: true })),
+    ...[process.execPath, tmpdir(), homedir()].map((root) => ({ root, label: "<path>", keepTail: false })),
+  ]
+    .filter(({ root }) => typeof root === "string" && root.length > 1)
+    .sort((a, b) => b.root.length - a.root.length)
+    .map(({ root, label, keepTail }) => ({ pattern: new RegExp(rootPattern(root) + SEGMENT_END, flags), label, keepTail }));
+
+  const render = (text) => {
+    const held = [];
+    const hold = (rendered) => `\u0001${held.push(rendered) - 1}\u0001`;
+    let out = text;
+    for (const { pattern, label, keepTail } of roots)
+      out = replaceRoot(out, pattern, (tail) => hold(keepTail ? `${label}${cleanRootTail(tail)}` : label));
+    // ⚠️ PATHS BEFORE CREDENTIALS, so a credential inside a path goes with the path rather than splitting it.
+    out = replaceUnknownPaths(out);
+    out = redactCredentials(out);
+    return out.replace(/\u0001(\d+)\u0001/g, (_match, index) => held[Number(index)]);
+  };
+
+  const copy = (inner) => {
+    if (typeof inner === "string") return render(inner);
+    if (Array.isArray(inner)) return inner.map(copy);
+    if (inner !== null && typeof inner === "object") return Object.fromEntries(Object.entries(inner).map(([key, v]) => [key, copy(v)]));
+    return inner;
+  };
+  return copy(value);
+}
+
+/** The most of the Stage 1 document a status result carries, in UTF-8 bytes, measured after cleaning (D19). */
+const STAGE_DOCUMENT_MAX_BYTES = 64 * 1024;
+const utf8 = new TextEncoder();
+
+/** `text` cut to at most `maxBytes` of UTF-8 at a character boundary, never inside one. */
+function capUtf8(text, maxBytes) {
+  if (typeof text !== "string") return { text: null, truncated: false };
+  if (utf8.encode(text).length <= maxBytes) return { text, truncated: false };
+  let bytes = 0;
+  let end = 0;
+  for (const ch of text) {
+    const size = utf8.encode(ch).length;
+    if (bytes + size > maxBytes) break;
+    bytes += size;
+    end += ch.length;
+  }
+  return { text: text.slice(0, end), truncated: true };
+}
+
+/**
  * @param {object} pi  Pi's extension API.
  * @param {{lintProject?: Function, handoffCompleteness?: Function, researchTools?: object, validationTools?: object}} [deps]  the implementations these
  *   wrappers call. Pi passes one argument, so production always takes the lazy imports below; the only
@@ -746,31 +933,75 @@ export default function register(pi, deps = {}) {
     name: "kiln_project_status",
     label: "Kiln project status",
     description:
-      "Report whether this project's planning content is ready to hand off: the artifact count, and " +
-      "every blocker standing in the way. Reads only; changes nothing.",
+      "Report where this project stands: whether its planning content is ready to hand off, with the artifact " +
+      "count and every handoff blocker; the current stage derived from the stage definitions and attestations, " +
+      "with that stage's blockers and one recommended next action; the project's name and description; and the " +
+      "Stage 1 document. Reads only; changes nothing.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     execute: async () => {
       let context;
       try {
         context = await projectContext();
       } catch (e) {
-        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        return rendered(
+          await renderForModel(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`))
+        );
       }
 
-      const handoffCompleteness =
-        deps.handoffCompleteness ?? (await import("../../lib/handoff/completeness.mjs")).handoffCompleteness;
-      const completeness = handoffCompleteness(context.ctx, { toolRoot: context.toolRoot });
+      // ⚠️ ONE ROOT PER CALL. Everything below - the handoff gate, the derived state, the identity, the
+      // document, path reduction and cleaning - uses the root resolved above, never a second resolution.
+      const roots = { contentRoot: context.contentRoot, toolRoot: context.toolRoot };
+      const projectStatus = await import("../../lib/project-status.mjs");
+      const readProjectStatus = deps.readProjectStatus ?? projectStatus.readProjectStatus;
 
-      return rendered({
-        ok: true,
-        ready: completeness.ready === true,
-        artifactCount: completeness.artifactCount ?? 0,
-        blockers: (completeness.blockers ?? []).map((b) => ({
-          reason: b.reason ?? null,
-          detail: typeof b.detail === "string" ? scrub(b.detail, context.contentRoot) : null,
-          ruleId: b.ruleId ?? null,
-        })),
-      });
+      let completeness;
+      let status;
+      try {
+        const handoffCompleteness =
+          deps.handoffCompleteness ?? (await import("../../lib/handoff/completeness.mjs")).handoffCompleteness;
+        completeness = handoffCompleteness(context.ctx, { toolRoot: context.toolRoot });
+        status = readProjectStatus(context.ctx, { toolRoot: context.toolRoot });
+      } catch (e) {
+        // ⚠️ AN AUTHORED CODE AND MESSAGE, NEVER THE ERROR (F101). A loader's message quotes absolute paths and
+        // the file it could not parse; cleaning it would still pass on whatever the patterns miss.
+        const authored = projectStatus.toProjectStatusRefusal(e);
+        return rendered(await renderForModel(refusal(authored.code, authored.message), roots));
+      }
+
+      // ⚠️ PATHS ARE REDUCED BEFORE CLEANING (F105): relative to this root, or null.
+      const located = (item) => (item && typeof item === "object" ? { ...item, path: relativeTo(context.contentRoot, item.path) } : null);
+      const orchestration = status?.orchestration ?? {};
+      const document = status?.stageOneDocument ?? {};
+
+      const result = await renderForModel(
+        {
+          ok: true,
+          ready: completeness.ready === true,
+          artifactCount: completeness.artifactCount ?? 0,
+          blockers: (completeness.blockers ?? []).map((b) => ({
+            reason: b.reason ?? null,
+            detail: typeof b.detail === "string" ? scrub(b.detail, context.contentRoot) : null,
+            ruleId: b.ruleId ?? null,
+          })),
+          orchestration: {
+            ...orchestration,
+            blockers: (orchestration.blockers ?? []).map(located),
+            nextAction: located(orchestration.nextAction),
+          },
+          project: status?.project ?? null,
+          stageOneDocument: {
+            stageId: document.stageId ?? null,
+            path: relativeTo(context.contentRoot, document.path),
+            text: document.text ?? null,
+          },
+        },
+        roots
+      );
+
+      // ⚠️ CAPPED AFTER CLEANING (D19), so the limit is on what the model receives.
+      const capped = capUtf8(result.stageOneDocument.text, STAGE_DOCUMENT_MAX_BYTES);
+      result.stageOneDocument = { ...result.stageOneDocument, text: capped.text, truncated: capped.truncated };
+      return rendered(result);
     },
   });
 
