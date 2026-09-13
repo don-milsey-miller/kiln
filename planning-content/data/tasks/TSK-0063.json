@@ -19,7 +19,8 @@
   "acceptedBy": [
     "ACC-0086",
     "ACC-0087",
-    "ACC-0088"
+    "ACC-0088",
+    "ACC-0114"
   ],
   "dependsOn": [
     "TSK-0048",
@@ -27,5 +28,6 @@
     "TSK-0060",
     "TSK-0062",
     "TSK-0071"
-  ]
+  ],
+  "notes": "⚠️ D14 (2026-09-13): ACC-0114 accepts the user-visible first Stage 1 turn with a real model, judged by a human against a retained record, because a scripted provider cannot establish a model's choice of question (F98)."
 }

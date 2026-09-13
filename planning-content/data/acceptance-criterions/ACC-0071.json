@@ -6,11 +6,12 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "It refuses to operate on the tool's own planning content",
-  "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root; given a state in which the tool's own bundled content would resolve instead, it refuses and names both paths rather than authoring into the tool's plan.",
+  "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root. In any state in which the tool's own bundled planning content would resolve instead - including `PLANNING_CONTENT_DIR` naming it, and a sibling that is a link into it - it refuses before authoring anything, and no file under either root changes. The refusal has two surfaces: the operator-facing refusal names both canonical absolute paths, the resolved content root and the tool root; the model-facing structured refusal carries a stable refusal code and stable placeholders for those paths, and no absolute path. Self-hosting is permitted only by an explicit, strict self-host marker that the launcher emits into the orchestrator's environment after it has validated `--self-host`; an absent marker, or any value other than the exact expected one, refuses.",
   "evaluates": [
     "CMP-0034"
   ],
   "verifies": [
     "REQ-0022"
-  ]
+  ],
+  "notes": "⚠️ SPLIT 2026-09-13 (F96, F97, D13). F96: the launcher refuses the tool checkout (`resolveSelfHost`, EVD-0089), but the orchestrator's handlers re-resolve the content root inside the Pi child, which inherits `PLANNING_CONTENT_DIR`, and `resolveContentRoot` accepts any override - including the tool's own `planning-content/` - because its inside-the-tool-root backstop runs only without one. The child is never told whether self-hosting was validated, and Pi started without the launcher bypasses the launcher's refusal entirely. So the refusal must also live in the orchestrator, gated by a marker only the launcher emits. F97: 'names both paths' conflicted with the model-facing disclosure boundary - tool results expose no absolute path - so the operator sees canonical paths and the model sees placeholders. ⚠️ STRICT MEANS STRICT. A marker that accepted 'true', '1' or an empty value would let any inherited environment variable grant self-hosting; only the exact value the launcher writes after validation permits it."
 }

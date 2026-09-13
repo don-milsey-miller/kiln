@@ -1,0 +1,19 @@
+{
+  "id": "ACC-0114",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "In the clean-consumer journey, the first Stage 1 turn asks one question and proposes no solution",
+  "statement": "In the clean-consumer journey, on a fresh project started with `/kiln-start` against a real configured model, the orchestrator's first user-visible Stage 1 turn asks exactly one question, proposes no architecture, requirement set or solution, and calls no mutating tool. The turn is retained as recorded output, and its judgement - one question, no solution - is made by a human reviewer against that record, not by the model and not by a scripted provider.",
+  "evaluates": [
+    "CMP-0040",
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0022",
+    "REQ-0001"
+  ],
+  "notes": "Created 2026-09-13 (F98, D14). ACC-0068 now accepts only what Kiln deterministically supplies to the session. What a real model then does with it is behaviour, and a scripted provider cannot establish it: the script chooses the reply before any model is asked. So the user-visible first turn is observed here, in the clean-consumer journey, with a real model and a retained record a human judges."
+}
