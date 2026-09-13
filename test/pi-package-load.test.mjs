@@ -107,7 +107,7 @@ async function discover({ project, agentDir }, decision) {
       scope: e.sourceInfo?.scope ?? null,
       tools: [...e.tools.keys()].sort(),
       commands: e.commands.size,
-      handlers: e.handlers.size,
+      handlers: [...e.handlers].map(([event, list]) => [event, list.length]),
     })),
     errors: extensions.errors.map((e) => ({ path: e.path, error: String(e.error) })),
     skills: loader
@@ -175,7 +175,8 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "validation_run",
         ],
         commands: 0,
-        handlers: 0,
+        // ⚠️ EXACTLY ONE HOOK (G4): the stage context, added before each agent start. No other event is handled.
+        handlers: [["before_agent_start", 1]],
       },
     ]);
 

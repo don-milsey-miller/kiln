@@ -768,7 +768,86 @@ function capUtf8(text, maxBytes) {
  *   caller that passes a second is a test that needs to control what a dependency returns, because what
  *   this wrapper must do with a path is its own responsibility whatever the lint hands it.
  */
+/**
+ * The current stage's skill in the system prompt - TSK-0048 (G4), toward ACC-0068 (D11).
+ *
+ * ⚠️ **THE SESSION CANNOT READ A SKILL FILE ITSELF (F95).** Its tools are exactly Kiln's, so Pi's `read` is absent
+ * and Pi leaves skills out of the system prompt. This hook adds the current stage's skill instead: the complete
+ * content of the one file Pi resolved for that name, override included, with no path.
+ *
+ * ⚠️ **PI SWALLOWS A HOOK'S ERROR AND CARRIES ON.** A throw here would start the session with no stage context
+ * and nothing saying why. Every failure therefore becomes an authored block naming a stable code and telling the
+ * model to change nothing.
+ *
+ * ⚠️ **ONE BLOCK, HOWEVER OFTEN IT RUNS, FRAMED BY LENGTH.** Pi hands the hook its base prompt each turn. If what it
+ * is handed ends with an earlier Kiln frame, exactly that frame is removed before the new one is appended. The
+ * payload is project-authored when a consumer overrides a skill, so it may contain any marker text: a frame is
+ * therefore never found by searching for markers. Only a footer at the very end of the prompt is read, its length
+ * (UTF-16 code units, the string's own `length`) locates the payload's start, and the separator and header must sit
+ * exactly there. Anything else is not a Kiln frame, and nothing in the prompt is removed on a guess.
+ */
+const STAGE_CONTEXT_OPENING = "\n\n<!-- kiln:stage-context:begin -->\n";
+const STAGE_CONTEXT_FOOTER_AT_END = /\n<!-- kiln:stage-context:end length=(0|[1-9]\d{0,8}) -->$/;
+
+const framedStageContext = (payload) => `${STAGE_CONTEXT_OPENING}${payload}\n<!-- kiln:stage-context:end length=${payload.length} -->`;
+
+function withoutStageContextFrame(prompt) {
+  const footer = STAGE_CONTEXT_FOOTER_AT_END.exec(prompt);
+  if (footer === null) return prompt;
+  const frameStart = footer.index - Number(footer[1]) - STAGE_CONTEXT_OPENING.length;
+  if (frameStart < 0 || prompt.slice(frameStart, frameStart + STAGE_CONTEXT_OPENING.length) !== STAGE_CONTEXT_OPENING) return prompt;
+  return prompt.slice(0, frameStart);
+}
+
+const failClosedStageContext = (code) =>
+  [
+    "Kiln stage context: unavailable.",
+    `Kiln could not supply this session's stage context (code: ${code}).`,
+    "Make no change to this project's planning content: call no tool that creates, revises, links, unlinks, approves, activates or attests anything.",
+    "Tell the operator the code above, and stop.",
+  ].join("\n");
+
+async function stageContextBlock(event, deps) {
+  let stageContext;
+  try {
+    const context = await projectContext(deps);
+    const { resolveStageContext } = await import("../../lib/stage-context.mjs");
+    stageContext = resolveStageContext(context.ctx, { toolRoot: context.toolRoot, skills: event?.systemPromptOptions?.skills });
+  } catch (e) {
+    let code = "stage-context-unavailable";
+    try {
+      code = (await import("../../lib/stage-context.mjs")).stageContextCode(e);
+    } catch {
+      // The authored fallback code stands.
+    }
+    return failClosedStageContext(code);
+  }
+
+  if (stageContext.complete)
+    return [
+      "Kiln stage context: every stage is complete.",
+      "Every stage gate is ready, so no stage is current and no stage skill is supplied.",
+      "Tell the operator the planning stages are complete, and do not start another stage.",
+    ].join("\n");
+
+  const { stage, skillName, content } = stageContext;
+  return [
+    `Kiln stage context: the current stage is ${stage.id}${stage.name ? ` (${stage.name})` : ""}.`,
+    `Its skill, ${skillName}, follows exactly as this session loaded it. Work from it.`,
+    `<stage-skill name="${skillName}">`,
+    content,
+    "</stage-skill>",
+  ].join("\n");
+}
+
 export default function register(pi, deps = {}) {
+  // ⚠️ THE ONE HOOK, AND NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when it fires.
+  pi?.on?.("before_agent_start", async (event) => {
+    const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
+    const block = await stageContextBlock(event, deps);
+    return { systemPrompt: `${base}${framedStageContext(block)}` };
+  });
+
   // ⚠️ ONE SHAPE, NINE ROWS. Each tool differs only in which registry entry it delegates to, so the
   // adapter is written once: a per-tool copy is nine places for one rule to drift.
   for (const { name, type, noun } of CREATION_TOOLS)

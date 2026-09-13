@@ -405,7 +405,8 @@ syncBuiltinESMExports();
 
 const module = await import(entry);
 const registered = [];
-module.default({ registerTool: (tool) => registered.push(tool.name) });
+const hooks = [];
+module.default({ registerTool: (tool) => registered.push(tool.name), on: (event) => hooks.push(event) });
 const after = JSON.parse(JSON.stringify(seen));
 
 // The watchers must be able to see something, or the empty result above means nothing.
@@ -423,6 +424,7 @@ process.stdout.write(JSON.stringify({
   after,
   control,
   registered: registered.sort(),
+  hooks,
   signatureVersion: module.SIGNATURE_VERSION ?? null,
   packageRoot,
   contentRoot,
@@ -453,6 +455,7 @@ test("⚠️ ACC-0063 loading and registering touches no project, no credential,
   const seen = JSON.parse(r.stdout);
 
   assert.deepEqual(seen.registered, [...REGISTERED_TOOLS], "registration ran and produced every declared tool");
+  assert.deepEqual(seen.hooks, ["before_agent_start"], "registration adds exactly the one hook, and runs none of it");
   assert.equal(seen.signatureVersion, 1);
 
   assert.deepEqual(seen.after.writes, [], "registration wrote a file");

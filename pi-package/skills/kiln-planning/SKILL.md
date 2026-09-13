@@ -31,6 +31,7 @@ Approving an artifact and satisfying a user-owned exit criterion are the operato
 
 ## Not in this skill
 
-The `/kiln-start` orchestrator flow - deriving the current stage, recommending the next action and
-bringing in that stage's skill - is not implemented yet. This skill describes the artifacts and the
-tools that write them, not that flow.
+The `/kiln-start` prompt and the stage context Kiln adds to a session carry the planning flow: the
+current stage derived from the stage definitions and attestations, its blockers, the recommended next
+action and that stage's skill. This skill describes the artifacts and the tools that write them, not
+that flow.

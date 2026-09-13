@@ -96,10 +96,13 @@ test("⚠️ F87 every tool the resources name is one the package declares", () 
   for (const read of ["kiln_project_status", "kiln_lint"]) assert.ok(skillNames.includes(read), `kiln-planning does not name ${read}`);
 });
 
-test("⚠️ F87 the orchestrator flow is still stated as not implemented, and no approval or attestation tool is offered", () => {
+test("⚠️ ACC-0068 /kiln-start calls kiln_project_status first, neither resource calls the flow unimplemented, and no approval, activation or attestation tool is offered", () => {
+  // G4 implemented the flow, so a resource still calling it unimplemented would be the same kind of stale claim F87 was.
   for (const [path, text] of Object.entries(RESOURCES)) {
-    assert.match(normalise(text), /\borchestrator flow\b[^.]{0,200}\bnot implemented yet\b/, `${path} no longer says the orchestrator flow is not implemented`);
+    assert.doesNotMatch(normalise(text), /\b(?:orchestrator|planning) flow\b[^.]{0,200}\bnot (?:yet )?(?:implemented|available)\b/, `${path} still calls the flow unimplemented`);
     for (const boundaryTool of ["kiln_set_review_status", "kiln_write_stage_attestation", "kiln_set_type_activation"])
       assert.equal(text.includes(boundaryTool), false, `${path} names ${boundaryTool}, whose use is TSK-0050's boundary`);
   }
+  // `normalise` drops Markdown marks, underscores included, so the tool's name reads as one word here.
+  assert.match(normalise(RESOURCES["prompts/kiln-start.md"]), /\bcall kilnprojectstatus first\b/, "/kiln-start must call kiln_project_status first");
 });
