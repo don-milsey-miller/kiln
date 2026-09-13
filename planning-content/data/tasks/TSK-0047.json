@@ -4,8 +4,8 @@
   "schemaVersion": 2,
   "reviewStatus": "approved",
   "lifecycle": "active",
-  "title": "Register the consumer override path and test all four override states",
-  "statement": "Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.",
+  "title": "Prove the consumer skill-override entry through Pi's real loader, in all four override states",
+  "statement": "Prove, through the pinned Pi runtime's real resource loader, that the project-settings `skills` entry Kiln's settings merge produces - `../planning-content/skills-overrides`, written by `mergeSettingsText` and resolved relative to `.pi` - lets a consumer override of a generated stage skill win over the packaged skill of the same identity. Pi 0.84.4 resolves project-settings skill paths ahead of package resources, and the first skill loaded with a given identity wins, so the consumer override wins over the packaged skill; it is not claimed to win over every earlier project-settings skill path. Cover the packaged-only, override-present, override-edited and override-skill-removed states for `kiln-stage-01-intake`, reading provenance from the loaded file path and Pi's collision diagnostic. This task writes no settings in production and adds no launch refusal: setup writes the entry (TSK-0060), and an absent override directory is measured as ignored, not refused.",
   "role": "platform",
   "implements": [
     "CMP-0033"
@@ -18,5 +18,6 @@
   ],
   "dependsOn": [
     "TSK-0046"
-  ]
+  ],
+  "notes": "⚠️ CORRECTED 2026-09-13 (F91, F94, D9). The statement said the override directory is registered after the packaged skills. Pi 0.84.4 does the reverse: its package manager ranks a project-settings entry ahead of a package resource before loading, and skill loading keeps the first skill with each name, so the override wins because it is resolved first. ⚠️ THIS TASK PROVES AN ENTRY; IT DOES NOT REGISTER ONE. The entry is already produced by CMP-0024's settings merge (`lib/pi-settings.mjs`), and writing it into a real project belongs to setup (TSK-0060). ⚠️ D9: AN ABSENT OVERRIDE DIRECTORY IS IGNORED. Pi skips a settings skill path that does not exist and reports nothing. This task records that behaviour as a control; a refusal for a missing directory, if one is ever wanted, belongs to setup or preflight, not to launch."
 }

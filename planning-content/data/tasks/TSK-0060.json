@@ -37,5 +37,6 @@
     "TSK-0038",
     "TSK-0041",
     "TSK-0043"
-  ]
+  ],
+  "notes": "⚠️ R9 IS SETUP'S (recorded 2026-09-13). The skill-override entry `../planning-content/skills-overrides` is fixed relative to `.pi`, while the content root can be selected elsewhere, for example through `PLANNING_CONTENT_DIR`. Setup owns making the entry it writes agree with the selected content root's `skills-overrides/`. TSK-0047 proves the entry only in the default layout, where the content root is `<project>/planning-content`."
 }

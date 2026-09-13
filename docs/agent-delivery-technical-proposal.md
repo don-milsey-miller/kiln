@@ -917,9 +917,12 @@ Generate one packaged skill for each canonical `stages/*.json` definition. Each 
 Do not hand-maintain stage purpose, outputs, or exit criteria in two places. Implement a generator and
 a `--check` mode that fails CI when packaged skills are stale relative to `stages/`.
 
-Register `<project>/planning-content/skills-overrides/` after packaged skills so an override with the
-same skill identity wins without modifying the tool clone. Test packaged-only, override-present,
-override-edited, and override-removed cases through a real Pi resource load.
+Register `<project>/planning-content/skills-overrides/` through the project settings `skills` array so
+an override with the same skill identity wins without modifying the tool clone. Pi resolves
+project-settings skill paths ahead of package resources, and the first skill with a given identity
+wins, so the consumer override wins over the packaged skill. An earlier project-settings skill path
+with the same identity would outrank it. Test packaged-only, override-present, override-edited, and
+override-removed cases through a real Pi resource load.
 
 ## 11. Specialist roster and delegation
 
