@@ -5,7 +5,7 @@
   "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Build the stage-skill generator and its check mode",
-  "statement": "Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>` at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, carrying the stage's purpose, decision owner, outputs and exit criteria exactly as `stages/*.json` declares them, with deterministic generated-file metadata; and a `--check` mode that writes nothing and fails, naming each stale, missing or orphaned skill. Method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary are NOT generated here, because no canonical definition carries them yet: TSK-0071 adds them to the definitions first.",
+  "statement": "Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>` at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, carrying the stage's decision owner, its outputs - the typed artifacts it produces, the outputs not yet typed and its output prose - and its exit criteria exactly as `stages/*.json` declares them, with deterministic generated-file metadata; and a `--check` mode that writes nothing and fails, naming each stale, missing or orphaned skill. Purpose, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary are NOT generated here, because no canonical definition carries them yet: TSK-0071 adds them to the definitions first.",
   "role": "platform",
   "implements": [
     "CMP-0033"
@@ -19,5 +19,5 @@
   "dependsOn": [
     "TSK-0043"
   ],
-  "notes": "⚠️ NARROWED 2026-09-13 (O1). The original statement promised ten things and the canonical definitions support four. The six without a source moved to TSK-0071, which adds them to `stages/*.json` before anything generates them, so this task never has to invent methodology in a template."
+  "notes": "⚠️ NARROWED 2026-09-13 (O1, then F88). The original statement promised ten things. The canonical definitions carry three of them - decision owner, outputs and exit criteria - and the seven without a canonical field moved to TSK-0071, which adds them to `stages/*.json` before anything generates them, so this task never has to invent methodology in a template. ⚠️ PURPOSE IS ONE OF THE SEVEN (F88). `producesProse` describes what a stage produces, not what the stage is for. Labelling it Purpose would be exactly the inference O1 refuses, so it is carried under Outputs as output prose and purpose waits for a field of its own."
 }

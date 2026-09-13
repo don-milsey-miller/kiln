@@ -2,10 +2,10 @@
   "id": "TSK-0071",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "approved",
   "lifecycle": "active",
-  "title": "Add method, next activity, delegations and boundaries to the stage definitions, and generate them",
-  "statement": "Extend each canonical `stages/*.json` definition with its method, next-activity selection rules, allowed delegations and required capabilities, mutation boundary, approval boundary and expected completion summary, with the loader refusing a definition that omits a required field; then extend the stage-skill generator and its check mode to carry those fields from the definitions into every `kiln-stage-<stage-id>` skill. Nothing is hard-coded in templates.",
+  "title": "Add purpose, method, next activity, delegations and boundaries to the stage definitions, and generate them",
+  "statement": "Extend each canonical `stages/*.json` definition with its purpose, method, next-activity selection rules, allowed delegations and required capabilities, mutation boundary, approval boundary and expected completion summary, with the loader refusing a definition that omits a required field; then extend the stage-skill generator and its check mode to carry those seven fields from the definitions into every `kiln-stage-<stage-id>` skill. Nothing is hard-coded in templates, and no existing field is relabelled to stand in for one: `producesProse` describes a stage's outputs and is not its purpose.",
   "role": "platform",
   "implements": [
     "CMP-0001",
@@ -21,5 +21,5 @@
     "TSK-0046",
     "TSK-0051"
   ],
-  "notes": "Created 2026-09-13 when TSK-0046 was narrowed to what the canonical definitions can already generate (O1). The end-to-end journey (TSK-0063) depends on this, so it cannot pass with incomplete stage instructions; TSK-0048 does not, so the orchestrator can begin against the narrower skills."
+  "notes": "Created 2026-09-13 when TSK-0046 was narrowed to what the canonical definitions can already generate (O1). Purpose was added the same day as the seventh field (F88): `producesProse` describes what a stage produces rather than what it is for, so a purpose needs a field of its own. The end-to-end journey (TSK-0063) depends on this, so it cannot pass with incomplete stage instructions; TSK-0048 does not, so the orchestrator can begin against the narrower skills."
 }
