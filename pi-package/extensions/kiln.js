@@ -96,6 +96,15 @@ async function defaultResearchTools() {
 }
 
 /**
+ * The validation tools this host can offer, built when one is first called - for the reasons the
+ * research tools are: the package must load on its own, and a session may never validate anything.
+ */
+async function defaultValidationTools() {
+  const { createValidationTools } = await import("../../lib/validation/tools.mjs");
+  return createValidationTools();
+}
+
+/**
  * A path as the operator's project knows it.
  *
  * ⚠️ **RELATIVE, ALWAYS.** A result carrying `C:\Users\someone\...` names the machine it ran on, and
@@ -370,6 +379,60 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
 ]);
 
 /**
+ * The validation tools, as an explicit table.
+ *
+ * ⚠️ **UNPREFIXED FOR THE SAME REASON AS THE RESEARCH TOOLS.** `lib/specialists/contract.mjs` requires
+ * `validation_capability` and `validation_run` by key, and `verifyChild` checks a child's registry
+ * against those keys.
+ *
+ * ⚠️ **WRITTEN OUT, AND HELD TO `VALIDATION_TOOL_SIGNATURES` BY A TEST.** Importing them would reach
+ * into `lib/` at registration, which a package that must load on its own cannot do.
+ */
+const VALIDATION_TOOL_TABLE = Object.freeze([
+  {
+    name: "validation_capability",
+    label: "Validation capability",
+    description:
+      "Report whether this host can run tier-1 validation, proven by executing the interpreter. Returns available:false with a reason when it cannot.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "validation_run",
+    label: "Validation run",
+    description:
+      "Run one DECLARED validation job under the controller: provision -> execute -> observe -> destroy. Refuses jobs above the approved ceiling before provisioning. Returns an observation record, never a verdict.",
+    parameters: {
+      type: "object",
+      properties: {
+        tier: { type: "integer", minimum: 1, maximum: 3 },
+        commands: { type: "array", items: { type: "array", items: { type: "string" } } },
+        timeoutMs: { type: "integer", minimum: 1 },
+        maxOutputBytes: { type: "integer", minimum: 1 },
+        capturePlan: { type: "object" },
+        expectedOutputs: {
+          type: "array",
+          items: {
+            oneOf: [
+              { type: "string", minLength: 1 },
+              {
+                type: "object",
+                properties: { path: { type: "string", minLength: 1 }, minBytes: { type: "integer", minimum: 0 } },
+                required: ["path"],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        inputs: { type: "object", additionalProperties: { type: "string" } },
+        requires: { type: "object" },
+      },
+      required: ["tier", "commands", "timeoutMs", "maxOutputBytes", "capturePlan", "expectedOutputs"],
+      additionalProperties: false,
+    },
+  },
+]);
+
+/**
  * A refusal built from whatever the typed tool threw.
  *
  * ⚠️ **THE CODE COMES FROM THE ERROR'S OWN NAME, and the text is scrubbed.** A validation message
@@ -393,8 +456,103 @@ const PROJECT_REFUSAL_CODES = Object.freeze({ ValidationError: "invalid-request"
 const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details: result });
 
 /**
+ * A validation result as a model may see it.
+ *
+ * ⚠️ **THIS IS THE DISCLOSURE BOUNDARY, AND THE CONTROLLER IS DELIBERATELY NOT.** `lib/validation/`
+ * keeps precise internal paths in what it returns - the workspace a provisioning failure names, the
+ * directory a failed cleanup left behind, a traceback's file - because those are diagnostics the
+ * controller's own callers need. What reaches a model is decided here. A consumer that bypassed this
+ * boundary and showed a controller result to a model, or persisted it, would need its own rendering;
+ * the controller is not changed to anticipate one that does not exist.
+ *
+ * ⚠️ **A COPY, NEVER AN EDIT.** The controller's object is left exactly as it was returned, so the
+ * diagnostic record still exists for whatever called the controller to keep.
+ *
+ * ⚠️ **THE WORKSPACE FIRST, BY ITS EXACT ROOT, SO WHAT FOLLOWS IT SURVIVES.** A traceback naming
+ * `<tmp>/vpw-tier1-Ab3dEf/check.py` is useful as `<workspace>/check.py` and useless as `<path>`. The
+ * root is known exactly two ways - the retained path when cleanup failed, and the controller's own
+ * `vpw-tier1-` workspace under the temporary directory - and each is matched in every separator
+ * spelling a string can carry: raw, forward-slashed, and JSON-escaped. Only then does the general
+ * scrub run, over what is left, and it cannot reach back into what was already rendered.
+ *
+ * ⚠️ **CREDENTIALS ARE KEPT OUT UPSTREAM, NOT REDACTED HERE.** This entry point may not read the
+ * environment at all - its purity is a tested property of the package - so it has no credential
+ * values to look for. The controller runs every job in an allowlisted environment that supplies
+ * none, and the tests plant a credential and assert it reaches no rendered result.
+ */
+const WORKSPACE_PREFIX = "vpw-tier1-";
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const SEPARATOR = String.raw`[\\/]+`;
+/**
+ * Where a path stops: a separator, whitespace, a quote, markup, or the punctuation prose puts after a
+ * path - `, ; ( ) :` - and the placeholder this renderer holds rendered text behind. Without the
+ * punctuation, `home is C:\Users\someone, node is ...` would not match its root and would fall to the
+ * backstop, which would swallow the comma.
+ */
+const STOPS = String.raw`\s"'<>|*?:,;()\u0001`;
+/**
+ * Where a segment ends: at a separator, a stop, the end of the text, or a full stop that is itself
+ * followed by one. `C:\Users\someone` must not match inside `someone2`, and `...retained at
+ * C:\...\vpw-tier1-Ab3dEf.` must keep its sentence's period rather than read it as part of the name -
+ * while `check.py` and `.venv` keep theirs, because a period followed by more of the name is not an end.
+ */
+const END_AHEAD = String.raw`(?=[\\/${STOPS}]|\.(?:[${STOPS}]|$)|$)`;
+const SEGMENT_END = END_AHEAD;
+/** Whatever relative path follows a root, stopping where a path cannot continue. */
+const TAIL = String.raw`((?:[\\/]+[^\\/${STOPS}]+?${END_AHEAD})*)`;
+const DRIVE_PATH = new RegExp(String.raw`(?<![A-Za-z0-9])[A-Za-z]:[\\/][^${STOPS}]*?${END_AHEAD}`, "g");
+const POSIX_PATH = new RegExp(String.raw`(?<![\w.~\/:\u0001-])\/(?:[^${STOPS}\/]+\/)+[^${STOPS}\/]*?${END_AHEAD}`, "g");
+
+/** A root as a pattern matching it in any separator spelling, ending where the segment ends. */
+const rootPattern = (root) =>
+  root
+    .split(/[\\/]+/)
+    .filter((segment, index) => segment.length > 0 || index === 0)
+    .map(escapeRegExp)
+    .join(SEPARATOR);
+
+async function renderValidationResult(result) {
+  const { homedir, tmpdir } = await import("node:os");
+  const flags = process.platform === "win32" ? "gi" : "g";
+
+  const workspaceRoots = [];
+  const retained = result?.destroy?.retainedPath;
+  if (typeof retained === "string" && retained.length > 0)
+    workspaceRoots.push(new RegExp(rootPattern(retained) + SEGMENT_END + TAIL, flags));
+  workspaceRoots.push(
+    new RegExp(rootPattern(tmpdir()) + SEPARATOR + escapeRegExp(WORKSPACE_PREFIX) + "[A-Za-z0-9]{6}" + SEGMENT_END + TAIL, flags)
+  );
+  // ⚠️ THE INTERPRETER, THE TEMPORARY DIRECTORY AND HOME, longest-first, before the backstop: each is
+  // named whole, so a path with a space in it is not left half-rendered by a pattern that stops at one.
+  const machineRoots = [process.execPath, tmpdir(), homedir()]
+    .filter((root) => typeof root === "string" && root.length > 1)
+    .sort((a, b) => b.length - a.length)
+    .map((root) => new RegExp(rootPattern(root) + SEGMENT_END + TAIL, flags));
+
+  const render = (text) => {
+    const held = [];
+    const hold = (value) => `\u0001${held.push(value) - 1}\u0001`;
+    let out = text;
+    for (const pattern of workspaceRoots)
+      out = out.replace(pattern, (_match, tail) => hold(`<workspace>${(tail ?? "").replace(/[\\/]+/g, "/")}`));
+    for (const pattern of machineRoots) out = out.replace(pattern, () => hold("<path>"));
+    out = out.replace(DRIVE_PATH, "<path>").replace(POSIX_PATH, "<path>");
+    return out.replace(/\u0001(\d+)\u0001/g, (_match, index) => held[Number(index)]);
+  };
+
+  const copy = (value) => {
+    if (typeof value === "string") return render(value);
+    if (Array.isArray(value)) return value.map(copy);
+    if (value !== null && typeof value === "object")
+      return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, copy(inner)]));
+    return value;
+  };
+  return copy(result);
+}
+
+/**
  * @param {object} pi  Pi's extension API.
- * @param {{lintProject?: Function, handoffCompleteness?: Function, researchTools?: object}} [deps]  the implementations these
+ * @param {{lintProject?: Function, handoffCompleteness?: Function, researchTools?: object, validationTools?: object}} [deps]  the implementations these
  *   wrappers call. Pi passes one argument, so production always takes the lazy imports below; the only
  *   caller that passes a second is a test that needs to control what a dependency returns, because what
  *   this wrapper must do with a path is its own responsibility whatever the lint hands it.
@@ -523,6 +681,37 @@ export default function register(pi, deps = {}) {
           // ⚠️ THE MESSAGE IS SCRUBBED OF THIS MACHINE, and of nothing else: the library's own
           // sanitiser has already taken the credential out of anything it emits.
           return rendered(refusal("refused", scrub(e?.message ?? String(e), "")));
+        }
+      },
+    });
+
+  /**
+   * The two validation tools, each delegating to the controller that already exists.
+   *
+   * ⚠️ **THE CONTROLLER DECIDES; THIS RENDERS.** Whether a job is refused before provisioning, how long
+   * it may run, what is observed and whether the workspace is gone are `lib/validation/`'s rules. The
+   * result is passed through with one change, which is this boundary's to make: machine paths become
+   * `<workspace>` or `<path>` in a copy, and the controller's own record is left untouched.
+   *
+   * ⚠️ **NO CONTENT ROOT IS RESOLVED.** A validation job runs in a disposable workspace of its own, not
+   * in the project, and a host capability must not depend on standing in one.
+   */
+  for (const { name, label, description, parameters } of VALIDATION_TOOL_TABLE)
+    pi?.registerTool?.({
+      name,
+      label,
+      description,
+      parameters,
+      execute: async (_toolCallId, params) => {
+        const tools = deps.validationTools ?? (await defaultValidationTools());
+        const handler = tools[name];
+        if (typeof handler !== "function")
+          return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
+
+        try {
+          return rendered(await renderValidationResult(await handler(params ?? {})));
+        } catch (e) {
+          return rendered(await renderValidationResult(refusal("refused", e?.message ?? String(e))));
         }
       },
     });

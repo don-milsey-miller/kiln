@@ -35,6 +35,8 @@
     "kiln_write_stage_attestation",
     "research_capability",
     "research_fetch",
-    "research_search"
+    "research_search",
+    "validation_capability",
+    "validation_run"
   ]
 }

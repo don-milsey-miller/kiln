@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +38,14 @@ const PACKAGE_ROOT = join(ROOT, "pi-package");
 const DECLARATION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "signature.json"), "utf-8"));
 
 /** The tools whose subject is not the project: the package's own declaration, and the public web. */
-const PROJECTLESS = new Set(["kiln_capability", "research_capability", "research_search", "research_fetch"]);
+const PROJECTLESS = new Set([
+  "kiln_capability",
+  "research_capability",
+  "research_search",
+  "research_fetch",
+  "validation_capability",
+  "validation_run",
+]);
 const SCHEMAS = join(ROOT, "schemas");
 const schemas = loadSchemaSet(SCHEMAS);
 const validators = createValidators(SCHEMAS);
@@ -161,6 +168,8 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "research_capability",
       "research_fetch",
       "research_search",
+      "validation_capability",
+      "validation_run",
     ],
     "every tool this package declares: nine creations, eight mutations, two reads, activation and the two attestations"
   );
@@ -1200,13 +1209,12 @@ test("⚠️ ACC-0110 the research tools answer where there is no project at all
   }
 });
 
-test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content, configuration or stored state", async () => {
-  // ⚠️ **THE REFUSAL CASES CANNOT PROVE THIS.** Without a credential the adapter refuses before it does
-  // anything, so "nothing changed" there is true for a reason that has nothing to do with the probe.
-  // What ACC-0110 asks is that a probe that RAN and REPORTED AVAILABLE persisted nothing, so this builds
-  // the real `createResearchTools` over a backend that answers, and watches everything it could reach.
-  const { createResearchTools } = await import("../lib/research/tools.mjs");
-
+/**
+ * A temporary parent of six backdated sentinels, and a way to run a call with every route a write could
+ * take pointed into it: the content-root variable, Pi's agent-directory variable and the working
+ * directory. Shared by every "a successful probe persisted nothing" test, so each makes the same claim.
+ */
+function probeStateParent() {
   const parent = reapLater(mkdtempSync(join(tmpdir(), "kiln-probe-state-")));
   const sentinels = {
     "project/planning-content/data/requirements/REQ-0001.json": '{"id":"REQ-0001"}\n',
@@ -1242,6 +1250,43 @@ test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content,
     return out;
   };
 
+  const within = async (call) => {
+    const saved = { dir: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR, cwd: process.cwd() };
+    process.env.PLANNING_CONTENT_DIR = join(parent, "project", "planning-content");
+    process.env.PI_CODING_AGENT_DIR = join(parent, "agent");
+    process.chdir(join(parent, "project"));
+    try {
+      return await call();
+    } finally {
+      process.chdir(saved.cwd);
+      for (const [name, value] of [["PLANNING_CONTENT_DIR", saved.dir], ["PI_CODING_AGENT_DIR", saved.agent]])
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+    }
+  };
+
+  return { parent, tree, within };
+}
+
+/** The same entries, no new file or directory, and every file's bytes and modification time identical. */
+function assertTreeUnchanged(before, after) {
+  assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort(), "the probe created or removed an entry");
+  for (const [key, was] of before) {
+    if (was === "dir") continue;
+    const now = after.get(key);
+    assert.deepEqual(now.bytes, was.bytes, `the probe changed ${key}`);
+    assert.equal(now.mtimeMs, was.mtimeMs, `the probe rewrote or touched ${key}`);
+  }
+}
+
+test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content, configuration or stored state", async () => {
+  // ⚠️ **THE REFUSAL CASES CANNOT PROVE THIS.** Without a credential the adapter refuses before it does
+  // anything, so "nothing changed" there is true for a reason that has nothing to do with the probe.
+  // What ACC-0110 asks is that a probe that RAN and REPORTED AVAILABLE persisted nothing, so this builds
+  // the real `createResearchTools` over a backend that answers, and watches everything it could reach.
+  const { createResearchTools } = await import("../lib/research/tools.mjs");
+  const state = probeStateParent();
+
   let probes = 0;
   const tools = withResearch(
     createResearchTools({
@@ -1255,39 +1300,320 @@ test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content,
     })
   );
 
-  const saved = { dir: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR, cwd: process.cwd() };
-  // ⚠️ POINTED AT THE SENTINELS FROM EVERY DIRECTION A WRITE COULD RESOLVE ONE: the content-root
-  // variable, Pi's agent-directory variable, and the working directory.
-  process.env.PLANNING_CONTENT_DIR = join(parent, "project", "planning-content");
-  process.env.PI_CODING_AGENT_DIR = join(parent, "agent");
-  process.chdir(join(parent, "project"));
-
-  const before = tree();
-  let probed;
-  try {
-    probed = (await invokeAnywhere(tools.get("research_capability"))).details;
-  } finally {
-    process.chdir(saved.cwd);
-    for (const [name, value] of [["PLANNING_CONTENT_DIR", saved.dir], ["PI_CODING_AGENT_DIR", saved.agent]])
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-  }
-  const after = tree();
+  const before = state.tree();
+  const probed = (await state.within(() => invokeAnywhere(tools.get("research_capability")))).details;
+  const after = state.tree();
 
   // The probe ran, and it succeeded - otherwise the assertion below would prove nothing.
   assert.equal(probes, 1, "the capability probe did not run");
   assert.equal(probed.available, true, JSON.stringify(probed));
   assert.equal(probed.probedLive, true);
+  assertTreeUnchanged(before, after);
+});
 
-  // ⚠️ AND NOTHING UNDER THE PARENT MOVED: the same entries, no new file or directory, every file's
-  // bytes and modification time identical.
-  assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort(), "the probe created or removed an entry");
-  for (const [key, was] of before) {
-    if (was === "dir") continue;
-    const now = after.get(key);
-    assert.deepEqual(now.bytes, was.bytes, `the probe changed ${key}`);
-    assert.equal(now.mtimeMs, was.mtimeMs, `the probe rewrote or touched ${key}`);
+/* ============================================ the validation tools ============================= */
+
+const withValidation = (validationTools) => {
+  const tools = new Map();
+  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { validationTools });
+  return tools;
+};
+
+/** A job the controller accepts: tier 1, one argument-array command, bounded, with a capture plan. */
+const TIER_1_JOB = Object.freeze({
+  tier: 1,
+  commands: [["{python}", "-c", "print(1)"]],
+  timeoutMs: 20_000,
+  maxOutputBytes: 100_000,
+  capturePlan: { stdout: true, stderr: true },
+  expectedOutputs: [],
+});
+
+/**
+ * The real controller behind the seam, with every result it returns kept beside a deep copy taken
+ * the moment it was returned - so a rendering that edited the controller's object is caught.
+ *
+ * ⚠️ **NODE STANDS IN FOR THE INTERPRETER, ON PURPOSE.** It is present on every CI cell, it answers
+ * `--version` exactly as a probe needs, and it REFUSES `-m venv` - so a successful probe and a real
+ * provisioning failure are both deterministic, and no cell depends on an ambient Python.
+ */
+async function recordingValidation(options) {
+  const { createValidationTools } = await import("../lib/validation/tools.mjs");
+  const real = createValidationTools(options);
+  const originals = [];
+  const record = (name) => async (params) => {
+    const out = await real[name](params);
+    originals.push({ out, copy: structuredClone(out) });
+    return out;
+  };
+  return { tools: { validation_capability: record("validation_capability"), validation_run: record("validation_run") }, originals };
+}
+
+/** No workspace, interpreter, home or temporary directory, in any spelling. */
+const assertValidationDisclosesNothing = (text, paths, label) => {
+  assertNoMachinePath(text, paths, label);
+  assert.equal(text.includes("vpw-tier1-"), false, `${label}: a workspace directory name survived: ${text.slice(0, 240)}`);
+};
+
+test("⚠️ ACC-0110 the two validation tools register under the contract's names, with its measured schemas", async () => {
+  const { VALIDATION_TOOL_SIGNATURES } = await import("../lib/validation/tools.mjs");
+  const { contractFor } = await import("../lib/specialists/contract.mjs");
+  const tools = registered();
+
+  assert.deepEqual(contractFor("validation").requiredCapabilities, ["validation_capability", "validation_run"]);
+  for (const name of contractFor("validation").requiredCapabilities) {
+    const tool = tools.get(name);
+    assert.ok(tool, `${name} is not registered`);
+    assert.deepEqual(tool.parameters, VALIDATION_TOOL_SIGNATURES[name].input, `${name}'s schema is not the measured one`);
+    assert.equal(tool.description, VALIDATION_TOOL_SIGNATURES[name].description, `${name}'s description is not the measured one`);
+    assert.ok(DECLARATION.tools.includes(name), `${name} is not declared`);
   }
+});
+
+test("⚠️ ACC-0110 each validation tool hands its parameters to the controller and its path-free answer back unchanged", async () => {
+  const seen = [];
+  const answer = (name) => async (params) => {
+    seen.push({ name, params });
+    return { tool: name, ok: true, phase: "complete", executions: [{ argv: ["{python}", "-c", "print(1)"], exitStatus: 0, stdout: "1\n", stderr: "" }], limits: { executionDeadlineMs: 20_000 } };
+  };
+  const tools = withValidation({ validation_capability: answer("validation_capability"), validation_run: answer("validation_run") });
+
+  const ran = await invokeAnywhere(tools.get("validation_run"), structuredClone(TIER_1_JOB));
+  await invokeAnywhere(tools.get("validation_capability"), {});
+
+  assert.deepEqual(seen, [
+    { name: "validation_run", params: structuredClone(TIER_1_JOB) },
+    { name: "validation_capability", params: {} },
+  ]);
+  // ⚠️ NOTHING TO RENDER, SO NOTHING CHANGED: a result with no machine path comes back deep-equal.
+  assert.deepEqual(ran.details, { tool: "validation_run", ok: true, phase: "complete", executions: [{ argv: ["{python}", "-c", "print(1)"], exitStatus: 0, stdout: "1\n", stderr: "" }], limits: { executionDeadlineMs: 20_000 } });
+});
+
+test("⚠️ ACC-0110 a provisioning failure keeps its meaning and loses its paths, and the controller's record is untouched", async () => {
+  const workspaces = [];
+  const { tools, originals } = await recordingValidation({
+    python: process.execPath,
+    io: { remove: (p) => (workspaces.push(p), rmSync(p, { recursive: true, force: true, maxRetries: 3 })), exists: existsSync },
+  });
+
+  const rendered = (await invokeAnywhere(withValidation(tools).get("validation_run"), structuredClone(TIER_1_JOB))).details;
+  const [{ out, copy }] = originals;
+  const [workspace] = workspaces;
+
+  // The route is real: provisioning failed, and the controller's own message named the workspace.
+  assert.equal(out.phase, "provision");
+  assert.ok(workspace, "no workspace was provisioned");
+  assert.ok(out.failure.message.includes(workspace), "the controller's diagnostic no longer names its workspace");
+
+  // ⚠️ THE CONTROLLER'S OBJECT IS EXACTLY AS IT WAS RETURNED.
+  assert.deepEqual(out, copy, "rendering edited the controller's result");
+
+  // Rendered: the phase, the failure and the destroy record mean what they meant.
+  assert.equal(rendered.ok, false);
+  assert.equal(rendered.phase, "provision");
+  assert.equal(rendered.destroy.outcome, "destroyed");
+  assert.match(rendered.failure.message, /bad option/, rendered.failure.message);
+  assert.ok(rendered.failure.message.includes("<workspace>/.venv"), rendered.failure.message);
+  assertValidationDisclosesNothing(JSON.stringify(rendered), [workspace, process.execPath, homedir(), tmpdir()], "a provisioning failure");
+});
+
+test("⚠️ ACC-0110 a retained workspace is still reported as retained, at <workspace>", async () => {
+  const workspaces = [];
+  // Removal is suppressed and the workspace reported present, so the controller records a retained one.
+  const { tools, originals } = await recordingValidation({
+    python: process.execPath,
+    io: { remove: (p) => workspaces.push(p), exists: () => true },
+  });
+
+  try {
+    const rendered = (await invokeAnywhere(withValidation(tools).get("validation_run"), structuredClone(TIER_1_JOB))).details;
+    const [{ out, copy }] = originals;
+    const [workspace] = workspaces;
+
+    assert.equal(out.destroy.retainedPath, workspace, "the controller no longer keeps the exact retained path");
+    assert.deepEqual(out, copy, "rendering edited the controller's result");
+
+    // ⚠️ THE FACT SURVIVES; THE LOCATION DOES NOT.
+    assert.equal(rendered.destroy.outcome, "retained");
+    assert.equal(rendered.destroy.retainedPath, "<workspace>");
+    assert.equal(rendered.destroy.evidencePreserved, true);
+    assert.equal(rendered.destroy.reason, "Removal reported success and the workspace is still present.");
+    const omission = rendered.environment.omissions.find((o) => o.fact === "workspace-destroyed");
+    assert.equal(omission.state, "unavailable");
+    assert.equal(omission.reason, "Cleanup did not complete: Removal reported success and the workspace is still present. The environment is retained at <workspace>.");
+    assertValidationDisclosesNothing(JSON.stringify(rendered), [workspace, process.execPath, homedir(), tmpdir()], "a retained workspace");
+  } finally {
+    for (const p of workspaces) rmSync(p, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0110 a retained workspace outside the default location is still rendered by its exact root", async () => {
+  // ⚠️ **THE EXACT ROOT, NOT THE PATTERN.** Under the default location the controller's `vpw-tier1-`
+  // workspace sits directly in the temporary directory, and a pattern for that finds it. A controller
+  // given another `baseDir` puts it somewhere no pattern anticipates; the retained path the controller
+  // reports is then the only exact statement of the root, and without it the name would collapse to
+  // `<path>` and lose what followed it.
+  const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-custom-base-")));
+  const nested = join(base, "nested", "validation");
+  mkdirSync(nested, { recursive: true });
+
+  const workspaces = [];
+  const { tools, originals } = await recordingValidation({
+    python: process.execPath,
+    baseDir: nested,
+    io: { remove: (p) => workspaces.push(p), exists: () => true },
+  });
+
+  try {
+    const rendered = (await invokeAnywhere(withValidation(tools).get("validation_run"), structuredClone(TIER_1_JOB))).details;
+    const [{ out, copy }] = originals;
+    const [workspace] = workspaces;
+
+    assert.ok(workspace.startsWith(nested), "the controller did not honour the base directory");
+    assert.deepEqual(out, copy, "rendering edited the controller's result");
+    assert.equal(rendered.destroy.retainedPath, "<workspace>");
+    assert.ok(rendered.failure.message.includes("<workspace>/.venv"), rendered.failure.message);
+    const omission = rendered.environment.omissions.find((o) => o.fact === "workspace-destroyed");
+    assert.equal(omission.reason, "Cleanup did not complete: Removal reported success and the workspace is still present. The environment is retained at <workspace>.");
+    assertValidationDisclosesNothing(JSON.stringify(rendered), [workspace, base, process.execPath, homedir(), tmpdir()], "a retained workspace under another base");
+  } finally {
+    for (const p of workspaces) rmSync(p, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0110 a job's own output keeps its relative context through every spelling and every level of nesting", async () => {
+  // ⚠️ THE ROUTE A PYTHON TRACEBACK TAKES, measured locally with a real interpreter: the controller
+  // records a failing script's stderr as it was written, and it names the script by its absolute path.
+  // CI has no ambient Python, so the shape is reproduced here with the same workspace root.
+  const workspace = join(tmpdir(), "vpw-tier1-Ab3dEf");
+  const original = {
+    tool: "validation_run",
+    ok: true,
+    phase: "complete",
+    executions: [
+      {
+        argv: ["{python}", "check.py"],
+        exitStatus: 1,
+        stdout: `wrote ${join(workspace, "sub", "dir", "out.txt")}\n`,
+        stderr: `Traceback (most recent call last):\r\n  File "${join(workspace, "check.py")}", line 1, in <module>\r\nFileNotFoundError: [Errno 2] No such file or directory: 'missing.txt'\r\n`,
+      },
+    ],
+    environment: {
+      facts: {
+        nested: [{ deeper: { repr: `the workspace is ${JSON.stringify(workspace).slice(1, -1)}\\\\inputs` } }],
+        forward: workspace.split("\\").join("/") + "/inputs/data.json",
+        elsewhere: `home is ${homedir()}, node is ${process.execPath}`,
+      },
+    },
+  };
+  const copy = structuredClone(original);
+
+  const rendered = (await invokeAnywhere(withValidation({ validation_run: async () => original }).get("validation_run"), structuredClone(TIER_1_JOB))).details;
+
+  assert.deepEqual(original, copy, "rendering edited the controller's result");
+
+  const [execution] = rendered.executions;
+  assert.equal(execution.exitStatus, 1);
+  assert.equal(execution.stdout, "wrote <workspace>/sub/dir/out.txt\n");
+  assert.ok(execution.stderr.includes('File "<workspace>/check.py", line 1, in <module>'), execution.stderr);
+  assert.ok(execution.stderr.includes("FileNotFoundError: [Errno 2] No such file or directory: 'missing.txt'"), execution.stderr);
+  assert.equal(rendered.environment.facts.nested[0].deeper.repr, "the workspace is <workspace>/inputs");
+  assert.equal(rendered.environment.facts.forward, "<workspace>/inputs/data.json");
+  assert.equal(rendered.environment.facts.elsewhere, "home is <path>, node is <path>");
+  assertValidationDisclosesNothing(JSON.stringify(rendered), [workspace, process.execPath, homedir(), tmpdir()], "a job's output");
+});
+
+test("⚠️ ACC-0110 an unusable interpreter and an over-ceiling job stay the controller's own refusals", async () => {
+  const missing = join(tmpdir(), "kiln-no-interpreter", "python.exe");
+  const unusable = await recordingValidation({ python: missing });
+  const probed = (await invokeAnywhere(withValidation(unusable.tools).get("validation_capability"))).details;
+
+  assert.equal(probed.available, false);
+  assert.equal(probed.reason, "not-configured");
+  assert.equal(probed.mustRecordGap, true);
+  assert.match(probed.detail, /No usable Python interpreter \(<path>\)/, probed.detail);
+  assert.equal(probed.code, undefined, "the wrapper added a refusal code of its own");
+  assertValidationDisclosesNothing(JSON.stringify(probed), [missing, homedir(), tmpdir()], "an unusable interpreter");
+
+  const usable = await recordingValidation({ python: process.execPath });
+  const refused = (await invokeAnywhere(withValidation(usable.tools).get("validation_run"), { ...structuredClone(TIER_1_JOB), tier: 2 })).details;
+  assert.equal(refused.phase, "refused");
+  assert.equal(refused.reason, "above-approved-ceiling");
+  assert.equal(refused.destroy.outcome, "nothing-to-destroy");
+  assert.equal(refused.code, undefined);
+});
+
+test("⚠️ ACC-0110 a credential planted in the host environment reaches no validation result", async () => {
+  const planted = "sk-ant-VALIDATION-PLANTED-5e2a";
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = planted;
+
+  try {
+    // ⚠️ KEPT OUT UPSTREAM: the controller supplies every job an allowlisted environment, and this
+    // entry point may not read the environment at all. So the claim is asserted on the real paths.
+    const { tools, originals } = await recordingValidation({ python: process.execPath });
+    const wrapped = withValidation(tools);
+    const texts = [
+      JSON.stringify(await invokeAnywhere(wrapped.get("validation_capability"))),
+      JSON.stringify(await invokeAnywhere(wrapped.get("validation_run"), structuredClone(TIER_1_JOB))),
+    ];
+    for (const text of texts) {
+      assert.equal(text.includes(planted), false, "a planted credential reached a rendered result");
+      assert.equal(text.includes(`Bearer ${planted}`), false);
+    }
+    for (const { out } of originals) assert.equal(JSON.stringify(out).includes(planted), false, "the controller carried the credential");
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+});
+
+test("⚠️ ACC-0110 the production path builds the real controller, with no project and no Python to find", async () => {
+  // ⚠️ **OFFLINE AND DETERMINISTIC WITHOUT DEPENDING ON THIS HOST.** The production tools run `python`
+  // from PATH. Pointing PATH at an empty directory, from an empty working directory, makes it
+  // unresolvable on every cell - so the answer is the real controller's own not-configured refusal
+  // whether or not the host has Python.
+  const empty = reapLater(mkdtempSync(join(tmpdir(), "kiln-no-python-")));
+  const saved = { PATH: process.env.PATH, dir: process.env.PLANNING_CONTENT_DIR, cwd: process.cwd() };
+  process.env.PATH = empty;
+  delete process.env.PLANNING_CONTENT_DIR;
+  process.chdir(empty);
+
+  try {
+    const probed = (await invokeAnywhere(registered().get("validation_capability"))).details;
+    assert.equal(probed.available, false, JSON.stringify(probed));
+    assert.equal(probed.reason, "not-configured");
+    assert.match(probed.detail, /No usable Python interpreter \(python\)/);
+    assert.ok(probed.signatures?.validation_run, "the controller's measured signatures came through");
+    assert.notEqual(probed.code, "no-content-root", "validation demanded a project");
+
+    const ran = (await invokeAnywhere(registered().get("validation_run"), structuredClone(TIER_1_JOB))).details;
+    assert.equal(ran.phase, "refused");
+    assert.equal(ran.reason, "not-configured");
+    assert.equal(ran.destroy.outcome, "nothing-to-destroy");
+  } finally {
+    process.env.PATH = saved.PATH;
+    if (saved.dir !== undefined) process.env.PLANNING_CONTENT_DIR = saved.dir;
+    process.chdir(saved.cwd);
+    rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0110 a SUCCESSFUL validation probe changes no planning content, configuration or stored state", async () => {
+  // ⚠️ THE SAME CLAIM AS THE RESEARCH PROBE, over the real controller: node answers `--version`, so the
+  // probe genuinely runs an interpreter and genuinely reports available.
+  const { createValidationTools } = await import("../lib/validation/tools.mjs");
+  const state = probeStateParent();
+  const tools = withValidation(createValidationTools({ python: process.execPath }));
+
+  const before = state.tree();
+  const probed = (await state.within(() => invokeAnywhere(tools.get("validation_capability")))).details;
+  const after = state.tree();
+
+  assert.equal(probed.available, true, JSON.stringify(probed));
+  assert.equal(probed.probedLive, true);
+  assert.equal(probed.interpreter, process.version, "the probe did not run the interpreter it was given");
+  assertTreeUnchanged(before, after);
 });
 
 /* ============================================ the capability tool ============================== */

@@ -154,6 +154,8 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
           "research_capability",
           "research_fetch",
           "research_search",
+          "validation_capability",
+          "validation_run",
         ],
         commands: 0,
         handlers: 0,

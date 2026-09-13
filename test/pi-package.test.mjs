@@ -62,6 +62,8 @@ const REGISTERED_TOOLS = Object.freeze([
   "research_capability",
   "research_fetch",
   "research_search",
+  "validation_capability",
+  "validation_run",
 ]);
 
 /** A throwaway copy of the real package, for the cases that must break it. */

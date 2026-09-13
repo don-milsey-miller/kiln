@@ -376,7 +376,9 @@ test("⚠️ ACC-0064 the same probe, without the allowlist, measures Pi's own d
   // And the Kiln tools are there too: without an allowlist an extension's tools are active as well,
   // which is precisely the state the launch flag exists to narrow.
   assert.ok(measured.active.includes("kiln_lint"));
-  assert.ok(measured.active.length > 23, `the control adds Pi's own tools to the package's: ${measured.active.length}`);
+  // ⚠️ DERIVED, LIKE EVERY OTHER COUNT HERE (F83): the control holds the package's tools and Pi's own.
+  const declaredCount = (await piToolAllowlist(ROOT)).length;
+  assert.ok(measured.active.length > declaredCount, `the control adds Pi's own tools to the package's: ${measured.active.length}`);
 });
 
 test("⚠️ ACC-0064 without trust the package is not there to measure, and the session still runs", async () => {
