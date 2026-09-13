@@ -2419,6 +2419,77 @@ test("an explicit self-hosting run completes, and says which directory it opened
   );
 });
 
+/* ------------------------------------------------ the validated self-host marker (ACC-0071, D20) */
+
+/** A run to completion with stand-in children, returning the environment each child was given. */
+async function childEnvironments({ dir, selfHost, env }) {
+  const envs = [];
+  let launcherExit = null;
+  await runSupervisor({
+    ...(selfHost ? selfHosting(dir) : { agentDir: AGENT_DIR, readTrust: APPROVED, projectRoot: dir }),
+    selfHost,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    env: { PORT: String(await freePort()), ...env },
+    psRun: NO_DESCENDANTS,
+    randomBytes: () => Buffer.alloc(16, 9),
+    build: null,
+    spawn: (command, args, options) => {
+      envs.push(options.env);
+      if (envs.length === 1)
+        return {
+          get exitCode() {
+            return launcherExit;
+          },
+          signalCode: null,
+          stdin: { destroyed: false, write: () => {}, end: () => (launcherExit = 0) },
+          once: () => {},
+        };
+      return exitingChild();
+    },
+    fetchImpl: async () => ({
+      status: 200,
+      json: async () => ({ service: "kiln", protocol: "kiln.health/1", runId: "09".repeat(16), projectId: PROJECT_ID, build: null }),
+    }),
+  });
+  assert.equal(envs.length, 2, "both children were started");
+  return { launcher: envs[0], agent: envs[1] };
+}
+
+const markerKeys = (env) => Object.keys(env).filter((key) => /^kiln_self_host$/i.test(key));
+
+test("⚠️ ACC-0071 an inherited self-host marker reaches neither child of a consumer run, in any spelling", async () => {
+  const dir = project();
+  const { launcher, agent } = await childEnvironments({
+    dir,
+    selfHost: false,
+    env: { KILN_SELF_HOST: "validated-v1", kiln_self_host: "validated-v1" },
+  });
+
+  assert.equal(launcher.KILN_SELF_HOST, undefined, "the launcher is never given the marker");
+  assert.equal(agent.KILN_SELF_HOST, undefined, "an inherited value is not permission");
+  if (process.platform === "win32") {
+    assert.deepEqual(markerKeys(launcher), [], "on Windows every spelling is the same variable, and every one is removed");
+    assert.deepEqual(markerKeys(agent), []);
+  } else {
+    assert.deepEqual(markerKeys(agent), ["kiln_self_host"], "elsewhere a differently-cased name is a different variable and is not the marker");
+  }
+});
+
+test("⚠️ ACC-0071 a validated self-hosting run gives the agent exactly the marker, and the launcher nothing", async () => {
+  const dir = project();
+  const forged = process.platform === "win32" ? { Kiln_Self_Host: "forged" } : { KILN_SELF_HOST: "forged" };
+  const { launcher, agent } = await childEnvironments({
+    dir,
+    selfHost: true,
+    env: { PLANNING_CONTENT_DIR: join(dir, "planning-content"), ...forged },
+  });
+
+  assert.deepEqual(markerKeys(agent), ["KILN_SELF_HOST"], "one spelling, the supervisor's own");
+  assert.equal(agent.KILN_SELF_HOST, "validated-v1", "written because resolveSelfHost validated the run");
+  assert.deepEqual(markerKeys(launcher), [], "the launcher is never given the marker, validated or inherited");
+});
+
 test("⚠️ --self-host with no override reaches the SELF-HOST refusal, through the real command", () => {
   // ⚠️ **THE HELPER TEST ABOVE CANNOT SEE THIS, AND THAT IS THE WHOLE POINT.** `resolveSelfHost` is
   // reached from `main()` only after `resolveProjectRoot()`, and the project root is

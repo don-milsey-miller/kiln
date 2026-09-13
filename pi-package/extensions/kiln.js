@@ -52,10 +52,11 @@ export const SIGNATURE = deepFreeze(declaration);
  * one place that decides which project is open; a tool that derived its own would read one project
  * while the operator believed it read another.
  */
-async function projectContext() {
-  const [{ resolveContentRoot, toolRoot }, { loadSchemaSet }, { createValidators }, { readActivatedTypes }, { join }] =
+async function projectContext(deps = {}) {
+  const [{ resolveContentRoot, toolRoot }, { assertOrchestratorContentRoot }, { loadSchemaSet }, { createValidators }, { readActivatedTypes }, { join }] =
     await Promise.all([
       import("../../lib/content-root.mjs"),
+      import("../../lib/orchestrator-root.mjs"),
       import("../../lib/schema-resolver.mjs"),
       import("../../lib/validate.mjs"),
       import("../../lib/activation.mjs"),
@@ -63,7 +64,11 @@ async function projectContext() {
     ]);
 
   const contentRoot = resolveContentRoot();
-  const tool = toolRoot();
+  // ⚠️ `deps.toolRoot` exists for tests, which need a tool root they may safely let a handler near; Pi passes
+  // no second argument to `register`, so production always takes the tool root this module lives in.
+  const tool = deps.toolRoot ?? toolRoot();
+  // ⚠️ THE TOOL'S OWN CONTENT IS REFUSED HERE, BEFORE ANY SCHEMA, ACTIVATION, ARTIFACT OR DOCUMENT IS READ (ACC-0071).
+  assertOrchestratorContentRoot({ contentRoot, toolRoot: tool });
   const schemasDir = join(tool, "schemas");
   const schemas = loadSchemaSet(schemasDir);
   const validators = createValidators(schemasDir);
@@ -146,6 +151,25 @@ const scrub = (text, root) => {
 
 /** A refusal a model can act on, with no exception text and no machine path in it. */
 const refusal = (code, message) => ({ ok: false, code, message });
+
+/**
+ * What every project-bound handler returns when the content root is the tool's own - ACC-0071, D13.
+ *
+ * ⚠️ **TWO SURFACES.** The model receives this fixed result: a stable code and two placeholders, never a path.
+ * The operator is told the canonical absolute paths through the UI, once, when the invocation has one. Without a
+ * UI nothing is written to a terminal stream - the launcher's own refusal is the operator's surface there.
+ */
+function toolContentRefused(error, ctx) {
+  if (error?.code !== "tool-content-refused") return null;
+  if (ctx?.hasUI === true && typeof ctx.ui?.notify === "function") {
+    try {
+      ctx.ui.notify(String(error.message), "error");
+    } catch {
+      // A UI that cannot show the notice changes nothing about the refusal.
+    }
+  }
+  return rendered({ ok: false, code: "tool-content-refused", contentRoot: "<content-root>", toolRoot: "<tool-root>" });
+}
 
 /**
  * The creation tools, as an explicit table.
@@ -766,12 +790,12 @@ export default function register(pi, deps = {}) {
         required: ["artifact"],
         additionalProperties: false,
       },
-      execute: async (_toolCallId, params) => {
+      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
         let context;
         try {
-          context = await projectContext();
+          context = await projectContext(deps);
         } catch (e) {
-          return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+          return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
         }
 
         // ⚠️ THROUGH THE REGISTRY, WHICH IS THE ONLY LEGAL WRITER. Nothing here allocates an id,
@@ -803,12 +827,12 @@ export default function register(pi, deps = {}) {
       label,
       description,
       parameters,
-      execute: async (_toolCallId, params) => {
+      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
         let context;
         try {
-          context = await projectContext();
+          context = await projectContext(deps);
         } catch (e) {
-          return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+          return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
         }
 
         const mutationTools = deps.MUTATION_TOOLS ?? (await import("../../lib/tools/registry.mjs")).MUTATION_TOOLS;
@@ -938,12 +962,12 @@ export default function register(pi, deps = {}) {
       "with that stage's blockers and one recommended next action; the project's name and description; and the " +
       "Stage 1 document. Reads only; changes nothing.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
-    execute: async () => {
+    execute: async (_toolCallId, _params, _signal, _onUpdate, ctx) => {
       let context;
       try {
-        context = await projectContext();
+        context = await projectContext(deps);
       } catch (e) {
-        return rendered(
+        return toolContentRefused(e, ctx) ?? rendered(
           await renderForModel(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`))
         );
       }
@@ -1025,12 +1049,12 @@ export default function register(pi, deps = {}) {
       },
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       let context;
       try {
-        context = await projectContext();
+        context = await projectContext(deps);
       } catch (e) {
-        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
       }
 
       const lintProject = deps.lintProject ?? (await import("../../lib/lint.mjs")).lintProject;
@@ -1085,12 +1109,12 @@ export default function register(pi, deps = {}) {
       required: ["type", "action", "approvedBy"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       let context;
       try {
-        context = await projectContext();
+        context = await projectContext(deps);
       } catch (e) {
-        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
       }
 
       const projectTools = deps.PROJECT_TOOLS ?? (await import("../../lib/tools/registry.mjs")).PROJECT_TOOLS;
@@ -1145,12 +1169,12 @@ export default function register(pi, deps = {}) {
       required: ["stage"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       let context;
       try {
-        context = await projectContext();
+        context = await projectContext(deps);
       } catch (e) {
-        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
       }
 
       const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
@@ -1193,12 +1217,12 @@ export default function register(pi, deps = {}) {
       required: ["stage", "criterion", "result", "decidedBy"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       let context;
       try {
-        context = await projectContext();
+        context = await projectContext(deps);
       } catch (e) {
-        return rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
       }
 
       const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
