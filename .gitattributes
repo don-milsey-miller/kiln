@@ -25,6 +25,16 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# --- Packaged skills --------------------------------------------------------
+#
+# Named explicitly rather than left to the rule above. The generated kiln-stage-*
+# skills are compared BYTE FOR BYTE against what the generator produces, so a
+# checkout that converted them to CRLF would make every one of them stale on
+# Windows, and the check would fail for a reason that has nothing to do with the
+# stage definitions. The handwritten skill is covered by the same rule.
+
+pi-package/skills/**/SKILL.md text eol=lf
+
 # --- Binary ----------------------------------------------------------------
 #
 # Git detects most of these, but declaring them means no chance of a text

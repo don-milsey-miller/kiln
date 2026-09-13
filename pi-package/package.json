@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The unit Pi loads for a Kiln project: one extension, one skill, one prompt, and a declared signature.",
+  "description": "The unit Pi loads for a Kiln project: one extension, a handwritten planning skill, a generated skill for each planning stage, one prompt, and a declared signature.",
   "keywords": ["pi-package"],
   "pi": {
     "extensions": ["./extensions/kiln.js"],

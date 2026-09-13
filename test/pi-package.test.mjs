@@ -105,10 +105,25 @@ test("⚠️ ACC-0063 the real package validates: its declared resources exist a
 
   assert.equal(manifest.name, "@kiln/pi-package");
   assert.deepEqual(resources.extensions, ["kiln"]);
-  assert.deepEqual(resources.skills, ["kiln-planning"]);
+  // ⚠️ THE HANDWRITTEN SKILL AND THE NINE GENERATED ONES, written out rather than read from the
+  // declaration, so the comparison below is between two independent statements. Discovery order is
+  // whatever the filesystem enumerates and is not part of the contract, so names compare as sorted
+  // copies.
+  assert.deepEqual([...resources.skills].sort(), [
+    "kiln-planning",
+    "kiln-stage-01-intake",
+    "kiln-stage-02-intent-decomposition",
+    "kiln-stage-03-discovery",
+    "kiln-stage-04-requirement-gaps",
+    "kiln-stage-05-solution-design",
+    "kiln-stage-06-risk-feasibility",
+    "kiln-stage-07-acceptance-criteria",
+    "kiln-stage-08-implementation-plan",
+    "kiln-stage-09-handoff",
+  ]);
   assert.deepEqual(resources.prompts, ["kiln-start"]);
   assert.deepEqual([...signature.extensions], resources.extensions, "the declaration names what is there");
-  assert.deepEqual([...signature.skills], resources.skills);
+  assert.deepEqual([...signature.skills].sort(), [...resources.skills].sort());
   assert.deepEqual([...signature.prompts], resources.prompts);
   assert.equal(typeof register, "function");
 

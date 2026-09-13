@@ -4,7 +4,16 @@
     "kiln"
   ],
   "skills": [
-    "kiln-planning"
+    "kiln-planning",
+    "kiln-stage-01-intake",
+    "kiln-stage-02-intent-decomposition",
+    "kiln-stage-03-discovery",
+    "kiln-stage-04-requirement-gaps",
+    "kiln-stage-05-solution-design",
+    "kiln-stage-06-risk-feasibility",
+    "kiln-stage-07-acceptance-criteria",
+    "kiln-stage-08-implementation-plan",
+    "kiln-stage-09-handoff"
   ],
   "prompts": [
     "kiln-start"

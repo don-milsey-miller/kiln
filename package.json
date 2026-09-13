@@ -13,6 +13,8 @@
     "init:project": "node bin/init-project.mjs",
     "lint:plan": "node bin/lint-plan.mjs",
     "lint:shell": "node bin/lint-shell.mjs",
+    "skills:generate": "node bin/generate-stage-skills.mjs",
+    "skills:check": "node bin/generate-stage-skills.mjs --check",
     "dev": "node app/server.mjs",
     "shell:build": "next build",
     "shell:start": "next start --hostname 127.0.0.1",

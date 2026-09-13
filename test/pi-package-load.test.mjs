@@ -39,6 +39,23 @@ const { DefaultResourceLoader, ProjectTrustStore, hasTrustRequiringProjectResour
 const CONTROL_SKILL = "probe-control";
 
 /**
+ * Every skill the package declares, written out so this test does not agree with the declaration it
+ * checks: the handwritten skill and the nine generated from the stage definitions.
+ */
+const PACKAGE_SKILLS = Object.freeze([
+  "kiln-planning",
+  "kiln-stage-01-intake",
+  "kiln-stage-02-intent-decomposition",
+  "kiln-stage-03-discovery",
+  "kiln-stage-04-requirement-gaps",
+  "kiln-stage-05-solution-design",
+  "kiln-stage-06-risk-feasibility",
+  "kiln-stage-07-acceptance-criteria",
+  "kiln-stage-08-implementation-plan",
+  "kiln-stage-09-handoff",
+]);
+
+/**
  * An isolated project with Kiln's package installed into it, and an agent directory holding one
  * user-scoped control skill. `mutate` may break the copied package for the negative cases.
  */
@@ -112,7 +129,7 @@ const controlSkill = (agentDir) => ({
 
 /* ============================================ trusted =========================================== */
 
-test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and kiln-start, from the package", async () => {
+test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, its ten skills and its prompt, from the package", async () => {
   const fixture = isolated();
   try {
     const found = await discover(fixture, true);
@@ -162,8 +179,9 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
       },
     ]);
 
+    // ⚠️ ALL TEN, EACH FROM ITS OWN FILE IN THE PACKAGE, and the user-scoped control beside them.
     assert.deepEqual(found.skills, [
-      { name: "kiln-planning", filePath: join(fixture.pkg, "skills", "kiln-planning", "SKILL.md"), scope: "project" },
+      ...PACKAGE_SKILLS.map((name) => ({ name, filePath: join(fixture.pkg, "skills", name, "SKILL.md"), scope: "project" })),
       controlSkill(fixture.agentDir),
     ]);
 
@@ -177,7 +195,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly kiln, kiln-planning and ki
 
 /* ============================================ untrusted ========================================= */
 
-test("⚠️ ACC-0063 without trust none of the three is discovered, while the user-scoped control still is", async () => {
+test("⚠️ ACC-0063 without trust none of the package's resources is discovered, while the user-scoped control still is", async () => {
   for (const [label, decision] of [
     ["no decision recorded", undefined],
     ["an explicit denial", false],
@@ -231,7 +249,7 @@ test("⚠️ ACC-0063 the entry point is imported, not merely named: breaking it
       // ⚠️ AND THE PACKAGE ITSELF WAS STILL FOUND: the skill and prompt are there, so what failed is
       // the module, not the package's discovery. Without this the case would prove only that
       // something went wrong somewhere.
-      assert.deepEqual(found.skills.map((s) => s.name), ["kiln-planning", CONTROL_SKILL], label);
+      assert.deepEqual(found.skills.map((s) => s.name), [...PACKAGE_SKILLS, CONTROL_SKILL], label);
       assert.deepEqual(found.prompts.map((p) => p.name), ["kiln-start"], label);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
