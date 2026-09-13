@@ -1,0 +1,101 @@
+{
+  "id": "EVD-0105",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a consumer override of kiln-stage-01-intake through Pi's real loader, in four states with two controls",
+  "kind": "experiment",
+  "summary": "Measurement of TSK-0047's consumer skill override through CI. GitHub Actions run 34760917147 at commit 13e074e, attempt 1 with no job retried, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 1011 tests and 0 failures in every cell, zero failing-test lines in the log. The skills check printed clean in every cell, and the live Pi compatibility step on ubuntu-latest node 24 ran 5 tests and passed 5. WHAT RAN, BY NAME, IN EVERY CELL. All 3 tests in test/stage-skill-overrides.test.mjs - \"kiln-stage-01-intake through Pi's real loader: packaged only, override present, override edited, override skill removed\", \"control: an absent override directory is silently ignored, and the packaged skill loads\", \"control: an untrusted project loads neither the package's skills nor the override, while the user-scoped control still loads\" - were matched by name against the source file and passed in each of the four cells, 12 matches, none missing, failed or skipped. The 15 package-validation, 4 package-load, 11 generator, 11 command and 4 packaged-output tests also passed by name in every cell. THE ENTRY IS KILN'S. Each fixture is an isolated temporary project holding a copy of pi-package/ at .planning/pi-package, an override directory at planning-content/skills-overrides holding only .gitkeep, as the initializer scaffolds it, and a .pi/settings.json that is exactly the output of mergeSettingsText for a fresh project with Kiln's package entry. The test asserts that the merged settings hold exactly skills [\"../planning-content/skills-overrides\"] and packages [\"../.planning/pi-package\"]; it never spells the override entry itself. PI DOES THE LOADING, FRESH FOR EACH STATE. Every observation constructs a new DefaultResourceLoader from the pinned runtime, with the fixture as its working directory and a fixture agent directory, and calls reload() with Pi's non-interactive trust rule composed from its root exports. No provider is configured, no credential exists, no model turn is taken and nothing touches the network. HOME is pointed at an empty directory inside the fixture for each load and restored afterwards, so Pi's ~/.agents/skills scan cannot add the runner's own skills to the exact sets. THE FOUR STATES FOR kiln-stage-01-intake, EACH ASSERTED EXACTLY. (1) Packaged only: the loaded filePath is <project>/.planning/pi-package/skills/kiln-stage-01-intake/SKILL.md, the parsed description is the packaged one - stated from stages/01-intake.json in the generator's wording, not read back through Pi's parser - and Pi reports no collision. (2) Override present: exactly one skill with that identity loads, its filePath is <project>/planning-content/skills-overrides/kiln-stage-01-intake/SKILL.md, its description is the override's, and Pi reports exactly one collision, for that identity, with the override file as winner path and the packaged file as loser path. (3) Override edited: the same override filePath loads with the edited description, and the same single collision. (4) Override skill removed while the override directory and the settings file remain - the directory's existence and the settings bytes are asserted - the packaged filePath and packaged description load again and Pi reports no collision. In every state the loaded set is exactly the other nine packaged skills, each from <project>/.planning/pi-package/skills/<name>/SKILL.md, plus the identity and the user-scoped control from the agent directory, and Pi reports no other skill diagnostic. CONTROLS. With the override directory deleted and the settings entry still naming it, the packaged skill loads with its packaged description, the full set is unchanged, and Pi reports no collision and no diagnostic of any kind: an absent override directory is silently ignored, not refused. With no trust decision recorded, and again with an explicit denial, and an override present, the only skill loaded is the user-scoped control from the agent directory - none of the package's skills and not the override - and nothing collides. PLATFORM DIFFERENCE: NONE IN OUTCOME. Every assertion held identically on Windows and Ubuntu under node 22 and 24. Only durations differed: on node 24 the four-state test took about 298 ms on Windows and 50 ms on Ubuntu. WATCH ITEMS. F89 did not recur: all eight shutdown evidence records were complete with nothing unobserved and no shutdown-not-observed refusal. F45's real-Pi-save test, F50's slice 5c and port-retry tests, and all 5 R7 readiness tests passed in every cell, with no bad port or fetch failed in the log. MUTATION CONTROLS, LOCAL ONLY. Eight controls were run against the test file, each alone from a temporary working directory, restored byte-identical, with the repository's git status and fingerprints of pi-package/ and planning-content/ unchanged and no fixture left behind. Killed: the override entry removed or misspelled in the merged settings (caught by the merged-settings assertion); the entry removed or misspelled only in the file on disk (caught by the override-present loader assertion); the override's frontmatter identity changed (caught by the override-present loader assertion); and one loader reused across states and reloaded once (all three tests failed). Name-only assertions passed on the correct fixture and let the changed-identity defect survive, which the full assertions kill. The first harness run used only the merged-settings mutations and paired name-only with one of them; both were caught before any loader assertion, so the on-disk mutations were added and the name-only control was rebuilt around the changed identity.",
+  "outcome": "success",
+  "observedAt": "2026-09-13",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34760917147",
+      "commit": "13e074e",
+      "attempts": "attempt 1, no previous attempt, no job retried",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green",
+      "cell-windows-24": "job 103733481462, node v24.20.0, success, 1011 tests / 1010 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-24": "job 103733481545, node v24.20.0, success, 1011 tests / 1008 pass / 0 fail / 3 skipped; live Pi compatibility 5 / 5",
+      "cell-ubuntu-22": "job 103733481631, node v22.23.2, success, 1011 tests / 1008 pass / 0 fail / 3 skipped",
+      "cell-windows-22": "job 103733481663, node v22.23.2, success, 1011 tests / 1010 pass / 0 fail / 1 skipped",
+      "name-matches": "12 - the 3 override tests matched by name and passed in each of the four cells, none missing, failed or skipped",
+      "tests": "kiln-stage-01-intake through Pi's real loader: packaged only, override present, override edited, override skill removed | control: an absent override directory is silently ignored, and the packaged skill loads | control: an untrusted project loads neither the package's skills nor the override, while the user-scoped control still loads",
+      "pi-version": "0.84.4, the pinned runtime, through its DefaultResourceLoader",
+      "settings-source": "mergeSettingsText output for a fresh project with Kiln's package entry: skills [\"../planning-content/skills-overrides\"], packages [\"../.planning/pi-package\"]",
+      "identity": "kiln-stage-01-intake",
+      "packaged-path": "<project>/.planning/pi-package/skills/kiln-stage-01-intake/SKILL.md",
+      "override-path": "<project>/planning-content/skills-overrides/kiln-stage-01-intake/SKILL.md",
+      "state-packaged-only": "packaged filePath, packaged description, no collision",
+      "state-override-present": "override filePath, override description, exactly one skill with the identity, one collision: winner the override file, loser the packaged file",
+      "state-override-edited": "same override filePath, edited description, the same single collision",
+      "state-override-removed": "override directory and settings bytes unchanged; packaged filePath, packaged description, no collision",
+      "unchanged-skills": "in every trusted state the other nine packaged skills load from their package paths and the user-scoped control from the agent directory; no other skill diagnostic",
+      "control-absent-directory": "packaged skill loads, set unchanged, no collision and no diagnostic",
+      "control-untrusted": "no decision and explicit denial: only the user-scoped control loads; no package skill, no override, no collision",
+      "home-isolation": "HOME pointed at an empty fixture directory for each load and restored",
+      "platform-difference": "none in outcome; node 24 four-state test about 298 ms on Windows and 50 ms on Ubuntu",
+      "watch-items": "F89 not recurred (8 shutdown records complete, 0 shutdown-not-observed); F45, F50 and R7 tests passed in every cell",
+      "local-mutations": "8 run: 6 killed (entry removed or misspelled in merged settings, entry removed or misspelled on disk, identity changed, loader reused); name-only passed on the correct fixture and let the changed-identity defect survive",
+      "local-run": "Windows, node v24: targeted 3 / 3; full suite 1011 / 1009 pass / 0 fail / 2 skipped; lint:shell and lint:plan clean",
+      "commits": "3185c56 corrected the precedence wording and scoped TSK-0047 and ACC-0067; 13e074e the loader test"
+    },
+    "omissions": [
+      {
+        "fact": "observed-paths-in-ci-log",
+        "state": "not-captured",
+        "reason": "The test asserts exact file paths, descriptions and collision paths, but prints none of them, so the CI log records that every assertion passed rather than the values Pi returned. The paths are fixture-relative and differ per runner by temporary directory."
+      },
+      {
+        "fact": "full-cli-session",
+        "state": "not-captured",
+        "reason": "This is Pi's resource loader, not a command-line session with a model turn. The command-line route - provenance read at before_agent_start - was observed in EVD-0081 and EVD-0083 with the probe identity kiln-probe, a present and an absent override directory, and no edited or packaged-only state; it was not repeated here with the generated identity."
+      },
+      {
+        "fact": "skill-body",
+        "state": "not-observable",
+        "reason": "Pi parses a skill's name and description at load and records its location; the body is read later, when the agent opens the file. What this measures as loaded is the description and the file path, not the body text."
+      },
+      {
+        "fact": "earlier-project-skill-path",
+        "state": "not-captured",
+        "reason": "R8: Kiln's merge appends its override entry after any existing project skills entry, and project-settings entries keep their order, so an earlier project-settings skill path holding the same identity would outrank the override. That configuration is not tested and not claimed."
+      },
+      {
+        "fact": "selected-content-root",
+        "state": "not-captured",
+        "reason": "R9 is setup's (TSK-0060). The entry is fixed relative to .pi; this measures only the default layout, where the content root is <project>/planning-content. No project with a content root selected elsewhere was loaded."
+      },
+      {
+        "fact": "trust-rule-restated",
+        "state": "not-observable",
+        "reason": "Pi's own resolveProjectTrusted is internal. The untrusted control applies the trust decision through a callback composed from Pi's root exports - hasTrustRequiringProjectResources and ProjectTrustStore, with no UI to ask - which is the same restatement the package-load test uses. Pi's loader applied the answer; the answer itself was composed by the test."
+      },
+      {
+        "fact": "home-isolation",
+        "state": "not-observable",
+        "reason": "Each load runs with HOME pointed at an empty fixture directory, so Pi's ~/.agents/skills scan is exercised only against an empty directory. The exact sets are therefore independent of the runner's own skills, and a consumer whose home holds a skill of the same identity is not measured."
+      },
+      {
+        "fact": "mutation-controls-in-ci",
+        "state": "not-captured",
+        "reason": "The eight mutation controls were run locally on Windows before the commit. CI establishes that the test passes on both platforms; that it fails against these defects is established only by those local runs."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix is ubuntu-latest and windows-latest. macOS is not built, not tested and not claimed."
+      }
+    ]
+  }
+}
