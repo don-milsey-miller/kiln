@@ -178,7 +178,9 @@ test("each tree is asked, and each exit is observed on its own", async () => {
 
   const win = child({ pid: 11 });
   setTimeout(() => win.go(), 50);
-  const w = await stopTree(win, { platform: "win32", run, graceMs: 2000 });
+  // An empty injected process table: the identity read before any signal must not read this host's table,
+  // and must not take a real PowerShell start while the fixture's own timer decides when the tree goes.
+  const w = await stopTree(win, { platform: "win32", run, psRun: () => ({ status: 0, stdout: "" }), graceMs: 2000 });
   assert.equal(w.requested, true);
   assert.equal(w.exitObserved, true);
   assert.equal(w.escalated, false);
@@ -194,6 +196,7 @@ test("⚠️ a tree that will not go is escalated within the bound and REPORTED 
   const r = await stopTree(immortal, {
     platform: "win32",
     run: (c, a) => calls.push([c, ...a]),
+    psRun: () => ({ status: 0, stdout: "" }),
     graceMs: 150,
     hardMs: 100,
   });
@@ -213,7 +216,7 @@ test("on POSIX the request goes to the process GROUP, not the leader alone", asy
   const table = processTable([99]);
   const posix = child({ pid: 99 });
   setTimeout(() => posix.go(), 50);
-  const r = await stopTree(posix, { platform: "linux", group: true, graceMs: 2000, kill: table.kill });
+  const r = await stopTree(posix, { platform: "linux", group: true, graceMs: 2000, kill: table.kill, psRun: () => ({ status: 0, stdout: "" }) });
   assert.deepEqual(table.signals, [[-99, "SIGTERM"]], "the negative pid is the group");
   assert.match(r.method, /SIGTERM to the group/);
   assert.equal(r.exitObserved, true);
@@ -551,7 +554,7 @@ for (const platform of ["linux", "win32"])
       agent,
       launcher,
       agentDescendants: { pids: [], enumerated: true },
-      launcherDescendants: { pids: [950], enumerated: true },
+      launcherDescendants: { pids: [950], identities: [{ pid: 950, created: "950" }], enumerated: true },
       port: 1,
       createServerImpl: () => fakeServer(true),
       platform,
@@ -571,7 +574,8 @@ for (const platform of ["linux", "win32"])
         if (cmd === "taskkill") targeted.push(Number(args[args.indexOf("/pid") + 1]));
         return { status: 0, stdout: "" };
       },
-      psRun: NO_DESCENDANTS,
+      // The worker's identity is re-read before it is classified or signalled, so the table has to show it.
+      psRun: () => ({ status: 0, stdout: "950 1 950\n" }),
     });
 
     assert.equal(r.launcher.exitObserved, true, "the control channel did see the leader go");
@@ -699,7 +703,7 @@ test("⚠️ a foreground agent's DESCENDANTS are signalled, because it can have
     platform: "linux",
     graceMs: 2000,
     kill: table.kill,
-    psRun: () => ({ status: 0, stdout: "  1 0\n100 1\n200 100\n300 200\n" }),
+    psRun: () => ({ status: 0, stdout: "  1 0 1\n100 1 100\n200 100 200\n300 200 300\n" }),
   });
 
   assert.deepEqual(r.descendants, [300, 200], "deepest first, so a parent cannot re-parent them away");
@@ -737,7 +741,7 @@ test("⚠️ a descendant that survives its parent is escalated, and the tree is
     graceMs: 200,
     hardMs: 150,
     kill: table.kill,
-    psRun: () => ({ status: 0, stdout: ++looks === 1 ? "100 1\n200 100\n" : "200 1\n" }),
+    psRun: () => ({ status: 0, stdout: ++looks === 1 ? "100 1 100\n200 100 200\n" : "200 1 200\n" }),
   });
 
   assert.equal(r.exitObserved, true, "the leader really did exit");
@@ -765,7 +769,7 @@ test("a surviving descendant makes the whole shutdown partial, whatever the exit
     createServerImpl: () => fakeServer(true),
     platform: "linux",
     kill: table.kill,
-    psRun: () => ({ status: 0, stdout: "100 1\n200 100\n" }),
+    psRun: () => ({ status: 0, stdout: "100 1 100\n200 100 200\n" }),
     graceMs: 200,
     hardMs: 150,
   });
@@ -846,7 +850,7 @@ test("⚠️ Pi exiting with a live child is not a stopped tree — the ordinary
   const agent = child({ pid: 100 });
 
   // Tracked while it lives, exactly as the run loop will.
-  const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1\n200 100\n" }) });
+  const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1 100\n200 100 200\n" }) });
   await tracker.sample();
   const known = tracker.snapshot();
   assert.deepEqual(known.pids, [200], "the relationship was visible while the parent was alive");
@@ -860,7 +864,7 @@ test("⚠️ Pi exiting with a live child is not a stopped tree — the ordinary
     kill: table.kill,
     knownDescendants: known,
     // ⚠️ AFTER THE FACT `ps` SHOWS NOTHING: 200 is init's child now.
-    psRun: () => ({ status: 0, stdout: "200 1\n" }),
+    psRun: () => ({ status: 0, stdout: "200 1 200\n" }),
   });
 
   assert.equal(r.exitObserved, true, "the leader really had gone");
@@ -878,7 +882,7 @@ test("a tracked tree whose children all went is a clean stop", async () => {
   // running past the end of the test.
   const table = processTable([100, 200]);
   const agent = child({ pid: 100 });
-  const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1\n200 100\n" }) });
+  const tracker = trackDescendants(agent, { psRun: () => ({ status: 0, stdout: "100 1 100\n200 100 200\n" }) });
   await tracker.sample();
   const known = tracker.snapshot();
   assert.deepEqual(known.pids, [200], "the child was tracked while its parent lived");
@@ -909,9 +913,9 @@ test("⚠️ STOP JOINS A QUERY ALREADY IN FLIGHT, rather than walking away from
     intervalMs: 20,
     psRun: async () => {
       calls += 1;
-      if (calls === 1) return { status: 0, stdout: "100 1" + LF + "200 100" + LF };
+      if (calls === 1) return { status: 0, stdout: "100 1 100" + LF + "200 100 200" + LF };
       await held;
-      return { status: 0, stdout: "200 1" + LF }; // 200 has been re-parented: no children to relate
+      return { status: 0, stdout: "200 1 200" + LF }; // 200 has been re-parented: no children to relate
     },
   });
 
@@ -938,7 +942,7 @@ test("⚠️ A TREE WHOSE ONLY LOOK RACED IS REPORTED UNMADE, not as an empty tr
     intervalMs: 10_000,
     psRun: async () => {
       await held;
-      return { status: 0, stdout: "200 1" + LF };
+      return { status: 0, stdout: "200 1 200" + LF };
     },
   });
 
@@ -1007,7 +1011,7 @@ test("⚠️ A LOOK THAT FAILS LATER DOES NOT UNMAKE ONE THAT SUCCEEDED", async 
   let call = 0;
   const tracker = trackDescendants(child, {
     intervalMs: 10_000,
-    psRun: async () => (++call === 1 ? { status: 0, stdout: "100 1" + LF + "200 100" + LF } : { status: 1, stdout: "" }),
+    psRun: async () => (++call === 1 ? { status: 0, stdout: "100 1 100" + LF + "200 100 200" + LF } : { status: 1, stdout: "" }),
   });
   await tracker.sample();
   await tracker.sample();
@@ -1025,7 +1029,7 @@ test("the tracker keeps the UNION, so a child seen once is not lost by a later p
   const agent = child({ pid: 100 });
   let look = 0;
   const tracker = trackDescendants(agent, {
-    psRun: () => ({ status: 0, stdout: ++look === 1 ? "100 1\n200 100\n" : "100 1\n300 100\n" }),
+    psRun: () => ({ status: 0, stdout: ++look === 1 ? "100 1 100\n200 100 200\n" : "100 1 100\n300 100 300\n" }),
   });
   // ⚠️ **THE SAMPLE IS AWAITED NOW, because reading a process table is I/O and on Windows it costs a
   // PowerShell start.** A synchronous poll at that price left the supervisor blocked a large share

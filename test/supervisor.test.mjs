@@ -1785,7 +1785,8 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
       listed += 1;
       const launcherPid = calls.find((c) => c.command === "L")?.child?.pid;
       if (listed === 1 || !launcherPid) return { status: 0, stdout: "" };
-      return { status: 0, stdout: `${WORKER} ${launcherPid}
+      return { status: 0, stdout: `${launcherPid} 1 1000
+${WORKER} ${launcherPid} 2000
 ` };
     },
     // The worker never dies, so it is a survivor at teardown — which is only observable if it was
