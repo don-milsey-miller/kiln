@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalPath, pathIdentityKey } from "../lib/content-root.mjs";
 import { yamlString } from "../lib/project-scaffold.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
+import { providerVisible } from "./helpers/provider-visible.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PROJECTLESS = new Set(["kiln_capability", "research_capability", "research_search", "research_fetch", "validation_capability", "validation_run"]);
@@ -61,7 +62,7 @@ function fixture() {
 
 const toolsFor = (fx) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { toolRoot: fx.tool });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { toolRoot: fx.tool });
   return tools;
 };
 

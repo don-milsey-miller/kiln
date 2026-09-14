@@ -22,6 +22,7 @@ import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs
 import { createValidators } from "../lib/validate.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
+import { exercised, providerVisible } from "./helpers/provider-visible.mjs";
 
 /**
  * The declaration as it sits on disk.
@@ -53,7 +54,7 @@ const validators = createValidators(SCHEMAS);
 /** The tools the package registers, by name, as a session would hold them. */
 const registered = () => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) });
   return tools;
 };
 
@@ -479,7 +480,7 @@ test("⚠️ ACC-0065 a refusal from the registry is scrubbed before it reaches 
   // that scrubbed them. What the wrapper owes is an answer for a message that DOES carry a path.
   const tools = new Map();
   register(
-    { registerTool: (tool) => tools.set(tool.name, tool) },
+    { registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) },
     {
       TYPED_TOOLS: {
         decision: async () => {
@@ -930,7 +931,7 @@ test("⚠️ ACC-0065 activation goes through the project registry, not around i
   const called = [];
   const tools = new Map();
   register(
-    { registerTool: (tool) => tools.set(tool.name, tool) },
+    { registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) },
     {
       PROJECT_TOOLS: {
         setTypeActivation: (type, action, options) => {
@@ -962,7 +963,7 @@ test("⚠️ ACC-0065 activation goes through the project registry, not around i
  */
 const withLint = (lintProject) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { lintProject });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { lintProject });
   return tools;
 };
 
@@ -1058,7 +1059,7 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
  */
 const withResearch = (researchTools) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { researchTools });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { researchTools });
   return tools;
 };
 
@@ -1318,7 +1319,7 @@ test("⚠️ ACC-0110 a SUCCESSFUL capability probe changes no planning content,
 
 const withValidation = (validationTools) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) }, { validationTools });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { validationTools });
   return tools;
 };
 
@@ -1673,4 +1674,13 @@ test("⚠️ ACC-0109 the declaration it returns carries no credential and no ma
 
   assert.equal(text.includes(planted), false);
   assertNoMachinePath(text, [ROOT, homedir()], "a capability result");
+});
+
+test("⚠️ F114 every declared tool was exercised in this file, and each result and refusal carried its rendering as model-visible text", () => {
+  // ⚠️ **LAST IN THIS FILE ON PURPOSE.** Every registration above goes through `providerVisible`, which checks each
+  // result as it returns; this proves those checks ran for every declared tool rather than for none.
+  assert.deepEqual([...exercised.keys()].sort(), [...DECLARATION.tools].sort(), "a declared tool was never exercised through the check");
+  const totals = [...exercised.values()].reduce((sum, seen) => ({ results: sum.results + seen.results, refusals: sum.refusals + seen.refusals }), { results: 0, refusals: 0 });
+  assert.ok(totals.results > 0, "no successful result was checked");
+  assert.ok(totals.refusals > 0, "no refusal was checked");
 });

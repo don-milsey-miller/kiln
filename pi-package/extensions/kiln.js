@@ -476,8 +476,17 @@ const REFUSAL_CODES = Object.freeze({
  */
 const PROJECT_REFUSAL_CODES = Object.freeze({ ValidationError: "invalid-request" });
 
-/** Pi wants a string to show; the structured result travels beside it as details. */
-const rendered = (result) => ({ output: JSON.stringify(result, null, 2), details: result });
+/**
+ * A result as Pi carries it: the rendering as model-visible text content, and the structured result beside it.
+ *
+ * ⚠️ **`content` IS THE ONLY PART A MODEL SEES (F114).** Pi builds the provider's tool message from `content`
+ * alone; a result without it reached every model as `(no tool output)`, while `details` still looked complete
+ * to anything reading `tool_execution_end`. `output` and `details` are kept exactly as they were.
+ */
+const rendered = (result) => {
+  const output = JSON.stringify(result, null, 2);
+  return { content: [{ type: "text", text: output }], output, details: result };
+};
 
 /**
  * A validation result as a model may see it.

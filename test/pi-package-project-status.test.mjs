@@ -28,6 +28,7 @@ import { PROJECT_STATUS_MESSAGES, PROJECT_STATUS_REFUSAL, readProjectStatus } fr
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import register from "../pi-package/extensions/kiln.js";
+import { providerVisible } from "./helpers/provider-visible.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const schemas = loadSchemaSet(join(ROOT, "schemas"));
@@ -40,7 +41,7 @@ const POSIX_PATH = "/home/operator/secret/token.txt";
 
 const statusTool = (deps = {}) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, tool) }, deps);
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, deps);
   return tools.get("kiln_project_status");
 };
 
@@ -503,13 +504,14 @@ test("⚠️ ACC-0068 an invocation writes nothing, reaches no network, starts n
   const tool = statusTool();
   const before = snapshot(f.base);
   let result;
+  // ⚠️ THE FIXTURE IS REMOVED HOWEVER THE INVOCATION ENDS, including when a result check throws inside it.
   try {
-    result = await invoke(tool, f.contentRoot);
-  } finally {
-    for (const undo of restore.reverse()) undo();
-    syncBuiltinESMExports();
-  }
-  try {
+    try {
+      result = await invoke(tool, f.contentRoot);
+    } finally {
+      for (const undo of restore.reverse()) undo();
+      syncBuiltinESMExports();
+    }
     assert.equal(result.details.ok, true);
     assert.deepEqual(seen, [], "the invocation wrote, connected or spawned");
     assert.deepEqual(snapshot(f.base), before, "no byte or modification time changed");

@@ -169,11 +169,18 @@ const chunk = (delta, finish = null) =>
  */
 async function loopback({ callTool = null } = {}) {
   const requests = [];
+  // ⚠️ WHAT THE PROVIDER WAS SENT (F114). A tool's result is model-visible only as it appears here.
+  const bodies = [];
   const server = createServer((req, res) => {
     let body = "";
     req.on("data", (d) => (body += d));
     req.on("end", () => {
       requests.push(req.url ?? "");
+      try {
+        bodies.push(JSON.parse(body));
+      } catch {
+        bodies.push(null);
+      }
       if (!callTool) {
         res.statusCode = 500;
         res.end("this test makes no model request");
@@ -193,7 +200,7 @@ async function loopback({ callTool = null } = {}) {
     });
   });
   await new Promise((done) => server.listen(0, "127.0.0.1", done));
-  return { port: server.address().port, requests, close: () => new Promise((done) => server.close(done)) };
+  return { port: server.address().port, requests, bodies, close: () => new Promise((done) => server.close(done)) };
 }
 
 /**
@@ -319,6 +326,8 @@ async function measure({ allowlist, trusted = true, callTool = null }) {
       answered: /"command":"get_state","success":true/.test(stdout),
       sessionDir: { exists: existsSync(sessions), entries: existsSync(sessions) ? readdirSync(sessions).length : 0 },
       providerRequests: server.requests.length,
+      // The tool messages each request carried, in order: what a model was given as a tool's result.
+      toolMessages: server.bodies.map((body) => (body?.messages ?? []).filter((m) => m.role === "tool")),
       // ⚠️ WHAT THE SESSION CHANGED, BY NAME. An empty list is a stronger statement than a boolean,
       // and a non-empty one says which file to go and look at.
       projectChanges: differences(projectBefore, fingerprint(project)),
@@ -425,6 +434,16 @@ test("⚠️ ACC-0109 a real session calls kiln_capability and gets the package'
   assert.deepEqual(Object.keys(measured.called.details).sort(), Object.keys(declaration).sort(), "nothing added in transit");
   assert.deepEqual(measured.called.details.tools, declaration.tools);
   assert.ok(measured.called.details.tools.includes("kiln_capability"));
+
+  // ⚠️ **AND THE PROVIDER WAS SENT IT (F114).** `tool_execution_end` shows what the tool returned; a model sees only
+  // the tool message Pi builds from the result's content. The first request carries none, and the second carries
+  // exactly one: the declaration's rendering, byte for byte, which parses back to the shipped file.
+  assert.deepEqual(measured.toolMessages[0], [], "the first request already carried a tool result");
+  assert.equal(measured.toolMessages[1].length, 1, "the second request carries exactly one tool result");
+  const [toolMessage] = measured.toolMessages[1];
+  assert.equal(toolMessage.content, JSON.stringify(declaration, null, 2), "the provider was not sent the declaration");
+  assert.notEqual(toolMessage.content, "(no tool output)");
+  assert.deepEqual(JSON.parse(toolMessage.content), declaration);
 
   // ⚠️ AND THE CALL PERSISTED NOTHING OF ITS OWN. The project is untouched outright - no planning
   // content, no `.pi/settings.json`, no package file, neither bytes nor modification times.
