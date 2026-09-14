@@ -2077,6 +2077,18 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
   const shutdown = e.detail.shutdown;
   assert.equal(shutdown.agent.descendantLooks.unresolved, 1, "the agent's query was joined, bounded, and reported");
   assert.equal(shutdown.launcherTree.descendantLooks.unresolved, 1, "and so was the launcher's");
+  // ⚠️ AND EACH TREE'S QUERY IS RECORDED UNDER ITS OWN NAME, TIMED FROM THE SHUTDOWN (F119).
+  for (const [tree, record] of [
+    ["agent", shutdown.agent],
+    ["launcher", shutdown.launcherTree],
+  ]) {
+    const unresolved = record.descendantQueries.filter((q) => q.unresolvedAtFinalize);
+    assert.equal(unresolved.length, 1, `${tree}: one query was left unresolved: ${JSON.stringify(record.descendantQueries)}`);
+    assert.equal(unresolved[0].id, `${tree}-${unresolved[0].look}`);
+    assert.equal(unresolved[0].classification, "unresolved");
+    assert.ok(unresolved[0].startMs <= 0, `${tree}: it started before the shutdown did: ${unresolved[0].startMs}`);
+    assert.equal(record.descendantQueryTiming.origin, "shutdown-start");
+  }
   assert.equal(shutdown.budget.ms, graceMs + hardMs, "the record carries the budget it was given");
   assert.ok(shutdown.budget.spentMs >= 0, "and what the teardown actually cost");
 });

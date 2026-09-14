@@ -313,6 +313,9 @@ test("⚠️ the enumeration really ran on this platform, rather than finding no
   const agentChild = readJson(paths.agentChild).pid;
   const launcherChild = readJson(paths.launcherChild).pid;
 
+  // ⚠️ PRINTED BEFORE ANY ASSERTION, SO A FAILING CELL CARRIES ITS OWN QUERY TIMINGS (F119).
+  console.log(`\n[evidence ${process.platform}/enumeration]\n${JSON.stringify({ agentChild, launcherChild, ...record }, null, 2)}\n`);
+
   assert.ok(
     record.shutdown.agent.descendants?.includes(agentChild),
     `the agent's real descendant ${agentChild} must appear in what was enumerated: ` +
