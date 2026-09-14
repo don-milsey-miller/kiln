@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
+import { firstLookWindowMs } from "./observation-window.mjs";
 
 if (process.argv.length < 9) process.exit(0);
 
@@ -43,7 +44,9 @@ try {
     },
     agent: {
       command: process.execPath,
-      args: [join(HERE, "tree-agent.mjs"), agentReport, agentChild, mode === "interrupt" ? "wait" : "exit"],
+      // O9: on Windows the agent lives long enough for a first process-table look to finish however slow the table
+      // is; POSIX keeps the three seconds it was measured with.
+      args: [join(HERE, "tree-agent.mjs"), agentReport, agentChild, mode === "interrupt" ? "wait" : "exit", String(firstLookWindowMs() ?? 3000)],
     },
     spawn,
     randomBytes,

@@ -26,7 +26,8 @@ import { fileURLToPath } from "node:url";
 
 if (process.argv.length < 5) process.exit(0);
 
-const [, , reportPath, childReportPath, mode] = process.argv;
+// `exitAfterMs` is how long the `exit` mode lives; the evidence harness passes its observation window (O9).
+const [, , reportPath, childReportPath, mode, exitAfterMs] = process.argv;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const child = spawn(process.execPath, [join(HERE, "long-lived-child.mjs"), childReportPath], {
@@ -52,7 +53,7 @@ if (mode === "exit") {
   // platform cannot observe at all, because the process table arrives after the parent is gone and
   // its children have been re-parented. A Pi session is minutes; this is the shortest thing that is
   // still one, rather than the shortest thing that still runs.
-  setTimeout(() => process.exit(0), 3000);
+  setTimeout(() => process.exit(0), Number(exitAfterMs) || 3000);
 } else {
   // Still working. Only the interrupt ends this run — and nothing here handles the signal, because
   // Windows has no graceful request and a handler would hide that difference.

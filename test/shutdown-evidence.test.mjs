@@ -37,6 +37,7 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { probePort, pidAlive, runFilePath, SHUTDOWN_MIN_PHASE_MS } from "../lib/supervisor.mjs";
 import { grantTrust } from "../lib/pi-trust.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
+import { firstLookWindowMs } from "./fixtures/supervisor/observation-window.mjs";
 
 installReaper();
 
@@ -199,7 +200,8 @@ async function viaConsoleEvent({ dir, out, argv, paths }) {
   const first = await untilAny([paths.agentChild, result]);
   if (first !== result) {
     await until(paths.launcherChild);
-    await sleep(3500); // the Windows tracker polls every 3s; let one land with the children present
+    // O9: long enough for a first process-table look to finish while both trees live, however slow the table is.
+    await sleep(firstLookWindowMs("win32"));
     writeFileSync(trigger, "go\n", "utf-8");
   }
 

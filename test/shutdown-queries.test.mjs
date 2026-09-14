@@ -67,6 +67,9 @@ test("⚠️ F119 a completed query records its timing, the leader's state, what
       unresolvedAtFinalize: false,
       completedAfterFinalize: false,
       lateOutcome: null,
+      completedAfterRootExit: false,
+      rootRow: { pid: 100, created: "1000" },
+      rootVerification: "captured",
     },
   ]);
   assert.deepEqual(snap.queryTiming, { origin: "shutdown-start", trackingStartedMs: -1000, finalizedMs: 0 });
