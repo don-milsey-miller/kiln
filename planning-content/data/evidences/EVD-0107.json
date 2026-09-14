@@ -1,0 +1,89 @@
+{
+  "id": "EVD-0107",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: /kiln-start gives a real trusted session Stage 1's skill, the start instructions, and the project's identity and Stage 1 document",
+  "kind": "experiment",
+  "summary": "For ACC-0068. Two GitHub Actions runs, each one attempt with no job retried, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green in both, zero failing-test lines. G4: run 34790900443 at commit 1de0ba2, 1069 tests in every cell. G5: run 34838944777 at commit 8edfbe5, 1073 tests in every cell. The criterion's 37 tests across six files were matched by name against their source in every cell of the G5 run and all passed; the 35 that existed at G4 also all passed in every cell of run 34790900443. WHAT THE SESSION IS GIVEN, AT THE PROVIDER. test/pi-session-orchestrator.test.mjs starts the pinned Pi 0.84.4 CLI in a trusted consumer project with the production tool allowlist and sends /kiln-start as an RPC prompt, so Pi's own prompt-template expansion runs. A scripted loopback provider bound to 127.0.0.1 records every request. Exactly two requests arrive, both to /v1/chat/completions from a loopback address, and each offers exactly the 28 declared tools. The first carries the roles system and user. Its user text is byte-equal to Pi's own frontmatter-stripped kiln-start.md body and contains the instructions to call kiln_project_status first, to ask the operator exactly one question, to propose no architecture, requirement set or solution, and to call no tool that changes planning content. Its system prompt ends in exactly one length-valid Kiln stage frame naming 01-intake, whose skill element holds the resolved kiln-stage-01-intake bytes exactly. The provider answers with one call to kiln_project_status. The second request carries system, user, assistant and tool, with the system prompt and user turn byte-identical to the first. Its tool message is not Pi's placeholder: it parses to ok true, fresh true, current stage 01-intake, the project's exact name and description, and stageOneDocument deep-equal to stage 01-intake, path stages/01-intake.md, the starter document's exact bytes and truncated false. PACKAGED AND OVERRIDE. One test runs with no override, and the frame ends in the packaged SKILL.md bytes. The other writes a consumer override and then edits it before launch; the frame ends in the edited override's exact bytes, and neither the pre-edit text nor the packaged skill appears in either request's system prompt. WHAT EXECUTED, AND WHAT DID NOT CHANGE. The only tool execution events are one start and one end for kiln_project_status, not an error. The whole project tree, including planning-content, .pi/settings.json, the portable package and the tool copy, is byte- and mtime-identical before and after by SHA-256 and mtime, as are the agent directory's trust.json and sentinel and a home-directory sentinel. The planted provider key is not a credential and appears in no file Pi adds to the agent directory. THE DETERMINISTIC PARTS BELOW THE SESSION, AT G4 AND AGAIN AT G5. The before_agent_start hook's stage-context tests (8), the /kiln-start resource-claims test, the project-status tool tests (10), the project-status reader tests (7) and the orchestrator-state derivation tests (15) cover freshness defined by state, stage derivation, the exact loaded skill including overrides, one frame per turn with hostile and malformed framing, fail-closed refusals without paths, and read-only status. MUTATION CONTROLS, RUN LOCALLY. G4: seventeen mutations of the hook, stage context and start prompt (MH1 to MH17) were each killed. G5: nine mutations (MG1 to MG9) were each killed - the frame not appended, the packaged skill used instead of the loaded one (killed by the override case), the status-first instruction weakened, the one-question instruction removed, F114 reverted, the Stage 1 document trimmed, the status handler writing a file into the project, the description not read, and the scripted provider calling kiln_lint instead. Each ran one at a time from a temporary working directory, with the file restored byte-identical, git status back to baseline and no fixture left, and for G5 also the repository's node_modules intact. RELATION TO F114. The G4 run predates commit 81f69a9, when Kiln's results had no model-visible content. The G5 run is the observation that kiln_project_status's result reaches the provider; EVD-0106 covers every tool at the handler boundary.",
+  "outcome": "success",
+  "observedAt": "2026-09-14",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-g4": "GitHub Actions run 34790900443 at commit 1de0ba2, one attempt, no job retried, all four cells green, 1069 tests / 0 fail in every cell",
+      "ci-g5": "GitHub Actions run 34838944777 at commit 8edfbe5, one attempt, no job retried, all four cells green, 1073 tests / 0 fail in every cell",
+      "cell-ubuntu-22": "G5 job 103959154044, node v22.23.2, success, 1073 tests / 1069 pass / 0 fail / 4 skipped",
+      "cell-ubuntu-24": "G5 job 103959154016, node v24.20.0, success, 1073 tests / 1069 pass / 0 fail / 4 skipped",
+      "cell-windows-22": "G5 job 103959154130, node v22.23.2, success, 1073 tests / 1072 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "G5 job 103959153915, node v24.20.0, success, 1073 tests / 1072 pass / 0 fail / 1 skipped",
+      "name-matches": "37 ACC-0068 tests across six files passed by name in every G5 cell; the 35 present at G4 passed by name in every G4 cell",
+      "pi": "@earendil-works/pi-coding-agent 0.84.4, the pinned CLI entry point with the production tool allowlist",
+      "request-sequence": "exactly two provider requests: [system, user], then [system, user, assistant calling kiln_project_status, tool]; 28 tools offered in each",
+      "first-request": "user text byte-equal to Pi's expansion of kiln-start.md with the four instructions; system prompt ends in one Kiln frame holding the resolved Stage 1 skill bytes",
+      "second-request": "tool message carries the exact project name, description and Stage 1 document; system prompt and user turn byte-identical to the first",
+      "override-case": "the edited override's exact bytes reach the provider, and neither the pre-edit override nor the packaged skill does",
+      "executed-tools": "kiln_project_status only, one start and one end, not an error",
+      "non-mutation": "project tree, settings, package and tool copy, agent trust.json and sentinel, and home sentinel byte- and mtime-identical",
+      "provider": "loopback only (127.0.0.1), with a planted non-credential key; credential-shaped variables, KILN_SELF_HOST and inherited PLANNING_CONTENT_DIR removed from the child",
+      "mutations": "G4 MH1 to MH17 and G5 MG1 to MG9, 26 of 26 killed locally, every guard held"
+    },
+    "omissions": [
+      {
+        "fact": "base-prompt-ending-in-a-kiln-frame",
+        "state": "not-observable",
+        "reason": "R10: the hook removes a previous frame only when the prompt ends in a footer whose length places the exact separator and header. A base prompt Pi hands the hook that already ends in such a complete frame, from any source, has that frame removed, because Pi offers no way to tell Kiln's earlier frame from identical bytes. Partial or malformed lookalikes are never removed. Accepted as a limitation; not closed here."
+      },
+      {
+        "fact": "paths-in-pi-base-prompt",
+        "state": "not-captured",
+        "reason": "R12: Pi's own base system prompt carries the session's working directory and the pinned install's documentation paths. The no-path assertion covers Kiln's stage frame and the kiln_project_status tool message only, not text Pi itself writes."
+      },
+      {
+        "fact": "session-clean-exit",
+        "state": "not-observable",
+        "reason": "F82: each session is stopped once the agent settles, and no claim is made about its exit status. The interactive shutdown path stays with TSK-0063."
+      },
+      {
+        "fact": "model-behaviour",
+        "state": "not-captured",
+        "reason": "The provider is scripted, so no model chose the call or the question. Whether a real model's first turn follows the instructions is ACC-0114 on TSK-0063."
+      },
+      {
+        "fact": "harness-arguments",
+        "state": "not-captured",
+        "reason": "The measurement adds -e for a probe extension that registers the loopback provider and records tool execution events, --provider, --model, --mode rpc, --session-dir and --offline, which the production launch does not pass."
+      },
+      {
+        "fact": "whole-agent-directory",
+        "state": "not-captured",
+        "reason": "Pi writes its own bookkeeping files into the agent directory during a turn. The protected agent state is trust.json and a sentinel; the added files are checked only for the absence of the planted key."
+      },
+      {
+        "fact": "other-provider-apis",
+        "state": "not-captured",
+        "reason": "The loopback provider uses Pi's openai-completions API. Other provider APIs build their messages through their own code, which these runs do not exercise."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "The 26 mutation controls ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix builds ubuntu-latest and windows-latest only."
+      }
+    ]
+  }
+}

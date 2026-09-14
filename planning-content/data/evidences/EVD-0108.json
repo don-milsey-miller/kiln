@@ -1,0 +1,65 @@
+{
+  "id": "EVD-0108",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the orchestrator refuses the tool's own planning content unless the launcher validated self-hosting",
+  "kind": "experiment",
+  "summary": "For ACC-0071. GitHub Actions run 34778806796 at commit 8fbd3e2 (G3b), one attempt with no job retried, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green, 1061 tests and 0 failures in every cell, zero failing-test lines. The criterion's 13 tests across test/orchestrator-root.test.mjs, test/pi-package-tool-content.test.mjs and test/supervisor.test.mjs were matched by name in every cell: all 13 passed on windows-latest, and on ubuntu-latest 12 passed and the Windows-only case-insensitive root comparison was skipped by design. The same 13 passed by name again in G5 run 34838944777 at commit 8edfbe5, where every handler result in the tool-content tests also passes the provider-visible content check. THE RESOLVER. An external consumer content root is accepted and a marker beside it grants and changes nothing. The tool root itself, a root nested in it and a deeper root are refused without the marker, naming both canonical paths; a sibling that is a symlink or junction into the tool root is refused by where it leads; on Windows the roots compare without case. An absent marker and every malformed value refuse, and only the exact KILN_SELF_HOST=validated-v1 permits. THE HANDLERS. Every project-bound handler refuses a nested tool content root with the fixed model-facing result - ok false, code tool-content-refused, contentRoot <content-root> and toolRoot <tool-root>, no absolute path - notifies the operator once with the canonical paths, and changes no file under either root. The tool root itself, a sibling link into it, an absent marker and every malformed marker are refused the same way. The validated marker permits the tool's own content with nothing refused or notified, an external consumer root is served with a marker beside it changing nothing, and without a UI the refusal notifies nothing and writes nothing to a terminal stream. THE SUPERVISOR. An inherited self-host marker reaches neither child of a consumer run in any spelling - removed case-insensitively on Windows and exactly elsewhere - and a validated self-hosting run gives the agent exactly the marker and the launcher nothing. MUTATION CONTROLS, RUN LOCALLY. Fourteen mutations (MR1 to MR14) were each killed: the guard not called, any truthy marker permitting, only equality with the tool root refusing, the content root not canonicalised, Windows marker removal made case-sensitive, the supervisor passing the inherited environment through, the launcher given the marker, a validated run's agent not given it, the guard running after the schema reads, a context without a UI notified, a refusal without a UI writing to a terminal stream, the operator notified twice, the model result carrying canonical paths, and kiln_lint not wired to the refusal. Each ran one at a time from a temporary working directory with the file restored byte-identical, git status back to baseline and no fixture left. RELATION TO F114. At 8fbd3e2 the model-facing refusal was returned without model-visible content. Since commit 81f69a9 every Kiln result and refusal carries its rendering as text content, recorded in EVD-0106.",
+  "outcome": "success",
+  "observedAt": "2026-09-14",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34778806796 at commit 8fbd3e2, one attempt, no job retried, all four cells green, 1061 tests / 0 fail in every cell",
+      "cell-ubuntu-22": "job 103781893915, node v22.23.2, success, 1061 tests / 1057 pass / 0 fail / 4 skipped",
+      "cell-ubuntu-24": "job 103781893755, node v24.20.0, success, 1061 tests / 1057 pass / 0 fail / 4 skipped",
+      "cell-windows-22": "job 103781893860, node v22.23.2, success, 1061 tests / 1060 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103781893929, node v24.20.0, success, 1061 tests / 1060 pass / 0 fail / 1 skipped",
+      "name-matches": "13 ACC-0071 tests: 13 passed in each windows-latest cell, 12 passed and 1 Windows-only test skipped in each ubuntu-latest cell; the same result in G5 run 34838944777",
+      "model-facing-refusal": "ok false, code tool-content-refused, contentRoot <content-root>, toolRoot <tool-root>, no absolute path",
+      "operator-facing-refusal": "one notification naming the canonical content root and tool root, only when the context has a UI",
+      "marker": "KILN_SELF_HOST=validated-v1 exactly; absent or any other value refuses",
+      "marker-propagation": "inherited spellings removed from both children; a validated self-hosting run gives the marker to the agent alone",
+      "mutations": "MR1 to MR14, 14 of 14 killed locally, every guard held",
+      "relation-to-EVD-0106": "provider visibility of the refusal is established by commit 81f69a9 and EVD-0106, not by this run"
+    },
+    "omissions": [
+      {
+        "fact": "marker-authentication",
+        "state": "not-observable",
+        "reason": "F112: inside the Pi process the guard cannot tell a marker written by the supervisor from one the process inherited. Supervised runs strip every inherited spelling and add the marker only after resolveSelfHost validated --self-host, so the launcher path never grants self-hosting by accident. A user who starts Pi directly and deliberately exports the exact marker is making an explicit self-host opt-in and is permitted. The marker is a local safety interlock, not authentication."
+      },
+      {
+        "fact": "case-insensitive-roots-on-posix",
+        "state": "not-captured",
+        "reason": "The case-insensitive root comparison is a Windows behaviour and its test is skipped on ubuntu-latest by design."
+      },
+      {
+        "fact": "real-session-refusal",
+        "state": "not-captured",
+        "reason": "The refusal is observed through the registered handlers and the supervisor's child environments, not through a real Pi session started on the tool's own content."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "The 14 mutation controls ran locally on Windows, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix builds ubuntu-latest and windows-latest only."
+      }
+    ]
+  }
+}

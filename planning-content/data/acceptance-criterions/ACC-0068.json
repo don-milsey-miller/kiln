@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "On a fresh project, /kiln-start supplies Stage 1's context and one-question instructions",
   "statement": "On a fresh project - one with no typed planning artifacts and no stage attestations, whatever its starter documents and project metadata say - `/kiln-start` deterministically supplies the orchestrator with the project's name and description and the Stage 1 starter document, both through `kiln_project_status`; the exact loaded `kiln-stage-01-intake` skill content, injected at `before_agent_start` from the derived current stage, including a consumer override when Pi resolved one; and instructions to ask exactly one question, to propose no architecture, requirement set or solution, and to call no mutating tool. Each of these is observed in what the session is given, not inferred from what a model says.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0022",
     "REQ-0001"
   ],
-  "notes": "⚠️ NARROWED 2026-09-13 (F98, D14). The criterion used to accept that the first turn asked 'a single relevant question' and proposed no solution. Whether a question is relevant is model behaviour, and a scripted provider decides the answer before the model is asked, so a test built on one would claim a selection nobody made. This criterion now accepts only what Kiln deterministically gives the session. The user-visible first turn - a real model on a clean consumer - is accepted by the TSK-0063 journey criterion instead. ⚠️ PERSISTENCE MOVED (D15). Writing the operator's answer into the intake document is TSK-0049's continuous capture and has its own criterion there; no typed stage-document writer exists yet. ⚠️ FRESH IS DEFINED BY STATE, NOT BY TEXT (D12). No typed planning artifacts and no stage attestations. The generated starter documents and `project.yaml` exist in every initialised project and do not make it non-fresh."
+  "notes": "⚠️ NARROWED 2026-09-13 (F98, D14). The criterion used to accept that the first turn asked 'a single relevant question' and proposed no solution. Whether a question is relevant is model behaviour, and a scripted provider decides the answer before the model is asked, so a test built on one would claim a selection nobody made. This criterion now accepts only what Kiln deterministically gives the session. The user-visible first turn - a real model on a clean consumer - is accepted by the TSK-0063 journey criterion instead. ⚠️ PERSISTENCE MOVED (D15). Writing the operator's answer into the intake document is TSK-0049's continuous capture and has its own criterion there; no typed stage-document writer exists yet. ⚠️ FRESH IS DEFINED BY STATE, NOT BY TEXT (D12). No typed planning artifacts and no stage attestations. The generated starter documents and `project.yaml` exist in every initialised project and do not make it non-fresh. ⚠️ PASSED 2026-09-14 ON EVD-0107: G4 run 34790900443 and G5 run 34838944777 observed the hook, the status tool and a real trusted /kiln-start session at the provider, with the packaged and the edited-override skill. Declared: R10, R12, F82, local-only mutations, no macOS.",
+  "evidencedBy": [
+    "EVD-0107"
+  ]
 }
