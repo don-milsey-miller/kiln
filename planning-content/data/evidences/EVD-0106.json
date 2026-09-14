@@ -1,0 +1,72 @@
+{
+  "id": "EVD-0106",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: every Kiln tool result and refusal reaches the provider as model-visible text",
+  "kind": "experiment",
+  "summary": "Supplemental to EVD-0102 for ACC-0065 and to EVD-0103 for ACC-0109 and ACC-0110, after F114. GitHub Actions run 34812083727 at commit 81f69a9, one attempt with no job retried, matrix ubuntu-latest x windows-latest by node 22 (v22.23.2) and node 24 (v24.20.0), all four cells green: 1071 tests and 0 failures in every cell, zero failing-test lines in the log, and the live Pi compatibility step on ubuntu-latest node 24 passed 5 of 5. EVD-0102 and EVD-0103 stand as recorded and nothing in them is withdrawn. WHAT THEY OBSERVED, AND WHAT THEY DID NOT. Both recorded what a handler returned, through a recording stub, the session registry and the session's own tool_execution_end.details. None of those is what a model receives. Pi builds the provider's tool message from a result's content alone, and rendered() in pi-package/extensions/kiln.js returned {output, details} with no content, so every Kiln result and refusal reached a model as the placeholder `(no tool output)`. A real /kiln-start session measured it on 2026-09-14: kiln_project_status executed without error and the provider's tool message was exactly that placeholder. WHAT CHANGED. rendered() now returns content: [{ type: \"text\", text: output }] beside output and details, which are unchanged. WHAT RAN, BY NAME, IN EVERY CELL. All 52 tool-registration tests (test/pi-package-tools.test.mjs), all 10 project-status tool tests (test/pi-package-project-status.test.mjs), all 5 tool-content refusal tests (test/pi-package-tool-content.test.mjs) and all 6 session tests (test/pi-session-tools.test.mjs) were matched by name against their source files in each of the four cells - 292 name matches, none missing. THE HANDLER BOUNDARY, FOR EVERY TOOL. Every registration in those three wrapper test files goes through test/helpers/provider-visible.mjs, which checks each result and each refusal as it returns: its keys are exactly content, output and details; content holds exactly one item, deep-equal to { type: \"text\", text: output }; and output is still JSON.stringify(details, null, 2), so the structured output and details the existing assertions read are unchanged. The final test in the tool file asserts that the check ran for every one of the 28 declared tools and saw both successful results and refusals. THE PROVIDER BOUNDARY, THROUGH A REAL SESSION. The pinned CLI runs a trusted project with the production allowlist against a loopback provider that records each request body. The scripted model answers the first request with a call to kiln_capability and the second with a stop. The first request carries no tool message, and the second carries exactly one, whose content equals JSON.stringify(signature.json, null, 2) byte for byte, is not the placeholder, and parses back deep-equal to the shipped declaration. MUTATION CONTROLS, RUN LOCALLY. Six mutations were applied one at a time from a temporary working directory, with each file restored byte-identical, git status back to baseline and no fixture left after each. Content removed as before the correction, content text differing from output, a second content item, a content item of the wrong type, and output no longer the rendering of details were each killed by both the every-tool check and the real-session provider check. Bypassing the helper's check was killed by the every-tool test. The first mutation run showed that the project-status non-mutation test left its fixture behind when a result check threw inside the invocation; that cleanup was corrected in the same commit, and the rerun left none.",
+  "outcome": "success",
+  "observedAt": "2026-09-14",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci": "GitHub Actions run 34812083727",
+      "commit": "81f69a9",
+      "matrix": "ubuntu-latest and windows-latest, node 22 and node 24 - all four cells green, one attempt, no job retried",
+      "cell-ubuntu-22": "job 103875276349, node v22.23.2, success, 1071 tests / 1067 pass / 0 fail / 4 skipped",
+      "cell-ubuntu-24": "job 103875276116, node v24.20.0, success, 1071 tests / 1067 pass / 0 fail / 4 skipped",
+      "cell-windows-22": "job 103875276240, node v22.23.2, success, 1071 tests / 1070 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 103875276342, node v24.20.0, success, 1071 tests / 1070 pass / 0 fail / 1 skipped",
+      "name-matches": "52 tool, 10 project-status tool, 5 tool-content and 6 session tests in every cell - 292 matches, none missing",
+      "defect": "F114: rendered() returned {output, details} without content, and Pi sent every Kiln result and refusal to the provider as (no tool output)",
+      "correction": "rendered() returns content: [{ type: \"text\", text: output }] beside the unchanged output and details",
+      "handler-boundary": "every exercised result and refusal of all 28 declared tools carried exactly one text item equal to output, with output still the rendering of details",
+      "provider-boundary": "a real kiln_capability session sent the provider exactly one tool message on its second request, equal byte for byte to the declaration's rendering",
+      "mutations": "6 of 6 killed locally, every guard held",
+      "relation-to-EVD-0102-and-EVD-0103": "supplemental: both stand as the record of what handlers returned, and nothing there is withdrawn. What they did not observe was the provider-facing tool content."
+    },
+    "omissions": [
+      {
+        "fact": "provider-message-per-tool",
+        "state": "not-captured",
+        "reason": "Only kiln_capability is observed in a real provider request. The other 27 tools are proven at the handler boundary, where content is what Pi reads, and Pi's mapping from content to the provider's tool message is observed for that one tool. kiln_project_status is observed through the provider by TSK-0048's G5, not here."
+      },
+      {
+        "fact": "other-provider-apis",
+        "state": "not-captured",
+        "reason": "The loopback provider uses Pi's openai-completions API. Other provider APIs build their tool messages from the same content through their own code, which this run does not exercise."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "The six mutation controls ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "session-clean-exit",
+        "state": "not-observable",
+        "reason": "F82: the capability session is stopped once the agent settles and makes no claim about its exit status. The interactive production path is owned by ACC-0088's human check."
+      },
+      {
+        "fact": "real-research-and-validation-backends",
+        "state": "not-captured",
+        "reason": "As in EVD-0103, successful research results come from a stand-in, and the production route in CI is the real adapter's no-credential refusal. That refusal is checked like every other result."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix builds ubuntu-latest and windows-latest only."
+      }
+    ]
+  }
+}

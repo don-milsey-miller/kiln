@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The capability tool returns exactly the package's declared signature",
   "statement": "The registered Kiln capability tool, called in a session that loaded the package, returns the package's own versioned signature declaration unchanged: the same version and the same resource names the package declares, with nothing added, dropped or rewritten in transit. A session that did not load the package has no such tool to call, and that difference is what a consumer comparing an expected signature against a returned one relies on.",
   "evaluates": [
@@ -14,8 +14,9 @@
     "REQ-0026",
     "REQ-0028"
   ],
-  "notes": "⚠️ REOPENED 2026-09-14 (F114): THE MODEL RECEIVED NO CAPABILITY DECLARATION. EVD-0103 observed the handler result and the session's `tool_execution_end.details`, not the provider-facing tool content. `rendered()` in `pi-package/extensions/kiln.js` returned `{output, details}` with no `content`, and Pi sends a tool result without `content` to the provider as `(no tool output)`. A real `/kiln-start` session measured it on 2026-09-14: `kiln_project_status` executed without error and the provider received exactly that placeholder. The historical evidence and its link are kept unchanged. This criterion returns to pass only on supplemental evidence that the provider-facing tool message carries the rendered result. ⚠️ TSK-0045's STATEMENT ALREADY PROMISED THIS AND NOTHING ACCEPTED IT. That task registers the research and validation adapters, delegation, AND the Kiln capability signature, but its only criterion was ACC-0065, which is about the write discipline of mutation wrappers. The capability tool could have been registered wrongly, or not at all, without a single criterion noticing. ⚠️ THE PACKAGE DECLARES, THE TOOL RETURNS, A CONSUMER COMPARES. ACC-0063 covers the declaration agreeing with the manifest; this covers the tool handing that declaration back intact; ACC-0075 covers a delegation refusing a child whose signature is absent or drifted. Three criteria, three owners, one chain - and no single one of them is the whole claim.",
+  "notes": "⚠️ REOPENED 2026-09-14 (F114): THE MODEL RECEIVED NO CAPABILITY DECLARATION. EVD-0103 observed the handler result and the session's `tool_execution_end.details`, not the provider-facing tool content. `rendered()` in `pi-package/extensions/kiln.js` returned `{output, details}` with no `content`, and Pi sends a tool result without `content` to the provider as `(no tool output)`. A real `/kiln-start` session measured it on 2026-09-14: `kiln_project_status` executed without error and the provider received exactly that placeholder. The historical evidence and its link are kept unchanged. This criterion returns to pass only on supplemental evidence that the provider-facing tool message carries the rendered result. ⚠️ RESTORED TO PASS 2026-09-14 ON EVD-0106: commit 81f69a9 returns every result as text content equal to its rendering, and CI run 34812083727 observed it at the handler boundary for all 28 tools and in a real provider request for kiln_capability. ⚠️ TSK-0045's STATEMENT ALREADY PROMISED THIS AND NOTHING ACCEPTED IT. That task registers the research and validation adapters, delegation, AND the Kiln capability signature, but its only criterion was ACC-0065, which is about the write discipline of mutation wrappers. The capability tool could have been registered wrongly, or not at all, without a single criterion noticing. ⚠️ THE PACKAGE DECLARES, THE TOOL RETURNS, A CONSUMER COMPARES. ACC-0063 covers the declaration agreeing with the manifest; this covers the tool handing that declaration back intact; ACC-0075 covers a delegation refusing a child whose signature is absent or drifted. Three criteria, three owners, one chain - and no single one of them is the whole claim.",
   "evidencedBy": [
-    "EVD-0103"
+    "EVD-0103",
+    "EVD-0106"
   ]
 }
