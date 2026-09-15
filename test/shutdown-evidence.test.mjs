@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
-import { probePort, pidAlive, runFilePath, SHUTDOWN_MIN_PHASE_MS } from "../lib/supervisor.mjs";
+import { probePort, pidAlive, runFilePath } from "../lib/supervisor.mjs";
 import { grantTrust } from "../lib/pi-trust.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 import { firstLookWindowMs } from "./fixtures/supervisor/observation-window.mjs";
@@ -283,16 +283,18 @@ for (const mode of ["natural", "interrupt"]) {
     // ⚠️ **AND IT WAS BOUNDED END TO END, WHICH IS WHAT "WITHIN THEIR GRACE PERIODS" MEANS.** Every step was
     // separately bounded before and their sum was not: two descendant joins at the process table's
     // own timeout, then a grace and a hard period per tree, each started when its own step began.
-    // The budget is one deadline taken at the trigger; what it can legitimately exceed is the floor
-    // under each of the three waiting periods, which exists so a kill always has time to be observed.
-    // Clause 4 asks for escalation that is bounded; the statement asks for trees stopped within their
-    // grace periods, and a teardown whose steps are each bounded separately satisfies neither.
+    // The budget is one deadline taken at the trigger, and every operation — waits, identity reads,
+    // terminations, cleanup and the port probe — draws its allowance from it (O12).
+    //
+    // ⚠️ **THERE IS NO CEILING ABOVE THE BUDGET ANY MORE, AND THERE WAS ONE.** This asserted
+    // `budget.ms + 6 * SHUTDOWN_MIN_PHASE_MS`: a 9,500ms ceiling for an 8,000ms budget, written for
+    // waiting periods that were each guaranteed a floor whatever the deadline said. It passed a run
+    // recorded at 8,092ms and let it be read as a shutdown inside its budget. A completed teardown is
+    // now inside the budget it declares, and nothing else counts as completed.
     const budget = record.shutdown.budget;
-    const ceiling = budget.ms + 6 * SHUTDOWN_MIN_PHASE_MS;
-    assert.ok(
-      budget.spentMs <= ceiling,
-      `(4) the teardown must fit one budget: spent ${budget.spentMs}ms of ${budget.ms}ms, ceiling ${ceiling}ms`
-    );
+    assert.equal(budget.withinBudget, true, `(4) the teardown must fit one budget: spent ${budget.spentMs}ms of ${budget.ms}ms`);
+    assert.ok(budget.spentMs <= budget.ms, `(4) spent ${budget.spentMs}ms of ${budget.ms}ms`);
+    assert.deepEqual(record.shutdown.unfinished, [], "(4) and no operation ran out of deadline");
 
     // ⚠️ **AND THE DESCENDANTS ARE CHECKED AGAINST THE OPERATING SYSTEM, not against the record.**
     // Everything above is the supervisor's account of itself. This is the independent one: the two

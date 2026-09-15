@@ -126,9 +126,13 @@ test("⚠️ R19 a tree's waits, identity read and taskkill are timed in order, 
   assert.ok(entries.every((e) => e.endMs !== null && e.abandonedMs === null && e.startMs <= e.endMs), JSON.stringify(entries));
   for (let i = 1; i < entries.length; i++) assert.ok(entries[i].startMs >= entries[i - 1].endMs, "one after another");
   const [grace, read, kill, hard] = entries;
-  assert.equal(grace.ms, 120);
+  // O12: the wait is what the deadline had left after the verification and termination it precedes,
+  // never more than the 120ms configured.
+  assert.ok(grace.ms > 0 && grace.ms <= 120, `the wait was bounded by the deadline: ${grace.ms}`);
   assert.deepEqual(grace.outcome, { settled: false });
-  assert.equal(read.timeoutMs, 300);
+  // O12: what the read was given is the deadline's, not the 300ms configured: the hard period it
+  // precedes is held back from it.
+  assert.ok(read.timeoutMs > 0 && read.timeoutMs <= 300, `the read was bounded by the deadline: ${read.timeoutMs}`);
   assert.deepEqual(read.outcome, { error: null, resolved: true, rows: 1 });
   assert.equal(kill.pid, 200);
   assert.deepEqual(kill.args, ["/pid", "200", "/F"]);
@@ -144,10 +148,12 @@ test("⚠️ R19 a tree's waits, identity read and taskkill are timed in order, 
 test("⚠️ R19 an identity read the shutdown stopped waiting for is abandoned, and an unverified tree has no stop time", async () => {
   const h = host([[200, 1, "1100"]]);
   h.set("silent");
+  // The escalation period is what the two reads are drawn from (O12), so it is wide enough for both:
+  // a deadline with nothing left refuses a read rather than abandoning one, which is a different fact.
   const r = await stopTree(leader(100, { exited: true }), {
     platform: "win32",
     graceMs: 60,
-    hardMs: 60,
+    hardMs: 200,
     identityReadMs: 80,
     tree: "agent",
     knownDescendants: tracked([[200, "1100"]]),
@@ -278,13 +284,17 @@ test("⚠️ R19 the whole shutdown record carries one finalized timeline, and l
     port: 1,
     createServerImpl: () => server,
     platform: "win32",
-    graceMs: 150,
-    hardMs: 150,
+    // O12: one deadline covers both trees, the control channel, the cleanup and the probe, so the
+    // fixture gives the teardown enough of one to do all five.
+    graceMs: 400,
+    hardMs: 200,
     timeline: tl,
     ...seams(h),
   });
 
-  assert.equal(r.complete, true);
+  assert.equal(r.complete, true, JSON.stringify(r.unfinished));
+  assert.equal(r.budget.withinBudget, true);
+  assert.deepEqual(r.unfinished, []);
   const entries = r.timeline.entries;
   assert.deepEqual(
     entries.map((e) => [e.kind, e.tree ?? null]),
@@ -304,7 +314,7 @@ test("⚠️ R19 the whole shutdown record carries one finalized timeline, and l
     ]
   );
   assert.ok(entries.every((e) => e.endMs !== null && e.startMs <= e.endMs), JSON.stringify(entries));
-  assert.deepEqual(entries.at(-1).outcome, { free: true });
+  assert.deepEqual(entries.at(-1).outcome, { free: true, timedOut: false }, "the probe answered inside its own bound (O12)");
   assert.ok(r.timeline.finalizedMs >= entries.at(-1).endMs, "the record is finalized after its last operation");
   assert.ok(r.agent.timing.treeStopObservedMs <= r.launcherTree.timing.treeStopObservedMs, "the agent tree stopped first");
   assert.ok(r.launcherTree.timing.treeStopObservedMs <= entries.at(-2).startMs, "and both stopped before cleanup began");
