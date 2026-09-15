@@ -2088,7 +2088,15 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
     assert.equal(unresolved[0].classification, "unresolved");
     assert.ok(unresolved[0].startMs <= 0, `${tree}: it started before the shutdown did: ${unresolved[0].startMs}`);
     assert.equal(record.descendantQueryTiming.origin, "shutdown-start");
+    // ⚠️ AND ITS JOIN IS TIMED ON THE SAME CLOCK, ENDED WHEN THE BOUND GAVE UP ON THE QUERY (R19).
+    const join = shutdown.timeline.entries.find((e) => e.kind === "tracker-join" && e.tree === tree);
+    assert.ok(join, `${tree}: the join is on the timeline: ${JSON.stringify(shutdown.timeline.entries)}`);
+    assert.equal(typeof join.endMs, "number");
+    assert.ok(join.startMs >= 0 && join.startMs <= join.endMs);
+    assert.deepEqual(join.outcome, { unresolved: 1 });
   }
+  assert.equal(shutdown.timeline.origin, "shutdown-start");
+  assert.equal(typeof shutdown.timeline.finalizedMs, "number");
   assert.equal(shutdown.budget.ms, graceMs + hardMs, "the record carries the budget it was given");
   assert.ok(shutdown.budget.spentMs >= 0, "and what the teardown actually cost");
 });
