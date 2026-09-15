@@ -23,6 +23,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  waitUntil,
   createShutdownDeadline,
   identityFloor,
   shutdown,
@@ -175,42 +176,59 @@ test("⚠️ O12 a grace period is what is left after the verification and termi
   const grace = r.timeline.entries.find((e) => e.kind === "grace-wait");
   const read = r.timeline.entries.find((e) => e.kind === "identity-read");
   assert.ok(grace.ms < 4000, `the wait gave way to what follows it: ${grace.ms}`);
-  // ⚠️ AND IT ENDED WHEN IT WAS TOLD TO. A wait that polls past its allowance spends the reserve
-  // held back for the verification after it, which is how a 88ms period was recorded ending at 101.8.
-  assert.ok(
-    grace.durationMs <= grace.ms + WAIT_SLACK_MS,
-    `the wait ended inside its allowance: ${grace.durationMs} of ${grace.ms}`
-  );
   assert.ok(grace.ms >= waitFloor(5000), `and kept its floor: ${grace.ms}`);
   assert.ok(read.timeoutMs >= identityFloor(5000), `the read it reserved for got its floor: ${read.timeoutMs}`);
   assert.ok(r.timeline.entries.some((e) => e.kind === "taskkill"), "and the termination it reserved for happened");
 });
 
 test("⚠️ O12 a waiting period ends when its allowance does, not one poll later", async () => {
-  // ⚠️ **A WAIT THAT POLLS PAST ITS ALLOWANCE SPENDS SOMEONE ELSE'S TIME.** Every reserve here is
-  // sized for one timer tick of overshoot; a period that always ran to the next 50ms poll would eat
-  // the verification reserved after it, which is how a period bounded at 88ms was recorded at 101.8.
-  // The allowance is deliberately smaller than one poll, so the difference is the whole of it.
-  const h = host([], { immortal: [100] });
-  const clock = createShutdownDeadline({ at: Date.now() + 100 });
-  const r = await stopTree(leader(100), {
-    platform: "win32",
-    graceMs: 150,
-    hardMs: 50,
-    deadline: clock,
-    tree: "agent",
-    knownDescendants: { pids: [], identities: [], enumerated: true },
-    run: h.run,
-    kill: () => true,
-    psRun: h.psRun,
-  });
+  // ⚠️ **A WAIT THAT POLLS PAST ITS ALLOWANCE SPENDS SOMEONE ELSE'S TIME.** A period that always slept a
+  // whole 50ms poll would run past its allowance and eat the verification reserved after it. What is
+  // proved is what the loop ASKS for, on a clock this test moves: no sleep is ever requested past what is
+  // left. How late a real timer then fires is the operating system's, and a Windows CI runner fired a
+  // 25ms timer 31ms late (F120); the shutdown record measures that, and this test no longer bets on it.
+  let now = 0;
+  const slept = [];
+  const sleep = async (ms) => {
+    slept.push({ ms, left: 37 - now });
+    now += ms;
+  };
 
-  const grace = r.timeline.entries.find((e) => e.kind === "grace-wait");
-  assert.ok(grace.ms < 50, `the allowance is shorter than one poll: ${grace.ms}`);
-  assert.ok(
-    grace.durationMs <= grace.ms + WAIT_SLACK_MS,
-    `the wait ended inside its allowance and one timer tick: ${grace.durationMs} of ${grace.ms}`
-  );
+  // An allowance shorter than one poll, for something that never happens.
+  const never = await waitUntil(() => false, 37, { now: () => now, sleep });
+  assert.equal(never, false, "an allowance that runs out is reported as not settled");
+  assert.deepEqual(slept.map((s) => s.ms), [37], "one sleep, of exactly what was left, not a whole poll");
+  assert.equal(now, 37, "and the wait ends at its allowance, to the millisecond");
+
+  // A longer one polls, and the last sleep is cut to what remains.
+  now = 0;
+  slept.length = 0;
+  const longer = await waitUntil(() => false, 120, { now: () => now, sleep: async (ms) => (slept.push({ ms }), (now += ms)) });
+  assert.equal(longer, false);
+  assert.deepEqual(slept.map((s) => s.ms), [50, 50, 20], "whole polls, then only the remainder");
+  assert.equal(now, 120);
+
+  // Something that settles is looked at first, and the wait stops the moment it is seen.
+  now = 0;
+  let calls = 0;
+  const soon = await waitUntil(() => ++calls >= 3, 1000, { now: () => now, sleep: async (ms) => (now += ms) });
+  assert.equal(soon, true);
+  assert.equal(calls, 3, "checked before sleeping, then after each poll");
+  assert.equal(now, 100, "and no time is spent after it settled");
+
+  // Already settled: no sleep at all, and no allowance spent.
+  now = 0;
+  let asleep = 0;
+  assert.equal(await waitUntil(() => true, 1000, { now: () => now, sleep: async () => (asleep += 1) }), true);
+  assert.equal(asleep, 0);
+
+  // A clock that jumps past the end while asleep (a stalled event loop) ends the wait, and never asks for
+  // a negative or zero sleep on the way.
+  now = 0;
+  slept.length = 0;
+  const stalled = await waitUntil(() => false, 100, { now: () => now, sleep: async (ms) => (slept.push({ ms }), (now += ms + 500)) });
+  assert.equal(stalled, false);
+  assert.deepEqual(slept.map((s) => s.ms), [50], "one poll, then the deadline had already passed");
 });
 
 test("⚠️ O12 the identity floor a teardown passes down is the one its trees refuse against", async () => {
