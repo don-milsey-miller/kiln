@@ -22,5 +22,6 @@
   "dependsOn": [
     "TSK-0031",
     "TSK-0057"
-  ]
+  ],
+  "notes": "F122 (2026-09-16): CI run 35097288227, at commit b8b09b2, windows-latest node 22, natural mode. The launch preflight timed out on the primed WMI route at 10,009.7 ms with no rows, and the supervisor refused with process-table-not-primed before either Pi or the launcher was spawned. ACC-0081's 10-second preflight bound held as specified, so the criterion outcome stands. This is the second primed-route timeout event that EVD-0109's recorded rule names: WMI is withdrawn as the Windows identity strategy and replaced wholesale by a WMI-free identity format, delivered as a separate correction. The later green run 35141902017 does not cancel it. Interactive session recovery for ACC-0103 is paused until the replacement is green."
 }
