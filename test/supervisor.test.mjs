@@ -96,7 +96,23 @@ function project({ record = { recordVersion: 1, projectId: PROJECT_ID } } = {}) 
  * the shutdown partial — `descendantsEnumerated: false` is not `no descendants`. That distinction has
  * its own test below; here it would only be noise.
  */
-const NO_DESCENDANTS = () => ({ status: 0, stdout: "" });
+const NO_DESCENDANTS = () => ({ status: 0, stdout: `${process.pid} 1 133000000000000001
+` });
+
+/**
+ * O14: the launch reads the process table once before spawning anything, so a run-level fixture has one
+ * more call than it used to. This answers that first read with the supervisor's own row — what any real
+ * table contains — and leaves every later call to the reader the test is actually about.
+ */
+const afterPriming = (next) => {
+  let primed = false;
+  return (...args) => {
+    if (primed) return next(...args);
+    primed = true;
+    return { status: 0, stdout: `${process.pid} 1 133000000000000001
+` };
+  };
+};
 
 /**
  * A stand-in child that exits the way a real one does: the exit event AND `exitCode` together.
@@ -751,6 +767,137 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
   assert.equal(launcher.options.env.KILN_RUN_ID, "07".repeat(16));
   assert.equal(launcher.options.env.KILN_PROJECT_ID, PROJECT_ID);
   assert.deepEqual(result.ready.identityConfirmedBy, ["service", "protocol", "runId", "projectId"]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+/**
+ * O14: the Windows process table is primed once, before anything is spawned.
+ *
+ * ⚠️ **MEASURED IN CI RUN 35055338147.** The first Windows query of a run spent 7,114ms between its child
+ * starting and that child's first byte, while the child itself started in 13ms and later queries answered in
+ * about 300ms; both trees' first queries unblocked in the same millisecond, and a WMI-free enumeration at
+ * that moment took 68ms. That is one shared first use of the WMI provider, and it is paid before the
+ * children exist rather than inside the teardown an operator is waiting out.
+ */
+/** A launcher that goes when its private control channel is closed, as the polite path expects. */
+function obedientLauncher() {
+  let exit = null;
+  return {
+    get exitCode() {
+      return exit;
+    },
+    signalCode: null,
+    stdin: { destroyed: false, write: () => {}, end: () => (exit = 0) },
+    once: () => {},
+    kill: () => ((exit = 0), true),
+  };
+}
+
+test("⚠️ O14 the process table is read before either child is spawned, and the launch records what it cost", async () => {
+  const order = [];
+  const dir = project();
+  const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    platform: "win32",
+    spawn: (command) => {
+      order.push(`spawn:${command}`);
+      if (command === "L") return obedientLauncher();
+      return exitingChild();
+    },
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 5),
+    psRun: () => {
+      order.push("psRun");
+      // The supervisor's own row, with a creation time: what priming requires before it will start anything.
+      return { status: 0, stdout: `${process.pid} 1 133000000000000001\n` };
+    },
+    fetchImpl: async () => ({
+      status: 200,
+      json: async () => ({ service: "kiln", protocol: "kiln.health/1", runId: "05".repeat(16), projectId: PROJECT_ID, build: null }),
+    }),
+    build: null,
+  });
+
+  // ⚠️ THE ORDER IS THE POINT: read, then spawn. A priming read racing the children would put its cost back
+  // inside the window the trees are tracked in, which is the cost it exists to move.
+  assert.equal(order[0], "psRun", `the table is read first: ${JSON.stringify(order.slice(0, 4))}`);
+  assert.equal(order[1], "spawn:L", `and exactly one read precedes the first child: ${JSON.stringify(order.slice(0, 4))}`);
+
+  // ⚠️ RECORDED APART FROM THE SHUTDOWN BUDGET, which it precedes and is no part of.
+  assert.equal(result.preflight.ran, true);
+  assert.equal(result.preflight.ok, true);
+  assert.equal(result.preflight.verified, true);
+  assert.equal(typeof result.preflight.ms, "number");
+  assert.equal(result.preflight.rows, 1);
+  assert.equal("preflight" in result.shutdown, false, "it is not counted inside the teardown's own record");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("⚠️ O14 a process table that cannot be read refuses the launch, and nothing is spawned", async () => {
+  // ⚠️ **A RUN THAT CANNOT READ THE TABLE CAN ONLY FAIL CLOSED AT THE END**, having already taken the port
+  // and put two process trees on the operator's machine. The refusal costs nothing instead.
+  const dir = project();
+  let spawned = 0;
+  const e = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    platform: "win32",
+    spawn: () => {
+      spawned += 1;
+      return exitingChild();
+    },
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 6),
+    psRun: () => ({ status: 1, stdout: "" }),
+    build: null,
+  }).catch((x) => x);
+
+  assert.ok(e instanceof SupervisorRefusal, String(e));
+  assert.equal(e.reason, REFUSAL.PROCESS_TABLE_NOT_PRIMED);
+  assert.equal(e.detail.reason, "powershell-failed", JSON.stringify(e.detail));
+  assert.equal(typeof e.detail.ms, "number");
+  assert.equal(spawned, 0, "nothing was started");
+  assert.match(e.message, /Nothing has been started/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("⚠️ O14 POSIX primes nothing: `ps` answers in milliseconds and has no provider to start", async () => {
+  const order = [];
+  const dir = project();
+  const result = await runSupervisor({
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    platform: "linux",
+    spawn: (command) => {
+      order.push(`spawn:${command}`);
+      if (command === "L") return obedientLauncher();
+      return exitingChild();
+    },
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 4),
+    psRun: () => {
+      order.push("psRun");
+      return { status: 0, stdout: "" };
+    },
+    fetchImpl: async () => ({
+      status: 200,
+      json: async () => ({ service: "kiln", protocol: "kiln.health/1", runId: "04".repeat(16), projectId: PROJECT_ID, build: null }),
+    }),
+    build: null,
+  });
+
+  assert.equal(order[0], "spawn:L", `the launcher starts first on POSIX: ${JSON.stringify(order.slice(0, 3))}`);
+  assert.deepEqual(result.preflight, { ran: false, ok: true, verified: false, reason: "not-windows", ms: 0, rows: null });
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -1613,7 +1760,7 @@ test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY T
     spawn: recordingSpawn(calls),
     env: { PORT: String(await freePort()) },
     randomBytes: () => Buffer.alloc(16, 7),
-    psRun: () => ({ status: 1, stdout: "" }),
+    psRun: afterPriming(() => ({ status: 1, stdout: "" })),
     signalTarget: fakeSignals(),
     fetchImpl: healthyFetch(),
     build: null,
@@ -1781,14 +1928,14 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
     randomBytes: () => Buffer.alloc(16, 7),
     // ⚠️ THE FIRST LOOK FINDS NOTHING; EVERY LATER ONE FINDS THE WORKER, reported as a child of the
     // launcher. A tracker that never re-sampled would carry the empty first answer into the shutdown.
-    psRun: () => {
+    psRun: afterPriming(() => {
       listed += 1;
       const launcherPid = calls.find((c) => c.command === "L")?.child?.pid;
       if (listed === 1 || !launcherPid) return { status: 0, stdout: "" };
       return { status: 0, stdout: `${launcherPid} 1 1000
 ${WORKER} ${launcherPid} 2000
 ` };
-    },
+    }),
     // The worker never dies, so it is a survivor at teardown — which is only observable if it was
     // sampled at all.
     kill: (pid, signal) => {
@@ -2050,7 +2197,7 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
     randomBytes: () => Buffer.alloc(16, 7),
     // ⚠️ A PROCESS TABLE THAT NEVER ANSWERS. Measured on Windows, not invented: an operator's
     // Ctrl+Break reaches PowerShell too, and PowerShell answers it by breaking into its debugger.
-    psRun: () => new Promise(() => {}),
+    psRun: afterPriming(() => new Promise(() => {})),
     kill: () => true,
     run: () => ({ status: 0, stdout: "" }),
     signalTarget: signals,
@@ -2144,13 +2291,13 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
   let inFlight = 0;
   let mostAtOnce = 0;
   const startedAt = [];
-  const psRun = () => {
+  const psRun = afterPriming(() => {
     if (!hang) return Promise.resolve({ status: 0, stdout: "" });
     startedAt.push(Date.now());
     inFlight += 1;
     mostAtOnce = Math.max(mostAtOnce, inFlight);
     return new Promise(() => {}); // the join has to give up on this one, which is what makes it observable
-  };
+  });
 
   const run = runSupervisor({
     agentDir: AGENT_DIR,

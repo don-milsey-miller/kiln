@@ -14,7 +14,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,27 +32,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * F119 (diagnostic only): where each Windows process-table query's time goes.
  *
  * ⚠️ **IT CHANGES NO DECISION.** `psRun` is the seam the supervisor already has; it runs the same command
- * with the same timeout and returns the same shape. The Toolhelp probe beside the first queries is recorded
- * and never reaches the shutdown. On POSIX nothing is injected at all, and the production reader runs.
+ * with the same timeout and returns the same shape, recording only what each phase of it cost. On POSIX
+ * nothing is injected at all, and the production reader runs.
+ *
+ * The Toolhelp probe that isolated the stall to the WMI provider has been removed with its compiler; CI run
+ * 35055338147 holds that evidence, and the launch now primes the provider before spawning anything (O14).
  */
-const diagnostic =
-  process.platform === "win32" ? createQueryDiagnostic({ dir: join(dirname(out), "f119-probe"), owned: ownedPids }) : null;
-
-/** This run's own processes: both leaders and the descendant each of them spawned. */
-function ownedPids() {
-  const pids = [process.pid];
-  for (const path of [agentReport, launcherReport]) {
-    try {
-      if (!existsSync(path)) continue;
-      const r = JSON.parse(readFileSync(path, "utf-8"));
-      if (r.pid) pids.push(Number(r.pid));
-      if (r.childPid) pids.push(Number(r.childPid));
-    } catch {
-      /* a report that cannot be read leaves its pids out of the comparison, and says so by their absence */
-    }
-  }
-  return pids;
-}
+const diagnostic = process.platform === "win32" ? createQueryDiagnostic() : null;
 
 const record = (o) =>
   writeFileSync(
@@ -112,6 +98,8 @@ try {
     port: result.port,
     trigger: result.trigger,
     agentExit: result.agentExit,
+    // What priming the process table cost this launch, apart from the shutdown budget it precedes (O14).
+    preflight: result.preflight,
     shutdown: result.shutdown,
   });
   process.exit(0);
@@ -122,6 +110,8 @@ try {
   record({
     ok: false,
     refusal: e instanceof SupervisorRefusal ? e.reason : String(e?.message ?? e),
+    // A launch refused for an unreadable process table says so here, with the reason and what it cost.
+    preflight: e?.detail?.reason ? { ok: false, reason: e.detail.reason, ms: e.detail.ms ?? null, rows: e.detail.rows ?? null } : null,
     shutdown: e?.detail?.shutdown ?? null,
     agentExit: e?.detail?.agentExit ?? null,
   });
