@@ -16,7 +16,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,9 @@ import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
 
 import {
+  REFUSAL,
   STOP_SIGNALS,
+  SupervisorRefusal,
   removeOwnedFiles,
   shutdown,
   stopTree,
@@ -40,6 +42,7 @@ import {
   planSession,
   sessionDirFor,
 } from "../lib/session-record.mjs";
+import { resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 
 const PROJECT_ID = "abcdef0123456789abcdef0123456789";
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "supervisor");
@@ -362,27 +365,70 @@ test("⚠️ a launcher that ignores its control channel is escalated, and the r
 
 /* ============================================== ACC-0103: the EXACT session ==================== */
 
-function stateRoot({ record, sessions = [] } = {}) {
+/**
+ * ⚠️ **F121: PI NAMES SESSION FILES `<timestamp>_<uuid>.jsonl`, AND THE ID IS NOT THE UUID IN THE NAME.**
+ * It is in the file's header. The previous fixtures wrote `sess-7f3a.jsonl`, so a discovery that derived
+ * ids by stripping the extension looked correct here and reported every REAL recorded session as gone.
+ * These fixtures write the shape Pi writes, with a header id that deliberately differs from the filename.
+ */
+const PROJECT_CWD = "/projects/kiln";
+let stamp = 0;
+function sessionFile(dir, { id, cwd = PROJECT_CWD, header = true, name = null }) {
+  const uuid = `${String(++stamp).padStart(8, "0")}-1111-4111-8111-111111111111`;
+  const file = join(dir, name ?? `2026-09-16T10-00-${String(stamp).padStart(2, "0")}-000Z_${uuid}.jsonl`);
+  const lines = [];
+  if (header === true) lines.push(JSON.stringify({ type: "session", version: 3, id, timestamp: new Date().toISOString(), cwd }));
+  else if (typeof header === "string") lines.push(header);
+  lines.push(JSON.stringify({ type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "hi" }] } }));
+  writeFileSync(file, lines.join("\n") + "\n");
+  return { id, file, cwd };
+}
+
+/**
+ * A stand-in for Pi's lister that behaves the way the measured one does: ids from headers, exact cwd
+ * filtering, and malformed or header-less files dropped.
+ */
+const fakeLister = async (cwd, dir) => {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    if (!entry.endsWith(".jsonl")) continue;
+    let header;
+    try {
+      header = JSON.parse(readFileSync(join(dir, entry), "utf-8").split("\n")[0]);
+    } catch {
+      continue;
+    }
+    if (header?.type !== "session" || typeof header.id !== "string" || header.cwd !== cwd) continue;
+    out.push({ id: header.id, path: join(dir, entry), cwd: header.cwd, modified: statSync(join(dir, entry)).mtime });
+  }
+  return out;
+};
+
+function stateRoot({ record, sessions = [], cwd = PROJECT_CWD } = {}) {
   const dir = scratch();
   mkdirSync(join(dir, "runtime"), { recursive: true });
   mkdirSync(join(dir, "sessions"), { recursive: true });
   if (record) writeFileSync(join(dir, SESSION_RECORD), typeof record === "string" ? record : JSON.stringify(record));
-  for (const s of sessions) writeFileSync(join(dir, "sessions", `${s}.jsonl`), "{}\n");
+  for (const id of sessions) sessionFile(join(dir, "sessions"), { id, cwd });
   return dir;
 }
 const sessionDirOf = (root) => join(root, "sessions");
+const SESSION_ID = "7f3a1c2e-0000-4000-8000-000000000001";
+const OTHER_ID = "0older00-0000-4000-8000-000000000002";
+const plan = (over = {}) =>
+  planSession({ projectId: PROJECT_ID, stateMode: "project", projectRoot: PROJECT_CWD, lister: fakeLister, ...over });
 const valid = (over = {}) => ({
   recordVersion: 1,
   projectId: PROJECT_ID,
-  sessionId: "sess-7f3a",
+  sessionId: SESSION_ID,
   stateMode: "project",
   ...over,
 });
 
-test("a first run with nothing recorded and nothing stored starts, and says so", () => {
+test("a first run with nothing recorded and nothing stored starts, and says so", async () => {
   const root = stateRoot();
   try {
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", sessionDir: sessionDirOf(root) });
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
     assert.equal(p.action, SESSION.START);
     assert.equal(p.problem, SESSION_PROBLEM.MISSING);
   } finally {
@@ -390,22 +436,22 @@ test("a first run with nothing recorded and nothing stored starts, and says so",
   }
 });
 
-test("⚠️ a later run resumes the EXACT recorded session, named in the plan", () => {
+test("⚠️ a later run resumes the EXACT recorded session, named in the plan", async () => {
   // ⚠️ "THE AGENT STARTED" IS NOT "THE SESSION RESUMED". A brand-new unrelated session starts just
   // as successfully, and the two are indistinguishable to an operator until the context is missing.
   // What is asserted is the identifier, which is the only thing that differs.
-  const root = stateRoot({ record: valid(), sessions: ["sess-7f3a", "sess-older"] });
+  const root = stateRoot({ record: valid(), sessions: [SESSION_ID, OTHER_ID] });
   try {
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", sessionDir: sessionDirOf(root) });
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
     assert.equal(p.action, SESSION.RESUME);
-    assert.equal(p.sessionId, "sess-7f3a", "the stored one, not the newest and not any other");
-    assert.notEqual(p.sessionId, "sess-older");
+    assert.equal(p.sessionId, SESSION_ID, "the stored one, not the newest and not any other");
+    assert.notEqual(p.sessionId, OTHER_ID);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("⚠️ every way a record can fail becomes a question, never a silent fresh start", () => {
+test("⚠️ every way a record can fail becomes a question, never a silent fresh start", async () => {
   // ⚠️ EACH OF THESE HAS AN OBVIOUS CHEAP ANSWER — start a new session — and that answer silently
   // discards the thing the operator came back for.
   const cases = [
@@ -415,17 +461,17 @@ test("⚠️ every way a record can fail becomes a question, never a silent fres
     // ⚠️ A STATE ROOT CAN BE SHARED OR COPIED, so a record whose every field is valid can still
     // belong to another project — the one route where nothing else would catch it.
     [JSON.stringify(valid({ projectId: "f".repeat(32) })), SESSION_PROBLEM.FOREIGN],
-    [JSON.stringify(valid({ sessionId: "sess-vanished" })), SESSION_PROBLEM.GONE],
+    [JSON.stringify(valid({ sessionId: "vanished-0000-4000-8000-000000000009" })), SESSION_PROBLEM.GONE],
   ];
   for (const [record, problem] of cases) {
-    const root = stateRoot({ record, sessions: ["sess-7f3a"] });
+    const root = stateRoot({ record, sessions: [SESSION_ID] });
     try {
-      const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", sessionDir: sessionDirOf(root) });
+      const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
       assert.equal(p.action, SESSION.ASK, `${problem} must ask`);
       assert.equal(p.problem, problem);
       assert.deepEqual(
         p.available.sessions.map((s) => s.id),
-        ["sess-7f3a"],
+        [SESSION_ID],
         "and offer what is actually there"
       );
     } finally {
@@ -434,54 +480,55 @@ test("⚠️ every way a record can fail becomes a question, never a silent fres
   }
 });
 
-test("a missing record with sessions present asks rather than starting over them", () => {
+test("a missing record with sessions present asks rather than starting over them", async () => {
   // ⚠️ THE ONE CASE WHERE STARTING FRESH DISCARDS NOTHING is no record AND no sessions. With sessions
   // sitting there, a lost record is a question about which one, not permission to ignore them.
-  const root = stateRoot({ sessions: ["sess-a", "sess-b"] });
+  const root = stateRoot({ sessions: ["aaaa1111-0000-4000-8000-00000000000a", "bbbb2222-0000-4000-8000-00000000000b"] });
   try {
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", sessionDir: sessionDirOf(root) });
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
     assert.equal(p.action, SESSION.ASK);
     assert.equal(p.problem, SESSION_PROBLEM.MISSING);
     assert.deepEqual(
       p.available.sessions.map((s) => s.id).sort(),
-      ["sess-a", "sess-b"]
+      ["aaaa1111-0000-4000-8000-00000000000a", "bbbb2222-0000-4000-8000-00000000000b"]
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("available sessions are read from the directory, newest first", () => {
-  const root = stateRoot({ sessions: ["one", "two"] });
+test("available sessions are read from the directory, newest first", async () => {
+  const root = stateRoot({ sessions: ["one11111-0000-4000-8000-00000000000c", "two22222-0000-4000-8000-00000000000d"] });
+  const look = (dir) => availableSessions(dir, { lister: fakeLister, projectRoot: PROJECT_CWD });
   try {
-    const list = availableSessions(sessionDirOf(root));
+    const list = await look(sessionDirOf(root));
     assert.equal(list.state, STORAGE.LISTED);
     assert.deepEqual(
       list.sessions.map((s) => s.id).sort(),
-      ["one", "two"]
+      ["one11111-0000-4000-8000-00000000000c", "two22222-0000-4000-8000-00000000000d"]
     );
 
     // ⚠️ "I COULD NOT LOOK" IS NOT "THERE IS NOTHING THERE", AND THESE USED TO BE ONE ANSWER. All
     // three collapsed into an empty list, and an empty list with no record reads as a first run —
     // which starts fresh over sessions nobody could enumerate.
-    assert.equal(availableSessions(join(root, "nope")).state, STORAGE.ABSENT, "an absent directory IS an answer");
-    assert.equal(availableSessions(undefined).state, STORAGE.ABSENT);
+    assert.equal((await look(join(root, "nope"))).state, STORAGE.ABSENT, "an absent directory IS an answer");
+    assert.equal((await look(undefined)).state, STORAGE.ABSENT);
     const file = join(root, "a-file");
     writeFileSync(file, "not a directory");
-    assert.equal(availableSessions(file).state, STORAGE.NOT_A_DIRECTORY);
+    assert.equal((await look(file)).state, STORAGE.NOT_A_DIRECTORY);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("⚠️ storage that could not be inspected asks; it never authorises a fresh start", () => {
+test("⚠️ storage that could not be inspected asks; it never authorises a fresh start", async () => {
   // ⚠️ THE DEFECT: with no record and a session directory that is really a FILE, availability was an
   // empty list and the plan was START — a fresh session begun over storage nobody could read.
   const root = scratch();
   try {
     mkdirSync(join(root, "runtime"), { recursive: true });
     writeFileSync(join(root, "sessions"), "I am a regular file");
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project" });
+    const p = await plan({ stateRoot: root });
     assert.equal(p.action, SESSION.ASK, "uncertainty asks");
     assert.equal(p.problem, SESSION_PROBLEM.STORAGE_UNREADABLE);
     assert.equal(p.available.state, STORAGE.NOT_A_DIRECTORY);
@@ -490,44 +537,114 @@ test("⚠️ storage that could not be inspected asks; it never authorises a fre
   }
 });
 
-test("⚠️ a session recorded under a different state mode is a question, not a resume", () => {
+test("⚠️ a session recorded under a different state mode is a question, not a resume", async () => {
   // ⚠️ THE MODE DECIDES WHICH STORE THE ID REFERS TO. A record written under project-local state and
   // read while running `--local-state user` names a session in the other store — and every field
   // along that route is individually valid, so nothing else would have caught it.
-  const root = stateRoot({ record: valid({ stateMode: "user" }), sessions: ["sess-7f3a"] });
+  const root = stateRoot({ record: valid({ stateMode: "user" }), sessions: [SESSION_ID] });
   try {
-    const p = planSession({
-      stateRoot: root,
-      projectId: PROJECT_ID,
-      stateMode: "project",
-      sessionDir: sessionDirOf(root),
-    });
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
     assert.equal(p.action, SESSION.ASK);
     assert.equal(p.problem, SESSION_PROBLEM.MODE_CHANGED);
 
     // ...and it resumes when the modes agree, so the check is about the mode and not the record.
-    const same = planSession({
-      stateRoot: root,
-      projectId: PROJECT_ID,
-      stateMode: "user",
-      sessionDir: sessionDirOf(root),
-    });
+    const same = await plan({ stateRoot: root, stateMode: "user", sessionDir: sessionDirOf(root) });
     assert.equal(same.action, SESSION.RESUME);
-    assert.equal(same.sessionId, "sess-7f3a");
+    assert.equal(same.sessionId, SESSION_ID);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("the session directory is derived, so the existence check cannot be skipped", () => {
+test("the session directory is derived, so the existence check cannot be skipped", async () => {
   // ⚠️ AS AN OPTIONAL ARGUMENT ITS ABSENCE SILENTLY SKIPPED THE EXISTENCE CHECK: the caller who
   // forgot it got a resume with no proof the session was there.
-  const root = stateRoot({ record: valid({ sessionId: "sess-vanished" }), sessions: ["sess-7f3a"] });
+  const root = stateRoot({ record: valid({ sessionId: "vanished-0000-4000-8000-00000000000e" }), sessions: [SESSION_ID] });
   try {
     assert.equal(sessionDirFor(root), join(root, "sessions"));
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project" });
+    const p = await plan({ stateRoot: root });
     assert.equal(p.action, SESSION.ASK, "no override, and the vanished session is still caught");
     assert.equal(p.problem, SESSION_PROBLEM.GONE);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * ⚠️ **THE CONTROL F121 NEEDED, AND THIS ONE USES PI'S OWN LISTER.** Everything above drives a stand-in.
+ * The defect was that Kiln derived session ids by stripping a filename's extension, while Pi keeps the id
+ * in each file's header — so every real recorded session would have been reported as one that no longer
+ * exists, and fixtures named `sess-7f3a.jsonl` could never show it. These files are named the way Pi names
+ * them, and the header id is deliberately NOT the uuid in the name.
+ */
+test("⚠️ a lister that could not answer is not an empty store, and never a first run", async () => {
+  // ⚠️ **"I COULD NOT LOOK" IS NOT "THERE IS NOTHING THERE", AND THE LISTER IS THE SECOND WAY TO LEARN IT.**
+  // The directory inspection above catches an absent or unreadable path; this catches the case where the
+  // path is a fine directory and PI could not read it — a permissions failure, a store mid-write, a lister
+  // that threw for its own reasons. Treated as an empty list, with no record present, it reads as a first
+  // run: Kiln would start a fresh session over sessions nobody could enumerate.
+  const root = stateRoot({ sessions: [SESSION_ID] });
+  const threw = async () => {
+    throw Object.assign(new Error("denied"), { code: "EACCES" });
+  };
+  try {
+    const listed = await availableSessions(sessionDirOf(root), { lister: threw, projectRoot: PROJECT_CWD });
+    assert.equal(listed.state, STORAGE.UNREADABLE, "a lister that threw reported nothing, not nothing there");
+    assert.equal(listed.code, "EACCES", "and why it could not answer is kept");
+    assert.deepEqual(listed.sessions, []);
+
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root), lister: threw });
+    assert.equal(p.action, SESSION.ASK, "uncertainty asks; it never authorises a fresh start");
+    assert.equal(p.problem, SESSION_PROBLEM.STORAGE_UNREADABLE);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ F121 ids come from each session's header, through Pi's own lister, never from the filename", async () => {
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const lister = await resolvePinnedSessionLister(repoRoot);
+  const root = scratch();
+  const sessions = join(root, "sessions");
+  const mine = join(root, "mine");
+  const theirs = join(root, "theirs");
+  try {
+    mkdirSync(join(root, "runtime"), { recursive: true });
+    mkdirSync(sessions, { recursive: true });
+    mkdirSync(mine, { recursive: true });
+    mkdirSync(theirs, { recursive: true });
+
+    const header = (id, cwd) => JSON.stringify({ type: "session", version: 3, id, timestamp: new Date().toISOString(), cwd });
+    const msg = JSON.stringify({ type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "hi" }] } });
+    const HEADER_ID = "99999999-9999-4999-8999-999999999999";
+    const NAME_UUID = "11111111-1111-4111-8111-111111111111";
+    // The id in the name and the id in the header disagree, which is the whole defect in one file.
+    writeFileSync(join(sessions, `2026-09-16T10-00-00-000Z_${NAME_UUID}.jsonl`), [header(HEADER_ID, mine), msg].join("\n") + "\n");
+    // Another project's session, in the same flat directory.
+    writeFileSync(join(sessions, "2026-09-16T10-05-00-000Z_22222222-2222-4222-8222-222222222222.jsonl"), [header("88888888-8888-4888-8888-888888888888", theirs), msg].join("\n") + "\n");
+    // A malformed header, and one with no header at all.
+    writeFileSync(join(sessions, "2026-09-16T10-10-00-000Z_33333333-3333-4333-8333-333333333333.jsonl"), ["{ not json", msg].join("\n") + "\n");
+    writeFileSync(join(sessions, "2026-09-16T10-15-00-000Z_44444444-4444-4444-8444-444444444444.jsonl"), msg + "\n");
+
+    const listed = await availableSessions(sessions, { lister, projectRoot: mine });
+    assert.equal(listed.state, STORAGE.LISTED);
+    assert.deepEqual(
+      listed.sessions.map((x) => x.id),
+      [HEADER_ID],
+      "the header's id, not the filename's uuid, and only this project's"
+    );
+
+    // A record naming the HEADER id resumes; one naming the FILENAME uuid is a session that is not there.
+    const record = (sessionId) => writeFileSync(join(root, SESSION_RECORD), JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId, stateMode: "project" }));
+    record(HEADER_ID);
+    const resumed = await planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", projectRoot: mine, lister, sessionDir: sessions });
+    assert.equal(resumed.action, SESSION.RESUME);
+    assert.equal(resumed.sessionId, HEADER_ID);
+
+    record(NAME_UUID);
+    const gone = await planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", projectRoot: mine, lister, sessionDir: sessions });
+    assert.equal(gone.action, SESSION.ASK, "a filename-derived id names no session Pi knows");
+    assert.equal(gone.problem, SESSION_PROBLEM.GONE);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -779,7 +896,7 @@ test("a surviving descendant makes the whole shutdown partial, whatever the exit
   assert.equal(r.complete, false);
 });
 
-test("⚠️ a session record that exists but cannot be read is a question, not a first run", () => {
+test("⚠️ a session record that exists but cannot be read is a question, not a first run", async () => {
   // ⚠️ `existsSync` ANSWERS FALSE FOR A RECORD THAT IS THERE AND CANNOT BE OPENED — a permissions
   // problem, a broken link — and false was the one answer that could authorise starting fresh.
   // Only ENOENT means "no record"; the record is read rather than asked about.
@@ -790,7 +907,7 @@ test("⚠️ a session record that exists but cannot be read is a question, not 
     // A DIRECTORY where the record belongs: it exists, and reading it fails with EISDIR/EPERM.
     mkdirSync(join(root, SESSION_RECORD), { recursive: true });
 
-    const p = planSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project" });
+    const p = await plan({ stateRoot: root });
     assert.equal(p.action, SESSION.ASK, "an unreadable record must not authorise a fresh start");
     assert.equal(p.problem, SESSION_PROBLEM.UNREADABLE);
   } finally {
