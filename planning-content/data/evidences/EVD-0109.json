@@ -1,0 +1,83 @@
+{
+  "id": "EVD-0109",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: enforced shutdown deadline and bounded Windows launch preflight",
+  "kind": "experiment",
+  "summary": "For ACC-0081, and it records what EVD-0088 could not have shown. FOUR FAILED MEASUREMENT RUNS CAME FIRST. Run 34849329259 refused the windows-latest node 22 natural shutdown twice, on the attempt and its one re-run, with shutdown-not-observed, both trackers at clean 0 and unresolved 1, no identity reads and about 2,720 ms spent. Run 34901223783, the first with per-query records, showed a windows-22 query taking 3,573 ms and completing 364 ms after the agent exited: its table held the agent's own row and the real child, and it was discarded as raced, so the run refused. Runs 34955664251 and 35028709582 showed the severe form on windows-24 natural, where both trees' first queries exceeded the 10,000 ms process-table timeout at 10,126 and 10,159 ms, then at 10,249 and 10,078 ms, their successors were still unresolved when the shutdown finalized, nothing was enumerated, and the run refused at about 2,740 ms. Run 34910936533 is R18's source: green, yet recording spentMs 8092 against an 8,000 ms budget with withinBudget false, passed by an evidence-test ceiling this criterion never stated. ATTRIBUTION RUN 35055338147 SETTLED THE CAUSE. Each query was recorded in phases. On windows-22 natural the first query cost 7,266 ms: 13 ms to start the child, 7,114 ms waiting for its first byte, 138 ms draining; on windows-24 natural 3,388 ms, as 18, 3,230 and 140. Every later query in those runs answered in about 300 ms. Both trees' first queries emitted their first byte in the same millisecond though they began 450 ms apart, and a WMI-free Toolhelp32 probe run beside them read the same machine in 68 ms and 45 ms, returning the same row count. The cost is neither machine load nor process creation: it is one shared first use of the WMI provider. THE GREEN RUN IS 35086096358, all four cells, 1,141 tests and no failures in each. The launch preflight ran and verified on all six Windows records, at 3,142 ms and 3,057 ms on the cold natural runs and 375 to 435 ms on the warm interrupt and enumeration runs, reading 148 to 153 rows, and recorded ran false with reason not-windows on all six POSIX records. The first tracked query after priming cost 827 ms on windows-22 natural and 483 ms on windows-24 natural, against 7,266 and 3,388 ms unprimed. All twelve records report complete true, withinBudget true and unfinished empty, spending 5,817 to 6,697 ms of 8,000 on Windows and 5,105 to 6,238 ms on Linux, and the whole run contains no process-table-timeout, shutdown-not-observed, descendants-unverified, identity-changed or creation-time-ambiguous marker. MUTATION CONTROLS RAN LOCALLY: 73 mutations across six sets, O14 MP1 to MP9, O12 MD1 to MD18, O11 MT1 to MT14, F119 MQ1 to MQ12, F116 MI1 to MI16 with 14 active, and O8 MS1 to MS6, each applied one at a time from a temporary working directory, every one killed, with lib/supervisor.mjs restored byte-identical, git status back to baseline and no fixture directory left behind. Locally on Windows the preflight measured 333 to 347 ms and the first query after it 319 to 349 ms, with the real evidence tests passing 4 of 4 in each of two isolated runs.",
+  "outcome": "success",
+  "observedAt": "2026-09-16",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-failed-runs": "34849329259 (windows-22 natural refused twice, no identity reads, about 2,720 ms), 34901223783 (a 3,573 ms query completing 364 ms after the agent exited, discarded as raced), 34955664251 and 35028709582 (windows-24 natural, first queries timing out at 10,126/10,159 ms and 10,249/10,078 ms, successors unresolved, nothing enumerated)",
+      "ci-r18-source": "34910936533 at commit 000ae35: green, spentMs 8092 of an 8,000 ms budget, withinBudget false, passed by an unstated 9,500 ms evidence-test ceiling",
+      "ci-attribution": "35055338147 at commit f6a1b1a: windows-22 natural first query 7,266 ms = 13 ms start + 7,114 ms to first byte + 138 ms drain; windows-24 natural 3,388 = 18 + 3,230 + 140; both trees' first bytes in the same millisecond though started 450 ms apart; a WMI-free Toolhelp32 probe beside them read the same machine in 68 ms and 45 ms",
+      "ci-green": "35086096358 at commit 91db6a9, one attempt, no job re-run, all four cells green, 1,141 tests and 0 fail in every cell",
+      "cell-ubuntu-22": "node v22.23.2, 1141 tests / 1137 pass / 0 fail / 4 skipped",
+      "cell-ubuntu-24": "node v24.20.0, 1141 tests / 1137 pass / 0 fail / 4 skipped",
+      "cell-windows-22": "node v22.23.2, 1141 tests / 1140 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node v24.20.0, 1141 tests / 1140 pass / 0 fail / 1 skipped",
+      "preflight-windows": "ran and verified on all six Windows records: 3,142 ms (windows-22 natural) and 3,057 ms (windows-24 natural) cold, 375 to 435 ms warm, 148 to 153 rows, no launch refused",
+      "preflight-posix": "ran false, reason not-windows, 0 ms, on all six Linux records",
+      "first-query-after-priming": "827 ms on windows-22 natural and 483 ms on windows-24 natural, against 7,266 and 3,388 ms unprimed in run 35055338147",
+      "budgets": "all twelve records complete true, withinBudget true, unfinished empty; 5,817 to 6,697 ms of 8,000 on Windows, 5,105 to 6,238 ms on Linux",
+      "signatures": "no process-table-timeout, shutdown-not-observed, descendants-unverified, identity-changed or creation-time-ambiguous marker anywhere in run 35086096358",
+      "mutations": "73 local mutations, all killed: O14 MP1-MP9 (9), O12 MD1-MD18 (18), O11 MT1-MT14 (14), F119 MQ1-MQ12 (12), F116 MI1-MI16 with 14 active, O8 MS1-MS6 (6); every guard held",
+      "local-windows": "preflight 333 to 347 ms, first query after it 319 to 349 ms, real evidence tests 4 of 4 in each of two isolated runs, full suite 1,141 tests / 0 fail"
+    },
+    "omissions": [
+      {
+        "fact": "f119-elimination",
+        "state": "not-observable",
+        "reason": "Two consecutive green runs do not prove the WMI provider cannot stall again. Priming moves its first use before the children exist and bounds it at 10,000 ms; it does not make the provider fast. Recorded as mitigated, with the standing rule that another primed timeout in CI removes WMI wholesale in favour of a WMI-free identity format."
+      },
+      {
+        "fact": "preflight-failure-path-in-ci",
+        "state": "not-captured",
+        "reason": "No CI run has exercised a refused launch: every preflight so far verified. The refusal paths, a timeout, a failing reader, a table without this process, and a row with no creation time, are covered by unit controls over injected readers and by mutations MP3 to MP5, not by a platform run."
+      },
+      {
+        "fact": "cold-provider-cost-variability",
+        "state": "not-captured",
+        "reason": "The cold preflight was measured at 3,142 ms and 3,057 ms on two CI runners and at 333 to 347 ms locally. That is four observations, not a distribution, and nothing here bounds how slow a cold provider can be short of the 10,000 ms refusal."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "The 73 mutation controls ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "The CI matrix builds ubuntu-latest and windows-latest only. A BSD-derived platform's process table and process-group behaviour are not observed by anything here."
+      },
+      {
+        "fact": "windows-sigint-delivery",
+        "state": "not-observable",
+        "reason": "Carried from EVD-0088: no API can deliver SIGINT to a Windows process, so the Windows cell observes a real CTRL_BREAK_EVENT through the same handler and the SIGINT delivery itself is observed only by the POSIX cell."
+      },
+      {
+        "fact": "real-pi-and-next-children",
+        "state": "not-captured",
+        "reason": "Carried from EVD-0088: the supervisor, processes, port, process table and kill mechanism are real, but both children are fixtures. Neither real program's own behaviour on being signalled is observed."
+      },
+      {
+        "fact": "escalation-under-a-child-that-ignores-signals",
+        "state": "not-captured",
+        "reason": "Carried from EVD-0088: every tree went within its periods in these runs, so a tree surviving escalation is covered by unit controls over injected process tables rather than by a platform run."
+      }
+    ]
+  }
+}
