@@ -14,12 +14,13 @@
  */
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
 import { firstLookWindowMs } from "./observation-window.mjs";
+import { createQueryDiagnostic } from "./query-diagnostic.mjs";
 
 if (process.argv.length < 9) process.exit(0);
 
@@ -27,10 +28,40 @@ const [, , projectRoot, out, port, mode, launcherReport, launcherChild, agentRep
   process.argv;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * F119 (diagnostic only): where each Windows process-table query's time goes.
+ *
+ * ⚠️ **IT CHANGES NO DECISION.** `psRun` is the seam the supervisor already has; it runs the same command
+ * with the same timeout and returns the same shape. The Toolhelp probe beside the first queries is recorded
+ * and never reaches the shutdown. On POSIX nothing is injected at all, and the production reader runs.
+ */
+const diagnostic =
+  process.platform === "win32" ? createQueryDiagnostic({ dir: join(dirname(out), "f119-probe"), owned: ownedPids }) : null;
+
+/** This run's own processes: both leaders and the descendant each of them spawned. */
+function ownedPids() {
+  const pids = [process.pid];
+  for (const path of [agentReport, launcherReport]) {
+    try {
+      if (!existsSync(path)) continue;
+      const r = JSON.parse(readFileSync(path, "utf-8"));
+      if (r.pid) pids.push(Number(r.pid));
+      if (r.childPid) pids.push(Number(r.childPid));
+    } catch {
+      /* a report that cannot be read leaves its pids out of the comparison, and says so by their absence */
+    }
+  }
+  return pids;
+}
+
 const record = (o) =>
   writeFileSync(
     out,
-    JSON.stringify({ platform: process.platform, node: process.versions.node, mode, ...o }, null, 2) + "\n"
+    JSON.stringify(
+      { platform: process.platform, node: process.versions.node, mode, ...o, diagnostics: diagnostic?.snapshot() ?? null },
+      null,
+      2
+    ) + "\n"
   );
 
 try {
@@ -49,6 +80,8 @@ try {
       args: [join(HERE, "tree-agent.mjs"), agentReport, agentChild, mode === "interrupt" ? "wait" : "exit", String(firstLookWindowMs() ?? 3000)],
     },
     spawn,
+    // The diagnostic reader on Windows, the production reader everywhere else (F119).
+    psRun: diagnostic?.psRun,
     randomBytes,
     env: { ...process.env, PORT: port },
     build: null,
