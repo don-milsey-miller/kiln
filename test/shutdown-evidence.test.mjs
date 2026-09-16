@@ -7,8 +7,8 @@
  * an answer; they cannot prove the answer. Here the children are real processes, the grandchildren
  * are real processes that outlive their parents, the port is a real port, the file removed at the
  * end is one a real run created, and the enumeration and the kill are whatever this platform
- * actually provides — `ps` and `kill` on POSIX, `Get-CimInstance Win32_Process` and `taskkill` on
- * Windows, where `wmic` is absent from build 26200 and the CIM query is what production uses.
+ * actually provides — `ps` and `kill` on POSIX, the kernel's process list through
+ * `NtQuerySystemInformation` and `taskkill` on Windows, which is what production uses (F122).
  *
  * ⚠️ **AND IT RECORDS PER PLATFORM RATHER THAN LETTING ONE STAND FOR THE OTHER (clause 7).** CI runs
  * the suite on `ubuntu-latest` and `windows-latest` independently, so each reports for itself; the
@@ -34,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
-import { probePort, pidAlive, runFilePath } from "../lib/supervisor.mjs";
+import { REFUSAL, probePort, pidAlive, runFilePath } from "../lib/supervisor.mjs";
 import { grantTrust } from "../lib/pi-trust.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 import { firstLookWindowMs } from "./fixtures/supervisor/observation-window.mjs";
@@ -213,6 +213,18 @@ async function viaConsoleEvent({ dir, out, argv, paths }) {
   return { record: existsSync(out) ? readJson(out) : null, paths, dir, delivery };
 }
 
+/**
+ * ⚠️ **A LAUNCH REFUSED BY THE PREFLIGHT IS REPORTED AS THAT REFUSAL (F122).** Neither child was spawned, so
+ * there are no child files, and reading them first failed the cell with `ENOENT` on a file nobody was ever
+ * going to write. The refusal and the preflight's own record are what a person needs from that cell.
+ */
+function assertLaunched(record) {
+  if (record?.refusal !== REFUSAL.PROCESS_TABLE_NOT_PRIMED) return;
+  assert.fail(
+    `the launch was refused before either child was spawned (${record.refusal}): preflight ${JSON.stringify(record.preflight)}`
+  );
+}
+
 /** A pid that is gone stays gone; a survivor is what this whole criterion is about. */
 async function goneWithin(pid, ms = 15_000) {
   const deadline = Date.now() + ms;
@@ -249,6 +261,7 @@ for (const mode of ["natural", "interrupt"]) {
       assert.equal(delivery.sent, true, "GenerateConsoleCtrlEvent must have reported success");
     }
 
+    assertLaunched(record);
     const launcherChild = readJson(paths.launcherChild).pid;
     const agentChild = readJson(paths.agentChild).pid;
     assert.ok(launcherChild > 0 && agentChild > 0, "each tree really had a descendant");
@@ -314,6 +327,12 @@ test("⚠️ the enumeration really ran on this platform, rather than finding no
   // group leader on POSIX and the agent cannot be; asking only the agent's would leave the launcher
   // side resting on the group kill having reached something nobody looked for.
   const { record, paths } = await observe("natural");
+  if (record?.refusal === REFUSAL.PROCESS_TABLE_NOT_PRIMED)
+    console.log(`
+[evidence ${process.platform}/enumeration]
+${JSON.stringify(record, null, 2)}
+`);
+  assertLaunched(record);
   const agentChild = readJson(paths.agentChild).pid;
   const launcherChild = readJson(paths.launcherChild).pid;
 

@@ -315,7 +315,7 @@ test("⚠️ F116 a candidate child without a creation time is not tracked, and 
 
 test("⚠️ F116 every process-table row carries a creation time, on both platforms", () => {
   assert.ok(PROCESS_TABLE_COMMAND.posix[1].join(" ").includes("lstart"), "POSIX asks ps for the start time");
-  assert.match(PROCESS_TABLE_COMMAND.win32[1].join(" "), /CreationDate\.ToFileTimeUtc\(\)/, "Windows asks CIM for it");
+  assert.match(PROCESS_TABLE_COMMAND.win32[1].join(" "), /ReadInt64\(\$e, 0x20\)/, "Windows reads the kernel's creation time");
 
   const rows = parseProcessTable(
     ["  7     1 Mon Sep 14 12:00:00 2026", "8 7 Fri Sep  4 09:05:07 2026", "9 8 134337279036604340", "10 9 -", "11 10"].join(LF)

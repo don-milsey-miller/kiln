@@ -13,7 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { PROCESS_TABLE_TIMEOUT_MS, primeProcessTable } from "../lib/supervisor.mjs";
+import { PROCESS_TABLE_COMMAND, PROCESS_TABLE_TIMEOUT_MS, primeProcessTable } from "../lib/supervisor.mjs";
 
 const LF = String.fromCharCode(10);
 /** A reader that answers with the rows it was given, in the shape the production reader returns. */
@@ -60,7 +60,7 @@ test("⚠️ O14 a Windows table that shows this process with a creation time pr
   // run never uses, which is indistinguishable from not priming at all.
   assert.equal(seen.length, 1, "read once");
   assert.equal(seen[0][0], "powershell");
-  assert.ok(seen[0][1].includes("Get-CimInstance Win32_Process"), seen[0][1]);
+  assert.equal(seen[0][1], PROCESS_TABLE_COMMAND.win32[1].join(" "));
 });
 
 test("⚠️ O14 a table that never answers refuses, and says it timed out", async () => {

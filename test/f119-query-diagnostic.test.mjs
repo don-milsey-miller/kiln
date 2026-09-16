@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
+import { PROCESS_TABLE_COMMAND } from "../lib/supervisor.mjs";
 
 /** Rows joined by a newline the CHILD builds, so no real newline ever sits inside its source. */
 const prints = (rows) => [process.execPath, ["-e", `process.stdout.write(${JSON.stringify([...rows, ""])}.join(String.fromCharCode(10)))`]];
@@ -124,6 +125,6 @@ test("⚠️ F119 the snapshot is a copy of plain values, fit for a record", asy
 test("⚠️ F119 the diagnostic offers the platform's own command, so the fixture measures the real route", () => {
   const [cmd, args] = createQueryDiagnostic({ platform: "win32" }).command();
   assert.equal(cmd, "powershell");
-  assert.ok(args.join(" ").includes("Get-CimInstance Win32_Process"), args.join(" "));
+  assert.deepEqual(args, PROCESS_TABLE_COMMAND.win32[1], "the production arguments, unchanged");
   assert.equal(createQueryDiagnostic({ platform: "linux" }).command()[0], "ps");
 });

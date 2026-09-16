@@ -5,7 +5,7 @@
  * ⚠️ **THE SUPERVISOR HERE IS THE PRODUCTION ONE, AND SO ARE THE PROCESSES.** Nothing about the
  * routing, the readiness rule, the descendant enumeration or the platform's kill mechanism is
  * simulated: real children, real grandchildren, a real port, the real process table — `ps` on POSIX,
- * `Get-CimInstance Win32_Process` on Windows, where `wmic` is absent from 26200 — and the real
+ * the kernel's process list on Windows, read without WMI (F122) — and the real
  * `kill`/`taskkill`. That is what makes the record evidence rather than a restatement of the tests.
  *
  * ⚠️ **IT RUNS AS A SEPARATE PROCESS BECAUSE THE INTERRUPT PATH NEEDS ONE.** A signal is delivered
