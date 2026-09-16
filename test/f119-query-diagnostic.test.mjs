@@ -3,30 +3,24 @@
  *
  * ⚠️ **THE POINT OF THESE TESTS IS THE WORD "NOTHING".** The diagnostic replaces the process-table reader in
  * the Windows evidence fixture, so a mistake here would change what the supervisor sees: a wrong shape on
- * timeout would turn a timed-out query into an ordinary failure, and a probe result leaking into the return
- * value would feed Toolhelp identities into a shutdown. Both are asserted against directly.
+ * timeout would turn a timed-out query into an ordinary failure.
  *
  * Every command here is a short `node -e`, so nothing enumerates or signals a real process.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn as realSpawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createQueryDiagnostic, compileToolhelp, CSC_PATH } from "./fixtures/supervisor/query-diagnostic.mjs";
+import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
 
-const dir = () => mkdtempSync(join(tmpdir(), "kiln-f119-diag-"));
 /** Rows joined by a newline the CHILD builds, so no real newline ever sits inside its source. */
 const prints = (rows) => [process.execPath, ["-e", `process.stdout.write(${JSON.stringify([...rows, ""])}.join(String.fromCharCode(10)))`]];
 /** A command that prints a two-row process table and leaves. */
 const TABLE = prints(["10 4 133", "11 10 134"]);
-/** No probe: these tests are about the reader, and a compiler is not always there. */
-const noProbe = () => ({ available: false, reason: "compile-skipped-by-test" });
 
 test("⚠️ F119 a completed query records every phase, the row count, and returns what the reader would", async () => {
-  const d = createQueryDiagnostic({ dir: dir(), compile: noProbe });
+  const d = createQueryDiagnostic();
   const out = await d.psRun(...TABLE);
 
   // The shape the production reader returns, unchanged: the supervisor parses this exactly as before.
@@ -55,7 +49,7 @@ test("⚠️ F119 a completed query records every phase, the row count, and retu
 
 test("⚠️ F119 a query that outlasts the timeout is killed and reported exactly as the production reader reports it", async () => {
   // The bound is a seam here only so the test is quick; the fixture uses PROCESS_TABLE_TIMEOUT_MS unchanged.
-  const d = createQueryDiagnostic({ dir: dir(), compile: noProbe, timeoutMs: 120 });
+  const d = createQueryDiagnostic({ timeoutMs: 120 });
   const started = Date.now();
   const out = await d.psRun(process.execPath, ["-e", "setTimeout(() => {}, 60000)"]);
   const spent = Date.now() - started;
@@ -76,7 +70,7 @@ test("⚠️ F119 a query that outlasts the timeout is killed and reported exact
 });
 
 test("⚠️ F119 a failing query records its exit code and its first stderr byte, and returns no rows", async () => {
-  const d = createQueryDiagnostic({ dir: dir(), compile: noProbe });
+  const d = createQueryDiagnostic();
   const out = await d.psRun(process.execPath, ["-e", "process.stderr.write('broken'); process.exit(3)"]);
 
   assert.equal(out.status, 3);
@@ -91,8 +85,8 @@ test("⚠️ F119 a failing query records its exit code and its first stderr byt
 });
 
 test("⚠️ F119 a command that cannot start is recorded rather than thrown at the supervisor", async () => {
-  const d = createQueryDiagnostic({ dir: dir(), compile: noProbe });
-  const out = await d.psRun(join(dir(), "no-such-program.exe"), []);
+  const d = createQueryDiagnostic();
+  const out = await d.psRun(join(tmpdir(), "kiln-no-such-program.exe"), []);
 
   assert.equal(out.status, 1);
   assert.equal(out.stdout, "");
@@ -102,82 +96,34 @@ test("⚠️ F119 a command that cannot start is recorded rather than thrown at 
   assert.ok(/^[A-Za-z][A-Za-z0-9_]*$/.test(q.error), q.error);
 });
 
-test("⚠️ F119 with no compiler the probe is recorded as unavailable, with its reason, and never silently skipped", async () => {
-  const d = createQueryDiagnostic({
-    dir: dir(),
-    compile: (target, opts) => compileToolhelp(target, { ...opts, csc: join(target, "nowhere", "csc.exe") }),
-  });
+test("⚠️ F119 each query is recorded separately, in the order they ran", async () => {
+  const d = createQueryDiagnostic();
   await d.psRun(...TABLE);
-  const snap = d.snapshot();
+  await d.psRun(...prints(["12 4 135"]));
 
-  assert.equal(snap.toolhelp.available, false);
-  assert.ok(["csc-not-found", "not-windows"].includes(snap.toolhelp.reason), JSON.stringify(snap.toolhelp));
-  assert.deepEqual(snap.probes, [], "no probe ran");
-  assert.deepEqual(snap.ownedByProbe, [], "and nothing is claimed about identities it never read");
-  assert.equal(snap.queries.length, 1, "the query itself still ran");
-});
-
-test("⚠️ F119 the probe runs beside the first queries only, and what it reads never reaches the caller", async () => {
-  // A stand-in probe: it prints a table whose rows differ from the query's, so a leak would be visible.
-  const probeRows = ["10 4 999", "12 10 998", ""].join(String.fromCharCode(10));
-  const d = createQueryDiagnostic({
-    dir: dir(),
-    probeFirst: 2,
-    owned: () => [10, 12, 99],
-    compile: () => ({ available: true, exe: process.execPath, compileMs: 1 }),
-    spawnImpl: (cmd, args, opts) => {
-      // The probe is the call with no arguments; give it its own table.
-      const real = args.length ? args : ["-e", `process.stdout.write(${JSON.stringify(probeRows)})`];
-      return realSpawn(cmd, real, opts);
-    },
-  });
-
-  const first = await d.psRun(...TABLE);
-  const second = await d.psRun(...TABLE);
-  const third = await d.psRun(...TABLE);
-  // ⚠️ NOTHING THE PROBE SAW IS IN WHAT THE SUPERVISOR GETS BACK.
-  for (const out of [first, second, third]) assert.equal(out.stdout.includes("999"), false, out.stdout);
-
-  await new Promise((r) => setTimeout(r, 200));
-  const snap = d.snapshot();
-  assert.equal(snap.queries.length, 3);
-  assert.equal(snap.probes.length, 2, "two queries got a probe, the third did not");
+  const { queries } = d.snapshot();
   assert.deepEqual(
-    snap.probes.map((p) => p.beside),
-    ["q1", "q2"]
-  );
-
-  // The comparison covers this run's own pids and says plainly which the probe did not see.
-  const [{ owned }] = snap.ownedByProbe;
-  assert.deepEqual(
-    owned.map((o) => [o.pid, o.found]),
+    queries.map((q) => [q.id, q.rows]),
     [
-      [10, true],
-      [12, true],
-      [99, false],
+      ["q1", 2],
+      ["q2", 1],
     ]
   );
-  assert.equal(owned[0].created, "999", "the probe's own reading, recorded as its own");
-  assert.equal(owned[2].ppid, null, "a pid it never saw carries nothing");
 });
 
-test("⚠️ F119 the snapshot is a copy of plain values, and the probe's table is not in it", async () => {
-  const d = createQueryDiagnostic({ dir: dir(), compile: noProbe });
+test("⚠️ F119 the snapshot is a copy of plain values, fit for a record", async () => {
+  const d = createQueryDiagnostic();
   await d.psRun(...TABLE);
   const snap = d.snapshot();
 
   assert.equal(JSON.parse(JSON.stringify(snap)).queries[0].rows, 2, "it survives being written to a record");
-  assert.equal("table" in snap.queries[0], false);
-  for (const p of snap.probes) assert.equal("table" in p, false);
+  snap.queries[0].rows = 99;
+  assert.equal(d.snapshot().queries[0].rows, 2, "and a caller's edit does not reach the diagnostic");
 });
 
 test("⚠️ F119 the diagnostic offers the platform's own command, so the fixture measures the real route", () => {
-  const d = createQueryDiagnostic({ dir: dir(), platform: "win32", compile: noProbe });
-  const [cmd, args] = d.command();
+  const [cmd, args] = createQueryDiagnostic({ platform: "win32" }).command();
   assert.equal(cmd, "powershell");
   assert.ok(args.join(" ").includes("Get-CimInstance Win32_Process"), args.join(" "));
-
-  const posix = createQueryDiagnostic({ dir: dir(), platform: "linux", compile: noProbe });
-  assert.equal(posix.command()[0], "ps");
-  assert.ok(CSC_PATH.endsWith("csc.exe"));
+  assert.equal(createQueryDiagnostic({ platform: "linux" }).command()[0], "ps");
 });
