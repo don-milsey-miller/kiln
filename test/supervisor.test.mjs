@@ -104,7 +104,8 @@ const NO_DESCENDANTS = () => ({ status: 0, stdout: `${process.pid} 1 13300000000
  * more call than it used to. This answers that first read with the supervisor's own row — what any real
  * table contains — and leaves every later call to the reader the test is actually about.
  */
-const afterPriming = (next) => {
+const afterPriming = (next, { primes = process.platform === "win32" } = {}) => {
+  if (!primes) return next;
   let primed = false;
   return (...args) => {
     if (primed) return next(...args);
@@ -2297,7 +2298,7 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
     inFlight += 1;
     mostAtOnce = Math.max(mostAtOnce, inFlight);
     return new Promise(() => {}); // the join has to give up on this one, which is what makes it observable
-  });
+  }, { primes: true });
 
   const run = runSupervisor({
     agentDir: AGENT_DIR,
