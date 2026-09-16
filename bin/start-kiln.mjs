@@ -25,7 +25,7 @@ import { spawn } from "node:child_process";
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
 import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
-import { resolvePinnedAgent, resolvePinnedAgentDir } from "../lib/pi-runtime.mjs";
+import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -240,6 +240,12 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     // the trust gate reads and the store the child consults are one directory, without Kiln restating
     // another tool's home-directory rules. The supervisor forces it into every child's environment.
     agentDir: await resolvePinnedAgentDir(TOOL_ROOT),
+    // ⚠️ **PI'S OWN LISTER, FOR THE SAME REASON THE COMMAND RESOLVES THE AGENT (F121).** Which sessions
+    // exist, and what each one's id is, are Pi's facts: the id lives in a session file's header and is a
+    // different value from the uuid in its filename. Kiln asks the pinned package rather than reading
+    // names off disk, and it is resolved here because `lib/pi-runtime.mjs` imports the supervisor's
+    // refusal types — the supervisor reaching back for it would close that circle at load time.
+    sessionLister: await resolvePinnedSessionLister(TOOL_ROOT),
     spawn,
     randomBytes,
     interactive: Boolean(process.stdin.isTTY),

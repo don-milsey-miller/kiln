@@ -25,13 +25,17 @@ import { EventEmitter } from "node:events";
 
 import {
   REFUSAL,
+  SESSION_ID_FLAG,
+  SESSION_SELECTORS,
   STOP_SIGNALS,
   SupervisorRefusal,
+  generateSessionId,
   removeOwnedFiles,
   shutdown,
   stopTree,
   trackDescendants,
   watchForStop,
+  withSessionPolicy,
 } from "../lib/supervisor.mjs";
 import {
   SESSION,
@@ -40,6 +44,7 @@ import {
   STORAGE,
   availableSessions,
   planSession,
+  recordSession,
   sessionDirFor,
 } from "../lib/session-record.mjs";
 import { resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
@@ -596,6 +601,18 @@ test("⚠️ a lister that could not answer is not an empty store, and never a f
     const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root), lister: threw });
     assert.equal(p.action, SESSION.ASK, "uncertainty asks; it never authorises a fresh start");
     assert.equal(p.problem, SESSION_PROBLEM.STORAGE_UNREADABLE);
+
+    // ⚠️ AND THE RECORD IS NOT WRITTEN OVER A STORE THAT COULD NOT BE READ.
+    const out = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: threw,
+      sessionId: "fresh-0000-4000-8000-000000000010",
+    });
+    assert.equal(out.ok, false, "a fresh session is not recorded over an unreadable store");
+    assert.equal(out.problem, SESSION_PROBLEM.STORAGE_UNREADABLE);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -648,6 +665,134 @@ test("⚠️ F121 ids come from each session's header, through Pi's own lister, 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("⚠️ the session this run starts is recorded before Pi is spawned, and validated first", async () => {
+  const root = stateRoot();
+  try {
+    const written = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionId: SESSION_ID,
+    });
+    assert.equal(written.ok, true);
+    assert.equal(written.action, SESSION.START);
+    assert.equal(written.sessionId, SESSION_ID);
+
+    const doc = JSON.parse(readFileSync(join(root, SESSION_RECORD), "utf-8"));
+    assert.equal(doc.sessionId, SESSION_ID);
+    assert.equal(doc.projectId, PROJECT_ID);
+    assert.equal(doc.stateMode, "project");
+    assert.equal(doc.recordVersion, 1);
+    // ⚠️ A MODE AND AN ID, NEVER A PATH: the state root is rederived, so a moved project resumes nothing
+    // belonging elsewhere.
+    assert.equal(JSON.stringify(doc).includes(root), false, "no absolute path is stored");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a record that would not validate is never written, and the caller is told why", async () => {
+  // ⚠️ **AN INVALID RECORD IS NOT A PRIVATE MISTAKE; IT IS THE NEXT RUN'S QUESTION.** `planSession` answers
+  // INVALID for a record that fails its schema, so writing one would leave the operator unable to resume
+  // the session they came back for — and the fault would surface a run later, far from its cause.
+  const root = stateRoot();
+  // A validator that refuses whatever it is handed, standing in for a schema the document fails.
+  // ⚠️ THE SHAPE THE VALIDATOR ACTUALLY HAS: `assertValidRecord` calls it and reads a boolean, with the
+  // reasons on `.errors`. A stub that threw would pass this test for the wrong reason.
+  const refuses = { "kiln-session": Object.assign(() => false, { errors: [{ message: "refused by the test" }] }) };
+  try {
+    const out = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionId: SESSION_ID,
+      validators: refuses,
+    });
+
+    assert.equal(out.ok, false, "an invalid record is refused rather than written");
+    assert.equal(out.problem, SESSION_PROBLEM.INVALID);
+    assert.equal(existsSync(join(root, SESSION_RECORD)), false, "and nothing reached the disk");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a run that loses the race adopts the recorded session rather than overwriting it", async () => {
+  // ⚠️ TWO FIRST RUNS STARTING TOGETHER BOTH SAW "no record" BEFORE THE LOCK EXISTED, and the second
+  // would overwrite the first — leaving a live conversation that nothing points at.
+  const root = stateRoot({ sessions: [SESSION_ID] });
+  try {
+    writeFileSync(join(root, SESSION_RECORD), JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId: SESSION_ID, stateMode: "project" }));
+    const mine = "cccc3333-0000-4000-8000-00000000000f";
+    const out = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionId: mine,
+    });
+    assert.equal(out.ok, true);
+    assert.equal(out.action, SESSION.RESUME);
+    assert.equal(out.sessionId, SESSION_ID, "the winner's session, not this run's fresh id");
+    assert.equal(JSON.parse(readFileSync(join(root, SESSION_RECORD), "utf-8")).sessionId, SESSION_ID, "and the record is untouched");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a missing runtime directory is reported, and the supervisor creates nothing", async () => {
+  // ⚠️ MAKING THE LAYOUT IS SETUP'S WORK, under the lock that owns it. A launch that created one would be
+  // the second writer of a directory tree with exactly one owner.
+  const root = scratch();
+  try {
+    mkdirSync(join(root, "sessions"), { recursive: true });
+    const out = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionId: SESSION_ID,
+    });
+    assert.equal(out.ok, false);
+    assert.equal(out.problem, SESSION_PROBLEM.NO_RUNTIME_DIR);
+    assert.equal(existsSync(join(root, "runtime")), false, "nothing was created");
+    assert.equal(existsSync(join(root, SESSION_RECORD)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ Kiln names the session, and refuses every other way of choosing one", async () => {
+  // ⚠️ ONLY ONE THING MAY DECIDE THE SESSION. Any second selector means the record and the running session
+  // can disagree, which is the failure ACC-0103 exists to rule out.
+  const chosen = withSessionPolicy({ command: "pi", args: ["--print"] }, SESSION_ID, { A: "1" });
+  assert.deepEqual(chosen.args, ["--print", SESSION_ID_FLAG, SESSION_ID]);
+  assert.deepEqual(chosen.env, { A: "1" });
+
+  for (const flag of SESSION_SELECTORS) {
+    assert.throws(
+      () => withSessionPolicy({ command: "pi", args: ["--print", flag, "x"] }, SESSION_ID, {}),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.SESSION_SELECTOR_CONFLICT,
+      `${flag} must be refused`
+    );
+    assert.throws(
+      () => withSessionPolicy({ command: "pi", args: [`${flag}=x`] }, SESSION_ID, {}),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.SESSION_SELECTOR_CONFLICT,
+      `${flag}= must be refused`
+    );
+  }
+
+  // A generated id is what a first run passes, and it is the shape Pi uses for its own.
+  const id = generateSessionId((n) => Buffer.alloc(n, 7));
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
 for (const platform of ["linux", "win32"])

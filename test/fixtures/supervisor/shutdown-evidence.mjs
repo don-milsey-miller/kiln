@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
+import { resolvePinnedSessionLister } from "../../../lib/pi-runtime.mjs";
 import { firstLookWindowMs } from "./observation-window.mjs";
 import { createQueryDiagnostic } from "./query-diagnostic.mjs";
 
@@ -27,6 +28,7 @@ if (process.argv.length < 9) process.exit(0);
 const [, , projectRoot, out, port, mode, launcherReport, launcherChild, agentReport, agentChild, readyFlag, agentDir] =
   process.argv;
 const HERE = dirname(fileURLToPath(import.meta.url));
+const TOOL_ROOT = join(HERE, "..", "..", "..");
 
 /**
  * F119 (diagnostic only): where each Windows process-table query's time goes.
@@ -69,6 +71,8 @@ try {
     // The diagnostic reader on Windows, the production reader everywhere else (F119).
     psRun: diagnostic?.psRun,
     randomBytes,
+    // Pi's own lister, as the production command supplies (F121).
+    sessionLister: await resolvePinnedSessionLister(TOOL_ROOT),
     env: { ...process.env, PORT: port },
     build: null,
     readyMs: 30_000,

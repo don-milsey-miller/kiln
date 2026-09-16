@@ -43,6 +43,8 @@ import {
   resolveRunState,
   SESSION_DIR_ENV,
   SESSION_DIR_FLAG,
+  SESSION_ID_FLAG,
+  generateSessionId,
   stopLauncher,
   withSessionDir,
   leftoverRunFiles,
@@ -80,9 +82,20 @@ const AGENT_DIR = join(tmpdir(), "kiln-supervisor-agent-dir");
 const APPROVED = async ({ projectRoot }) => ({ state: "approved", projectRoot, recordedFor: projectRoot });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function project({ record = { recordVersion: 1, projectId: PROJECT_ID } } = {}) {
+/**
+ * A project directory.
+ *
+ * ⚠️ **THE STATE LAYOUT IS OPT-IN, BECAUSE ITS ABSENCE IS ITSELF A CASE.** Setup makes `runtime/` and Pi
+ * makes `sessions/` on first use; the supervisor makes neither. `state: true` models a project setup has
+ * finished, which a run that must record its session needs. `sessions: true` is for the few tests that
+ * require a session to be listed — an absent session directory is a legitimate first run, not a fixture
+ * oversight, and creating one everywhere would hide that.
+ */
+function project({ record = { recordVersion: 1, projectId: PROJECT_ID }, state = false, sessions = false } = {}) {
   const dir = reapLater(mkdtempSync(join(tmpdir(), "kiln-sup-")));
   mkdirSync(join(dir, ".pi"), { recursive: true });
+  if (state) mkdirSync(join(dir, ".pi", "runtime"), { recursive: true });
+  if (sessions) mkdirSync(join(dir, ".pi", "sessions"), { recursive: true });
   if (record) writeFileSync(join(dir, ".pi", "kiln.json"), JSON.stringify(record, null, 2) + "\n");
   return dir;
 }
@@ -98,6 +111,15 @@ function project({ record = { recordVersion: 1, projectId: PROJECT_ID } } = {}) 
  */
 const NO_DESCENDANTS = () => ({ status: 0, stdout: `${process.pid} 1 133000000000000001
 ` });
+
+/**
+ * Pi's session lister, stood in for: these runs have no real sessions and no real Pi.
+ *
+ * ⚠️ **IDS ARE PI'S TO REPORT, NOT KILN'S TO PARSE (F121).** The real one reads each session file's
+ * header; a stand-in that invented ids from filenames would hide the very defect that rule exists for,
+ * so this reports nothing, and the tests that matter use the pinned lister against real files.
+ */
+const listNothing = async () => [];
 
 /**
  * O14: the launch reads the process table once before spawning anything, so a run-level fixture has one
@@ -167,6 +189,10 @@ function snapshot(dir, prefix = "") {
   const out = {};
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    // ⚠️ RUNTIME STATE IS EXCLUDED, AND ONLY RUNTIME STATE. `.pi/runtime/` is ignored, per-run and
+    // per-machine: the run file and the session record are written there BECAUSE a run happened. What
+    // these snapshots assert is that a run changes no committed project content, which is everything else.
+    if (rel === ".pi/runtime") continue;
     if (entry.isDirectory()) Object.assign(out, snapshot(join(dir, entry.name), rel));
     else out[rel] = readFileSync(join(dir, entry.name), "utf-8");
   }
@@ -250,7 +276,7 @@ test("⚠️ an offered port changes no byte of the project, proved through a wh
   // no project path and therefore could not have persisted anything wherever it tried. The claim is
   // about the COMMAND, so the run is the thing to observe: take the port, force the fallback, and
   // compare the project tree byte for byte across a complete supervised run.
-  const dir = project();
+  const dir = project({ state: true });
   const before = snapshot(dir);
 
   const wanted = await freePort();
@@ -261,6 +287,7 @@ test("⚠️ an offered port changes no byte of the project, proved through a wh
   const calls = [];
   try {
     const result = await runSupervisor({
+      sessionLister: listNothing,
       agentDir: AGENT_DIR,
       readTrust: APPROVED,
       projectRoot: dir,
@@ -633,7 +660,7 @@ test("⚠️ ACC-0041: the pin and the Node floor are exactly what DEC-0026 deci
 
 test("⚠️ the sentinel reaches the agent while an adversary is trying to take it", async (t) => {
   t.diagnostic("two stand-in children and a real supervisor; the adversary reads first by construction");
-  const dir = project();
+  const dir = project({ state: true });
   const agentReport = join(dir, "agent.json");
   const launcherReport = join(dir, "launcher.json");
   const readyFlag = join(dir, "adversary-reading");
@@ -720,8 +747,9 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
     return exitingChild();
   };
 
-  const dir = project();
+  const dir = project({ state: true });
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -760,7 +788,9 @@ test("structurally: the launcher gets a new writable pipe and the agent inherits
   // transcripts is not the caller's to choose — the coverage gate is only meaningful if Kiln knows
   // the location — so the flag is appended here rather than composed in `bin/start-kiln.mjs`, and it
   // is still a structured array with no shell between it and the child.
-  assert.deepEqual(agent.args, ["b", "--session-dir", join(dir, ".pi", "sessions")]);
+  const recorded = JSON.parse(readFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), "utf-8"));
+  assert.deepEqual(agent.args, ["b", "--session-dir", join(dir, ".pi", "sessions"), SESSION_ID_FLAG, recorded.sessionId]);
+  assert.equal(result.preflight === undefined, false, "the launch's own record is present");
   assert.equal(agent.options.env.PI_CODING_AGENT_SESSION_DIR, join(dir, ".pi", "sessions"), "every route agrees");
 
   // ⚠️ AND THE IDENTITY THE LAUNCHER IS TOLD TO SERVE is the one the supervisor then demands back.
@@ -796,8 +826,9 @@ function obedientLauncher() {
 
 test("⚠️ O14 the process table is read before either child is spawned, and the launch records what it cost", async () => {
   const order = [];
-  const dir = project();
+  const dir = project({ state: true });
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -841,9 +872,10 @@ test("⚠️ O14 the process table is read before either child is spawned, and t
 test("⚠️ O14 a process table that cannot be read refuses the launch, and nothing is spawned", async () => {
   // ⚠️ **A RUN THAT CANNOT READ THE TABLE CAN ONLY FAIL CLOSED AT THE END**, having already taken the port
   // and put two process trees on the operator's machine. The refusal costs nothing instead.
-  const dir = project();
+  const dir = project({ state: true });
   let spawned = 0;
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -871,8 +903,9 @@ test("⚠️ O14 a process table that cannot be read refuses the launch, and not
 
 test("⚠️ O14 POSIX primes nothing: `ps` answers in milliseconds and has no provider to start", async () => {
   const order = [];
-  const dir = project();
+  const dir = project({ state: true });
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -999,7 +1032,7 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
   // ⚠️ A SPAWN FAILURE ARRIVES AS AN EVENT, NOT A THROW. Unlistened it is an unhandled error — and
   // for the agent it would also leave the exit promise pending for ever, the supervisor hanging on a
   // child that was never born.
-  const dir = project();
+  const dir = project({ state: true });
   const mk = (fail) => {
     const handlers = {};
     return {
@@ -1017,6 +1050,7 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
   // The AGENT cannot start: the run must refuse rather than wait.
   let n = 0;
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1044,6 +1078,7 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
 
   // The LAUNCHER cannot start: readiness must stop rather than poll a process that never existed.
   const e2 = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1137,7 +1172,7 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   // ⚠️ THIS RETURNED NORMALLY, and the wrapper then exited with Pi's code — so Pi finishing cleanly
   // reported overall success while a launcher that would not go was still holding the port. The
   // next start would meet an occupied port with nothing to explain it.
-  const dir = project();
+  const dir = project({ state: true });
   const port = String(await freePort());
   let n = 0;
   const immortal = {
@@ -1153,6 +1188,7 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   };
 
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1242,7 +1278,7 @@ test("⚠️ every externally reportable error is classified, not quoted", async
   assert.ok(!JSON.stringify(record).includes("sk-live-secret"), "no shutdown record may carry it");
 
   // And the agent spawn path.
-  const dir = project();
+  const dir = project({ state: true });
   let n = 0;
   const child = (fail) => ({
     exitCode: null,
@@ -1254,6 +1290,7 @@ test("⚠️ every externally reportable error is classified, not quoted", async
     },
   });
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1350,7 +1387,7 @@ test("⚠️ an unprotected project is REFUSED, and Pi is never started", async 
   // REQ-0027's ordering, at the last moment it can still be asked: the transcript is the first thing
   // Pi writes. The assertion that matters is that the agent was never spawned — a version that
   // logged a warning and launched anyway would satisfy any check on the message.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
   const calls = [];
   const port = String(await freePort());
@@ -1358,6 +1395,7 @@ test("⚠️ an unprotected project is REFUSED, and Pi is never started", async 
   await assert.rejects(
     () =>
       runSupervisor({
+        sessionLister: listNothing,
         agentDir: AGENT_DIR,
         readTrust: APPROVED,
         projectRoot: dir,
@@ -1425,7 +1463,7 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
   //
   // What must remain true is that the SUPERVISOR creates nothing: making directories is setup's
   // work, under the transaction that owns the project lock.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "precondition: nothing has created it");
 
@@ -1435,6 +1473,7 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
 
   const calls = [];
   await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1450,6 +1489,110 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
 
   assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded — an absent directory is not a refusal");
   assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "and the supervisor still created nothing");
+});
+
+/**
+ * ⚠️ **EVERY UNRESOLVED SESSION STATE REACHES NO AGENT (ACC-0103, step 5).** "The agent started" is not
+ * "the session resumed": a brand-new unrelated session starts just as successfully, so a supervisor that
+ * fell through to a fresh one would pass every check except this one. Each row is a state the record can
+ * be in; none of them may spawn Pi.
+ */
+for (const [label, record, sessions] of [
+  ["foreign", { recordVersion: 1, projectId: "f".repeat(32), sessionId: "s-1", stateMode: "project" }, ["s-1"]],
+  ["mode-changed", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-1", stateMode: "user" }, ["s-1"]],
+  ["missing-session", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-gone", stateMode: "project" }, ["s-1"]],
+  ["invalid", { recordVersion: 1 }, ["s-1"]],
+  ["unreadable", "{ not json", ["s-1"]],
+  ["record-missing-with-sessions", null, ["s-1"]],
+])
+  test(`⚠️ ACC-0103 a ${label} session state refuses, and the agent is never spawned`, async () => {
+    const dir = repoProject({ state: true, sessions: true });
+    ignoreAll(dir);
+    if (record !== null)
+      writeFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), typeof record === "string" ? record : JSON.stringify(record));
+
+    const calls = [];
+    const e = await runSupervisor({
+      // The sessions this project holds, as Pi would report them: ids from headers, not filenames.
+      sessionLister: async () => sessions.map((id) => ({ id, path: join(dir, ".pi", "sessions", `x_${id}.jsonl`), modified: new Date() })),
+      agentDir: AGENT_DIR,
+      readTrust: APPROVED,
+      projectRoot: dir,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: [] },
+      spawn: recordingSpawn(calls),
+      env: { PORT: String(await freePort()) },
+      randomBytes: () => Buffer.alloc(16, 7),
+      psRun: NO_DESCENDANTS,
+      fetchImpl: healthyFetch(),
+      build: null,
+    }).catch((x) => x);
+
+    assert.ok(e instanceof SupervisorRefusal, `${label}: expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
+    assert.equal(e.reason, REFUSAL.SESSION_UNRESOLVED, label);
+    // ⚠️ THE WHOLE POINT: no agent. A launcher may have started, and it is stopped before the refusal returns.
+    assert.deepEqual(calls.map((c) => c.command), ["L"], `${label}: the AGENT must never be spawned`);
+    assert.ok(calls[0].child.killed.length > 0 || calls[0].child.exitCode !== null, `${label}: the launcher must be stopped`);
+    // ⚠️ COUNTS AND STATES, NEVER IDS OR PATHS: a refusal is printed, logged and pasted into issues.
+    assert.equal(e.message.includes(dir), false, `${label}: no path in the refusal`);
+    for (const id of sessions) assert.equal(e.message.includes(id), false, `${label}: no session id in the refusal`);
+    assert.equal(typeof e.detail.problem, "string");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes that same id back", async () => {
+  // ⚠️ **THE IDENTIFIER IS THE ONLY THING THAT DIFFERS between a resumed session and a brand-new one.**
+  // So the assertion is the argument Pi was invoked with, matched against what is on disk — twice, because
+  // the first run mints and records it and the second must pass the recorded one unchanged.
+  const dir = repoProject({ state: true, sessions: true });
+  ignoreAll(dir);
+  const port = String(await freePort());
+  const started = [];
+  // ⚠️ PER RUN: the first call is the run id and stays fixed, because readiness demands back exactly what
+  // the health endpoint was told. Every later call differs, so a freshly minted session id can never
+  // coincide with the recorded one — which is the only way the substitution MS3 makes is visible.
+  let session = 0;
+  const generatorForOneRun = () => {
+    let call = 0;
+    return (n) => Buffer.alloc(n, call++ === 0 ? 7 : 20 + ++session);
+  };
+  const run = async (lister) => {
+    const calls = [];
+    await runSupervisor({
+      sessionLister: lister,
+      agentDir: AGENT_DIR,
+      readTrust: APPROVED,
+      projectRoot: dir,
+      launcher: { command: "L", args: [] },
+      agent: { command: "A", args: ["b"] },
+      spawn: recordingSpawn(calls),
+      env: { PORT: port },
+      randomBytes: generatorForOneRun(),
+      psRun: NO_DESCENDANTS,
+      fetchImpl: healthyFetch(),
+      build: null,
+    });
+    const agent = calls.find((c) => c.command === "A");
+    started.push(agent.args[agent.args.indexOf(SESSION_ID_FLAG) + 1]);
+  };
+
+  // First run: nothing recorded, nothing stored — a genuine first run.
+  await run(async () => []);
+  const recorded = JSON.parse(readFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), "utf-8"));
+  assert.equal(started[0], recorded.sessionId, "the id Pi was given is the id written down");
+
+  // Second run: the recorded session now exists, so it is resumed by name.
+  await run(async () => [{ id: recorded.sessionId, path: join(dir, ".pi", "sessions", "x.jsonl"), modified: new Date() }]);
+  assert.equal(started[1], recorded.sessionId, "the rerun passes the STORED id, not a fresh one");
+  // ⚠️ AND A FRESH ID WOULD HAVE BEEN DIFFERENT: the generator never repeats, so this equality can only
+  // hold because the recorded id was used rather than a newly minted one.
+  assert.notEqual(generateSessionId((n) => Buffer.alloc(n, 99)), recorded.sessionId, "a newly minted id differs");
+  assert.equal(
+    JSON.parse(readFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), "utf-8")).sessionId,
+    recorded.sessionId,
+    "and the record still names the same session"
+  );
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test("⚠️ the session directory is supplied by the FLAG, and the variable is made to agree", () => {
@@ -1493,7 +1636,7 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
   // The race is the point. Awaiting the agent's exit and only then looking for a signal means an
   // interrupt during a long session is handled when the session ends — which is to say, not handled.
   // This agent never exits on its own; only the signal can end the run.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const calls = [];
@@ -1546,6 +1689,7 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
   };
 
   const run = runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1582,7 +1726,7 @@ test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () =>
   // exists for — and awaiting it means replacing a hung application with a hung terminal.
   //
   // Asserted as a DEADLINE rather than by waiting to see: a hang has no failing assertion of its own.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const calls = [];
@@ -1611,6 +1755,7 @@ test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () =>
   const started = Date.now();
   const outcome = await Promise.race([
     runSupervisor({
+      sessionLister: listNothing,
       agentDir: AGENT_DIR,
       readTrust: APPROVED,
       projectRoot: dir,
@@ -1654,7 +1799,7 @@ test("⚠️ the teardown runs ONCE, however many callers ask for it", async () 
   // from outside without changing what it does.
   // ⚠️ IT HAS TO BE THE SIGNAL PATH. On a clean exit there is only one caller, so a version with no
   // memoisation at all behaves identically — the test would pass against the bug.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const byPid = new Map();
@@ -1688,6 +1833,7 @@ test("⚠️ the teardown runs ONCE, however many callers ask for it", async () 
   };
 
   const run = runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1722,10 +1868,11 @@ test("⚠️ the teardown runs ONCE, however many callers ask for it", async () 
 test("⚠️ the signal is recorded where it was HANDLED, and a clean exit records none", async () => {
   // Inferring "we were interrupted" from the processes having gone is unfalsifiable — they exit on
   // their own all the time. A run Pi ended must carry no signal rather than a plausible one.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const calls = [];
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1748,11 +1895,12 @@ test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY T
   // ACC-0081's seventh clause: "a descendant enumeration that fails is recorded as unmade, because
   // an empty list would claim a tree with no children". The lister here fails the way a real one
   // does — a non-zero status — and the run must refuse rather than report a clean shutdown.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const calls = [];
 
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1780,7 +1928,7 @@ test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOW
   // teardown, which is the state the clause exists for: every process record is clean, the leader's
   // exit code says nothing about a worker still listening, and the rebind is the only check that
   // can notice.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const port = await freePort();
   const calls = [];
@@ -1789,6 +1937,7 @@ test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOW
   let held = null;
   try {
     const e = await runSupervisor({
+      sessionLister: listNothing,
       agentDir: AGENT_DIR,
       readTrust: APPROVED,
       projectRoot: dir,
@@ -1830,12 +1979,13 @@ test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOW
 
 test("⚠️ the signal handlers are removed when the run ends, on every path", async () => {
   // A supervisor that returns while still owning the operator's Ctrl+C has not finished.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const calls = [];
 
   await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1852,10 +2002,11 @@ test("⚠️ the signal handlers are removed when the run ends, on every path", 
   assert.deepEqual(signals.installed(), [], "nothing left installed after a clean run");
 
   // And after a refusal.
-  const bad = repoProject();
+  const bad = repoProject({ state: true });
   writeFileSync(join(bad, ".gitignore"), "node_modules/\n", "utf-8");
   const signals2 = fakeSignals();
   await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: bad,
@@ -1880,7 +2031,7 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
   //
   // The lister below reports nothing at first and a worker afterwards, which is the whole scenario:
   // `next start` spawns its workers a moment after the launcher itself is up.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const calls = [];
   let listed = 0;
@@ -1919,6 +2070,7 @@ test("⚠️ A DESCENDANT THAT APPEARS AFTER THE FIRST SAMPLE IS STILL SEEN AT T
   };
 
   const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -1973,7 +2125,7 @@ test("⚠️ THE RUN REMOVES THE FILE IT CREATED, AND LEAVES EVERY FILE IT DID N
   //
   // ⚠️ AND THE LIST WAS VACUOUS UNTIL THIS RAN. The run loop passed `ownedFiles: []`, so
   // `files.failed === []` was true of a shutdown that removed nothing and could never have failed.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const runtime = join(dir, ".pi", "runtime");
   mkdirSync(runtime, { recursive: true });               // setup's work, done here as setup does it
@@ -1994,6 +2146,7 @@ test("⚠️ THE RUN REMOVES THE FILE IT CREATED, AND LEAVES EVERY FILE IT DID N
   let contentAtAgentSpawn = null;
 
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -2032,15 +2185,21 @@ test("⚠️ THE RUN REMOVES THE FILE IT CREATED, AND LEAVES EVERY FILE IT DID N
   );
 });
 
-test("⚠️ a project whose runtime directory is gone still runs, and says it left no run file", async () => {
-  // ⚠️ THE SUPERVISOR CREATES NO STATE DIRECTORY, here as everywhere: that is setup's work,
-  // under the transaction that owns the project lock. The alternative — refusing — would make a
-  // deleted breadcrumb directory more serious than the run it is a breadcrumb for.
+test("⚠️ a project whose runtime directory is gone REFUSES, because the session cannot be recorded", async () => {
+  // ⚠️ **THE RUN FILE AND THE SESSION RECORD ARE NOT THE SAME KIND OF THING, AND THIS TEST CHANGED WHEN
+  // ACC-0103 LANDED.** A run file is a breadcrumb: `writeRunFile` still returns null and says so, and a
+  // deleted breadcrumb directory must never be more serious than the run it describes. The session
+  // record is durable state an operator comes back to — a session nothing points at is one no later run
+  // can return to — so a launch that cannot write it refuses before Pi is started.
+  //
+  // ⚠️ AND THE SUPERVISOR STILL CREATES NOTHING. Making the layout is setup's work, under the
+  // transaction that owns the project lock; the refusal names re-running setup instead.
   const dir = repoProject();
   ignoreAll(dir);
   const lines = [];
   const calls = [];
-  await runSupervisor({
+  const e = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -2053,11 +2212,22 @@ test("⚠️ a project whose runtime directory is gone still runs, and says it l
     fetchImpl: healthyFetch(),
     build: null,
     log: (m) => lines.push(m),
-  });
+  }).catch((x) => x);
 
-  assert.deepEqual(calls.map((c) => c.command), ["L", "A"], "the run proceeded");
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 140)}`);
+  assert.equal(e.reason, REFUSAL.SESSION_RECORD_UNWRITABLE);
+  assert.equal(e.detail.problem, "the runtime directory does not exist");
+  assert.match(e.message, /Re-run setup/);
+
+  // ⚠️ PI IS NEVER STARTED, and the launcher that was already running is stopped before the refusal
+  // returns — a refusal that left a process holding the port would be worse than the fault it reports.
+  assert.deepEqual(calls.map((c) => c.command), ["L"], "the launcher started; the AGENT never did");
+  assert.ok(
+    calls[0].child.killed.length > 0 || calls[0].child.exitCode !== null,
+    `the launcher must be stopped before the refusal returns: ${JSON.stringify(calls[0].child.killed)}`
+  );
   assert.equal(existsSync(join(dir, ".pi", "runtime")), false, "and nothing created the directory");
-  assert.ok(lines.some((m) => m.includes("leaves no run file")), JSON.stringify(lines));
+  assert.equal(existsSync(join(dir, ".pi", "sessions")), false);
 });
 
 test("⚠️ A RUN ID THAT IS NOT ONE NEVER BECOMES A PATH (traversal)", () => {
@@ -2107,7 +2277,7 @@ test("⚠️ A FILE ALREADY AT THAT NAME IS NOT CLAIMED BY THIS RUN, and survive
   // then added to `ownedFiles`, so the shutdown deleted a file this invocation did not create — the
   // half of clause 6 the run-file work was added to satisfy. `wx` is what makes the filesystem, not
   // this module's own earlier stat, answer the question.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const runtime = join(dir, ".pi", "runtime");
   mkdirSync(runtime, { recursive: true });
@@ -2120,6 +2290,7 @@ test("⚠️ A FILE ALREADY AT THAT NAME IS NOT CLAIMED BY THIS RUN, and survive
   const calls = [];
   const lines = [];
   const result = await runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -2166,7 +2337,7 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
   // ⚠️ ASSERTED AS A DEADLINE, because a hang has no failing assertion of its own — and the
   // arithmetic is stated rather than a round number: a 600ms budget, of which enumeration may take a
   // third, and three waiting periods that each keep their floor however little is left.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const calls = [];
@@ -2188,6 +2359,7 @@ test("⚠️ ONE DEADLINE COVERS THE WHOLE TEARDOWN, ENUMERATION INCLUDED", asyn
   const graceMs = 400;
   const hardMs = 200;
   const outcome = runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -2257,7 +2429,7 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
   //
   // ⚠️ COUNTED, NOT TIMED. Two queries in flight at once is the fact; a duration would be a proxy
   // for it that a slow machine can falsify.
-  const dir = repoProject();
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   const signals = fakeSignals();
   const calls = [];
@@ -2301,6 +2473,7 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
   }, { primes: true });
 
   const run = runSupervisor({
+    sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
     projectRoot: dir,
@@ -2439,6 +2612,7 @@ test("⚠️ the refusal arrives BEFORE the project record, so it never tells th
   await assert.rejects(
     () =>
       runSupervisor({
+        sessionLister: listNothing,
         ...selfHosting(dir),
         selfHost: false,
         launcher: { command: "L", args: [] },
@@ -2519,12 +2693,13 @@ test("⚠️ the opt-in grants nothing: a self-hosting run meets every check a c
   // ⚠️ THE MUTATION THIS EXISTS TO CATCH is a self-host branch that skips the consumer-root checks
   // "because the operator asked for it". The opt-in decides WHERE the run is; the record, port,
   // state-coverage and readiness checks all still have to happen after it.
-  const dir = project({ record: null });
+  const dir = project({ record: null, state: true });
   writeFileSync(join(dir, ".pi", "kiln.json"), JSON.stringify({ recordVersion: 1, projectId: "nope" }));
 
   await assert.rejects(
     () =>
       runSupervisor({
+        sessionLister: listNothing,
         ...selfHosting(dir),
         selfHost: true,
         launcher: { command: "L", args: [] },
@@ -2539,12 +2714,13 @@ test("⚠️ the opt-in grants nothing: a self-hosting run meets every check a c
 });
 
 test("an explicit self-hosting run completes, and says which directory it opened", async () => {
-  const dir = project();
+  const dir = project({ state: true });
   const said = [];
   let launcherExit = null;
   const calls = [];
 
   const result = await runSupervisor({
+    sessionLister: listNothing,
     ...selfHosting(dir),
     selfHost: true,
     launcher: { command: "L", args: [] },
@@ -2595,6 +2771,7 @@ async function childEnvironments({ dir, selfHost, env }) {
   const envs = [];
   let launcherExit = null;
   await runSupervisor({
+    sessionLister: listNothing,
     ...(selfHost ? selfHosting(dir) : { agentDir: AGENT_DIR, readTrust: APPROVED, projectRoot: dir }),
     selfHost,
     launcher: { command: "L", args: [] },
@@ -2628,7 +2805,7 @@ async function childEnvironments({ dir, selfHost, env }) {
 const markerKeys = (env) => Object.keys(env).filter((key) => /^kiln_self_host$/i.test(key));
 
 test("⚠️ ACC-0071 an inherited self-host marker reaches neither child of a consumer run, in any spelling", async () => {
-  const dir = project();
+  const dir = project({ state: true });
   const { launcher, agent } = await childEnvironments({
     dir,
     selfHost: false,
@@ -2646,7 +2823,7 @@ test("⚠️ ACC-0071 an inherited self-host marker reaches neither child of a c
 });
 
 test("⚠️ ACC-0071 a validated self-hosting run gives the agent exactly the marker, and the launcher nothing", async () => {
-  const dir = project();
+  const dir = project({ state: true });
   const forged = process.platform === "win32" ? { Kiln_Self_Host: "forged" } : { KILN_SELF_HOST: "forged" };
   const { launcher, agent } = await childEnvironments({
     dir,
@@ -2703,7 +2880,10 @@ test("the command line takes --self-host and refuses anything else", () => {
 
 /** A project that would launch: covered state, a valid record, and a free port to ask for. */
 const trustableProject = async () => {
-  const dir = repoProject();
+  // ⚠️ THE STATE LAYOUT IS PART OF BEING TRUSTABLE-AND-LAUNCHABLE. A run records the session it starts
+  // before Pi is spawned, and `runtime/` is setup's to create — the supervisor makes nothing, so a
+  // fixture without it models a project setup never finished and refuses for that reason instead.
+  const dir = repoProject({ state: true });
   ignoreAll(dir);
   return dir;
 };
@@ -2744,7 +2924,12 @@ test("⚠️ ACC-0051 an unasked project refuses as trust-missing, and a decline
     [TRUST.MISSING, REFUSAL.TRUST_MISSING, /run setup/i],
     [TRUST.DENIED, REFUSAL.TRUST_DENIED, /run setup again and approve/i],
   ]) {
-    const dir = await trustableProject();
+    // ⚠️ NO STATE LAYOUT HERE, DELIBERATELY. This asserts the trust gate refuses BEFORE any state work,
+    // and its proof is that no runtime directory appears — which a fixture that pre-created one would
+    // make unfalsifiable. The launch path's own fixture (`trustableProject`) does create it, because a
+    // run that reaches the launch must record its session.
+    const dir = repoProject();
+    ignoreAll(dir);
     const { read, asked } = trustReader(state);
     const before = scaffoldBytes(dir);
 
@@ -2865,6 +3050,7 @@ test("⚠️ ACC-0051 an approved project reaches the launch path, and every chi
 
   const calls = [];
   const result = await runSupervisor({
+    sessionLister: listNothing,
     projectRoot: dir,
     agentDir: agent,
     launcher: { command: "L", args: ["a"] },

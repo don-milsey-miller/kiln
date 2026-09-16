@@ -13,8 +13,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runSupervisor } from "../../../lib/supervisor.mjs";
+import { resolvePinnedSessionLister } from "../../../lib/pi-runtime.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const TOOL_ROOT = join(HERE, "..", "..", "..");
 /**
  * ⚠️ **A PRECONDITION, AND ALSO WHY THIS FILE IS HARMLESS TO `node --test`.** The runner executes
  * every file under `test/`, and unlike the inert fixtures beside it this one is a real program. Run
@@ -60,6 +62,8 @@ const result = await runSupervisor({
   },
   spawn,
   randomBytes,
+  // Pi's own lister: which sessions exist, and their header ids, are Pi's facts to report (F121).
+  sessionLister: await resolvePinnedSessionLister(TOOL_ROOT),
   env: { ...process.env, PORT: port, KILN_FAKE_BUILD: "" },
   build: null, // the adversary cannot know this checkout's version; identity is the four facts
   readyMs: 30_000,
