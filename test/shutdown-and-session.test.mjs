@@ -40,9 +40,13 @@ import {
 import {
   SESSION,
   SESSION_PROBLEM,
+  RECOVERABLE_PROBLEMS,
+  SESSION_NAME_MAX,
   SESSION_RECORD,
   STORAGE,
   availableSessions,
+  renderSessionChoices,
+  terminalSafeName,
   planSession,
   recordSession,
   sessionDirFor,
@@ -474,6 +478,7 @@ test("⚠️ every way a record can fail becomes a question, never a silent fres
       const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
       assert.equal(p.action, SESSION.ASK, `${problem} must ask`);
       assert.equal(p.problem, problem);
+      assert.equal(p.recoverable, true, `${problem} is resolved by choosing`);
       assert.deepEqual(
         p.available.sessions.map((s) => s.id),
         [SESSION_ID],
@@ -524,6 +529,106 @@ test("available sessions are read from the directory, newest first", async () =>
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("⚠️ the listing keeps what the picker shows, and never a session's text", async () => {
+  // ⚠️ PI'S LISTING CARRIES EACH SESSION'S FIRST MESSAGE AND FULL TEXT. A transcript can hold a pasted
+  // credential, and nothing Kiln prints or records needs either, so neither is copied.
+  const root = stateRoot();
+  mkdirSync(sessionDirOf(root), { recursive: true });
+  const created = new Date(Date.UTC(2026, 8, 14, 10, 5));
+  const modified = new Date(Date.UTC(2026, 8, 16, 9, 0));
+  const lister = async () => [
+    {
+      id: SESSION_ID,
+      path: join(sessionDirOf(root), `x_${SESSION_ID}.jsonl`),
+      cwd: PROJECT_CWD,
+      name: "planning",
+      created,
+      modified,
+      messageCount: 12,
+      firstMessage: "my token is SECRET-FIRST",
+      allMessagesText: "SECRET-ALL",
+      parentSessionPath: "/elsewhere",
+    },
+  ];
+  try {
+    const listed = await availableSessions(sessionDirOf(root), { lister, projectRoot: PROJECT_CWD });
+    assert.deepEqual(listed.sessions, [
+      {
+        id: SESSION_ID,
+        path: join(sessionDirOf(root), `x_${SESSION_ID}.jsonl`),
+        name: "planning",
+        createdMs: created.getTime(),
+        modifiedMs: modified.getTime(),
+        messageCount: 12,
+      },
+    ]);
+    assert.equal(JSON.stringify(listed).includes("SECRET"), false, "no message text survives the listing");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a session name cannot drive the terminal it is printed on", () => {
+  const E = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const cases = [
+    ["plain name", "plain name"],
+    [`a${E}[31mred${E}[0m`, "ared"],
+    [`${E}[2J${E}[Hcleared`, "cleared"],
+    [`x${E}]0;window title${BEL}y`, "xy"],
+    [`x${E}]8;;http://example.test${E}\\link${E}]8;;${E}\\`, "xlink"],
+    [`unterminated${E}]0;never ends`, "unterminated"],
+    [`dcs${E}Pq#payload${E}\\done`, "dcsdone"],
+    [`eight${String.fromCharCode(0x9b)}31mbit`, "eightbit"],
+    [`osc8${String.fromCharCode(0x9d)}0;t${String.fromCharCode(0x9c)}bit`, "osc8bit"],
+    ["line1\r\nline2\tz", "line1 line2 z"],
+    [`bell${BEL} null${String.fromCharCode(0)} del${String.fromCharCode(0x7f)} c1${String.fromCharCode(0x85)}x`, "bell null del c1 x"],
+    [`bidi${String.fromCharCode(0x202e)}evil${String.fromCharCode(0x2066)}`, "bidievil"],
+    [`lone${E}`, "lone"],
+    [`${E}[2J`, null],
+    ["   ", null],
+    [42, null],
+  ];
+  for (const [input, expected] of cases) assert.equal(terminalSafeName(input), expected, JSON.stringify(input));
+
+  const long = terminalSafeName("n".repeat(200));
+  assert.equal(Array.from(long).length, SESSION_NAME_MAX, "capped");
+  assert.ok(long.endsWith("..."));
+  assert.equal(terminalSafeName("e".repeat(SESSION_NAME_MAX)), "e".repeat(SESSION_NAME_MAX), "a name at the cap is kept whole");
+
+  // Every character that can reach the terminal is printable, whatever the input.
+  let hostile = "";
+  for (let cp = 0; cp < 0x100; cp++) hostile += String.fromCharCode(cp);
+  hostile += String.fromCharCode(0x2028, 0x2029, 0x202a, 0x202e, 0x2066, 0x2069, 0x061c, 0x200e, 0x200f);
+  for (const ch of terminalSafeName(hostile, 1000)) {
+    const cp = ch.codePointAt(0);
+    assert.ok(cp >= 0x20 && cp !== 0x7f && !(cp >= 0x80 && cp <= 0x9f), `code point ${cp.toString(16)} survived`);
+  }
+});
+
+test("⚠️ the choices are numbered lines with no id, no path and no message text", () => {
+  const E = String.fromCharCode(0x1b);
+  const lines = renderSessionChoices([
+    {
+      id: SESSION_ID,
+      path: "/home/someone/.pi/sessions/x.jsonl",
+      name: `plan${E}[1mning`,
+      createdMs: Date.UTC(2026, 8, 14, 10, 5),
+      modifiedMs: Date.UTC(2026, 8, 16, 9, 0),
+      messageCount: 12,
+    },
+    { id: OTHER_ID, path: "/p", name: null, createdMs: 0, modifiedMs: 0, messageCount: 1 },
+    { id: "third", path: "/q", name: "x", createdMs: 1, modifiedMs: 1, messageCount: null },
+  ]);
+  assert.deepEqual(lines, [
+    "  1. planning | created 2026-09-14 10:05 UTC | modified 2026-09-16 09:00 UTC | 12 messages",
+    "  2. (unnamed) | created unknown | modified unknown | 1 message",
+    "  3. x | created 1970-01-01 00:00 UTC | modified 1970-01-01 00:00 UTC | message count unknown",
+  ]);
+  const text = lines.join("");
+  for (const leak of [SESSION_ID, OTHER_ID, "/home", "/p", "/q", "third"]) assert.equal(text.includes(leak), false, leak);
 });
 
 test("⚠️ storage that could not be inspected asks; it never authorises a fresh start", async () => {
@@ -1054,7 +1159,11 @@ test("⚠️ a session record that exists but cannot be read is a question, not 
 
     const p = await plan({ stateRoot: root });
     assert.equal(p.action, SESSION.ASK, "an unreadable record must not authorise a fresh start");
-    assert.equal(p.problem, SESSION_PROBLEM.UNREADABLE);
+    // ⚠️ NOT THE CORRUPT-JSON PROBLEM: a record that could not be opened may be valid, and nothing replaces it.
+    assert.equal(p.problem, SESSION_PROBLEM.INACCESSIBLE);
+    assert.equal(p.recoverable, false);
+    assert.equal(RECOVERABLE_PROBLEMS.includes(SESSION_PROBLEM.INACCESSIBLE), false);
+    assert.equal(RECOVERABLE_PROBLEMS.includes(SESSION_PROBLEM.STORAGE_UNREADABLE), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

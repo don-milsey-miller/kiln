@@ -1077,11 +1077,14 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
   assert.match(e.message, /Nothing was handed the terminal/);
 
   // The LAUNCHER cannot start: readiness must stop rather than poll a process that never existed.
+  // ⚠️ ITS OWN PROJECT: the run above recorded a session Pi never started, and the session is now planned
+  // before the launcher, so reusing that directory would test the recorded session instead (F129).
+  const dir2 = project({ state: true });
   const e2 = await runSupervisor({
     sessionLister: listNothing,
     agentDir: AGENT_DIR,
     readTrust: APPROVED,
-    projectRoot: dir,
+    projectRoot: dir2,
     launcher: { command: "L", args: [] },
     agent: { command: "A", args: [] },
     env: { PORT: String(await freePort()) },
@@ -1102,6 +1105,7 @@ test("⚠️ a child that cannot be spawned is refused, and never leaves the wai
   assert.equal(e2.detail.code, "ENOENT", "carrying a classification, not a message");
   assert.match(e2.message, /no readiness was claimed/);
   rmSync(dir, { recursive: true, force: true });
+  rmSync(dir2, { recursive: true, force: true });
 });
 
 /* ============================================== the second round of leaks ====================== */
@@ -1497,21 +1501,26 @@ test("⚠️ an ABSENT session directory is a first run, not a refusal — and t
  * fell through to a fresh one would pass every check except this one. Each row is a state the record can
  * be in; none of them may spawn Pi.
  */
-for (const [label, record, sessions] of [
-  ["foreign", { recordVersion: 1, projectId: "f".repeat(32), sessionId: "s-1", stateMode: "project" }, ["s-1"]],
-  ["mode-changed", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-1", stateMode: "user" }, ["s-1"]],
-  ["missing-session", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-gone", stateMode: "project" }, ["s-1"]],
-  ["invalid", { recordVersion: 1 }, ["s-1"]],
-  ["unreadable", "{ not json", ["s-1"]],
-  ["record-missing-with-sessions", null, ["s-1"]],
+// A directory where the record belongs: it exists and cannot be opened, so it may be valid.
+const INACCESSIBLE_RECORD = Symbol("inaccessible");
+for (const [label, record, sessions, recoverable] of [
+  ["foreign", { recordVersion: 1, projectId: "f".repeat(32), sessionId: "s-1", stateMode: "project" }, ["s-1"], true],
+  ["mode-changed", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-1", stateMode: "user" }, ["s-1"], true],
+  ["missing-session", { recordVersion: 1, projectId: PROJECT_ID, sessionId: "s-gone", stateMode: "project" }, ["s-1"], true],
+  ["invalid", { recordVersion: 1 }, ["s-1"], true],
+  ["unreadable", "{ not json", ["s-1"], true],
+  ["record-missing-with-sessions", null, ["s-1"], true],
+  ["record-inaccessible", INACCESSIBLE_RECORD, ["s-1"], false],
 ])
   test(`⚠️ ACC-0103 a ${label} session state refuses, and the agent is never spawned`, async () => {
     const dir = repoProject({ state: true, sessions: true });
     ignoreAll(dir);
-    if (record !== null)
+    if (record === INACCESSIBLE_RECORD) mkdirSync(join(dir, ".pi", "runtime", "kiln-session.json"));
+    else if (record !== null)
       writeFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), typeof record === "string" ? record : JSON.stringify(record));
 
     const calls = [];
+    let tableReads = 0;
     const e = await runSupervisor({
       // The sessions this project holds, as Pi would report them: ids from headers, not filenames.
       sessionLister: async () => sessions.map((id) => ({ id, path: join(dir, ".pi", "sessions", `x_${id}.jsonl`), modified: new Date() })),
@@ -1523,19 +1532,29 @@ for (const [label, record, sessions] of [
       spawn: recordingSpawn(calls),
       env: { PORT: String(await freePort()) },
       randomBytes: () => Buffer.alloc(16, 7),
-      psRun: NO_DESCENDANTS,
+      psRun: (...a) => {
+        tableReads += 1;
+        return NO_DESCENDANTS(...a);
+      },
       fetchImpl: healthyFetch(),
       build: null,
     }).catch((x) => x);
 
     assert.ok(e instanceof SupervisorRefusal, `${label}: expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
     assert.equal(e.reason, REFUSAL.SESSION_UNRESOLVED, label);
-    // ⚠️ THE WHOLE POINT: no agent. A launcher may have started, and it is stopped before the refusal returns.
-    assert.deepEqual(calls.map((c) => c.command), ["L"], `${label}: the AGENT must never be spawned`);
-    assert.ok(calls[0].child.killed.length > 0 || calls[0].child.exitCode !== null, `${label}: the launcher must be stopped`);
+    // ⚠️ THE WHOLE POINT: NEITHER CHILD. The session is planned before the port, the preflight and the launcher,
+    // so a refusal has nothing to stop.
+    assert.deepEqual(calls.map((c) => c.command), [], `${label}: neither Pi nor the launcher may be spawned`);
+    assert.equal(tableReads, 0, `${label}: not even the process-table preflight runs`);
+    assert.equal(e.detail.recoverable, recoverable, `${label}: whether a choice could resolve it`);
     // ⚠️ COUNTS AND STATES, NEVER IDS OR PATHS: a refusal is printed, logged and pasted into issues.
+    const detail = JSON.stringify(e.detail);
     assert.equal(e.message.includes(dir), false, `${label}: no path in the refusal`);
-    for (const id of sessions) assert.equal(e.message.includes(id), false, `${label}: no session id in the refusal`);
+    assert.equal(detail.includes(dir), false, `${label}: no path in its detail`);
+    for (const id of [...sessions, "s-gone"]) {
+      assert.equal(e.message.includes(id), false, `${label}: no session id in the refusal`);
+      assert.equal(detail.includes(id), false, `${label}: no session id in its detail`);
+    }
     assert.equal(typeof e.detail.problem, "string");
     rmSync(dir, { recursive: true, force: true });
   });
