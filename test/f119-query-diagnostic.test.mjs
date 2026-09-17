@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EventEmitter } from "node:events";
 
 import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
 import { PROCESS_TABLE_COMMAND } from "../lib/supervisor.mjs";
@@ -177,4 +178,69 @@ test("⚠️ O6 the diagnostic starts the command the way the production reader 
   await d.psRun("powershell", []);
   assert.equal(seen.env.LC_ALL, "C", "the pinned locale");
   assert.equal(seen.windowsHide, undefined, "no hidden window, as execFile's default");
+});
+
+test("⚠️ A7 the record waits, within a bound, for a killed child to close", async () => {
+  const d = createQueryDiagnostic({ timeoutMs: 120 });
+  await d.psRun(process.execPath, ["-e", "setTimeout(() => {}, 60000)"]);
+  assert.equal(d.snapshot().queries[0].outcome, "timeout");
+
+  assert.equal(await d.settle(5000), true, "the child closed within the wait");
+  const [q] = d.snapshot().queries;
+  assert.equal(typeof q.closeMs, "number", "so the record carries its close");
+  assert.ok(q.signal !== null || q.exitCode !== null, "and how it ended");
+  assert.equal(q.exitedMs, null, "the answer it already gave is unchanged");
+});
+
+test("⚠️ A7 settling gives up at its bound rather than waiting a child out", async () => {
+  // ⚠️ AN INJECTED CHILD THAT NEVER CLOSES. A real one cannot stand in for this on Windows, where a
+  // termination request is not something a process can decline.
+  const never = () => {
+    const child = new EventEmitter();
+    child.pid = 4242;
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => true;
+    return child;
+  };
+  const d = createQueryDiagnostic({ timeoutMs: 60, spawnImpl: never });
+  await d.psRun("powershell", []);
+  const started = Date.now();
+  const settled = await d.settle(300);
+  const spent = Date.now() - started;
+
+  assert.equal(settled, false, "a child that will not go is reported unsettled");
+  assert.ok(spent < 3000, `the wait is bounded: ${spent}ms`);
+});
+
+test("⚠️ A8 the companions run only after a real timeout, and only on Windows", async () => {
+  const d = createQueryDiagnostic({ platform: "win32" });
+  assert.deepEqual(await d.companions(), { ran: false, reason: "no-timeout" }, "a healthy run explains nothing");
+  assert.deepEqual(await createQueryDiagnostic({ platform: "linux" }).companions({ force: true }), { ran: false, reason: "not-windows" });
+});
+
+test("⚠️ A8 each companion is a separate process, timed by its own markers", { skip: process.platform !== "win32" && "starts PowerShell" }, async () => {
+  const d = createQueryDiagnostic();
+  assert.deepEqual(await d.companions({ force: true }), { ran: true, reason: null });
+  const { companions } = d.snapshot();
+
+  assert.deepEqual(
+    companions.map((c) => c.id),
+    ["powershell-start", "native-call-defined", "query-run"]
+  );
+  // ⚠️ SEQUENTIAL: each begins after the one before it closed, so none times another's contention.
+  for (let i = 1; i < companions.length; i++)
+    assert.ok(companions[i - 1].closeMs <= companions[i].spawnRequestedMs, `${companions[i].id} started after the one before closed`);
+
+  const [start, defined, query] = companions;
+  assert.equal(typeof start.markers.entry, "number", "PowerShell reaching its first statement");
+  assert.equal(typeof defined.markers.defined, "number", "the native call defined in memory");
+  for (const phase of ["entry", "defined", "beforeQuery", "afterQuery"]) assert.equal(typeof query.markers[phase], "number", phase);
+  assert.ok(query.rows > 10, `the probe walked a whole table: ${query.rows}`);
+  for (const c of companions) assert.equal(typeof c.pid, "number");
+
+  // ⚠️ A COUNT, NEVER A ROW: nothing a process table said survives into the record.
+  const text = JSON.stringify(companions);
+  assert.equal(/"\d+ \d+ \d+"/.test(text), false, "no process-table row");
+  assert.equal(text.includes("ntdll"), false, "and no script text");
 });

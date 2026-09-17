@@ -26,6 +26,7 @@ import {
 } from "../lib/supervisor.mjs";
 import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
 
+const NL = String.fromCharCode(10);
 const WINDOWS = process.platform === "win32";
 const onlyWindows = { skip: !WINDOWS && "reads the real Windows process table" };
 /** FILETIME counts 100ns intervals from 1601; the Unix epoch is 11,644,473,600 seconds later. */
@@ -36,10 +37,11 @@ const diagnosed = (body) => async (t) => {
   try {
     await body(d.psRun);
   } catch (e) {
-    console.log(`
-[reader diagnostics] ${t.name}
-${JSON.stringify(d.snapshot(), null, 2)}
-`);
+    // A7: a killed child's close, signal and exit exist a moment after the read gave its answer; the report
+    // waits that bounded moment so they are in the record. A8: a real timeout, and only then, runs the probes.
+    await d.settle();
+    await d.companions();
+    console.log(`${NL}[reader diagnostics] ${t.name}${NL}${JSON.stringify(d.snapshot(), null, 2)}${NL}`);
     throw e;
   }
 };

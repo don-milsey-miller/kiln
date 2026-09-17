@@ -42,6 +42,17 @@ const TOOL_ROOT = join(HERE, "..", "..", "..");
  */
 const diagnostic = process.platform === "win32" ? createQueryDiagnostic() : null;
 
+/**
+ * A7 and A8 (F130): before the record is written, any killed query is given a bounded moment to close, and a
+ * real timeout starts the companion probes that say which phase of the read stalled. Neither changes a decision
+ * the supervisor has already taken; both only fill in the record it leaves behind.
+ */
+const settleDiagnostics = async () => {
+  if (!diagnostic) return;
+  await diagnostic.settle();
+  await diagnostic.companions();
+};
+
 const record = (o) =>
   writeFileSync(
     out,
@@ -96,6 +107,7 @@ try {
   });
   // ⚠️ THE RUN ID IS RECORDED BECAUSE THE OWNED FILE IS NAMED AFTER IT. Clause 6 is about the file
   // THIS invocation created; the observer has to be able to name it without guessing.
+  await settleDiagnostics();
   record({
     ok: true,
     runId: result.runId,
@@ -111,6 +123,7 @@ try {
   // ⚠️ A REFUSAL IS AN OBSERVATION TOO, AND IT IS RECORDED RATHER THAN THROWN AWAY. A shutdown the
   // supervisor could not complete is precisely the outcome ACC-0081 asks to be reported as partial,
   // so the evidence has to be able to say so instead of leaving a non-zero exit and no record.
+  await settleDiagnostics();
   record({
     ok: false,
     refusal: e instanceof SupervisorRefusal ? e.reason : String(e?.message ?? e),
