@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, sym
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { GUARD_ENV, GUARD_PROBLEM, createGuardFile, takeGuardFile } from "../lib/session-guard.mjs";
+import { GUARD_CODE, GUARD_ENV, GUARD_OUTCOME, GUARD_PROBLEM, createGuardFile, takeGuardFile, writeGuardResult } from "../lib/session-guard.mjs";
 
 const EXPECTED = { sessionId: "7f3a1c2e-0000-4000-8000-000000000001", file: "/state/sessions/x.jsonl", digest: "ab".repeat(32) };
 const fixedBytes = (n) => Buffer.alloc(n, 0x5a);
@@ -44,7 +44,8 @@ test("⚠️ the guard file is created exclusively, owner-only, and removed once
     const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
     assert.equal(g.ok, true);
     assert.equal(g.path, join(r.dir, NAME));
-    assert.deepEqual(JSON.parse(readFileSync(g.path, "utf-8")), { guardVersion: 1, ...EXPECTED });
+    assert.deepEqual(JSON.parse(readFileSync(g.path, "utf-8")), { guardVersion: 1, ...EXPECTED, result: g.resultPath });
+    assert.equal(g.resultPath.endsWith(".result.json"), true, "and where the guard is to answer");
     if (process.platform !== "win32") assert.equal(statSync(g.path).mode & 0o777, 0o600, "owner read and write only");
 
     assert.equal(g.remove(), "removed");
@@ -111,7 +112,7 @@ test("⚠️ the guard takes the expectation once: the variable goes, the file g
     const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
     const env = { [GUARD_ENV]: g.path, OTHER: "kept" };
     const took = takeGuardFile(env);
-    assert.deepEqual(took, { ok: true, expected: EXPECTED });
+    assert.deepEqual(took, { ok: true, expected: { ...EXPECTED, result: g.resultPath } });
     assert.equal(GUARD_ENV in env, false, "no process started afterwards inherits the path");
     assert.equal(env.OTHER, "kept");
     assert.equal(existsSync(g.path), false, "read once, then gone");
@@ -192,6 +193,48 @@ test("⚠️ cleanup never deletes a file that replaced the guard file at the sa
     writeFileSync(g.path, impostor);
     assert.equal(g.remove(), "replaced");
     assert.equal(readFileSync(g.path, "utf-8"), impostor);
+  } finally {
+    r.done();
+  }
+});
+
+test("⚠️ the guard's answer is a code, and the launch reads it once and clears it", () => {
+  const r = runtime();
+  try {
+    const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
+    assert.deepEqual(g.readResult(), { ok: false, problem: GUARD_PROBLEM.NO_RESULT }, "a guard that never ran left nothing");
+
+    assert.deepEqual(writeGuardResult(g.resultPath, GUARD_OUTCOME.REFUSED, GUARD_CODE.SESSION_ID_MISMATCH), { ok: true });
+    assert.deepEqual(g.readResult(), { ok: true, outcome: GUARD_OUTCOME.REFUSED, code: GUARD_CODE.SESSION_ID_MISMATCH });
+
+    // ⚠️ NOTHING ABOUT THE SESSION TRAVELS IN THE ANSWER: no id, no path, no digest.
+    const text = readFileSync(g.resultPath, "utf-8");
+    for (const value of [EXPECTED.sessionId, EXPECTED.file, EXPECTED.digest]) assert.equal(text.includes(value), false, value);
+
+    // An answer already at that name is not replaced, so the launch cannot read a stranger's verdict.
+    assert.equal(writeGuardResult(g.resultPath, GUARD_OUTCOME.ACCEPTED).problem, GUARD_PROBLEM.EXISTS);
+
+    assert.equal(g.remove(), "removed", "and cleanup clears both files");
+    assert.equal(existsSync(g.resultPath), false);
+    assert.equal(existsSync(g.path), false);
+  } finally {
+    r.done();
+  }
+});
+
+test("⚠️ an answer that is not a known verdict is not one the launch acts on", () => {
+  const r = runtime();
+  try {
+    const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
+    assert.equal(writeGuardResult(g.resultPath, GUARD_OUTCOME.REFUSED, "invented-code").problem, GUARD_PROBLEM.INVALID);
+    assert.equal(existsSync(g.resultPath), false, "and nothing was written");
+
+    writeFileSync(g.resultPath, JSON.stringify({ resultVersion: 1, outcome: "refused", code: "invented-code" }));
+    assert.equal(g.readResult().problem, GUARD_PROBLEM.INVALID, "nor is one read back");
+
+    unlinkSync(g.resultPath);
+    writeFileSync(g.resultPath, JSON.stringify({ resultVersion: 99, outcome: "accepted" }));
+    assert.equal(g.readResult().problem, GUARD_PROBLEM.INVALID, "nor an answer from another version");
   } finally {
     r.done();
   }

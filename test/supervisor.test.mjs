@@ -24,6 +24,8 @@ import { createServer } from "node:http";
 import { delimiter, dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
@@ -43,7 +45,9 @@ import {
   resolveRunState,
   SESSION_DIR_ENV,
   SESSION_DIR_FLAG,
+  EXTENSION_FLAG,
   SESSION_ID_FLAG,
+  SESSION_RESUME_FLAG,
   generateSessionId,
   stopLauncher,
   withSessionDir,
@@ -53,6 +57,7 @@ import {
 } from "../lib/supervisor.mjs";
 import { PINNED_AGENT_NAME, readOwnPin, resolvePinnedAgent, resolvePinnedAgentDir } from "../lib/pi-runtime.mjs";
 import { TRUST, denyTrust, grantTrust } from "../lib/pi-trust.mjs";
+import { GUARD_ENV, GUARD_OUTCOME, takeGuardFile, writeGuardResult } from "../lib/session-guard.mjs";
 import { canonicalPath } from "../lib/content-root.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import {
@@ -1348,6 +1353,76 @@ const ignoreAll = (dir) =>
  * to stop it; without the second it would call `kill` on a pid this test invented, which on a busy
  * machine is somebody else's process.
  */
+const NEWLINE = String.fromCharCode(10);
+
+/** The same path, spelled the way both sides spell it, so a comparison is about the file and not the text. */
+const canon = (path) => {
+  const real = realpathSync.native(path);
+  return process.platform === "win32" ? real.toLowerCase() : real;
+};
+
+/** Every guard file this project holds right now: the expectation, and any answer to it. */
+const guardFilesIn = (dir) => {
+  const runtime = join(dir, ".pi", "runtime");
+  return (existsSync(runtime) ? readdirSync(runtime) : [])
+    .filter((f) => f.startsWith("session-guard-"))
+    .map((f) => join(runtime, f))
+    .sort();
+};
+
+/** A transcript in the shape the pinned Pi writes, with a lister that reports it. */
+function piTranscript(dir, id) {
+  const sessions = join(dir, ".pi", "sessions");
+  mkdirSync(sessions, { recursive: true });
+  const file = join(sessions, "2026-09-17T09-00-00-000Z_11111111-1111-4111-8111-111111111111.jsonl");
+  const at = new Date().toISOString();
+  writeFileSync(
+    file,
+    [
+      { type: "session", version: 3, id, timestamp: at, cwd: dir },
+      { type: "model_change", id: "e1", parentId: null, timestamp: at, provider: "p", modelId: "m" },
+      { type: "thinking_level_change", id: "e2", parentId: "e1", timestamp: at, thinkingLevel: "off" },
+      { type: "message", id: "e3", parentId: "e2", timestamp: at, message: { role: "user", content: [] } },
+    ]
+      .map((e) => JSON.stringify(e))
+      .join(NEWLINE) + NEWLINE
+  );
+  return { id, file, lister: Object.assign(async () => [{ id, path: file, modified: new Date() }], { sessionVersion: 3 }) };
+}
+
+/** Everything a run needs except the part each case is about. */
+const resumeRun = (dir, port) => ({
+  agentDir: AGENT_DIR,
+  readTrust: APPROVED,
+  projectRoot: dir,
+  launcher: { command: "L", args: [] },
+  agent: { command: "A", args: [] },
+  env: { PORT: port },
+  randomBytes: () => Buffer.alloc(16, 7),
+  psRun: NO_DESCENDANTS,
+  fetchImpl: healthyFetch(),
+  build: null,
+});
+
+/**
+ * Pi's side of the resume guard, without Pi: it takes the expectation as the extension does, and answers.
+ *
+ * ⚠️ **THE ANSWER IS WHAT THESE TESTS ARE ABOUT, NOT THE CHECK.** What the guard decides about a real session is
+ * tested against the real thing elsewhere. Here the subject is the launch: which flags a resume passes, that the
+ * expectation is on disk before the agent starts, and what the supervisor does with each verdict.
+ */
+function guardAnswers(calls, { verdict = GUARD_OUTCOME.ACCEPTED, code = null, silent = false } = {}) {
+  const record = recordingSpawn(calls);
+  return (command, args, options) => {
+    const child = record(command, args, options);
+    if (command === "A" && !silent) {
+      const taken = takeGuardFile({ ...options.env });
+      if (taken.ok) writeGuardResult(taken.expected.result, verdict, code);
+    }
+    return child;
+  };
+}
+
 function recordingSpawn(calls) {
   return (command, args, options) => {
     const exitListeners = [];
@@ -1587,7 +1662,7 @@ test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes
       projectRoot: dir,
       launcher: { command: "L", args: [] },
       agent: { command: "A", args: ["b"] },
-      spawn: recordingSpawn(calls),
+      spawn: guardAnswers(calls),
       env: { PORT: port },
       randomBytes: generatorForOneRun(),
       psRun: NO_DESCENDANTS,
@@ -1595,7 +1670,9 @@ test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes
       build: null,
     });
     const agent = calls.find((c) => c.command === "A");
-    started.push(agent.args[agent.args.indexOf(SESSION_ID_FLAG) + 1]);
+    // A first run names the session with the flag that creates it; a resume uses the one that refuses (F128).
+    const flag = agent.args.includes(SESSION_ID_FLAG) ? SESSION_ID_FLAG : SESSION_RESUME_FLAG;
+    started.push(agent.args[agent.args.indexOf(flag) + 1]);
   };
 
   // First run: nothing recorded, nothing stored — a genuine first run.
@@ -1632,6 +1709,89 @@ test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes
   );
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("⚠️ F128 a resume opens the recorded session by id, guarded; a first run does neither", async () => {
+  const dir = repoProject({ state: true, sessions: true });
+  ignoreAll(dir);
+  const port = String(await freePort());
+  const transcript = piTranscript(dir, "resume77-0000-4000-8000-00000000abcd");
+
+  const firstCalls = [];
+  await runSupervisor({ ...resumeRun(dir, port), sessionLister: listNothing, spawn: guardAnswers(firstCalls) });
+  const first = firstCalls.find((c) => c.command === "A");
+  // ⚠️ A FIRST RUN CREATES THE SESSION IT NAMES, so it uses the flag that creates, and carries no guard.
+  assert.equal(first.args.includes(SESSION_ID_FLAG), true, "--session-id names a session that need not exist yet");
+  assert.equal(first.args.includes(SESSION_RESUME_FLAG), false);
+  assert.equal(first.args.includes(EXTENSION_FLAG), false, "and loads no guard extension");
+  assert.equal(GUARD_ENV in first.options.env, false, "and names no guard file");
+  assert.deepEqual(guardFilesIn(dir), [], "and leaves none behind");
+
+  writeFileSync(
+    join(dir, ".pi", "runtime", "kiln-session.json"),
+    JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId: transcript.id, stateMode: "project" })
+  );
+
+  const calls = [];
+  const seen = [];
+  await runSupervisor({
+    ...resumeRun(dir, port),
+    sessionLister: transcript.lister,
+    spawn: (command, args, options) => {
+      // What is on disk when the agent starts, which is the only moment its guard could read it.
+      if (command === "A") seen.push(...guardFilesIn(dir).map((p) => JSON.parse(readFileSync(p, "utf-8"))));
+      return guardAnswers(calls)(command, args, options);
+    },
+  });
+
+  const agent = calls.find((c) => c.command === "A");
+  // ⚠️ **`--session` REFUSES A SESSION THAT HAS GONE; `--session-id` WOULD CREATE AN EMPTY ONE WITH THAT ID.**
+  assert.equal(agent.args.includes(SESSION_ID_FLAG), false, "a resume never uses the creating flag");
+  assert.equal(agent.args[agent.args.indexOf(SESSION_RESUME_FLAG) + 1], transcript.id);
+  assert.equal(agent.args[agent.args.indexOf(EXTENSION_FLAG) + 1].endsWith("pi-session-guard.mjs"), true);
+
+  const [expectation] = seen;
+  assert.equal(expectation.sessionId, transcript.id, "the guard is told which session,");
+  assert.equal(canon(expectation.file), canon(transcript.file), "which transcript,");
+  assert.equal(expectation.digest, createHash("sha256").update(readFileSync(transcript.file)).digest("hex"), "and its exact bytes");
+  assert.equal(typeof agent.options.env[GUARD_ENV], "string", "and only that file's path travels in the environment");
+
+  // ⚠️ THE VALUES THEMSELVES NEVER DO: every process Pi starts would inherit them.
+  const env = JSON.stringify(agent.options.env);
+  assert.equal(env.includes(transcript.id), false, "no session id in the environment");
+  assert.equal(env.includes(expectation.digest), false, "no digest in the environment");
+  assert.deepEqual(guardFilesIn(dir), [], "and both guard files are cleared when the run ends");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+for (const [label, answer, expected] of [
+  ["refuses", { verdict: GUARD_OUTCOME.REFUSED, code: "session-id-mismatch" }, REFUSAL.SESSION_GUARD_REFUSED],
+  ["never answers", { silent: true }, REFUSAL.SESSION_GUARD_NOT_REACHED],
+])
+  test(`⚠️ F128 a resume whose guard ${label} is a refusal, and leaves no guard files`, async () => {
+    const dir = repoProject({ state: true, sessions: true });
+    ignoreAll(dir);
+    const transcript = piTranscript(dir, "resume77-0000-4000-8000-00000000abcd");
+    writeFileSync(
+      join(dir, ".pi", "runtime", "kiln-session.json"),
+      JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId: transcript.id, stateMode: "project" })
+    );
+
+    const calls = [];
+    const e = await runSupervisor({
+      ...resumeRun(dir, String(await freePort())),
+      sessionLister: transcript.lister,
+      spawn: guardAnswers(calls, answer),
+    }).catch((x) => x);
+
+    assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
+    assert.equal(e.reason, expected);
+    // ⚠️ A CODE, NOT A CIRCUMSTANCE: nothing about the session is in what gets printed and pasted into an issue.
+    const text = `${e.message} ${JSON.stringify({ ...e.detail, shutdown: null })}`;
+    assert.equal(text.includes(transcript.id), false, "no session id");
+    assert.equal(text.includes(dir), false, "no path");
+    assert.deepEqual(guardFilesIn(dir), [], "and the guard's files are cleared");
+    rmSync(dir, { recursive: true, force: true });
+  });
 
 test("⚠️ the session directory is supplied by the FLAG, and the variable is made to agree", () => {
   // All three routes were measured to work (EVD-0081) and they are not interchangeable: the flag is
