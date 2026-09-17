@@ -164,14 +164,34 @@ test("⚠️ a guard file that is a link is not read, and its target is not dele
   }
 });
 
+test("⚠️ cleanup never deletes the guard file's own inode once its contents are someone else's", () => {
+  // ⚠️ THE SAME INODE ON EVERY PLATFORM: rewritten in place, not replaced. Device and inode still match what was
+  // written, which is exactly the identity Linux's inode reuse showed is not enough on its own.
+  const r = runtime();
+  try {
+    const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
+    const impostor = "y".repeat(statSync(g.path).size);
+    writeFileSync(g.path, impostor);
+    assert.equal(g.remove(), "replaced");
+    assert.equal(readFileSync(g.path, "utf-8"), impostor);
+  } finally {
+    r.done();
+  }
+});
+
 test("⚠️ cleanup never deletes a file that replaced the guard file at the same name", () => {
   const r = runtime();
   try {
     const g = createGuardFile({ runtimeDir: r.dir, expected: EXPECTED, randomBytes: fixedBytes });
+    writeFileSync(join(r.dir, NAME + ".copy"), readFileSync(g.path));
     unlinkSync(g.path);
-    writeFileSync(g.path, "a different file, now at the same name");
+    // ⚠️ ON LINUX THIS REPLACEMENT USUALLY GETS THE DELETED FILE'S INODE, which is how CI run 35244161345 caught
+    // cleanup comparing device and inode alone. Same length as the original, so size cannot tell them apart either.
+    const original = readFileSync(join(r.dir, NAME + ".copy"), "utf-8");
+    const impostor = "x".repeat(original.length);
+    writeFileSync(g.path, impostor);
     assert.equal(g.remove(), "replaced");
-    assert.equal(readFileSync(g.path, "utf-8"), "a different file, now at the same name");
+    assert.equal(readFileSync(g.path, "utf-8"), impostor);
   } finally {
     r.done();
   }
