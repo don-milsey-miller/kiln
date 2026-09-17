@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 
 import {
@@ -681,6 +682,7 @@ test("⚠️ a transcript Pi would rewrite while opening it is refused before Pi
       const r = inspectTranscript(file, { version: 3, sessionId: SESSION_ID });
       assert.equal(r.problem, problem, label);
       assert.equal(r.ok, problem === null, label);
+      if (r.ok) assert.equal(r.digest, createHash("sha256").update(before).digest("hex"), `${label}: the digest of the bytes inspected`);
       assert.ok(readFileSync(file).equals(before), `${label}: inspecting never writes`);
     }
     assert.equal(inspectTranscript(join(dir, "absent.jsonl"), { version: 3 }).problem, TRANSCRIPT_PROBLEM.UNREADABLE);
