@@ -228,9 +228,15 @@ test("⚠️ A8 each companion is a separate process, timed by its own markers",
     companions.map((c) => c.id),
     ["powershell-start", "native-call-defined", "query-run"]
   );
-  // ⚠️ SEQUENTIAL: each begins after the one before it closed, so none times another's contention.
-  for (let i = 1; i < companions.length; i++)
-    assert.ok(companions[i - 1].closeMs <= companions[i].spawnRequestedMs, `${companions[i].id} started after the one before closed`);
+  // ⚠️ SEQUENTIAL: each begins only after the one before it ENDED, so none times another's contention. A
+  // companion ends at its close, or at its own bound when a slow host makes it overrun — which is exactly the
+  // case these probes exist for, so the check is against whichever came first rather than against the close.
+  for (let i = 1; i < companions.length; i++) {
+    const before = companions[i - 1];
+    const ended = before.timedOutMs ?? before.closeMs;
+    assert.equal(typeof ended, "number", `${before.id} ended`);
+    assert.ok(ended <= companions[i].spawnRequestedMs, `${companions[i].id} started after ${before.id} ended`);
+  }
 
   const [start, defined, query] = companions;
   assert.equal(typeof start.markers.entry, "number", "PowerShell reaching its first statement");
