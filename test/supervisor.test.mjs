@@ -1219,6 +1219,9 @@ test("⚠️ a launcher that outlives its escalation makes the run fail, not suc
   assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
   assert.equal(e.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED);
   assert.equal(e.detail.agentExit.code, 0, "even though the agent itself finished cleanly");
+  // F131: a refused shutdown keeps the launch preflight it followed, as a completed run's record does.
+  assert.equal(typeof e.detail.preflight?.ok, "boolean", "the launch preflight survives the refusal");
+  assert.equal("preflight" in e.detail.shutdown, false, "and is still not counted inside the teardown");
   // ⚠️ THE RECORD IS THE SEVEN-PART OBSERVATION NOW, not the launcher's alone. The launcher's own
   // control channel is one fact and the escalation against its tree is another, and this test is
   // about the second: the stop was asked for, it was not obeyed, and that is reported.
@@ -1600,8 +1603,24 @@ test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes
   const recorded = JSON.parse(readFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), "utf-8"));
   assert.equal(started[0], recorded.sessionId, "the id Pi was given is the id written down");
 
-  // Second run: the recorded session now exists, so it is resumed by name.
-  await run(async () => [{ id: recorded.sessionId, path: join(dir, ".pi", "sessions", "x.jsonl"), modified: new Date() }]);
+  // Second run: the recorded session now exists, so it is resumed by name. Its transcript is written in the
+  // pinned Pi's current format, because a transcript Pi would rewrite is refused before launch.
+  const transcript = join(dir, ".pi", "sessions", "x.jsonl");
+  const at = new Date().toISOString();
+  writeFileSync(
+    transcript,
+    [
+      { type: "session", version: 3, id: recorded.sessionId, timestamp: at, cwd: dir },
+      { type: "model_change", id: "e1", parentId: null, timestamp: at, provider: "p", modelId: "m" },
+      { type: "thinking_level_change", id: "e2", parentId: "e1", timestamp: at, thinkingLevel: "off" },
+      { type: "message", id: "e3", parentId: "e2", timestamp: at, message: { role: "user", content: [] } },
+    ]
+      .map((e) => JSON.stringify(e))
+      .join("\n") + "\n"
+  );
+  await run(
+    Object.assign(async () => [{ id: recorded.sessionId, path: transcript, modified: new Date() }], { sessionVersion: 3 })
+  );
   assert.equal(started[1], recorded.sessionId, "the rerun passes the STORED id, not a fresh one");
   // ⚠️ AND A FRESH ID WOULD HAVE BEEN DIFFERENT: the generator never repeats, so this equality can only
   // hold because the recorded id was used rather than a newly minted one.

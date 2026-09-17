@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
 
@@ -44,7 +44,9 @@ import {
   SESSION_NAME_MAX,
   SESSION_RECORD,
   STORAGE,
+  TRANSCRIPT_PROBLEM,
   availableSessions,
+  inspectTranscript,
   renderSessionChoices,
   terminalSafeName,
   planSession,
@@ -388,16 +390,26 @@ function sessionFile(dir, { id, cwd = PROJECT_CWD, header = true, name = null })
   const lines = [];
   if (header === true) lines.push(JSON.stringify({ type: "session", version: 3, id, timestamp: new Date().toISOString(), cwd }));
   else if (typeof header === "string") lines.push(header);
-  lines.push(JSON.stringify({ type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "hi" }] } }));
+  lines.push(...currentBranch());
   writeFileSync(file, lines.join("\n") + "\n");
   return { id, file, cwd };
+}
+
+/** A current branch as the pinned Pi writes one: model, thinking level, then a message. */
+function currentBranch() {
+  const at = new Date().toISOString();
+  return [
+    JSON.stringify({ type: "model_change", id: "e1", parentId: null, timestamp: at, provider: "p", modelId: "m" }),
+    JSON.stringify({ type: "thinking_level_change", id: "e2", parentId: "e1", timestamp: at, thinkingLevel: "off" }),
+    JSON.stringify({ type: "message", id: "e3", parentId: "e2", timestamp: at, message: { role: "user", content: [{ type: "text", text: "hi" }] } }),
+  ];
 }
 
 /**
  * A stand-in for Pi's lister that behaves the way the measured one does: ids from headers, exact cwd
  * filtering, and malformed or header-less files dropped.
  */
-const fakeLister = async (cwd, dir) => {
+const fakeLister = Object.assign(async (cwd, dir) => {
   const out = [];
   for (const entry of readdirSync(dir)) {
     if (!entry.endsWith(".jsonl")) continue;
@@ -411,7 +423,7 @@ const fakeLister = async (cwd, dir) => {
     out.push({ id: header.id, path: join(dir, entry), cwd: header.cwd, modified: statSync(join(dir, entry)).mtime });
   }
   return out;
-};
+}, { sessionVersion: 3 });
 
 function stateRoot({ record, sessions = [], cwd = PROJECT_CWD } = {}) {
   const dir = scratch();
@@ -631,6 +643,78 @@ test("⚠️ the choices are numbered lines with no id, no path and no message t
   for (const leak of [SESSION_ID, OTHER_ID, "/home", "/p", "/q", "third"]) assert.equal(text.includes(leak), false, leak);
 });
 
+test("⚠️ a transcript Pi would rewrite while opening it is refused before Pi starts", () => {
+  // ⚠️ EACH OF THESE IS A WRITE THE PINNED PI MAKES BEFORE ANY EXTENSION RUNS: a migration of an older header,
+  // a newline appended to an unterminated last line, an empty file replaced, or model and thinking-level
+  // entries appended to a branch that lacks them. Kiln's guard could only see the transcript after that write.
+  const dir = scratch();
+  const header = (over = {}) => JSON.stringify({ type: "session", version: 3, id: SESSION_ID, timestamp: "t", cwd: PROJECT_CWD, ...over });
+  const [model, thinking, message] = currentBranch();
+  const cases = [
+    ["current", [header(), model, thinking, message].join("\n") + "\n", null],
+    ["empty", "", TRANSCRIPT_PROBLEM.EMPTY],
+    ["unterminated", [header(), model, thinking, message].join("\n"), TRANSCRIPT_PROBLEM.UNTERMINATED],
+    ["malformed line", [header(), "{ not json", model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.MALFORMED],
+    ["no header", [model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.NO_HEADER],
+    ["version missing", [header({ version: undefined }), model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.VERSION],
+    ["version 2", [header({ version: 2 }), model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.VERSION],
+    ["version 4", [header({ version: 4 }), model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.VERSION],
+    ["another session", [header({ id: OTHER_ID }), model, thinking, message].join("\n") + "\n", TRANSCRIPT_PROBLEM.WRONG_SESSION],
+    ["no message on the branch", [header(), model, thinking].join("\n") + "\n", TRANSCRIPT_PROBLEM.NO_MESSAGE],
+    [
+      "no thinking level on the branch",
+      [header(), model, JSON.stringify({ ...JSON.parse(message), parentId: "e1" })].join("\n") + "\n",
+      TRANSCRIPT_PROBLEM.NO_THINKING_LEVEL,
+    ],
+    [
+      // The thinking level is in the file but on an abandoned branch, so Pi's current branch lacks it.
+      "thinking level only on another branch",
+      [header(), model, thinking, JSON.stringify({ ...JSON.parse(message), id: "e4", parentId: "e1" })].join("\n") + "\n",
+      TRANSCRIPT_PROBLEM.NO_THINKING_LEVEL,
+    ],
+  ];
+  try {
+    for (const [label, text, problem] of cases) {
+      const file = join(dir, `${label.replaceAll(" ", "-")}.jsonl`);
+      writeFileSync(file, text);
+      const before = readFileSync(file);
+      const r = inspectTranscript(file, { version: 3, sessionId: SESSION_ID });
+      assert.equal(r.problem, problem, label);
+      assert.equal(r.ok, problem === null, label);
+      assert.ok(readFileSync(file).equals(before), `${label}: inspecting never writes`);
+    }
+    assert.equal(inspectTranscript(join(dir, "absent.jsonl"), { version: 3 }).problem, TRANSCRIPT_PROBLEM.UNREADABLE);
+    assert.equal(inspectTranscript(join(dir, "current.jsonl"), {}).problem, TRANSCRIPT_PROBLEM.FORMAT_UNKNOWN, "no format, no pass");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a recorded session whose transcript Pi would rewrite asks instead of resuming", async () => {
+  const root = stateRoot({ record: JSON.stringify(valid()), sessions: [SESSION_ID] });
+  try {
+    const file = join(sessionDirOf(root), readdirSync(sessionDirOf(root))[0]);
+    const lines = readFileSync(file, "utf-8").trimEnd().split("\n");
+    lines[0] = JSON.stringify({ ...JSON.parse(lines[0]), version: 2 });
+    writeFileSync(file, lines.join("\n") + "\n");
+    const before = readFileSync(file);
+
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
+    assert.equal(p.action, SESSION.ASK, "never a resume Pi would begin by rewriting");
+    assert.equal(p.problem, SESSION_PROBLEM.TRANSCRIPT_UNSUPPORTED);
+    assert.equal(p.transcript, TRANSCRIPT_PROBLEM.VERSION, "and which rewrite it would have been");
+    assert.equal(p.recoverable, true, "another session, or a new one, can still be chosen");
+    assert.ok(readFileSync(file).equals(before), "the transcript is untouched");
+
+    // A lister that does not report Pi's format cannot pass a transcript either.
+    const unknown = Object.assign(async (...a) => fakeLister(...a), {});
+    const q = await plan({ stateRoot: root, sessionDir: sessionDirOf(root), lister: unknown });
+    assert.equal(q.transcript, TRANSCRIPT_PROBLEM.FORMAT_UNKNOWN);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ storage that could not be inspected asks; it never authorises a fresh start", async () => {
   // ⚠️ THE DEFECT: with no record and a session directory that is really a FILE, availability was an
   // empty list and the plan was START — a fresh session begun over storage nobody could read.
@@ -726,6 +810,8 @@ test("⚠️ a lister that could not answer is not an empty store, and never a f
 test("⚠️ F121 ids come from each session's header, through Pi's own lister, never from the filename", async () => {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
   const lister = await resolvePinnedSessionLister(repoRoot);
+  const sdk = await import(pathToFileURL(join(repoRoot, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "index.js")).href);
+  assert.equal(lister.sessionVersion, sdk.CURRENT_SESSION_VERSION, "the format comes from the pinned package itself");
   const root = scratch();
   const sessions = join(root, "sessions");
   const mine = join(root, "mine");
@@ -737,7 +823,7 @@ test("⚠️ F121 ids come from each session's header, through Pi's own lister, 
     mkdirSync(theirs, { recursive: true });
 
     const header = (id, cwd) => JSON.stringify({ type: "session", version: 3, id, timestamp: new Date().toISOString(), cwd });
-    const msg = JSON.stringify({ type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "hi" }] } });
+    const msg = currentBranch().join("\n");
     const HEADER_ID = "99999999-9999-4999-8999-999999999999";
     const NAME_UUID = "11111111-1111-4111-8111-111111111111";
     // The id in the name and the id in the header disagree, which is the whole defect in one file.

@@ -115,7 +115,11 @@ try {
     ok: false,
     refusal: e instanceof SupervisorRefusal ? e.reason : String(e?.message ?? e),
     // A launch refused for an unreadable process table says so here, with the reason and what it cost.
-    preflight: e?.detail?.reason ? { ok: false, reason: e.detail.reason, ms: e.detail.ms ?? null, rows: e.detail.rows ?? null } : null,
+    // A refused shutdown carries the launch preflight it followed (F131); a launch refused FOR an unreadable
+    // process table says so with the reason and what it cost.
+    preflight:
+      e?.detail?.preflight ??
+      (e?.detail?.reason ? { ok: false, reason: e.detail.reason, ms: e.detail.ms ?? null, rows: e.detail.rows ?? null } : null),
     shutdown: e?.detail?.shutdown ?? null,
     agentExit: e?.detail?.agentExit ?? null,
   });
