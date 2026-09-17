@@ -9,6 +9,10 @@
  * ⚠️ **THE REAL READS ARE THE POINT.** Every other process-table test injects the reader. These run the
  * production command against this machine, because an offset read one field over produces a table that parses
  * perfectly and names the wrong parent or the wrong creation time.
+ *
+ * ⚠️ **O6 (F130): EACH REAL READ IS TIMED BY PHASE, AND A FAILURE PRINTS THE TIMINGS.** The reads run through the
+ * query diagnostic, which starts the production command the way the production reader does, with the same
+ * bound, and records request, child created, first byte, exit, timeout, kill and close. It keeps no output.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -20,11 +24,26 @@ import {
   primeProcessTable,
   readProcessTable,
 } from "../lib/supervisor.mjs";
+import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
 
 const WINDOWS = process.platform === "win32";
 const onlyWindows = { skip: !WINDOWS && "reads the real Windows process table" };
 /** FILETIME counts 100ns intervals from 1601; the Unix epoch is 11,644,473,600 seconds later. */
 const filetimeToMs = (created) => Number(BigInt(created) / 10000n) - 11_644_473_600_000;
+/** Runs a real-reader test through the diagnostic, and prints what every read cost if the test fails. */
+const diagnosed = (body) => async (t) => {
+  const d = createQueryDiagnostic();
+  try {
+    await body(d.psRun);
+  } catch (e) {
+    console.log(`
+[reader diagnostics] ${t.name}
+${JSON.stringify(d.snapshot(), null, 2)}
+`);
+    throw e;
+  }
+};
+
 /** Generous against CI clocks, and still far closer than any wrong field would land. */
 const CLOCK_SLACK_MS = 5_000;
 
@@ -38,8 +57,8 @@ test("⚠️ F122 the Windows process table uses no WMI and no compiler", () => 
   assert.ok(!text.includes('"'), "no double quote to be mangled by the Windows command line");
 });
 
-test("⚠️ F122 the real table shows this process with its real parent and creation time", onlyWindows, async () => {
-  const read = await readProcessTable();
+test("⚠️ F122 the real table shows this process with its real parent and creation time", onlyWindows, diagnosed(async (run) => {
+  const read = await readProcessTable({ run });
   assert.equal(read.error, null);
   const self = read.rows.get(process.pid);
   assert.ok(self, "this process is in the table");
@@ -51,17 +70,17 @@ test("⚠️ F122 the real table shows this process with its real parent and cre
     Math.abs(filetimeToMs(self.created) - startedMs) < CLOCK_SLACK_MS,
     `the creation field is this process's start: ${new Date(filetimeToMs(self.created)).toISOString()} against ${new Date(startedMs).toISOString()}`
   );
-});
+}));
 
-test("⚠️ F122 every real process except the idle process has a creation time", onlyWindows, async () => {
-  const read = await readProcessTable();
+test("⚠️ F122 every real process except the idle process has a creation time", onlyWindows, diagnosed(async (run) => {
+  const read = await readProcessTable({ run });
   assert.equal(read.error, null);
   assert.ok(read.rows.size > 10, `a whole table, not a truncated one: ${read.rows.size} rows`);
   const missing = [...read.rows.values()].filter((r) => r.created === null && r.pid !== 0).map((r) => r.pid);
   assert.deepEqual(missing, [], "the kernel reports creation times without opening any process");
-});
+}));
 
-test("⚠️ F122 a child spawned now is found as a descendant, with the identity it was created with", onlyWindows, async () => {
+test("⚠️ F122 a child spawned now is found as a descendant, with the identity it was created with", onlyWindows, diagnosed(async (run) => {
   const before = Date.now();
   const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
   try {
@@ -69,7 +88,7 @@ test("⚠️ F122 a child spawned now is found as a descendant, with the identit
       child.once("spawn", resolve);
       child.once("error", reject);
     });
-    const found = await descendantsOfAsync(process.pid);
+    const found = await descendantsOfAsync(process.pid, { run });
     assert.equal(found.error, null);
     const identity = found.identities.find((d) => d.pid === child.pid);
     assert.ok(identity, `the child ${child.pid} was enumerated: ${JSON.stringify(found.pids)}`);
@@ -80,11 +99,11 @@ test("⚠️ F122 a child spawned now is found as a descendant, with the identit
   } finally {
     child.kill();
   }
-});
+}));
 
-test("⚠️ F122 the launch preflight verifies this process through the production reader", onlyWindows, async () => {
-  const r = await primeProcessTable();
+test("⚠️ F122 the launch preflight verifies this process through the production reader", onlyWindows, diagnosed(async (run) => {
+  const r = await primeProcessTable({ psRun: run });
   assert.equal(r.ran, true);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.verified, true);
-});
+}));

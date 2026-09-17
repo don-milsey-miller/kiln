@@ -128,3 +128,53 @@ test("⚠️ F119 the diagnostic offers the platform's own command, so the fixtu
   assert.deepEqual(args, PROCESS_TABLE_COMMAND.win32[1], "the production arguments, unchanged");
   assert.equal(createQueryDiagnostic({ platform: "linux" }).command()[0], "ps");
 });
+
+test("⚠️ O6 a query records its pid, exit, close and byte counts, and keeps none of its output", async () => {
+  // Two-byte characters, so a character count and a byte count disagree.
+  const d = createQueryDiagnostic();
+  await d.psRun(...prints(["10 4 133 éé"]));
+  const [q] = d.snapshot().queries;
+
+  assert.equal(typeof q.pid, "number", "the child's pid");
+  for (const phase of ["spawnRequestedMs", "childCreatedMs", "firstStdoutMs", "exitMs", "closeMs"])
+    assert.equal(typeof q[phase], "number", `${phase} must be recorded`);
+  assert.ok(q.exitMs <= q.closeMs, `exit ${q.exitMs} then close ${q.closeMs}`);
+  assert.equal(q.signal, null);
+  assert.equal(q.stdoutBytes, Buffer.byteLength("10 4 133 éé\n"), "bytes, not characters");
+  assert.equal(q.killRequestedMs, null);
+
+  // ⚠️ NO OUTPUT IN THE RECORD: not a row, not a byte of what the command printed.
+  const text = JSON.stringify(d.snapshot());
+  assert.equal(text.includes("133"), false, "no process-table row");
+  assert.equal(text.includes("é"), false, "no output text");
+});
+
+test("⚠️ O6 a timed-out query records the kill request, then the signal and the close", async () => {
+  const d = createQueryDiagnostic({ timeoutMs: 120 });
+  await d.psRun(process.execPath, ["-e", "setTimeout(() => {}, 60000)"]);
+  const until = Date.now() + 10_000;
+  while (d.snapshot().queries[0].closeMs === null && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
+  const [q] = d.snapshot().queries;
+
+  assert.equal(q.outcome, "timeout");
+  assert.equal(typeof q.killRequestedMs, "number");
+  assert.equal(q.killSent, true);
+  assert.ok(q.timedOutMs <= q.killRequestedMs);
+  assert.equal(typeof q.closeMs, "number", "the child's close is still recorded after the timeout answered");
+  assert.ok(q.killRequestedMs <= q.closeMs);
+  assert.ok(q.signal !== null || q.exitCode !== null, "how it ended");
+  assert.equal(q.exitedMs, null, "and it is still not reported as a query that finished");
+});
+
+test("⚠️ O6 the diagnostic starts the command the way the production reader does", async () => {
+  let seen;
+  const d = createQueryDiagnostic({
+    spawnImpl: (cmd, args, options) => {
+      seen = options;
+      throw Object.assign(new Error("stop here"), { code: "ESTOP" });
+    },
+  });
+  await d.psRun("powershell", []);
+  assert.equal(seen.env.LC_ALL, "C", "the pinned locale");
+  assert.equal(seen.windowsHide, undefined, "no hidden window, as execFile's default");
+});

@@ -10,6 +10,13 @@
  * ⚠️ **IT DECIDES NOTHING.** `psRun` runs the command the supervisor hands it, with the production timeout,
  * and returns exactly the shape the production reader returns. It only records what each phase cost.
  *
+ * ⚠️ **O6 (F130): EVERY PHASE A STALL COULD HIDE IN.** A WMI-free read stalled to its full bound five times in a row
+ * on windows-latest node 24 in CI run 35250274939, and nothing recorded where that time went. Each query now
+ * records, on one monotonic clock: request, child created, first stdout and stderr byte, exit, timeout, kill
+ * request and close, with the child's pid, its exit code or signal, and byte counts. It keeps NO output: not
+ * stdout, not stderr, not a row, a path or an environment value. The spawn matches the production reader's:
+ * the same pinned locale and no hidden window, so the process being timed is the one production starts.
+ *
  * ⚠️ **THE TOOLHELP PROBE THAT ISOLATED THE PROVIDER IS GONE, AND SO IS ITS COMPILER.** It did its work:
  * while a CIM query waited seven seconds, a WMI-free enumeration of the same machine finished in 68ms, which
  * is what ruled out load and process creation. Run 35055338147 holds that evidence, so the suite no longer
@@ -36,8 +43,8 @@ export function createQueryDiagnostic({ platform = process.platform, spawnImpl =
     new Promise((resolve) => {
       record.spawnRequestedMs = at();
       let settled = false;
-      let stdout = "";
-      let stderr = "";
+      // Only what the returned shape needs; nothing of it is kept in the record.
+      const stdoutChunks = [];
       let child;
       const finish = (value) => {
         if (settled) return;
@@ -50,42 +57,58 @@ export function createQueryDiagnostic({ platform = process.platform, spawnImpl =
       const timer = setTimeout(() => {
         record.timedOutMs = at();
         record.outcome = "timeout";
+        record.killRequestedMs = at();
         try {
-          child?.kill("SIGTERM");
+          record.killSent = child ? child.kill("SIGTERM") : false;
         } catch {
           /* a child that has already gone needs no signal */
+          record.killSent = false;
         }
         finish({ status: 1, stdout: "", error: Object.assign(new Error("process-table-timeout"), { killed: true, signal: "SIGTERM", code: null }) });
       }, timeoutMs);
 
       try {
-        child = spawnImpl(cmd, args, { windowsHide: true });
+        // As the production reader spawns it: the pinned locale, and no hidden window.
+        child = spawnImpl(cmd, args, { env: { ...process.env, LC_ALL: "C" } });
       } catch (e) {
         record.outcome = "spawn-threw";
         record.error = e?.code ?? e?.name ?? "unknown";
         finish({ status: 1, stdout: "", error: e });
         return;
       }
-      child.once("spawn", () => (record.childCreatedMs = at()));
+      record.pid = typeof child.pid === "number" ? child.pid : null;
+      child.once("spawn", () => {
+        record.childCreatedMs = at();
+        record.pid ??= typeof child.pid === "number" ? child.pid : null;
+      });
       child.stdout?.on("data", (d) => {
         record.firstStdoutMs ??= at();
-        stdout += d;
+        record.stdoutBytes += Buffer.byteLength(d);
+        stdoutChunks.push(Buffer.from(d));
       });
       child.stderr?.on("data", (d) => {
         record.firstStderrMs ??= at();
-        stderr += d;
+        record.stderrBytes += Buffer.byteLength(d);
+      });
+      child.once("exit", (code, signal) => {
+        record.exitMs = at();
+        record.exitCode = code;
+        record.signal = signal ?? null;
       });
       child.once("error", (e) => {
         record.outcome ??= "spawn-error";
         record.error = e?.code ?? e?.name ?? "unknown";
         finish({ status: 1, stdout: "", error: e });
       });
-      child.once("close", (code) => {
-        record.exitedMs = at();
-        record.exitCode = code;
-        record.stdoutBytes = stdout.length;
-        record.stderrBytes = stderr.length;
+      child.once("close", (code, signal) => {
+        record.closeMs = at();
+        record.exitCode ??= code;
+        record.signal ??= signal ?? null;
+        // A close after the timeout already answered is recorded, and changes nothing that was returned.
+        if (settled) return;
+        record.exitedMs = record.closeMs;
         record.outcome ??= code === 0 ? "exit" : "non-zero-exit";
+        const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
         record.rows = code === 0 ? parseProcessTable(stdout).size : 0;
         finish(code === 0 ? { status: 0, stdout } : { status: code ?? 1, stdout: "", error: Object.assign(new Error("exit"), { code }) });
       });
@@ -93,17 +116,23 @@ export function createQueryDiagnostic({ platform = process.platform, spawnImpl =
 
   const blank = (id, extra) => ({
     id,
+    pid: null,
     spawnRequestedMs: null,
     childCreatedMs: null,
     firstStdoutMs: null,
     firstStderrMs: null,
+    exitMs: null,
     exitedMs: null,
     timedOutMs: null,
+    killRequestedMs: null,
+    killSent: null,
+    closeMs: null,
     exitCode: null,
+    signal: null,
     outcome: null,
     rows: null,
-    stdoutBytes: null,
-    stderrBytes: null,
+    stdoutBytes: 0,
+    stderrBytes: 0,
     error: null,
     ...extra,
   });
