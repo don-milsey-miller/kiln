@@ -30,6 +30,7 @@ import {
   SESSION_SELECTORS,
   STOP_SIGNALS,
   SupervisorRefusal,
+  createShutdownDeadline,
   generateSessionId,
   removeOwnedFiles,
   shutdown,
@@ -1184,7 +1185,14 @@ test("⚠️ a descendant that survives its parent is escalated, and the tree is
   // exactly what "the tree was stopped" is supposed to rule out.
   const table = processTable([100, 200], { immortal: [200] });
   const fg = child({ pid: 100 });
-  setTimeout(() => fg.go(), 30); // the parent goes promptly; the child does not
+
+  // ⚠️ **NOTHING HERE WAITS ON A REAL CLOCK (F133).** With real periods this failed on a loaded CI
+  // runner: every allowance is computed from the wall clock, so a scheduling delay turned the survivor into
+  // an identity read the deadline refused, and the run reported nothing surviving rather than 200. The
+  // deadline runs on this test's own clock, and the leader exits when its tree is first looked at rather
+  // than after a timer — which is the ordering this test is about in the first place.
+  let fakeNow = 1_000_000;
+  const deadline = createShutdownDeadline({ at: fakeNow + 20_000, now: () => fakeNow });
 
   // ⚠️ **`ps` ANSWERS DIFFERENTLY ONCE THE PARENT IS GONE**, which is why the snapshot has to be
   // kept. On the second look 200 has been re-parented and is no longer a descendant of anything
@@ -1196,7 +1204,12 @@ test("⚠️ a descendant that survives its parent is escalated, and the tree is
     graceMs: 200,
     hardMs: 150,
     kill: table.kill,
-    psRun: () => ({ status: 0, stdout: ++looks === 1 ? "100 1 100\n200 100 200\n" : "200 1 200\n" }),
+    deadline,
+    psRun: () => {
+      // The leader goes as soon as its tree has been seen; the child does not go at all.
+      if (++looks === 1) fg.go();
+      return { status: 0, stdout: looks === 1 ? "100 1 100\n200 100 200\n" : "200 1 200\n" };
+    },
   });
 
   assert.equal(r.exitObserved, true, "the leader really did exit");
