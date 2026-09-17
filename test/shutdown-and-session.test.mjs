@@ -984,6 +984,34 @@ test("⚠️ Kiln names the session, and refuses every other way of choosing one
     );
   }
 
+  // ⚠️ **THE REFUSAL CARRIES THE SELECTOR'S NAME AND NOTHING ELSE.** An argument list holds whatever the
+  // operator typed: a session id, a token, the paths of two different machines. A refusal is printed, logged
+  // and pasted into issues, so none of it may travel with one.
+  const SECRETS = {
+    sessionId: "11111111-2222-4333-8444-555555555555",
+    credential: "sk-live-not-a-real-key-000",
+    windowsPath: "C:\Users\someone\AppData\Local\Temp\kiln",
+    posixPath: "/home/someone/.pi/sessions",
+  };
+  const leaky = withSessionPolicy.bind(null, {
+    command: "pi",
+    args: ["--print", `--session=${SECRETS.sessionId}`, "--resume", SECRETS.credential, SECRETS.windowsPath, SECRETS.posixPath],
+  });
+  assert.throws(
+    () => leaky(SESSION_ID, {}),
+    (e) => {
+      assert.equal(e.reason, REFUSAL.SESSION_SELECTOR_CONFLICT);
+      const text = `${e.message} ${JSON.stringify(e.detail)}`;
+      for (const [what, value] of Object.entries(SECRETS)) assert.equal(text.includes(value), false, `${what} must not appear`);
+      assert.equal(text.includes(SESSION_ID), false, "nor the id Kiln would have passed");
+      // What it does say: which selectors, normalised, and how many.
+      assert.deepEqual(e.detail.selectors, ["--session", "--resume"]);
+      assert.equal(e.detail.conflicts, 2);
+      assert.match(e.message, /--session, --resume/);
+      return true;
+    }
+  );
+
   // A generated id is what a first run passes, and it is the shape Pi uses for its own.
   const id = generateSessionId((n) => Buffer.alloc(n, 7));
   assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
