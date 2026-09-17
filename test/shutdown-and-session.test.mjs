@@ -1044,6 +1044,11 @@ for (const platform of ["linux", "win32"])
       platform,
       graceMs: 200,
       hardMs: 100,
+      // ⚠️ THE DEADLINE RUNS ON THIS TEST'S OWN CLOCK (F133). Allowances are computed from the wall clock,
+      // so on a loaded runner a survivor becomes an identity read the deadline refused, and the record then says
+      // nothing survived. The waits below stay real and unchanged; only the budget stops moving.
+      deadline: 9_020_000,
+      now: () => 9_000_000,
       kill: (pid, sig) => {
         if (sig === 0) {
           if (alive.has(Math.abs(pid))) return true;
@@ -1268,6 +1273,11 @@ test("a surviving descendant makes the whole shutdown partial, whatever the exit
     psRun: () => ({ status: 0, stdout: "100 1 100\n200 100 200\n" }),
     graceMs: 200,
     hardMs: 150,
+    // ⚠️ THE DEADLINE RUNS ON THIS TEST'S OWN CLOCK (F133). Allowances are computed from the wall clock,
+    // so on a loaded runner a survivor becomes an identity read the deadline refused, and the record then says
+    // nothing survived. The waits below stay real and unchanged; only the budget stops moving.
+    deadline: 9_020_000,
+    now: () => 9_000_000,
   });
 
   assert.equal(r.agent.exitObserved, true, "every process record about the leader says it went");
@@ -1361,6 +1371,10 @@ test("⚠️ Pi exiting with a live child is not a stopped tree — the ordinary
     platform: "linux",
     graceMs: 200,
     hardMs: 150,
+    // ⚠️ THE DEADLINE RUNS ON THIS TEST'S OWN CLOCK (F133). Allowances are computed from the wall clock,
+    // so on a loaded runner a survivor becomes an identity read the deadline refused, and the record then says
+    // nothing survived. The waits below stay real and unchanged; only the budget stops moving.
+    deadline: createShutdownDeadline({ at: 9_000_000 + 20_000, now: () => 9_000_000 }),
     kill: table.kill,
     knownDescendants: known,
     // ⚠️ AFTER THE FACT `ps` SHOWS NOTHING: 200 is init's child now.
