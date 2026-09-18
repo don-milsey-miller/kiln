@@ -12,5 +12,6 @@
   ],
   "verifies": [
     "REQ-0001"
-  ]
+  ],
+  "notes": "Evidence split agreed 2026-09-18 during TSK-0049. This criterion stays a claim about model behaviour: the second question itself must differ, not merely the state it is derived from. Restating it as \"the state turn two is derived from differs\" was considered and refused, because that is the mechanism and not adaptive questioning. It is therefore evidenced in two parts, and neither part alone satisfies it. (1) Deterministic tests prove the mechanism: two different first answers produce different persisted intake state and different turn-two inputs, with no real model involved. (2) Two retained real-model runs prove the behaviour: both start from the same project snapshot, differ only in the operator's first answer, and are reviewed by a person for whether the second questions differ and are relevant to the answers given."
 }
