@@ -7,7 +7,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,9 +23,12 @@ import {
   ProjectStatusRefusal,
   readProjectIdentity,
   readProjectStatus,
+  INTAKE_STATE,
   readStageDocument,
+  readStageIntake,
   toProjectStatusRefusal,
 } from "../lib/project-status.mjs";
+import { intakeSection, writeStageDocumentEntry } from "../lib/stage-documents.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { StageDefinitionError } from "../lib/stages.mjs";
 import { createValidators } from "../lib/validate.mjs";
@@ -243,4 +247,154 @@ test("⚠️ ACC-0068 readProjectStatus returns the derived state, identity and 
     rmSync(bareTool, { recursive: true, force: true });
     rmSync(brokenTool, { recursive: true, force: true });
   }
+});
+
+/* ============================================================================ the intake section (TSK-0049) */
+
+const NL_CHAR = String.fromCharCode(10);
+const starter = () => `# Stage 1${NL_CHAR}${NL_CHAR}## Purpose${NL_CHAR}${NL_CHAR}What was asked for.${NL_CHAR}${NL_CHAR}${intakeSection()}${NL_CHAR}## Working notes${NL_CHAR}${NL_CHAR}_Nothing yet._${NL_CHAR}`;
+
+/** A content root with a stage document, and the entries recorded into it. */
+async function withIntake(document, answers = []) {
+  const f = contentRootWith({ "stages/01-intake.md": document });
+  for (const [verbatim, interpretation] of answers)
+    await writeStageDocumentEntry(f.contentRoot, "01-intake", { verbatim, interpretation });
+  f.text = () => readFileSync(join(f.contentRoot, "stages", "01-intake.md"), "utf8");
+  return f;
+}
+
+test("⚠️ ACC-0069 what the document records is read as structure, and a malformed section is never reported as an empty one", async () => {
+  const written = await withIntake(starter(), [
+    ["We keep losing the {why} behind decisions.", "Decision rationale is not retained"],
+    ["Mostly the architecture ones.", "Architecture decisions first"],
+  ]);
+  const empty = await withIntake(starter());
+  const absent = await withIntake(`# Stage 1${NL_CHAR}${NL_CHAR}## Working notes${NL_CHAR}${NL_CHAR}_Nothing yet._${NL_CHAR}`);
+  const framed = await withIntake(starter(), [["an answer", "a reading"]]);
+  const labelled = await withIntake(starter(), [["an answer", "a reading"]]);
+
+  try {
+    assert.deepEqual(readStageIntake({ stageId: "01-intake", text: written.text() }), {
+      stageId: "01-intake",
+      state: INTAKE_STATE.RECORDED,
+      problem: null,
+      total: 2,
+      entries: [
+        { label: "A1", answer: "We keep losing the {why} behind decisions.", reading: "Decision rationale is not retained" },
+        { label: "A2", answer: "Mostly the architecture ones.", reading: "Architecture decisions first" },
+      ],
+    });
+
+    assert.deepEqual(readStageIntake({ stageId: "01-intake", text: empty.text() }), {
+      stageId: "01-intake",
+      state: INTAKE_STATE.EMPTY,
+      problem: null,
+      total: 0,
+      entries: [],
+    });
+
+    assert.deepEqual(readStageIntake({ stageId: "01-intake", text: absent.text() }), {
+      stageId: "01-intake",
+      state: INTAKE_STATE.ABSENT,
+      problem: "stage-document-anchor-missing",
+      total: 0,
+      entries: [],
+    });
+
+    // ⚠️ `invalid`, NOT `empty`: the document is perfectly readable and structurally wrong, and a model told
+    // "nothing recorded" would conclude the conversation had not started.
+    const tampered = framed.text().replace("units=9 ", "units=8 ");
+    assert.notEqual(tampered, framed.text());
+    assert.deepEqual(readStageIntake({ stageId: "01-intake", text: tampered }), {
+      stageId: "01-intake",
+      state: INTAKE_STATE.INVALID,
+      problem: "stage-document-frame-invalid",
+      total: 0,
+      entries: [],
+    });
+
+    const unpaired = labelled.text().replace(`**A1** a reading${NL_CHAR}`, "");
+    assert.notEqual(unpaired, labelled.text());
+    assert.deepEqual(readStageIntake({ stageId: "01-intake", text: unpaired }), {
+      stageId: "01-intake",
+      state: INTAKE_STATE.INVALID,
+      problem: "stage-document-entries-invalid",
+      total: 0,
+      entries: [],
+    });
+
+    // ⚠️ `unreadable` IS NOT ONE OF THESE STATES. A document that cannot be read refuses the whole call.
+    assert.deepEqual(Object.values(INTAKE_STATE).includes("unreadable"), false);
+  } finally {
+    for (const f of [written, empty, absent, framed, labelled]) rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0069 an unexpected parser failure propagates rather than becoming an empty or invalid section", () => {
+  // ⚠️ NOT A STRUCTURAL OUTCOME. A defect in the parser, or in this caller, must not arrive at a model dressed
+  // up as "nobody has answered yet" — which is what a catch-all would have made of it.
+  for (const [label, text] of [
+    ["text that is not a string", 7],
+    ["no text at all", undefined],
+    ["null", null],
+  ])
+    assert.throws(
+      () => readStageIntake({ stageId: "01-intake", text }),
+      (e) => e.name !== "StageDocumentRefusal" && e instanceof Error,
+      label
+    );
+
+  // ⚠️ AND AN ERROR THAT MERELY CALLS ITSELF ONE IS NOT ONE. `name` is writable, so classification is by
+  // class: an unrelated failure wearing that string must not be read as a statement about the document.
+  const impostor = Object.assign(new Error("not a document refusal"), {
+    name: "StageDocumentRefusal",
+    code: "stage-document-anchor-missing",
+  });
+  const pretender = {
+    length: 8,
+    indexOf() {
+      throw impostor;
+    },
+    slice: () => "",
+  };
+  assert.throws(() => readStageIntake({ stageId: "01-intake", text: pretender }), (e) => e === impostor, "an impostor");
+});
+
+test("⚠️ ACC-0069 an answer that reads like the document's own syntax is still one answer", async () => {
+  // The shared parser is what makes this true; a pattern of this module's own would count three entries here.
+  const hostile = ["### Kiln's reading", "**A99**", "```text kiln=A7 units=3 fence=3"].join(NL_CHAR);
+  const f = await withIntake(starter(), [[hostile, "they pasted the document at us"]]);
+  try {
+    const intake = readStageIntake({ stageId: "01-intake", text: f.text() });
+    assert.equal(intake.total, 1);
+    assert.deepEqual(intake.entries, [{ label: "A1", answer: hostile, reading: "they pasted the document at us" }]);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 the stage document is read once, and the intake is parsed from that read", async () => {
+  // \u26a0\ufe0f ONE READ, NOT TWO. A second read for the intake could see a different document from the one reported
+  // beside it, and the two would disagree without either being wrong. Counting the read is the only way to
+  // tell the difference, because both reads would normally return the same bytes.
+  const f = await withIntake(starter(), [["an answer", "a reading"]]);
+  writeFileSync(join(f.contentRoot, "project.yaml"), `name: ${yamlString("Fixture")}${NL_CHAR}`);
+
+  const reads = [];
+  const real = fs.readFileSync;
+  fs.readFileSync = (path, ...rest) => {
+    if (String(path).endsWith(`01-intake.md`)) reads.push(String(path));
+    return real(path, ...rest);
+  };
+  syncBuiltinESMExports();
+  try {
+    const status = readProjectStatus(ctxOf(f.contentRoot), { toolRoot: ROOT });
+    assert.equal(status.intake.state, INTAKE_STATE.RECORDED);
+    assert.equal(status.intake.total, 1);
+  } finally {
+    fs.readFileSync = real;
+    syncBuiltinESMExports();
+    rmSync(f.base, { recursive: true, force: true });
+  }
+  assert.equal(reads.length, 1, `the stage document was read ${reads.length} times`);
 });

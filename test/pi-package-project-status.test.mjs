@@ -26,6 +26,7 @@ import { readActivatedTypes } from "../lib/activation.mjs";
 import { yamlString } from "../lib/project-scaffold.mjs";
 import { PROJECT_STATUS_MESSAGES, PROJECT_STATUS_REFUSAL, readProjectStatus } from "../lib/project-status.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
+import { intakeSection, parseIntakeSection, writeStageDocumentEntry } from "../lib/stage-documents.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import register from "../pi-package/extensions/kiln.js";
 import { providerVisible } from "./helpers/provider-visible.mjs";
@@ -115,7 +116,7 @@ test("⚠️ ACC-0068 kiln_project_status keeps its existing fields and schema, 
     const status = result.details;
     assert.equal(result.output, JSON.stringify(status, null, 2));
 
-    assert.deepEqual(Object.keys(status).sort(), ["artifactCount", "blockers", "ok", "orchestration", "project", "ready", "stageOneDocument"]);
+    assert.deepEqual(Object.keys(status).sort(), ["artifactCount", "blockers", "intake", "ok", "orchestration", "project", "ready", "stageOneDocument"]);
     assert.equal(status.ok, true);
     assert.equal(typeof status.ready, "boolean");
     assert.equal(Number.isInteger(status.artifactCount), true);
@@ -128,6 +129,16 @@ test("⚠️ ACC-0068 kiln_project_status keeps its existing fields and schema, 
     assert.equal(status.orchestration.nextAction.kind, "work-toward-criterion");
     assert.deepEqual(status.project, { name: "Fixture", description: "A project.", issues: [] });
     assert.deepEqual(status.stageOneDocument, { stageId: "01-intake", path: "stages/01-intake.md", text: "# Stage 01 - Intake\n", truncated: false });
+    // ⚠️ THE FIXTURE'S DOCUMENT HAS NO INTAKE SECTION, so the block says so rather than saying nothing was asked.
+    assert.deepEqual(status.intake, {
+      stageId: "01-intake",
+      state: "absent",
+      problem: "stage-document-anchor-missing",
+      total: 0,
+      returned: 0,
+      omitted: 0,
+      entries: [],
+    });
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
@@ -515,6 +526,152 @@ test("⚠️ ACC-0068 an invocation writes nothing, reaches no network, starts n
     assert.equal(result.details.ok, true);
     assert.deepEqual(seen, [], "the invocation wrote, connected or spawned");
     assert.deepEqual(snapshot(f.base), before, "no byte or modification time changed");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+/* ============================================================================ the intake block (TSK-0049) */
+
+const N = String.fromCharCode(10);
+const starterDocument = () => `# Stage 01 - Intake${N}${N}${intakeSection()}${N}## Working notes${N}${N}_Nothing yet._${N}`;
+
+const documentOf = (f) => readFileSync(join(f.contentRoot, "stages", "01-intake.md"), "utf8");
+const record = (f, verbatim, interpretation) => writeStageDocumentEntry(f.contentRoot, "01-intake", { verbatim, interpretation });
+
+test("\u26a0\ufe0f ACC-0069 two different answers to the same question leave the same project in two different states", async () => {
+  // \u26a0\ufe0f ONE SNAPSHOT, COPIED. The two projects are byte-identical before either answer is recorded, and Kiln's
+  // reading is the same sentence in both, so the ONLY difference is the operator's own words.
+  const origin = project({ stageDocument: starterDocument() });
+  const left = { base: mkdtempSync(join(tmpdir(), "kiln-intake-left-")) };
+  const right = { base: mkdtempSync(join(tmpdir(), "kiln-intake-right-")) };
+  left.contentRoot = join(left.base, "planning-content");
+  right.contentRoot = join(right.base, "planning-content");
+
+  try {
+    fs.cpSync(origin.contentRoot, left.contentRoot, { recursive: true });
+    fs.cpSync(origin.contentRoot, right.contentRoot, { recursive: true });
+    assert.equal(documentOf(left), documentOf(right), "the two copies did not start identical");
+
+    const reading = "The operator named the problem they want solved";
+    await record(left, "We keep losing the reasoning behind decisions.", reading);
+    await record(right, "Onboarding a new engineer takes three weeks.", reading);
+
+    const tool = statusTool();
+    const a = (await invoke(tool, left.contentRoot)).details;
+    const b = (await invoke(tool, right.contentRoot)).details;
+
+    // What was asked of the project has not changed. What the project records has.
+    assert.deepEqual(a.orchestration, b.orchestration, "the derived orchestration state differs");
+    assert.deepEqual(a.blockers, b.blockers);
+    assert.equal(a.ready, b.ready);
+    assert.equal(a.artifactCount, b.artifactCount);
+    assert.deepEqual(a.project, b.project);
+
+    assert.notDeepEqual(a.intake, b.intake, "two different answers produced the same structured state");
+    assert.equal(a.intake.entries[0].answer, "We keep losing the reasoning behind decisions.");
+    assert.equal(b.intake.entries[0].answer, "Onboarding a new engineer takes three weeks.");
+    assert.equal(a.intake.entries[0].reading, reading, "only the operator's wording should differ");
+    assert.equal(b.intake.entries[0].reading, reading);
+    for (const status of [a, b]) {
+      assert.equal(status.intake.state, "recorded");
+      assert.deepEqual([status.intake.total, status.intake.returned, status.intake.omitted], [1, 1, 0]);
+      assert.deepEqual(Object.keys(status.intake.entries[0]).sort(), ["answer", "answerTruncated", "label", "reading", "readingTruncated"]);
+    }
+  } finally {
+    for (const f of [origin, left, right]) rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 the block carries the newest entries, says how many it left out, and keeps them in recorded order", async () => {
+  const f = project({ stageDocument: starterDocument() });
+  try {
+    for (let i = 1; i <= 15; i++) await record(f, `answer number ${i}`, `reading number ${i}`);
+
+    const status = (await invoke(statusTool(), f.contentRoot)).details;
+    assert.equal(status.intake.total, 15, "the count is the document's, not this block's");
+    assert.equal(status.intake.returned, 10);
+    assert.equal(status.intake.omitted, 5);
+    assert.deepEqual(
+      status.intake.entries.map((e) => e.label),
+      ["A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15"],
+      "the window is not the newest ten in recorded order"
+    );
+    assert.equal(status.intake.entries.at(-1).answer, "answer number 15", "the newest entry is not the last one");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 the newest answer survives a document too large to send", async () => {
+  const f = project({ stageDocument: starterDocument() });
+  try {
+    // \u26a0\ufe0f THE DOCUMENT IS CUT FROM THE FRONT AT 64 KiB, so without this block the newest answer is precisely
+    // the one a model would stop being able to see.
+    await record(f, "Z".repeat(70 * 1024), "a very long first answer");
+    await record(f, "the newest thing I said", "the newest reading");
+
+    const status = (await invoke(statusTool(), f.contentRoot)).details;
+    assert.equal(status.stageOneDocument.truncated, true, "the fixture is only interesting if the document is truncated");
+    assert.equal(status.stageOneDocument.text.includes("the newest thing I said"), false, "the newest answer survived in the document text");
+
+    assert.equal(status.intake.total, 2);
+    assert.equal(status.intake.entries.at(-1).answer, "the newest thing I said");
+    assert.equal(status.intake.entries.at(-1).answerTruncated, false);
+    assert.equal(status.intake.entries[0].answerTruncated, true, "the long answer was sent whole");
+    assert.equal(status.intake.entries[0].answer.length, 1024);
+    assert.equal(documentOf(f).includes("Z".repeat(70 * 1024)), true, "the document did not keep the whole answer");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 the block is bounded in bytes as well as in entries, and the newest still fits", async () => {
+  const f = project({ stageDocument: starterDocument() });
+  try {
+    for (let i = 1; i <= 10; i++) await record(f, `${i} `.repeat(600), `${i} `.repeat(600).trim());
+
+    const status = (await invoke(statusTool(), f.contentRoot)).details;
+    assert.equal(status.intake.total, 10);
+    assert.ok(status.intake.returned < 10, `the byte bound did not bind: ${status.intake.returned} returned`);
+    assert.ok(status.intake.returned >= 1, "the newest entry must always fit");
+    assert.equal(status.intake.omitted, 10 - status.intake.returned);
+    assert.ok(status.intake.entries.at(-1).answer.startsWith("10 "), "the newest entry was dropped");
+    assert.ok(
+      new TextEncoder().encode(JSON.stringify(status.intake.entries)).length <= 16 * 1024,
+      "the entries exceeded the byte bound"
+    );
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 an answer keeps its credential and its path in the document, and neither leaves in the status", async () => {
+  const f = project({ stageDocument: starterDocument() });
+  try {
+    const answer = `our key is ${SECRET}, the token is ${GITHUB_TOKEN}, files at ${WINDOWS_PATH} and ${POSIX_PATH}, repo at ${f.contentRoot}`;
+    await record(f, answer, "They pasted credentials at us");
+
+    // \u26a0\ufe0f PROVED PRESENT BEFORE ABSENCE IS ASSERTED: the document keeps the operator's words exactly.
+    assert.equal(parseIntakeSection(documentOf(f)).answers[0].text, answer);
+
+    const result = await invoke(statusTool(), f.contentRoot);
+    const serialised = JSON.stringify(result);
+    assertAbsent(serialised, [SECRET, GITHUB_TOKEN, WINDOWS_PATH, POSIX_PATH, f.contentRoot], "an intake answer");
+    assert.equal(result.details.intake.entries[0].answerTruncated, false);
+    assert.equal(result.details.intake.entries[0].answer.includes("our key is"), true, "the answer itself was dropped rather than cleaned");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f ACC-0069 reading the status changes no byte and no modification time of the document", async () => {
+  const f = project({ stageDocument: starterDocument() });
+  try {
+    await record(f, "an answer", "a reading");
+    const before = snapshot(f.contentRoot);
+    await invoke(statusTool(), f.contentRoot);
+    assert.deepEqual(snapshot(f.contentRoot), before);
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }

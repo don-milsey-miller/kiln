@@ -753,6 +753,18 @@ async function renderForModel(value, { contentRoot = null, toolRoot = null } = {
 
 /** The most of the Stage 1 document a status result carries, in UTF-8 bytes, measured after cleaning (D19). */
 const STAGE_DOCUMENT_MAX_BYTES = 64 * 1024;
+
+/**
+ * What the intake block may cost, as explicit initial limits rather than as a measurement.
+ *
+ * ⚠️ **THE NEWEST ENTRIES ARE THE ONES KEPT.** `stageOneDocument.text` is cut from the FRONT at 64 KiB, so in
+ * a long intake the newest answers are exactly the ones that fall out of the document. This block is built
+ * newest-first from the whole parse, which is what makes them observable at all once that happens.
+ */
+const INTAKE_ENTRIES_MAX = 10;
+const INTAKE_FIELD_MAX_BYTES = 1024;
+const INTAKE_BYTES_MAX = 16 * 1024;
+
 const utf8 = new TextEncoder();
 
 /** `text` cut to at most `maxBytes` of UTF-8 at a character boundary, never inside one. */
@@ -768,6 +780,37 @@ function capUtf8(text, maxBytes) {
     end += ch.length;
   }
   return { text: text.slice(0, end), truncated: true };
+}
+
+/**
+ * The intake entries a model receives: the newest that fit, in the order they were recorded.
+ *
+ * ⚠️ **CALLED AFTER CLEANING, AND THE BOUND IS MEASURED ON WHAT IS ACTUALLY SENT.** `INTAKE_BYTES_MAX` is the
+ * UTF-8 length of this array as JSON, with each field already capped, so the limit is on the result rather
+ * than on the project's own text.
+ *
+ * ⚠️ **THE NEWEST ENTRY ALWAYS FITS.** Two fields of at most 1 KiB each cannot approach 16 KiB, so the loop
+ * below can never drop the one entry the caller most needs.
+ */
+function boundIntakeEntries(entries) {
+  const kept = [];
+  for (let i = entries.length - 1; i >= 0 && kept.length < INTAKE_ENTRIES_MAX; i--) {
+    const answer = capUtf8(entries[i].answer, INTAKE_FIELD_MAX_BYTES);
+    const reading = capUtf8(entries[i].reading, INTAKE_FIELD_MAX_BYTES);
+    // Newest first, each older one in front of it, so what comes out is already in recorded order.
+    kept.unshift({
+      label: entries[i].label,
+      answer: answer.text,
+      answerTruncated: answer.truncated,
+      reading: reading.text,
+      readingTruncated: reading.truncated,
+    });
+    if (utf8.encode(JSON.stringify(kept)).length > INTAKE_BYTES_MAX) {
+      kept.shift();
+      break;
+    }
+  }
+  return kept;
 }
 
 /**
@@ -1084,6 +1127,7 @@ export default function register(pi, deps = {}) {
       const located = (item) => (item && typeof item === "object" ? { ...item, path: relativeTo(context.contentRoot, item.path) } : null);
       const orchestration = status?.orchestration ?? {};
       const document = status?.stageOneDocument ?? {};
+      const intake = status?.intake ?? {};
 
       const result = await renderForModel(
         {
@@ -1106,6 +1150,15 @@ export default function register(pi, deps = {}) {
             path: relativeTo(context.contentRoot, document.path),
             text: document.text ?? null,
           },
+          // ⚠️ WHAT THE DOCUMENT RECORDS, BESIDE THE DOCUMENT ITSELF. The operator's own words are kept in
+          // their own document exactly as they gave them; what leaves here is cleaned like every other string.
+          intake: {
+            stageId: intake.stageId ?? null,
+            state: intake.state ?? null,
+            problem: intake.problem ?? null,
+            total: intake.total ?? 0,
+            entries: (intake.entries ?? []).map((e) => ({ label: e.label, answer: e.answer, reading: e.reading })),
+          },
         },
         roots
       );
@@ -1113,6 +1166,19 @@ export default function register(pi, deps = {}) {
       // ⚠️ CAPPED AFTER CLEANING (D19), so the limit is on what the model receives.
       const capped = capUtf8(result.stageOneDocument.text, STAGE_DOCUMENT_MAX_BYTES);
       result.stageOneDocument = { ...result.stageOneDocument, text: capped.text, truncated: capped.truncated };
+
+      // ⚠️ `total` IS THE DOCUMENT'S COUNT, NOT THIS BLOCK'S. `omitted` says how many of the oldest were
+      // left out, so a model can tell a short conversation from the tail of a long one.
+      const entries = boundIntakeEntries(result.intake.entries);
+      result.intake = {
+        stageId: result.intake.stageId,
+        state: result.intake.state,
+        problem: result.intake.problem,
+        total: result.intake.total,
+        returned: entries.length,
+        omitted: Math.max(0, result.intake.total - entries.length),
+        entries,
+      };
       return rendered(result);
     },
   });
