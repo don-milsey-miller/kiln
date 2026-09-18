@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The operator's answer is persisted through a typed stage-document writer, wording kept apart from interpretation",
   "statement": "When the operator answers during a stage, the answer is written into that stage's document - for Stage 1, the intake document - through a registered typed stage-document writer, never by editing the file directly. What is written keeps the operator's own wording verbatim and separate from the orchestrator's interpretation of it, and the writer refuses a write outside the content root's stage documents.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0022",
     "REQ-0001"
   ],
-  "notes": "Created 2026-09-13 (D15) from the persistence clause ACC-0068 used to carry. It belongs to TSK-0049's continuous intake capture rather than to TSK-0048's first turn. No typed stage-document writer exists today: `lib/tools/` writes typed artifacts under `data/` only, and nothing writes `stages/*.md`. TSK-0049 has to add one. ACC-0069's adaptive second question is unchanged."
+  "notes": "Created 2026-09-13 (D15) from the persistence clause ACC-0068 used to carry. It belongs to TSK-0049's continuous intake capture rather than to TSK-0048's first turn. No typed stage-document writer exists today: `lib/tools/` writes typed artifacts under `data/` only, and nothing writes `stages/*.md`. TSK-0049 has to add one. ACC-0069's adaptive second question is unchanged.",
+  "evidencedBy": [
+    "EVD-0112"
+  ]
 }

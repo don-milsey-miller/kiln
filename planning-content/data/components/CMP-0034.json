@@ -9,5 +9,25 @@
   "satisfies": [
     "REQ-0022"
   ],
-  "notes": "⚠️ IT MAY NOT ATTEST. Approving an artifact and satisfying a user-owned exit criterion are the operator's acts; an orchestrator that can do either can walk the project through its own gates. This is the boundary the Stage 1 vertical slice has to demonstrate by being refused. ⚠️ THE ORCHESTRATOR READS THROUGH KILN, NOT THROUGH PI'S READ TOOL (F95, D10, D11, 2026-09-13). Its session holds only Kiln's tools, so project identity, the current stage's blockers and next action, and the Stage 1 starter document arrive through `kiln_project_status`, and the current stage's skill is injected at `before_agent_start` exactly as Pi loaded it, override included. ⚠️ THE CONTENT-ROOT REFUSAL LIVES IN THE ORCHESTRATOR TOO (F96, F97, D13). The launcher's refusal does not reach a Pi child that re-resolves the root from an inherited override; the orchestrator refuses the tool's own content itself, unless the launcher's strict self-host marker is present, and tells the model placeholders rather than paths."
+  "notes": "⚠️ IT MAY NOT ATTEST. Approving an artifact and satisfying a user-owned exit criterion are the operator's acts; an orchestrator that can do either can walk the project through its own gates. This is the boundary the Stage 1 vertical slice has to demonstrate by being refused. ⚠️ THE ORCHESTRATOR READS THROUGH KILN, NOT THROUGH PI'S READ TOOL (F95, D10, D11, 2026-09-13). Its session holds only Kiln's tools, so project identity, the current stage's blockers and next action, and the Stage 1 starter document arrive through `kiln_project_status`, and the current stage's skill is injected at `before_agent_start` exactly as Pi loaded it, override included. ⚠️ THE CONTENT-ROOT REFUSAL LIVES IN THE ORCHESTRATOR TOO (F96, F97, D13). The launcher's refusal does not reach a Pi child that re-resolves the root from an inherited override; the orchestrator refuses the tool's own content itself, unless the launcher's strict self-host marker is present, and tells the model placeholders rather than paths.",
+  "implementedBy": [
+    "lib/stage-documents.mjs",
+    "lib/project-status.mjs",
+    "lib/orchestrator-state.mjs",
+    "lib/stage-skills.mjs",
+    "lib/project-scaffold.mjs",
+    "stages/01-intake.json",
+    "pi-package/extensions/kiln.js",
+    "pi-package/signature.json",
+    "pi-package/prompts/kiln-start.md",
+    "pi-package/skills/kiln-stage-01-intake/SKILL.md",
+    "test/stage-documents.test.mjs",
+    "test/project-status.test.mjs",
+    "test/pi-package-project-status.test.mjs",
+    "test/pi-package-tools.test.mjs",
+    "test/stage-skills.test.mjs",
+    "test/package-resource-claims.test.mjs",
+    "test/pi-session-orchestrator.test.mjs",
+    "test/mdx-rejection.test.mjs"
+  ]
 }

@@ -1,0 +1,99 @@
+{
+  "id": "EVD-0112",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Adaptive questions and continuous intake capture, in CI and in one judged real-model pair",
+  "kind": "experiment",
+  "summary": "Adaptive question selection and continuous intake capture, proven deterministically in CI and then by one retained real-model pair judged by a person (TSK-0049, against ACC-0069 and ACC-0113). DETERMINISTIC, CI RUN 35378594390 AT COMMIT 673d203, four cells green, no job re-run: windows-latest node 22 and node 24, 1239 tests / 1238 pass / 0 fail / 1 skipped each; ubuntu-latest node 22 and node 24, 1239 tests / 1230 pass / 0 fail / 9 skipped each. Zero `not ok` lines in any cell. THE WRITER (ACC-0113). `kiln_write_stage_document` is the only writer for a stage document's intake section, registered in the package and declared in signature.json. It appends one entry to each of two anchored regions: the operator's answer stored as the exact input string, and, separately, what Kiln took from it. Payloads are length-framed by UTF-16 code-unit count, so an answer containing an anchor, a label or a code fence is stored rather than obeyed; labels must run A1..An in both regions, so the next label is never taken from the highest number a payload contains. Thirteen tests in test/stage-documents.test.mjs cover 20 hostile answers round- tripping, the placeholder replaced once, the astral-character measure, dynamic fence length, concurrency under the lock with no temporary file left, and the initializer's own output being writable. REFUSAL OUTSIDE THE CONTENT ROOT'S STAGE DOCUMENTS (ACC-0113). Eight refusal codes, each leaving the document byte-identical, asserted over bytes and modification times: invalid-request, stage-document-outside-root, stage-document-missing, stage-document-unreadable, stage-document-anchor-missing, stage-document-frame-invalid, stage-document-entries-invalid, and the wrapper's tool-content-refused and no-content-root. A stages/ directory replaced by a junction out of the root is refused, not followed. Refusals are classified by class rather than by the writable `name`, proven by an impostor error carrying that name and one of the writer's codes. OBSERVABLE INTAKE STATE (ACC-0069's mechanism). kiln_project_status carries a closed `intake` block derived through the writer's own parser: stageId, state, problem, total, returned, omitted, entries. `invalid` is distinct from `empty`, so a document edited into a shape Kiln will not read is never reported as one nobody has answered into; an unexpected parser failure propagates rather than becoming either. The block is built newest- first from the whole parse and bounded at ten entries, 1 KiB a field and 16 KiB of JSON measured after cleaning, so the newest answers stay visible after stageOneDocument.text is cut from the front at 64 KiB. The document keeps the operator's exact input; the status result goes through the same cleaning as every other string. THE CANONICAL RULE (ACC-0069). stages/01-intake.json declares `questionSelection`, and lib/stage-skills.mjs carries every declared line verbatim into kiln-stage-01-intake, contributing only the heading and four labels. The rule names the sequence after an answer - record through the writer, lint, re-read the status, ask one question - and forbids a fixed list, a repeated question, a compound question and a proposed solution. /kiln-start now sends the fresh turn to that rule instead of restating one, and keeps its no-solution and no-mutating-tool instructions. Declaring the rule defers the choice of next ACTIVITY still: stages 02-09 keep their sentence byte for byte, so all seven of TSK-0071's fields remain undeclared on every stage. THE DETERMINISTIC PAIR. test/pi-package-project-status.test.mjs drives one project copied byte-identically, records the same interpretation in both and differs only in the operator's answer: orchestration, blockers, ready, artifactCount and project are deep-equal while `intake` differs. test/pi-package-tools.test.mjs runs the declared sequence in order against a real project and asserts the status it ends on carries the answer. THE RETAINED REAL-MODEL PAIR, attempt 2, 2026-09-18, reviewed by the project's PM. Requested and resolved both openai-codex / gpt-5.6-sol, reasoning medium, asserted from each transcript's own model_change and thinking_level_change records before any behaviour was read. One session was run through the first question and archived; each branch is that archive restored to the same path, verified byte-identical to it and to each other, and answered once. The shared first question was 'What do you want this project to accomplish for the port office?'. Branch A answered 'We keep losing the reasoning behind decisions.' and branch B 'Onboarding a new engineer takes three weeks.'. Both called kiln_write_stage_document with the answer byte- exact, then kiln_lint, then kiln_project_status, which returned intake state `recorded` with that entry; both then asked exactly one question. A: 'Which decisions in the dock-fee reconciliation process most need their reasoning preserved?'. B: 'What outcome do you want for the three-week onboarding period?'. The reviewer confirmed for both branches that the writer received the exact wording, lint followed the write, the status followed lint and returned the updated intake, exactly one question was asked, the questions differ, each responds to its own branch's recorded uncertainty, neither repeats an answered question, neither is compound, neither proposes a solution, neither asks about Kiln internals, wording stayed separate from interpretation, and no direct file-edit tool was available or used. ATTEMPT 1 WAS A FAILURE AND IS NOT SUPPORTING EVIDENCE. It ran openai-codex / gpt-5.5 with thinking off, which was not the specified configuration, so it is an invalid measurement as well as a failed behavioural attempt: one branch never called the writer, its intake never changed, and its second question came from conversation memory. It is retained as a failed predecessor and is cited nowhere as support.",
+  "outcome": "success",
+  "observedAt": "2026-09-18",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35378594390 at commit 673d203, one attempt, no job re-run, all four cells green",
+      "cell-windows-22": "node 22, 1239 tests / 1238 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1239 tests / 1238 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1239 tests / 1230 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1239 tests / 1230 pass / 0 fail / 9 skipped",
+      "writer-tests": "test/stage-documents.test.mjs, 13 tests, all four cells: 20 hostile answers round-trip as the exact input string; an anchor and a label inside an answer are stored, not obeyed, and the next entry is still A2; the measure is UTF-16 code units; the fence clears the longest backtick run; the placeholder is replaced once and entries append in order; concurrent writes serialise with no temporary file left; the initializer's own document is accepted",
+      "refusal-tests": "test/stage-documents.test.mjs and test/pi-package-tools.test.mjs, all four cells: six bad requests, six anchor cases, eleven frame-tamper cases, four label-sequence cases, a stages/ junction out of the root, a missing document and a directory in its place; every refusal asserted over bytes and modification times",
+      "class-impostor": "an Error carrying name StageDocumentRefusal and one of the writer's codes is refused generically at both the reader (test/project-status.test.mjs) and the wrapper (test/pi-package-tools.test.mjs); the real class still reaches its own code",
+      "status-state-tests": "test/project-status.test.mjs and test/pi-package-project-status.test.mjs, all four cells: recorded, empty, absent, invalid-from-frame and invalid-from-labels, with invalid never reported as empty; an unexpected parser failure propagates; the stage document is read once per call, counted through a patched readFileSync; the newest ten of fifteen with total, returned and omitted; the newest answer present after stageOneDocument.text is truncated at 64 KiB; the byte bound binding before the count bound; a planted key, token, Windows path, POSIX path and content root intact in the document and absent from the result",
+      "generated-skill-tests": "test/stage-skills.test.mjs, all four cells: every declared line of questionSelection appears exactly once in kiln-stage-01-intake and the section carries no line the definition did not declare; the sequence is in declaration order; five sections for Stage 1 and four for the rest; thirteen malformed-field refusals naming the stage and field; skills:check clean for all nine in every cell",
+      "prompt-delegation-tests": "test/package-resource-claims.test.mjs, all four cells: /kiln-start names the delegation sentence, carries none of four shapes of a selection rule of its own including the exact previous wording, and keeps both first-turn boundaries; test/pi-session-orchestrator.test.mjs asserts the packaged skill reaching a real provider carries the rule",
+      "deterministic-pair": "test/pi-package-project-status.test.mjs: one project copied byte-identically, the same interpretation recorded in both, only the operator's answer differing; orchestration, blockers, ready, artifactCount and project deep-equal while intake differs",
+      "deterministic-sequence": "test/pi-package-tools.test.mjs: status empty, kiln_write_stage_document, kiln_lint, status recorded carrying the entry, the two intake blocks different",
+      "real-model-requested": "provider openai-codex, model gpt-5.6-sol, reasoning medium",
+      "real-model-resolved": "provider openai-codex, model gpt-5.6-sol, reasoning medium, read from each transcript's model_change and thinking_level_change records at turn 1 and again in each branch, with the harness set to stop on any mismatch",
+      "shared-pre-answer-state": "one session, 134 files; both branches restored from one archive to the same path and verified byte-identical to it and to each other; the 7-record transcript prefix identical across branches and the first divergent record the operator's answer",
+      "shared-transcript-sha256": "6ec04850050871c7 (first 16 hex of the sanitised shared-before-answer.jsonl)",
+      "branch-transcript-sha256": "branch A 52a5efd2b7cad26f, branch B 46b1df74f886ed9f (first 16 hex, sanitised)",
+      "project-state-sha256": "shared archive 64e846ec4d84fdaa, branch A 89d1e44d5499c959, branch B a432f868074952f8 (first 16 hex of a digest over 129 files, path and content)",
+      "branch-a-sequence": "kiln_write_stage_document with verbatim 'We keep losing the reasoning behind decisions.' byte-exact and interpretation 'The project should preserve the rationale behind decisions so the port office can retrieve it later.', then kiln_lint, then kiln_project_status returning intake recorded with total 1; second question 'Which decisions in the dock-fee reconciliation process most need their reasoning preserved?'; 4 provider requests after the answer",
+      "branch-b-sequence": "kiln_write_stage_document with verbatim 'Onboarding a new engineer takes three weeks.' byte-exact and interpretation 'The project should address a three-week onboarding period for new engineers, though the desired outcome and relationship to Harbour Ledger remain unclear.', then kiln_lint, then kiln_project_status returning intake recorded with total 1; second question 'What outcome do you want for the three-week onboarding period?'; 4 provider requests after the answer",
+      "human-review": "reviewed by the project's PM on 2026-09-18; twelve checks per branch, all yes for both: exact wording to the writer, lint after the write, status after lint returning the updated intake, exactly one second question, the questions differ, each responds to its branch's recorded uncertainty, no repeated question, not compound, no proposed solution, not about Kiln internals, wording separate from interpretation, no file-edit tool available or used",
+      "tool-boundary": "the session held exactly the 29 declared tools, passed with --tools; Pi's built-in read, write, edit and bash were not offered",
+      "retained-records": "sanitised under the operator's own .codex/kiln-evidence/ACC-0069/attempt-2, with a manifest of sha256 and sizes; OAuth material, the agent directory, the home directory and node_modules excluded, absolute paths replaced and the provider's encrypted reasoning content removed",
+      "failed-predecessor": "attempt-1, openai-codex / gpt-5.5 with thinking off, retained separately as a failed and invalidly configured attempt; it is not supporting evidence",
+      "mutations": "five sets, 42 active, all local on Windows against node v24.18.0: MD1-MD16 16 killed; MS1-MS9 9 killed; MQ1-MQ11 11 killed; MW4-MW5 2 killed; MA1-MA6 6 killed. 44 killed, none survived, none equivalent, none unexecuted; every set restored byte-identical and hash-verified"
+    },
+    "omissions": [
+      {
+        "fact": "reliability-of-question-selection",
+        "state": "not-captured",
+        "reason": "One judged pair. Nothing here measures how often a model follows the rule; it shows that it did, twice, from one state."
+      },
+      {
+        "fact": "other-providers-and-models",
+        "state": "not-captured",
+        "reason": "One provider, one model and one reasoning level: openai-codex / gpt-5.6-sol at medium. No other combination was run."
+      },
+      {
+        "fact": "real-model-run-in-ci",
+        "state": "not-captured",
+        "reason": "The pair ran locally on Windows. CI has no provider credential and runs no real-model session."
+      },
+      {
+        "fact": "objectivity-of-relevance",
+        "state": "not-observable",
+        "reason": "Whether a question responds to the uncertainty an answer left is a person's judgment. The reviewer's verdict is recorded; no mechanical check stands behind it."
+      },
+      {
+        "fact": "provider-wire-bytes",
+        "state": "not-captured",
+        "reason": "The inputs Pi constructs were compared - transcript prefix, skill bytes, prompt, signature, extension, settings and allowlist - not the requests as the provider received them. There was no recording proxy in front of a real provider."
+      },
+      {
+        "fact": "parallel-branch-execution",
+        "state": "not-observable",
+        "reason": "Pi records the project a session belongs to and refuses to resume it from another directory, offering a fork, which would be a different transcript. The branches were therefore restored sequentially at the same path rather than run side by side."
+      },
+      {
+        "fact": "encrypted-reasoning-content",
+        "state": "not-captured",
+        "reason": "The provider's encrypted reasoning payloads and signatures were removed from the retained records. What the model reasoned is not recoverable from them."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "Every mutation set ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "CI runs ubuntu-latest and windows-latest only. Nothing here was observed on macOS."
+      }
+    ]
+  }
+}
