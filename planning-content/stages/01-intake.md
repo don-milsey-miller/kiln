@@ -164,3 +164,20 @@ validation covers the approved through-handoff scope without importing the defer
 | `objective-understood` | **Satisfied.** The objective is maximum practical determinism through earlier uncertainty reduction; open question 3 still owes measurable acceptance criteria later. |
 | `constraints-recorded` | **Satisfied.** Research, experimental validation, governance, and preservation of claim strength are recorded; the unsupported local constraint was removed. |
 | `stage-set-determinable` | **Satisfied.** The approved scope terminates at handoff and is covered by the nine stages plus cross-cutting validation. |
+
+> **Added 2026-09-18 (TSK-0049).** The section below is the only part of this document Kiln writes,
+> and it is empty because everything above it predates the writer. Nothing above it was changed.
+
+## Intake
+
+Kiln writes this section through `kiln_write_stage_document`. The two headings below are
+anchors, and the region under each one is Kiln's to write: rename one, or write prose of your
+own between the entries, and the next write is refused rather than guessed at.
+
+### Recorded answers
+
+_Nothing recorded yet._
+
+### Kiln's reading
+
+_Nothing recorded yet._
