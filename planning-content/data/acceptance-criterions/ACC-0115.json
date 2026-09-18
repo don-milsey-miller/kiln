@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0115",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The orchestrator states a material change before making it",
+  "statement": "Before calling a tool that creates or mutates a typed artifact, the orchestrator states in a separate turn which artifact it proposes to create or change and what the change would be, and waits for the operator. If the operator rejects the proposal, cancels, or does not reply, no mutating tool call is made. Capturing an operator's own answer into a stage document is excluded, because that records the operator's reply rather than proposing a change to the project. Approval, activation and attestation are governed by ACC-0070 rather than by this criterion.",
+  "evaluates": [
+    "CMP-0034"
+  ],
+  "verifies": [
+    "REQ-0001"
+  ],
+  "notes": "Created 2026-09-18 under TSK-0050. The task's statement carries two obligations and ACC-0070 tested only one: show-before-doing had no criterion, so delivering it would have been work no criterion accepted. This is a single orchestrator-wide behaviour stated once, not TSK-0071's per-stage mutation policy: TSK-0071 owns a per-stage mutation-boundary field, and this criterion declares no stage-definition field. Like ACC-0069 it is a model-behaviour claim, so its evidence needs a retained real-model record judged by a person. The deterministic suite can show that the instruction is delivered, not that it is followed."
+}
