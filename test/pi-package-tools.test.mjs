@@ -133,11 +133,17 @@ const assertNoMachinePath = (serialised, paths, label) => {
 };
 
 /** Invoke a handler with the resolver pointed at this project, and restore the environment after. */
-async function invoke(tool, contentRoot, params = {}) {
+/**
+ * ⚠️ `confirm` IS THE OPERATOR, AND OMITTING IT IS A SESSION WITH NO UI. The three boundary tools ask
+ * `ctx.ui.confirm` before they touch anything (TSK-0050), so a call that passes nothing here is a call
+ * nobody authorised, and refusing it is the point rather than an inconvenience.
+ */
+async function invoke(tool, contentRoot, params = {}, { confirm } = {}) {
   const saved = process.env.PLANNING_CONTENT_DIR;
   process.env.PLANNING_CONTENT_DIR = contentRoot;
+  const ctx = confirm === undefined ? undefined : { hasUI: true, ui: { confirm: async () => confirm } };
   try {
-    return await tool.execute("call-1", params);
+    return await tool.execute("call-1", params, undefined, undefined, ctx);
   } finally {
     if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
     else process.env.PLANNING_CONTENT_DIR = saved;
@@ -679,9 +685,12 @@ test("⚠️ ACC-0065 every mutation refusal leaves every byte and modification 
     ["linking evidence that is not there", "kiln_link_evidence", { assertion: "AST-0001", evidence: "EVD-9999", polarity: "support" }],
   ];
 
+  // ⚠️ THE OPERATOR CONFIRMS EVERY ONE OF THESE, so what refuses is the OPERATION rather than the
+  // boundary. Without the confirmation an approval would refuse for the boundary's reason and would
+  // write an audit entry, and this test would then be measuring the gate instead of the library.
   for (const [label, name, params] of cases) {
     const before = snapshot(contentRoot);
-    const result = await invoke(tools.get(name), contentRoot, params);
+    const result = await invoke(tools.get(name), contentRoot, params, { confirm: true });
 
     assert.equal(result.details.ok, false, `${label}: ${name} accepted it`);
     assert.ok(result.details.message.length > 0, `${label}: the refusal says something`);
@@ -753,12 +762,12 @@ test("⚠️ ACC-0065 activation records the approval, and reports the list the 
   const tools = registered();
 
   const result = (
-    await invoke(tools.get("kiln_set_type_activation"), contentRoot, {
-      type: "component",
-      action: "activate",
-      approvedBy: "the product manager",
-      reason: "components are being authored",
-    })
+    await invoke(
+      tools.get("kiln_set_type_activation"),
+      contentRoot,
+      { type: "component", action: "activate", reason: "components are being authored" },
+      { confirm: true }
+    )
   ).details;
 
   assert.equal(result.ok, true, JSON.stringify(result));
@@ -769,7 +778,7 @@ test("⚠️ ACC-0065 activation records the approval, and reports the list the 
   assert.equal(result.noChangeBecause, null);
 
   const manifest = manifestOf(contentRoot);
-  assert.match(manifest, /approved by the product manager/, "the approver is recorded where the list is");
+  assert.match(manifest, /approved by operator via Pi UI/, "the approver is Kiln's own constant, never a model argument");
   assert.match(manifest, /components are being authored/);
   assert.match(manifest, /a comment that must survive an approval/, "and the rest of the manifest is untouched");
 });
@@ -778,7 +787,7 @@ test("⚠️ ACC-0065 deactivation is offered, and a no-op says so rather than c
   const { contentRoot } = await projectWithManifest(["requirement", "decision"]);
   const tools = registered();
   const activate = (type, action) =>
-    invoke(tools.get("kiln_set_type_activation"), contentRoot, { type, action, approvedBy: "pm" });
+    invoke(tools.get("kiln_set_type_activation"), contentRoot, { type, action }, { confirm: true });
 
   const again = (await activate("decision", "activate")).details;
   assert.equal(again.ok, true, JSON.stringify(again));
@@ -794,17 +803,19 @@ test("⚠️ ACC-0065 deactivation is offered, and a no-op says so rather than c
 test("⚠️ ACC-0065 activation refusals are the operation's own, and change nothing", async () => {
   const { contentRoot } = await projectWithManifest();
   const tools = registered();
-  const call = (params) => invoke(tools.get("kiln_set_type_activation"), contentRoot, params);
+  const call = (params) => invoke(tools.get("kiln_set_type_activation"), contentRoot, params, { confirm: true });
 
   // An artifact of the type exists, so deactivating it would strand it.
   const decision = (await invoke(tools.get("kiln_create_decision"), contentRoot, { artifact: MINIMAL.kiln_create_decision })).details;
   assert.equal(decision.ok, true, JSON.stringify(decision));
 
+  // ⚠️ "NO APPROVER" IS NO LONGER REACHABLE and its absence is the point: `approvedBy` left the
+  // model-facing schema, so the wrapper always supplies it after a confirmation. What remains here are
+  // the operation's OWN refusals, which stand whether or not the operator confirmed.
   const cases = [
-    ["no approver", { type: "component", action: "activate" }, /who approved/i],
-    ["a type the catalogue does not have", { type: "sprint", action: "activate", approvedBy: "pm" }, /catalogue/i],
-    ["an action that is neither", { type: "component", action: "archive", approvedBy: "pm" }, /activate/i],
-    ["deactivating a type whose artifacts exist", { type: "decision", action: "deactivate", approvedBy: "pm" }, /strand/i],
+    ["a type the catalogue does not have", { type: "sprint", action: "activate" }, /catalogue/i],
+    ["an action that is neither", { type: "component", action: "archive" }, /activate/i],
+    ["deactivating a type whose artifacts exist", { type: "decision", action: "deactivate" }, /strand/i],
   ];
 
   for (const [label, params, expected] of cases) {
@@ -822,7 +833,7 @@ test("⚠️ ACC-0065 activation refusals are the operation's own, and change no
 test("⚠️ ACC-0065 an attestation is written and read back, one stage at a time", async () => {
   const { contentRoot } = await project();
   const tools = registered();
-  const write = (params) => invoke(tools.get("kiln_write_stage_attestation"), contentRoot, params);
+  const write = (params) => invoke(tools.get("kiln_write_stage_attestation"), contentRoot, params, { confirm: true });
   const read = (stage) => invoke(tools.get("kiln_read_stage_attestations"), contentRoot, { stage });
 
   // Nothing recorded yet is an empty answer, not a refusal.
@@ -832,19 +843,19 @@ test("⚠️ ACC-0065 an attestation is written and read back, one stage at a ti
   assert.deepEqual(empty.attestations, []);
   assert.equal(empty.path, "state/stage-attestations/03-discovery.json", "it says where they would live");
 
-  const written = (await write({ stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "the reviewer" })).details;
+  const written = (await write({ stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied" })).details;
   assert.equal(written.ok, true, JSON.stringify(written));
   assert.equal(written.result, "satisfied");
-  assert.equal(written.decidedBy, "the reviewer");
+  assert.equal(written.decidedBy, "operator via Pi UI", "the attester is the confirmation, not a string the model chose");
   assert.equal(written.path, "state/stage-attestations/03-discovery.json");
 
   // On disk, where the gate reads it.
   const onDisk = JSON.parse(readFileSync(join(contentRoot, "state", "stage-attestations", "03-discovery.json"), "utf-8"));
   assert.equal(onDisk.stageId, "03-discovery");
-  assert.deepEqual(onDisk.attestations["unknowns-resolved"], { result: "satisfied", decidedBy: "the reviewer" });
+  assert.deepEqual(onDisk.attestations["unknowns-resolved"], { result: "satisfied", decidedBy: "operator via Pi UI" });
 
   // A second criterion joins the first rather than replacing it.
-  await write({ stage: "03-discovery", criterion: "sources-reconciled", result: "n/a", decidedBy: "the reviewer", reason: "no second source" });
+  await write({ stage: "03-discovery", criterion: "sources-reconciled", result: "n/a", reason: "no second source" });
   const both = (await read("03-discovery")).details;
   assert.equal(both.count, 2);
   assert.deepEqual(
@@ -863,25 +874,24 @@ test("⚠️ ACC-0065 an attestation is written and read back, one stage at a ti
 test("⚠️ ACC-0065 every attestation refusal leaves every byte and modification time alone", async () => {
   const { contentRoot } = await project();
   const tools = registered();
-  await invoke(tools.get("kiln_write_stage_attestation"), contentRoot, {
-    stage: "03-discovery",
-    criterion: "unknowns-resolved",
-    result: "satisfied",
-    decidedBy: "the reviewer",
-  });
+  await invoke(
+    tools.get("kiln_write_stage_attestation"),
+    contentRoot,
+    { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied" },
+    { confirm: true }
+  );
 
   const cases = [
     // ⚠️ SEEING A CRITERION IS NOT A VERDICT ON IT. There is deliberately no "acknowledged" result.
-    ["a result that is not a verdict", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "acknowledged", decidedBy: "r" }],
-    ["nobody deciding it", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "" }],
-    ["n/a with no reason", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "n/a", decidedBy: "r" }],
-    ["a stage id that is not one", "kiln_write_stage_attestation", { stage: "discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "r" }],
+    ["a result that is not a verdict", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "acknowledged" }],
+    ["n/a with no reason", "kiln_write_stage_attestation", { stage: "03-discovery", criterion: "unknowns-resolved", result: "n/a" }],
+    ["a stage id that is not one", "kiln_write_stage_attestation", { stage: "discovery", criterion: "unknowns-resolved", result: "satisfied" }],
     ["reading a stage id that is not one", "kiln_read_stage_attestations", { stage: "3-discovery" }],
   ];
 
   for (const [label, name, params] of cases) {
     const before = snapshot(contentRoot);
-    const result = (await invoke(tools.get(name), contentRoot, params)).details;
+    const result = (await invoke(tools.get(name), contentRoot, params, { confirm: true })).details;
 
     assert.equal(result.ok, false, `${label}: it was accepted`);
     assert.ok(result.message.length > 0, `${label}: the refusal says something`);
@@ -911,9 +921,9 @@ test("⚠️ ACC-0065 an activation result and an attestation result carry no cr
   try {
     const tools = registered();
     texts = [
-      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate", approvedBy: "pm" })),
-      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "sprint", action: "activate", approvedBy: "pm" })),
-      JSON.stringify(await invoke(tools.get("kiln_write_stage_attestation"), contentRoot, { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied", decidedBy: "r" })),
+      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate" }, { confirm: true })),
+      JSON.stringify(await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "sprint", action: "activate" }, { confirm: true })),
+      JSON.stringify(await invoke(tools.get("kiln_write_stage_attestation"), contentRoot, { stage: "03-discovery", criterion: "unknowns-resolved", result: "satisfied" }, { confirm: true })),
       JSON.stringify(await invoke(tools.get("kiln_read_stage_attestations"), contentRoot, { stage: "03-discovery" })),
     ];
   } finally {
@@ -949,11 +959,11 @@ test("⚠️ ACC-0065 activation goes through the project registry, not around i
   );
 
   const { contentRoot } = await projectWithManifest();
-  await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate", approvedBy: "pm" });
+  await invoke(tools.get("kiln_set_type_activation"), contentRoot, { type: "component", action: "activate" }, { confirm: true });
 
   // ⚠️ `toolRoot` IS THE ONE ARGUMENT THE OPERATION CANNOT DO WITHOUT: the stage definitions live under
   // it, and without them activation refuses rather than checking that a stage produces the type.
-  assert.deepEqual(called, [{ type: "component", action: "activate", toolRoot: "string", approvedBy: "pm" }]);
+  assert.deepEqual(called, [{ type: "component", action: "activate", toolRoot: "string", approvedBy: "operator via Pi UI" }]);
 });
 
 /* ============================================ the wrapper's own boundary ======================== */

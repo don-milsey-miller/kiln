@@ -172,6 +172,100 @@ function toolContentRefused(error, ctx) {
 }
 
 /**
+ * The operator's boundary — TSK-0050, toward ACC-0070.
+ *
+ * Three acts are the operator's and not the orchestrator's: attesting a stage exit criterion, approving
+ * an artifact, and activating or deactivating an artifact type. Each is refused unless the operator
+ * confirmed that exact act, through Pi's dialog channel, during that same tool invocation.
+ *
+ * ⚠️ **NO AUTHORISATION VALUE IS REACHABLE FROM A TOOL ARGUMENT.** `decidedBy` and `approvedBy` are gone
+ * from the model-facing schemas and `reviewedBy` was never in one. The actor written into an attestation
+ * or a manifest is `OPERATOR_ACTOR`, this package's own constant. A model cannot name an attester,
+ * cannot forge one, and cannot carry a granted confirmation into a later call: the boolean is read and
+ * discarded inside the invocation that asked for it.
+ *
+ * ⚠️ **THE 30-SECOND BOUND IS NOT OPTIONAL.** In RPC mode `confirm` emits a request to the client and
+ * waits, with no bound of its own. Without a timeout a client that never answers would hang the tool
+ * call rather than refuse it, which is a worse failure than the one this gate exists to prevent.
+ *
+ * ⚠️ **ONE CODE FOR EVERY WAY IT WAS NOT GRANTED.** No UI, rejection, cancellation, timeout, abort and an
+ * unexpected UI error are indistinguishable at this seam: Pi returns the same `false` for all of them,
+ * and its own timed-confirm example labels the outcome "Cancelled or timed out". A second code would be
+ * a distinction Kiln invented rather than observed.
+ */
+const CONFIRM_TIMEOUT_MS = 30_000;
+const OPERATOR_ACTOR = "operator via Pi UI";
+const CONFIRMATION_NOT_GRANTED = "operator-confirmation-not-granted";
+const REFUSAL_UNRECORDED = "operator-boundary-refusal-unrecorded";
+
+/**
+ * A model-supplied value as a dialog may show it.
+ *
+ * ⚠️ **THE DIALOG IS THE OPERATOR'S SURFACE, AND THE MODEL WRITES SOME OF WHAT APPEARS IN IT.** A value
+ * carrying newlines could forge further lines of the preview and make the dialog describe an act other
+ * than the one about to happen. Control characters go, and a single line stays a single line.
+ */
+const previewValue = (value, max = 100) => {
+  if (typeof value !== "string" || value.length === 0) return "(none)";
+  // ⚠️ Written as code points rather than a character class: a control character is invisible in
+  // source, and an editor that swallowed one would silently stop this doing its job.
+  let flat = "";
+  for (const ch of value) {
+    const code = ch.codePointAt(0);
+    flat += code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029 ? " " : ch;
+  }
+  flat = flat.trim();
+  if (flat.length === 0) return "(none)";
+  return flat.length > max ? `${flat.slice(0, max)}...` : flat;
+};
+
+/**
+ * Ask the operator, and treat everything that is not a plain yes as a no.
+ *
+ * @param {object} ctx the extension context
+ * @param {AbortSignal|undefined} signal this invocation's own signal, preferred over the context's
+ */
+async function operatorConfirmed(ctx, signal, title, lines) {
+  let granted;
+  try {
+    granted = await ctx?.ui?.confirm?.(title, lines.join("\n"), {
+      // D36: the invocation's signal is the one that means THIS call was abandoned. `ctx.signal` is the
+      // agent's and is only a fallback.
+      signal: signal ?? ctx?.signal,
+      timeout: CONFIRM_TIMEOUT_MS,
+    });
+  } catch {
+    // ⚠️ THE RAW ERROR NEVER LEAVES. A UI defect can carry a path or a stack, and it is not a message for
+    // a model. It is one more way the operator did not grant the action.
+    return false;
+  }
+  // ⚠️ LITERAL `true` ONLY. `undefined` from a missing UI, `"yes"` from a confused client and `1` from a
+  // loose one are none of them an approval.
+  return granted === true;
+}
+
+/** The refusal, recorded if it can be and reported either way (D37). */
+async function refuseUnconfirmed(context, deps, operation, target) {
+  let code = CONFIRMATION_NOT_GRANTED;
+  try {
+    const boundary = deps.operatorBoundary ?? (await import("../../lib/operator-boundary.mjs"));
+    await boundary.recordBoundaryRefusal(context.contentRoot, { operation, target });
+  } catch {
+    // ⚠️ THE REFUSAL STANDS EITHER WAY. Losing the audit entry must never turn into letting the act
+    // through, and the storage error itself never reaches the model: it carries an absolute path.
+    code = REFUSAL_UNRECORDED;
+  }
+  return rendered(
+    refusal(
+      code,
+      code === CONFIRMATION_NOT_GRANTED
+        ? "The operator did not confirm this action, so nothing was changed. Ask the operator directly; do not retry."
+        : "The operator did not confirm this action, so nothing was changed, and the refusal could not be recorded. Ask the operator directly; do not retry."
+    )
+  );
+}
+
+/**
  * The creation tools, as an explicit table.
  *
  * ⚠️ **WRITTEN OUT, NEVER DERIVED FROM THE NAME.** `kiln_create_acceptance_criterion` maps to
@@ -347,6 +441,37 @@ const MUTATION_TOOL_TABLE = Object.freeze([
       },
       required: ["type", "id", "reviewStatus"],
       additionalProperties: false,
+    },
+    /**
+     * ⚠️ **ONLY `approved` IS THE OPERATOR'S**, because that is the word ACC-0070 uses. `draft`,
+     * `in-review` and `amended` pass through, deliberately rather than by omission: moving an artifact
+     * back into review is not an approval and gating it would train the operator to click through.
+     *
+     * ⚠️ Until now this tool refused an approval by ACCIDENT — `reviewedBy` is required by the library
+     * and was never plumbed into `context.options`, so the refusal came from a missing argument rather
+     * than from a boundary. Plumbing it would have opened the door; supplying it only after a
+     * confirmation is what closes it.
+     */
+    gate: {
+      operation: "set-review-status",
+      applies: (p) => p?.reviewStatus === "approved",
+      title: "Approve this artifact?",
+      // ⚠️ **IT SAYS THE CONFIRMATION IS REQUIRED, NOT THAT THE APPROVER IS KEPT (F18).** `setReviewStatus`
+      // takes `reviewedBy`, reports it back and stores none of it: the artifact envelope has no reviewer
+      // field. A dialog promising "recorded as the approver" would have the operator authorise durable
+      // attribution that does not exist. Adding one is an artifact-schema and migration decision, and it
+      // is not TSK-0050's to make.
+      preview: (p) => [
+        "Kiln wants to approve an artifact.",
+        "",
+        `Artifact:  ${previewValue(p?.id)}`,
+        `Type:      ${previewValue(p?.type)}`,
+        "",
+        "Nothing but this confirmation authorises the change.",
+        "The artifact records the approved status; it does not record an approver.",
+      ],
+      target: (p) => ({ artifactType: p?.type, artifactId: p?.id }),
+      grant: () => ({ reviewedBy: OPERATOR_ACTOR }),
     },
     call: (fn, p, options) => fn(p.type, p.id, p.reviewStatus, options),
   },
@@ -952,13 +1077,13 @@ export default function register(pi, deps = {}) {
     });
 
   // ⚠️ THE SAME SHAPE AGAIN: resolve, delegate, render. What differs per row is the call line above.
-  for (const { name, entry, label, description, parameters, call } of MUTATION_TOOL_TABLE)
+  for (const { name, entry, label, description, parameters, call, gate } of MUTATION_TOOL_TABLE)
     pi?.registerTool?.({
       name,
       label,
       description,
       parameters,
-      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
         let context;
         try {
           context = await projectContext(deps);
@@ -971,8 +1096,17 @@ export default function register(pi, deps = {}) {
         if (typeof operation !== "function")
           return rendered(refusal("unknown-operation", `This project has no ${entry} operation.`));
 
+        // ⚠️ THE GATE RUNS BEFORE THE LIBRARY IS TOUCHED. A boundary a caller can step around by making
+        // the request invalid enough to fail first is not a boundary.
+        let options = context.options;
+        if (gate && gate.applies(params ?? {})) {
+          if (!(await operatorConfirmed(ctx, signal, gate.title, gate.preview(params ?? {}))))
+            return refuseUnconfirmed(context, deps, gate.operation, gate.target(params ?? {}));
+          options = { ...context.options, ...gate.grant() };
+        }
+
         try {
-          const result = await call(operation, params ?? {}, context.options);
+          const result = await call(operation, params ?? {}, options);
           return rendered({
             ok: true,
             id: result?.artifact?.id ?? result?.id ?? params?.id ?? null,
@@ -1257,13 +1391,14 @@ export default function register(pi, deps = {}) {
       properties: {
         type: { type: "string", description: "The artifact type, such as component or task." },
         action: { type: "string", enum: ["activate", "deactivate"] },
-        approvedBy: { type: "string", description: "Who approved this change. Recorded in the project manifest." },
-        reason: { type: "string", description: "Why it was approved. Recorded beside the approval." },
+        // ⚠️ D35: BOUNDED BY THE SCHEMA, NOT TRUNCATED BY THE PREVIEW. Showing the operator a shortened
+        // reason and then storing the rest would mean they approved text they never saw.
+        reason: { type: "string", maxLength: 500, description: "Why it was approved. Recorded beside the approval, and shown to the operator in full." },
       },
-      required: ["type", "action", "approvedBy"],
+      required: ["type", "action"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       let context;
       try {
         context = await projectContext(deps);
@@ -1276,11 +1411,23 @@ export default function register(pi, deps = {}) {
       if (typeof setTypeActivation !== "function")
         return rendered(refusal("unknown-operation", "This project has no setTypeActivation operation."));
 
+      const confirmed = await operatorConfirmed(ctx, signal, "Change this project's artifact types?", [
+        `Kiln wants to ${params?.action === "deactivate" ? "deactivate" : "activate"} an artifact type.`,
+        "",
+        `Type:    ${previewValue(params?.type)}`,
+        `Action:  ${previewValue(params?.action)}`,
+        "",
+        "Reason, as Kiln would record it:",
+        typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
+      ]);
+      if (!confirmed)
+        return refuseUnconfirmed(context, deps, "set-type-activation", { type: params?.type, action: params?.action });
+
       try {
         const result = await setTypeActivation(params?.type, params?.action, {
           ...context.options,
           toolRoot: context.toolRoot,
-          approvedBy: params?.approvedBy,
+          approvedBy: OPERATOR_ACTOR,
           reason: params?.reason,
         });
         return rendered({
@@ -1365,13 +1512,13 @@ export default function register(pi, deps = {}) {
         stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 03-discovery." },
         criterion: { type: "string", pattern: "^[a-z0-9-]+$", description: "The exit criterion's id, such as unknowns-resolved." },
         result: { type: "string", enum: ["satisfied", "not-satisfied", "n/a"] },
-        decidedBy: { type: "string", description: "Who evaluated it." },
-        reason: { type: "string", description: "Why. Required when the result is n/a." },
+        // ⚠️ D35: BOUNDED BY THE SCHEMA, NOT TRUNCATED BY THE PREVIEW (see the activation tool).
+        reason: { type: "string", maxLength: 500, description: "Why. Required when the result is n/a. Shown to the operator in full." },
       },
-      required: ["stage", "criterion", "result", "decidedBy"],
+      required: ["stage", "criterion", "result"],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       let context;
       try {
         context = await projectContext(deps);
@@ -1380,10 +1527,26 @@ export default function register(pi, deps = {}) {
       }
 
       const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
+
+      const confirmed = await operatorConfirmed(ctx, signal, "Record this stage attestation?", [
+        "Kiln wants to record your evaluation of a stage exit criterion.",
+        "",
+        `Stage:      ${previewValue(params?.stage)}`,
+        `Criterion:  ${previewValue(params?.criterion)}`,
+        `Result:     ${previewValue(params?.result)}`,
+        "",
+        "Reason, as Kiln would record it:",
+        typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
+        "",
+        "This will be recorded as decided by you.",
+      ]);
+      if (!confirmed)
+        return refuseUnconfirmed(context, deps, "write-stage-attestation", { stageId: params?.stage, criterion: params?.criterion });
+
       try {
         const written = await attestations.writeStageAttestation(context.contentRoot, params?.stage, params?.criterion, {
           result: params?.result,
-          decidedBy: params?.decidedBy,
+          decidedBy: OPERATOR_ACTOR,
           reason: params?.reason,
         });
         return rendered({
