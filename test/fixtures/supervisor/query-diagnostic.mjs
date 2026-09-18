@@ -97,6 +97,19 @@ const COMPANIONS = {
   ],
 };
 
+/**
+ * What a companion probe ended as, stated rather than inferred.
+ *
+ * ⚠️ **A BOUNDED TIMEOUT IS DIAGNOSTIC OUTPUT, NOT A BROKEN INVARIANT.** A probe exists to find out whether a
+ * phase is slow; one that hits its bound has answered the question, and a reader that treated a missing marker
+ * as a defect would turn the finding into a failure and lose it.
+ */
+export const COMPANION_RESULT = Object.freeze({ COMPLETED: "completed", TIMED_OUT: "timed-out", FAILED: "failed" });
+
+/** The one mapping from how a child ended to what that means, so nothing downstream decides it again. */
+export const companionResult = (outcome) =>
+  outcome === "exit" ? COMPANION_RESULT.COMPLETED : outcome === "timeout" ? COMPANION_RESULT.TIMED_OUT : COMPANION_RESULT.FAILED;
+
 /** A companion probe may not outlast the test it explains. */
 export const COMPANION_TIMEOUT_MS = 5000;
 /** How long a record waits for a killed child to close before it is printed (A7). */
@@ -210,7 +223,7 @@ export function createQueryDiagnostic({ platform = process.platform, spawnImpl =
   /** Run one companion to its own short bound, timestamping each marker its child writes. */
   const runCompanion = (name, script, timeoutMs) =>
     new Promise((resolve) => {
-      const record = blank(name, { markers: {}, rows: null });
+      const record = blank(name, { markers: {}, rows: null, result: null });
       companions.push(record);
       record.spawnRequestedMs = at();
       let child;
@@ -219,6 +232,8 @@ export function createQueryDiagnostic({ platform = process.platform, spawnImpl =
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        // ⚠️ CLASSIFIED WHERE IT ENDED, once, from the outcome the same call recorded.
+        record.result = companionResult(record.outcome);
         resolve();
       };
       const timer = setTimeout(() => {

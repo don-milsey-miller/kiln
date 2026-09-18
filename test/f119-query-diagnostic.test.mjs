@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 
-import { createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
+import { CLOSE_WAIT_MS, COMPANION_RESULT, COMPANION_TIMEOUT_MS, createQueryDiagnostic } from "./fixtures/supervisor/query-diagnostic.mjs";
 import { PROCESS_TABLE_COMMAND } from "../lib/supervisor.mjs";
 
 /** Rows joined by a newline the CHILD builds, so no real newline ever sits inside its source. */
@@ -219,34 +219,160 @@ test("⚠️ A8 the companions run only after a real timeout, and only on Window
   assert.deepEqual(await createQueryDiagnostic({ platform: "linux" }).companions({ force: true }), { ran: false, reason: "not-windows" });
 });
 
-test("⚠️ A8 each companion is a separate process, timed by its own markers", { skip: process.platform !== "win32" && "starts PowerShell" }, async () => {
+test("\u26a0\ufe0f A8 each companion is a separate process, timed by its own markers", { skip: process.platform !== "win32" && "starts PowerShell" }, async () => {
   const d = createQueryDiagnostic();
   assert.deepEqual(await d.companions({ force: true }), { ran: true, reason: null });
   const { companions } = d.snapshot();
 
+  // \u26a0\ufe0f THE RECORD TRAVELS WITH EVERY FAILURE. A probe that hits its bound on a loaded host is the finding;
+  // an assertion that printed only `undefined` would throw away the timings the probe was run to get.
+  const shown = (label) => `${label}${String.fromCharCode(10)}${JSON.stringify(companions, null, 1)}`;
+
   assert.deepEqual(
     companions.map((c) => c.id),
-    ["powershell-start", "native-call-defined", "query-run"]
+    ["powershell-start", "native-call-defined", "query-run"],
+    shown("the three probes, in order")
   );
-  // ⚠️ SEQUENTIAL: each begins only after the one before it ENDED, so none times another's contention. A
-  // companion ends at its close, or at its own bound when a slow host makes it overrun — which is exactly the
+
+  // \u26a0\ufe0f SEQUENTIAL: each begins only after the one before it ENDED, so none times another's contention. A
+  // companion ends at its close, or at its own bound when a slow host makes it overrun \u2014 which is exactly the
   // case these probes exist for, so the check is against whichever came first rather than against the close.
   for (let i = 1; i < companions.length; i++) {
     const before = companions[i - 1];
     const ended = before.timedOutMs ?? before.closeMs;
-    assert.equal(typeof ended, "number", `${before.id} ended`);
-    assert.ok(ended <= companions[i].spawnRequestedMs, `${companions[i].id} started after ${before.id} ended`);
+    assert.equal(typeof ended, "number", shown(`${before.id} ended`));
+    assert.ok(ended <= companions[i].spawnRequestedMs, shown(`${companions[i].id} started after ${before.id} ended`));
   }
 
-  const [start, defined, query] = companions;
-  assert.equal(typeof start.markers.entry, "number", "PowerShell reaching its first statement");
-  assert.equal(typeof defined.markers.defined, "number", "the native call defined in memory");
-  for (const phase of ["entry", "defined", "beforeQuery", "afterQuery"]) assert.equal(typeof query.markers[phase], "number", phase);
-  assert.ok(query.rows > 10, `the probe walked a whole table: ${query.rows}`);
-  for (const c of companions) assert.equal(typeof c.pid, "number");
+  // \u26a0\ufe0f A BOUNDED TIMEOUT IS AN ANSWER, A FAILED SPAWN IS NOT. `timed-out` says the phase is slower than the
+  // bound, which is what these probes measure; `failed` says the probe never ran, which explains nothing.
+  for (const c of companions) {
+    assert.ok([COMPANION_RESULT.COMPLETED, COMPANION_RESULT.TIMED_OUT].includes(c.result), shown(`${c.id} ended as ${c.result}`));
+    assert.equal(typeof c.pid, "number", shown(`${c.id} has a pid`));
+    if (c.result === COMPANION_RESULT.TIMED_OUT) {
+      assert.equal(typeof c.timedOutMs, "number", shown(`${c.id} records when its bound was reached`));
+      assert.equal(typeof c.killRequestedMs, "number", shown(`${c.id} records the kill it asked for`));
+      continue;
+    }
+    // Whatever a completed probe reached, it reached in order, and it reached its end.
+    assert.equal(typeof c.markers.entry, "number", shown(`${c.id} reached its first statement`));
+    assert.equal(typeof c.markers.done, "number", shown(`${c.id} reached its end`));
+    const times = Object.values(c.markers);
+    assert.deepEqual(times, [...times].sort((a, b) => a - b), shown(`${c.id}'s markers are in order`));
+  }
 
-  // ⚠️ A COUNT, NEVER A ROW: nothing a process table said survives into the record.
+  // The phases each completed probe adds over the one before it.
+  const [, defined, query] = companions;
+  if (defined.result === COMPANION_RESULT.COMPLETED)
+    assert.equal(typeof defined.markers.defined, "number", shown("the native call defined in memory"));
+  if (query.result === COMPANION_RESULT.COMPLETED) {
+    for (const phase of ["entry", "defined", "beforeQuery", "afterQuery"]) assert.equal(typeof query.markers[phase], "number", shown(phase));
+    assert.ok(query.rows > 10, shown(`the probe walked a whole table: ${query.rows}`));
+  }
+
+  // \u26a0\ufe0f A COUNT, NEVER A ROW: nothing a process table said survives into the record.
   const text = JSON.stringify(companions);
   assert.equal(/"\d+ \d+ \d+"/.test(text), false, "no process-table row");
   assert.equal(text.includes("ntdll"), false, "and no script text");
+});
+
+/* ================================= the companion classification, on injected children ========================= */
+
+/**
+ * A child this test drives, in place of PowerShell.
+ *
+ * \u26a0\ufe0f **INJECTED, SO THE CLASSIFICATION IS TESTED ON EVERY PLATFORM AND ON EVERY RUN.** The real probes start a
+ * real interpreter, so what they end as depends on the host; these say what each ending MEANS, deterministically.
+ */
+function scriptedCompanions(plan) {
+  let call = 0;
+  return () => {
+    const step = plan[Math.min(call++, plan.length - 1)];
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.pid = 4000 + call;
+    child.kill = () => true;
+    queueMicrotask(() => {
+      child.emit("spawn");
+      if (step.silent) return; // never speaks, never closes: its bound is the only thing that ends it
+      for (const line of step.lines) child.stdout.emit("data", Buffer.from(`${line}${String.fromCharCode(10)}`));
+      child.emit("exit", 0, null);
+      child.emit("close", 0, null);
+    });
+    return child;
+  };
+}
+
+const SPEAKS = { lines: ["m:entry", "m:defined", "m:beforeQuery", "m:afterQuery", "rows:151", "m:done"] };
+const SILENT = { silent: true };
+
+test("\u26a0\ufe0f A8 a probe that answers is completed, and its markers are read in the order they arrived", async () => {
+  const d = createQueryDiagnostic({ platform: "win32", spawnImpl: scriptedCompanions([SPEAKS]) });
+  assert.deepEqual(await d.companions({ force: true, timeoutMs: 2000 }), { ran: true, reason: null });
+
+  const { companions } = d.snapshot();
+  assert.equal(companions.length, 3);
+  for (const c of companions) {
+    assert.equal(c.result, COMPANION_RESULT.COMPLETED, `${c.id}: ${c.result}`);
+    assert.equal(c.outcome, "exit");
+    assert.equal(c.timedOutMs, null, "a probe that answered did not time out");
+    assert.equal(c.killRequestedMs, null, "and was never killed");
+    for (const phase of ["entry", "defined", "beforeQuery", "afterQuery", "done"]) assert.equal(typeof c.markers[phase], "number", `${c.id}: ${phase}`);
+    const times = ["entry", "defined", "beforeQuery", "afterQuery", "done"].map((p) => c.markers[p]);
+    assert.deepEqual(times, [...times].sort((a, b) => a - b), `${c.id}: the phases are out of order`);
+    assert.equal(c.rows, 151, "the row count the probe reported");
+  }
+});
+
+test("\u26a0\ufe0f A8 a probe that reaches its bound stays a timeout, and is never read as an answer", async () => {
+  const d = createQueryDiagnostic({ platform: "win32", spawnImpl: scriptedCompanions([SILENT]) });
+  const started = Date.now();
+  await d.companions({ force: true, timeoutMs: 80 });
+  const spent = Date.now() - started;
+  assert.ok(spent < 5000, `the probes were waited out: ${spent}ms`);
+
+  for (const c of d.snapshot().companions) {
+    // \u26a0\ufe0f NOT `completed`, AND NOT `failed`. The probe ran and the phase outlasted the bound: that is the
+    // measurement, and reporting it as either of the others would lose it.
+    assert.equal(c.result, COMPANION_RESULT.TIMED_OUT, `${c.id}: ${c.result}`);
+    assert.equal(c.outcome, "timeout");
+    assert.equal(typeof c.timedOutMs, "number");
+    assert.equal(typeof c.killRequestedMs, "number");
+    assert.equal(c.killSent, true, "the probe was asked to stop");
+    assert.deepEqual(c.markers, {}, "a silent probe reported no phase");
+  }
+});
+
+test("\u26a0\ufe0f A8 a probe that times out does not stop the ones after it", async () => {
+  // \u26a0\ufe0f THE FIRST PHASE IS THE ONE MOST LIKELY TO STALL, and the phases after it are what say whether the cost
+  // is startup alone. Abandoning the run there would throw away the comparison the probes exist to make.
+  const d = createQueryDiagnostic({ platform: "win32", spawnImpl: scriptedCompanions([SILENT, SPEAKS, SPEAKS]) });
+  await d.companions({ force: true, timeoutMs: 80 });
+
+  const { companions } = d.snapshot();
+  assert.deepEqual(
+    companions.map((c) => [c.id, c.result]),
+    [
+      ["powershell-start", COMPANION_RESULT.TIMED_OUT],
+      ["native-call-defined", COMPANION_RESULT.COMPLETED],
+      ["query-run", COMPANION_RESULT.COMPLETED],
+    ],
+    "an early timeout changed what the later probes reported"
+  );
+  // Still sequential: the second began only after the first had reached its bound.
+  assert.ok(companions[0].timedOutMs <= companions[1].spawnRequestedMs);
+  assert.ok(companions[1].closeMs <= companions[2].spawnRequestedMs);
+
+  // ⚠️ WHAT A FAILURE WOULD PRINT: the phases, and nothing the child said. This is the record an assertion
+  // carries, so it has to be both useful and safe to put in a log.
+  const record = JSON.stringify(companions, null, 1);
+  for (const field of ["spawnRequestedMs", "timedOutMs", "closeMs", "result", "markers"])
+    assert.ok(record.includes(field), `the printed record omits ${field}`);
+  assert.equal(record.includes("m:"), false, "a raw line the child wrote reached the record");
+  assert.equal(/"\d+ \d+ \d+"/.test(record), false, "a process-table row reached the record");
+
+  // The bounds these probes run under, pinned: raising one would stop them measuring what they exist for.
+  assert.equal(COMPANION_TIMEOUT_MS, 5000);
+  assert.equal(CLOSE_WAIT_MS, 3000);
 });
