@@ -284,7 +284,7 @@ function assertKilnStart(run) {
   assert.equal(startText, expected.startBody, "the user turn is Pi's own expansion of /kiln-start, byte for byte");
   for (const instruction of [
     "Call `kiln_project_status` first, before anything else, and work from what it returns.",
-    "- Ask the operator exactly one question: the one that best helps Stage 1 understand what they are asking for.",
+    "- For the fresh Stage 1 turn, follow the injected stage skill's question-selection rule.",
     "- Propose no architecture, no set of requirements and no solution.",
     "- Call no tool that creates, revises, links or otherwise changes planning content.",
   ])
@@ -328,6 +328,11 @@ test("⚠️ ACC-0068 /kiln-start in a real trusted session sends the provider t
   const run = await kilnStartSession();
   const payload = assertKilnStart(run);
   assert.ok(payload.endsWith(`<stage-skill name="${SKILL}">\n${run.expected.packagedSkill}\n</stage-skill>`), "the packaged Stage 1 skill's exact bytes end the frame");
+
+  // ⚠️ AND THE RULE TRAVELLED WITH IT. /kiln-start sends the fresh turn to the skill's question-selection
+  // rule, so a skill reaching the provider without one would send the model to an instruction that is not
+  // there. Asserted on the PACKAGED skill only: an override is the consumer's, and may say anything.
+  assert.ok(payload.includes("Choose each question from the current `kiln_project_status.intake` state by information value and blocking impact: ask the single question whose answer would most reduce the highest-impact uncertainty preventing Stage 1 from understanding the operator's request."), "the packaged Stage 1 skill reached the provider without its question-selection rule");
 });
 
 test("⚠️ ACC-0068 with a consumer override edited before the session, the provider receives exactly the edited bytes, not the earlier override or the packaged skill", async () => {

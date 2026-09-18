@@ -26,6 +26,24 @@
       "mechanised": false
     }
   ],
+  "questionSelection": {
+    "rule": "Choose each question from the current `kiln_project_status.intake` state by information value and blocking impact: ask the single question whose answer would most reduce the highest-impact uncertainty preventing Stage 1 from understanding the operator's request.",
+    "afterAnswer": [
+      "Record the operator's answer with `kiln_write_stage_document`: their exact words in `verbatim`, unchanged, and your own reading of them in `interpretation`. Never edit the document any other way.",
+      "Run `kiln_lint` after that write, so the project's findings reflect what was just recorded.",
+      "Call `kiln_project_status` again and read the `intake` block it returns, which is the state your next question is chosen from.",
+      "Ask exactly one question: the one that most reduces the highest-impact uncertainty the recorded intake still leaves open."
+    ],
+    "constraints": [
+      "The question comes from what this project's recorded intake leaves uncertain, never from a standard set asked of every project.",
+      "Do not ask again what a recorded answer already answers; where an answer is partial, ask about the specific gap, not the original question.",
+      "Ask one thing. A question joining two asks with \"and\", or offering a list to answer, is two questions.",
+      "Do not propose, name or imply a solution, a technology or a design. This stage records the problem.",
+      "Ask about the operator's situation, not about Kiln's own artifacts, stages or tools."
+    ],
+    "whenIntakeAbsent": "This project's stage document has no intake section, so an answer cannot be recorded. Say so, name the two headings the document needs, and do not ask a question until it has them.",
+    "whenIntakeInvalid": "This project's intake section is structurally invalid and Kiln will not write into it. Report the `problem` code and ask nothing; this is not a project that has answered nothing."
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

@@ -1826,6 +1826,41 @@ test("\u26a0\ufe0f ACC-0113 an error that merely calls itself a document refusal
   assert.equal(authentic.code, "stage-document-anchor-missing");
 });
 
+test("\u26a0\ufe0f ACC-0069 the sequence the stage skill declares runs in order, and the status it ends on carries the answer", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+
+  // \u26a0\ufe0f THE THREE TOOLS THE CANONICAL RULE NAMES, IN THE ORDER IT NAMES THEM: record, lint, then read the state
+  // the next question is chosen from. This proves the loop is available and the state moves; WHICH question a
+  // model then asks is ACC-0069's model-behaviour half and is not decided here.
+  const before = (await invoke(tools.get("kiln_project_status"), contentRoot)).details;
+  assert.equal(before.intake.state, "empty", JSON.stringify(before.intake));
+  assert.equal(before.intake.total, 0);
+
+  const written = (await invoke(tools.get("kiln_write_stage_document"), contentRoot, {
+    stage: "01-intake",
+    verbatim: "Dock fees are reconciled by hand every month.",
+    interpretation: "A manual monthly reconciliation is the work in question",
+  })).details;
+  assert.equal(written.ok, true, JSON.stringify(written));
+
+  const linted = (await invoke(tools.get("kiln_lint"), contentRoot)).details;
+  assert.equal(linted.ok, true, JSON.stringify(linted));
+
+  const after = (await invoke(tools.get("kiln_project_status"), contentRoot)).details;
+  assert.equal(after.intake.state, "recorded");
+  assert.deepEqual(
+    after.intake.entries.map((e) => [e.label, e.answer, e.reading]),
+    [["A1", "Dock fees are reconciled by hand every month.", "A manual monthly reconciliation is the work in question"]],
+    "the status the next question is chosen from does not carry the answer just recorded"
+  );
+  assert.deepEqual([after.intake.total, after.intake.returned, after.intake.omitted], [1, 1, 0]);
+
+  // \u26a0\ufe0f THE STATE THE SECOND TURN READS IS NOT THE STATE THE FIRST ONE DID. That difference is the whole
+  // mechanism: a question chosen from `after` cannot be the question chosen from `before`.
+  assert.notDeepEqual(after.intake, before.intake);
+});
+
 test("⚠️ F114 every declared tool was exercised in this file, and each result and refusal carried its rendering as model-visible text", () => {
   // ⚠️ **LAST IN THIS FILE ON PURPOSE.** Every registration above goes through `providerVisible`, which checks each
   // result as it returns; this proves those checks ran for every declared tool rather than for none.

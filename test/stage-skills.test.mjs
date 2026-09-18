@@ -115,15 +115,104 @@ test("⚠️ ACC-0066 nothing a definition does not declare is written as if it 
 
   // The deferred fields are named as absent, and nowhere described as present.
   for (const skill of generateStageSkills(DEFINITIONS)) {
+    // ⚠️ THE FIFTH SECTION EXISTS ONLY WHERE A DEFINITION DECLARES THE RULE. A stage without the field gets
+    // no section at all, because a template that supplied one would read exactly like a definition that did.
+    const declares = DEFINITIONS[skill.stageId].questionSelection !== undefined;
     assert.deepEqual(
       skill.content.match(/^## .*$/gm),
-      ["## Decision owner", "## Outputs", "## Exit criteria", "## Not in this skill"],
-      `${skill.name}: exactly the four generated sections, in order`
+      declares
+        ? ["## Decision owner", "## Outputs", "## Exit criteria", "## Choosing the next question", "## Not in this skill"]
+        : ["## Decision owner", "## Outputs", "## Exit criteria", "## Not in this skill"],
+      `${skill.name}: exactly the generated sections its definition calls for, in order`
     );
-    assert.match(skill.content, /## Not in this skill\n\nThis stage's purpose, its method, .*are not stated here, because its canonical definition does not declare them yet\.\n$/);
+
+    // ⚠️ DECLARING THE QUESTION RULE DEFERS THE CHOICE OF ACTIVITY STILL. Which question to ask and whether
+    // the next activity should be questioning at all are different fields, and only one of them exists.
+    assert.match(
+      skill.content,
+      declares
+        ? /## Not in this skill\n\nThis stage's purpose, its method, how to choose the next activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet\.\n$/
+        : /## Not in this skill\n\nThis stage's purpose, its method, how to choose the next question or activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet\.\n$/,
+      `${skill.name}: the deferred sentence does not match what its definition declares`
+    );
     assert.equal(/^## (Purpose|Method|Next|Delegation|Mutation|Approval|Completion)/m.test(skill.content), false, `${skill.name}: a deferred field has a section`);
   }
 });
+
+/* ============================================================ the question rule (TSK-0049, toward ACC-0069) */
+
+/** Everything under `## Choosing the next question`, up to the next heading. */
+function questionSection(content) {
+  const from = content.indexOf("## Choosing the next question");
+  if (from === -1) return null;
+  const rest = content.slice(from);
+  const next = rest.indexOf(`${String.fromCharCode(10)}## `, 1);
+  return next === -1 ? rest : rest.slice(0, next);
+}
+
+test("⚠️ ACC-0069 the canonical question rule reaches the skill, every line of it and nothing else", () => {
+  const intake = generateStageSkills(DEFINITIONS).find((s) => s.stageId === "01-intake");
+  const declared = DEFINITIONS["01-intake"].questionSelection;
+  const section = questionSection(intake.content);
+  assert.ok(section, "Stage 1's skill has no question-selection section");
+
+  // ⚠️ VERBATIM, BOTH WAYS. Every declared line appears exactly once, and the section contains no sentence
+  // the definition did not declare: a rule reworded on its way into a skill is a rule nobody authored.
+  const strings = [declared.rule, ...declared.afterAnswer, ...declared.constraints, declared.whenIntakeAbsent, declared.whenIntakeInvalid];
+  for (const text of strings) assert.equal(section.split(text).length - 1, 1, `not carried exactly once: ${text.slice(0, 60)}`);
+
+  const LABELS = new Set(["## Choosing the next question", "", "After an answer:", "Always:"]);
+  const contributed = section
+    .split(String.fromCharCode(10))
+    .filter((l) => !LABELS.has(l))
+    .map((l) => l.replace(/^\d+\. /, "").replace(/^- /, "").replace(/^If this stage's intake is reported `absent`: /, "").replace(/^If it is reported `invalid`: /, ""));
+  assert.deepEqual(
+    contributed.filter((l) => l.length > 0).sort(),
+    [...strings].sort(),
+    "the section carries a line the definition did not declare"
+  );
+
+  // The sequence is the definition's order: record, lint, re-read, then ask.
+  declared.afterAnswer.forEach((step, i) => assert.ok(section.includes(`${i + 1}. ${step}`), `step ${i + 1} is out of order or reworded`));
+  assert.ok(section.indexOf(declared.afterAnswer[0]) < section.indexOf(declared.afterAnswer[1]));
+  assert.ok(section.indexOf(declared.afterAnswer[1]) < section.indexOf(declared.afterAnswer[2]));
+  assert.ok(section.indexOf(declared.afterAnswer[2]) < section.indexOf(declared.afterAnswer[3]));
+
+  // The tools the rule names are the ones that do those things.
+  for (const tool of ["kiln_write_stage_document", "kiln_lint", "kiln_project_status"])
+    assert.ok(section.includes(`\`${tool}\``), `the rule does not name ${tool}`);
+
+  // ⚠️ AND THE OTHER EIGHT STAGES GET NOTHING. Only Stage 1's method has been settled.
+  for (const skill of generateStageSkills(DEFINITIONS))
+    if (skill.stageId !== "01-intake") assert.equal(questionSection(skill.content), null, `${skill.name} was given a rule nobody declared`);
+});
+
+test("⚠️ ACC-0069 a question rule that is not one is refused, naming the stage and the field", () => {
+  const withRule = (questionSelection) => ({ "01-intake": { ...DEFINITIONS["01-intake"], questionSelection } });
+  const good = DEFINITIONS["01-intake"].questionSelection;
+
+  for (const [label, value, field] of [
+    ["not an object", "ask a good question", "questionSelection"],
+    ["an array", [good.rule], "questionSelection"],
+    ["null", null, "questionSelection"],
+    ["no rule", { ...good, rule: undefined }, "questionSelection.rule"],
+    ["an empty rule", { ...good, rule: "   " }, "questionSelection.rule"],
+    ["a rule over two lines", { ...good, rule: `ask${String.fromCharCode(10)}something` }, "questionSelection.rule"],
+    ["no sequence", { ...good, afterAnswer: undefined }, "questionSelection.afterAnswer"],
+    ["an empty sequence", { ...good, afterAnswer: [] }, "questionSelection.afterAnswer"],
+    ["a step that is not a string", { ...good, afterAnswer: [1, 2] }, "questionSelection.afterAnswer[0]"],
+    ["no constraints", { ...good, constraints: undefined }, "questionSelection.constraints"],
+    ["an empty constraint list", { ...good, constraints: [] }, "questionSelection.constraints"],
+    ["no absent behaviour", { ...good, whenIntakeAbsent: undefined }, "questionSelection.whenIntakeAbsent"],
+    ["no invalid behaviour", { ...good, whenIntakeInvalid: undefined }, "questionSelection.whenIntakeInvalid"],
+  ])
+    assert.throws(
+      () => generateStageSkills(withRule(value)),
+      (e) => e instanceof StageSkillError && e.stageId === "01-intake" && e.field === field,
+      label
+    );
+});
+
 
 test("⚠️ F88 producesProse stays output prose: rendered once, inside Outputs, and never relabelled as purpose", () => {
   // ⚠️ **A FIELD RELABELLED IS A FIELD INFERRED.** `producesProse` says what a stage emits. The first

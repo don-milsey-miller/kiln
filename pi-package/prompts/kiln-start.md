@@ -11,7 +11,7 @@ If it reports the project as fresh - no typed planning artifacts and no stage at
 
 - Read the project's name and description, the Stage 1 document it returned, and the Stage 1 skill Kiln added to
   your instructions.
-- Ask the operator exactly one question: the one that best helps Stage 1 understand what they are asking for.
+- For the fresh Stage 1 turn, follow the injected stage skill's question-selection rule.
 - Propose no architecture, no set of requirements and no solution.
 - Call no tool that creates, revises, links or otherwise changes planning content.
 

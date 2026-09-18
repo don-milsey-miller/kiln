@@ -96,6 +96,29 @@ test("⚠️ F87 every tool the resources name is one the package declares", () 
   for (const read of ["kiln_project_status", "kiln_lint"]) assert.ok(skillNames.includes(read), `kiln-planning does not name ${read}`);
 });
 
+test("⚠️ ACC-0069 /kiln-start sends the fresh turn to the stage skill's rule instead of restating one of its own", () => {
+  const prompt = normalise(RESOURCES["prompts/kiln-start.md"]);
+
+  // ⚠️ ONE DESCRIPTION OF ONE RULE. The rule is canonical in stages/01-intake.json and reaches the model
+  // through the injected skill; a second wording here is the duplication stages/ exists to prevent, and it
+  // would be the one that never changed when the definition did.
+  assert.match(prompt, /for the fresh stage 1 turn, follow the injected stage skill's question-selection rule/);
+
+  // The sentence F87's successor would be: the prompt choosing the question itself.
+  for (const [label, pattern] of [
+    ["the old wording, restored", /ask the operator exactly one question: the one that best helps/],
+    ["a selection rule of the prompt's own", /ask (?:the operator )?(?:exactly )?one question[^.]{0,80}\b(?:that|which|whose)\b/],
+    ["a question the prompt supplies", /ask (?:them|the operator) (?:what|why|how|who|when|whether)\b/],
+    ["a fixed list of questions", /ask (?:the operator )?(?:the|these|each of the) following\b/],
+  ])
+    assert.equal(pattern.test(prompt), false, `/kiln-start restates its own selection rule: ${label}`);
+
+  // ⚠️ WHAT IT KEEPS. Delegating the CHOICE of question does not delegate the two boundaries the fresh
+  // turn has always had, and dropping either while narrowing the wording is the mistake this guards.
+  assert.match(prompt, /propose no architecture, no set of requirements and no solution/);
+  assert.match(prompt, /call no tool that creates, revises, links or otherwise changes planning content/);
+});
+
 test("⚠️ ACC-0068 /kiln-start calls kiln_project_status first, neither resource calls the flow unimplemented, and no approval, activation or attestation tool is offered", () => {
   // G4 implemented the flow, so a resource still calling it unimplemented would be the same kind of stale claim F87 was.
   for (const [path, text] of Object.entries(RESOURCES)) {

@@ -24,6 +24,28 @@ This stage produces no typed artifact.
 - `constraints-recorded` — Major constraints are recorded. (evaluated by a person and recorded as an attestation)
 - `stage-set-determinable` — Enough is known to determine which stages this project needs. (evaluated by a person and recorded as an attestation)
 
+## Choosing the next question
+
+Choose each question from the current `kiln_project_status.intake` state by information value and blocking impact: ask the single question whose answer would most reduce the highest-impact uncertainty preventing Stage 1 from understanding the operator's request.
+
+After an answer:
+
+1. Record the operator's answer with `kiln_write_stage_document`: their exact words in `verbatim`, unchanged, and your own reading of them in `interpretation`. Never edit the document any other way.
+2. Run `kiln_lint` after that write, so the project's findings reflect what was just recorded.
+3. Call `kiln_project_status` again and read the `intake` block it returns, which is the state your next question is chosen from.
+4. Ask exactly one question: the one that most reduces the highest-impact uncertainty the recorded intake still leaves open.
+
+Always:
+
+- The question comes from what this project's recorded intake leaves uncertain, never from a standard set asked of every project.
+- Do not ask again what a recorded answer already answers; where an answer is partial, ask about the specific gap, not the original question.
+- Ask one thing. A question joining two asks with "and", or offering a list to answer, is two questions.
+- Do not propose, name or imply a solution, a technology or a design. This stage records the problem.
+- Ask about the operator's situation, not about Kiln's own artifacts, stages or tools.
+
+If this stage's intake is reported `absent`: This project's stage document has no intake section, so an answer cannot be recorded. Say so, name the two headings the document needs, and do not ask a question until it has them.
+If it is reported `invalid`: This project's intake section is structurally invalid and Kiln will not write into it. Report the `problem` code and ask nothing; this is not a project that has answered nothing.
+
 ## Not in this skill
 
-This stage's purpose, its method, how to choose the next question or activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet.
+This stage's purpose, its method, how to choose the next activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet.
