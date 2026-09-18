@@ -1,0 +1,52 @@
+{
+  "id": "EVD-0113",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The operator-only boundary, in CI and in one unanswered real RPC session",
+  "kind": "experiment",
+  "summary": "The operator-only boundary on attestation, artifact approval and type activation, proven deterministically in CI and then in one real Pi RPC session where the dialog was never answered (TSK-0050, against ACC-0070). DETERMINISTIC, CI RUN 35395591003 AT COMMIT bd4a2af, four cells green, no job re-run: windows-latest node 22 and node 24, 1277 tests / 1276 pass / 0 fail / 1 skipped each; ubuntu-latest node 22 and node 24, 1277 tests / 1268 pass / 0 fail / 9 skipped each. Zero `not ok` lines in any cell. THE GATE. `ctx.ui.confirm` is called with `{ signal, timeout: 30000 }`, the signal being the tool invocation's own rather than the agent's, and only a literal `true` authorises the act. No UI context, rejection, cancellation, timeout, abort and an unexpected UI error all refuse and all write a bounded refusal record; they share one code, `operator-confirmation-not-granted`, because Pi returns the same `false` for every one of them and its own timed-confirm example labels the outcome \"Cancelled or timed out\". The confirmation is read and discarded inside the invocation that asked for it. NO AUTHORISATION REACHES A TOOL ARGUMENT. `decidedBy` and `approvedBy` left the model-facing schemas and `reviewedBy` was never in one; with `additionalProperties: false` an invented parameter is refused by the schema. The actor supplied to the libraries is the package's own constant, `operator via Pi UI`. Attestation persists it as `decidedBy` and activation persists it in the manifest; review status persists the approved status and stores no approver, because the artifact envelope has no reviewer field, and neither the criterion nor the dialog claims otherwise. Only `approved` is gated on review status, which is the word this criterion uses; `draft`, `in-review` and `amended` pass through deliberately. THE AUDIT FILE. `state/operator-boundary-refusals.json`, newest 100 entries, each holding occurredAt, operation, code and a target of validated identifiers and enums only. A target field that does not match its pattern is dropped rather than stored or escaped, so no path, argument, reason, operator or model wording, credential or transcript content can enter; a record whose target cleans to nothing is still a record. An existing file this module could not have written is refused rather than replaced. Every way the record can fail is one typed error, the lock included, and a refusal that cannot be recorded still refuses, under its own code `operator-boundary-refusal-unrecorded`, with the storage error never reaching the model. OBSERVABLE IN RECORDED STATE. `kiln_project_status` carries a closed `boundaryRefusals` block with states recorded, empty, absent and invalid, the newest ten returned beside total and omitted. A corrupt audit file reads `invalid` and does not refuse the status call. THE REAL RPC SESSION, 2026-09-18, reviewed by the project's PM. One real Pi session in `--mode rpc`, offline, with the package loaded and the 29-name allowlist; the provider is a loopback server scripted to call `kiln_write_stage_attestation` and then `kiln_project_status`, and the harness never writes a dialog response. Pi emitted one `extension_ui_request` at 833 ms with `method: confirm` and `timeout: 30000`; no response was sent; the refusal `operator-confirmation-not-granted` reached the model 30,058 ms later. The attestation file existed before the run holding an unrelated entry and was byte- and mtime-identical afterwards, sha256 be97f5265178ef98 at 199 bytes both times. The audit file did not exist beforehand and afterwards held exactly one entry, operation `write-stage-attestation`, target stageId `01-intake` and criterion `request-understood`. The `kiln_project_status` call that followed returned that entry to the model with state `recorded`, total 1, returned 1, omitted 0. The session settled with no error.",
+  "outcome": "success",
+  "observedAt": "2026-09-18",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35395591003 at commit bd4a2af, one attempt, no job re-run, all four cells green",
+      "cell-windows-22": "node 22, 1277 tests / 1276 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1277 tests / 1276 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1277 tests / 1268 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1277 tests / 1268 pass / 0 fail / 9 skipped",
+      "library-tests": "test/operator-boundary.test.mjs, 15 tests, all four cells: the record's shape; one code across all three operations; an unknown operation throws and writes nothing; pattern-failing target fields dropped with the file proven free of a planted key, a Windows path, prose and both separators; an unknown key refused even when it looks like an identifier; the 64-character cap; a target that cleans to nothing still recorded; 105 writes leaving the newest 100; absent, empty and recorded distinguished; ten malformed files each reading invalid; an invalid file keeping its bytes and mtime when a record is refused; a storage failure raising the typed error with the code as its whole message; a lock failure converted rather than escaping as a LockError; eight concurrent appends all kept",
+      "wrapper-tests": "test/pi-package-operator-boundary.test.mjs, 14 tests, all four cells: with no dialog channel every gated act refused and nothing changed, with the exact audit targets asserted; \"yes\", 1, {}, undefined, null and false each refused; a throwing dialog refused with its message and the home directory absent; the confirm options exactly { signal, timeout: 30000 } with the invocation's signal preferred; a type carrying newlines unable to forge a second dialog line; a 500-character reason shown in full; the confirmed path writing `operator via Pi UI` to disk; the library receiving the actor through an injected seam; in-review, amended and draft not gated and raising no dialog; an unrecordable refusal returning its own code with the project unchanged; no gated schema offering decidedBy, approvedBy, reviewedBy or four other authorisation-shaped names; the wrapper's three operation strings equal to the library's; no credential and no path in any boundary refusal",
+      "status-tests": "test/project-status.test.mjs and test/pi-package-project-status.test.mjs, all four cells: the four states at library level with a corrupt file proven not to refuse the whole call and its bytes absent from the result; the newest ten of fourteen with total 14, returned 10, omitted 4 and the exact tail; an invalid file at wrapper level; a no-path, no-credential, nothing-written sweep",
+      "byte-and-mtime-invariant": "every refusal case compares bytes and modification times over the whole project, not the absence of a write call",
+      "mutations-library": "12 written, 12 killed, restore byte-identical by sha256 after each: keep the oldest instead of the newest; raise the 100 bound; copy the caller's keys through; store a value its pattern refuses; drop the length cap; read an invalid file as empty; overwrite an invalid file; let the filesystem's sentence into the message; trust a stored target without re-cleaning it; accept an unknown operation; let the lock's error escape untyped; flatten an already-typed refusal",
+      "mutations-wrapper": "14 written, 14 killed: truthy answer; drop the timeout; prefer the agent's signal; broken dialog as a yes; report a lost audit entry as an ordinary refusal; storage error into the refusal; model names the attester; model names the approver; an approver nobody confirmed; never gate a review status; attest without waiting; unflattened preview value; widen the reason bound; promise an approver that is never stored",
+      "mutations-status": "6 written, 6 killed; one first cut was equivalent, re-cut, and then killed",
+      "rpc-session": "one real Pi session, --mode rpc, offline, package loaded, 29-name allowlist, provider scripted on loopback",
+      "rpc-ui-request": "1 emitted at 833 ms, method confirm, timeout 30000",
+      "rpc-ui-responses": "0; the harness never writes a dialog response, which is the 'does not answer' branch",
+      "rpc-elapsed-to-refusal": "30058 ms, request to the refusal reaching the model",
+      "rpc-refusal-code": "operator-confirmation-not-granted",
+      "rpc-target-unchanged": "state/stage-attestations/01-intake.json, sha256 be97f5265178ef98 and 199 bytes and mtimeMs 1789766696540.7993 before and after",
+      "rpc-audit-entry": "one entry: operation write-stage-attestation, code operator-confirmation-not-granted, target { stageId: 01-intake, criterion: request-understood }",
+      "rpc-status-block": "state recorded, total 1, returned 1, omitted 0, carrying that entry",
+      "retained-record": "<home>/.codex/kiln-evidence/ACC-0070/rpc-unanswered, 7 files, sanitised, machine paths and credentials absent",
+      "limitation-scripted-provider": "the provider is scripted, so the session measures the boundary and Pi's dialog path rather than a model's choice to call the tool",
+      "limitation-one-session": "one session, Windows, local, outside CI",
+      "limitation-bound-not-decomposed": "the 30-second bound is Kiln's own constant and the measured 30,058 ms is that bound plus Pi's dispatch and the tool's return path; no attempt is made to separate them",
+      "limitation-one-tool": "only the attestation tool is exercised in the session; the other two gated tools are covered deterministically in all four cells",
+      "limitation-no-macos": "no macOS coverage"
+    }
+  }
+}
