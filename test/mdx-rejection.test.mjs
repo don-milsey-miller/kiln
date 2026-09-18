@@ -144,3 +144,37 @@ test("⚠️ every REAL stage document compiles under the restricted contract", 
   }
   assert.deepEqual(refused, [], "a stage document does not survive the contract it is written under");
 });
+
+test("⚠️ F7 every stage document a REAL initializer generates compiles under the restricted contract", async () => {
+  // ⚠️ THE GENERATED DOCUMENT, NOT A HAND-BUILT ONE. The contract above is checked against this
+  // repository's own stage documents, which are hand-written; nothing checked what a new project is given.
+  // An HTML comment in the starter template shipped for a cycle, and every project created in it received
+  // nine documents that this compiler refuses — a failure the operator would have met at render time.
+  const { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { STATUS, initializeProject } = await import("../lib/initialize-project.mjs");
+
+  const projectRoot = mkdtempSync(join(tmpdir(), "kiln-mdx-scaffold-"));
+  try {
+    mkdirSync(join(projectRoot, ".git"), { recursive: true });
+    const created = await initializeProject({ projectRoot, name: "Fixture", description: "A generated project." });
+    assert.equal(created.status, STATUS.CREATED, JSON.stringify(created));
+
+    const dir = join(projectRoot, "planning-content", "stages");
+    const docs = readdirSync(dir).filter((f) => /\.mdx?$/.test(f));
+    assert.ok(docs.length >= 9, `expected the nine generated stage documents, saw ${docs.length}`);
+
+    const refused = [];
+    for (const f of docs) {
+      try {
+        await build(readFileSync(join(dir, f), "utf-8"));
+      } catch (e) {
+        refused.push(`${f}:${e.line}:${e.column} ${e.reason ?? e.message}`);
+      }
+    }
+    assert.deepEqual(refused, [], "a document the initializer generates does not survive the contract it is written under");
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
