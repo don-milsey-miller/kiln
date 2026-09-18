@@ -30,14 +30,29 @@ import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister }
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
 
-const ask = (question) =>
+/**
+ * One line from the operator, or `null` if there is not going to be one.
+ *
+ * ⚠️ **AN END OF INPUT AND AN INTERRUPT ARE ANSWERS TOO, AND THEY ARE NOT "YES".** A closed stdin, a Ctrl+C or a
+ * Ctrl+D while a question is on screen all mean the same thing: nobody chose. They resolve `null`, and every
+ * caller treats that as a decision not to continue rather than as a blank answer to be defaulted.
+ */
+const askLine = (question) =>
   new Promise((resolveAnswer) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question, (answer) => {
+    let answered = false;
+    const finish = (value) => {
+      if (answered) return;
+      answered = true;
       rl.close();
-      resolveAnswer(/^y(es)?$/i.test(answer.trim()));
-    });
+      resolveAnswer(value);
+    };
+    rl.on("SIGINT", () => finish(null));
+    rl.on("close", () => finish(null));
+    rl.question(question, (answer) => finish(answer));
   });
+
+const ask = async (question) => /^y(es)?$/i.test(String((await askLine(question)) ?? "").trim());
 
 /**
  * What the operator is told about the shutdown.
@@ -250,6 +265,7 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     randomBytes,
     interactive: Boolean(process.stdin.isTTY),
     ask,
+    askLine,
     log: say,
   });
 

@@ -1710,6 +1710,97 @@ test("⚠️ ACC-0103 a first run records the id it gives Pi, and a rerun passes
   rmSync(dir, { recursive: true, force: true });
 });
 
+for (const [label, answers, expectation] of [
+  ["a listed session is chosen", ["1"], { resumes: true }],
+  ["a new session is chosen", ["n"], { resumes: false }],
+])
+  test(`⚠️ S2 ${label}, and the run continues in exactly that session`, async () => {
+    const dir = repoProject({ state: true, sessions: true });
+    ignoreAll(dir);
+    const transcript = piTranscript(dir, "chosen00-0000-4000-8000-00000000abcd");
+    // No record at all, with a session sitting there: the one case an operator has to settle.
+    const calls = [];
+    const asked = [];
+
+    await runSupervisor({
+      ...resumeRun(dir, String(await freePort())),
+      sessionLister: transcript.lister,
+      interactive: true,
+      askLine: async (question) => {
+        asked.push(question);
+        return answers.shift() ?? null;
+      },
+      spawn: guardAnswers(calls),
+    });
+
+    const agent = calls.find((c) => c.command === "A");
+    const recorded = JSON.parse(readFileSync(join(dir, ".pi", "runtime", "kiln-session.json"), "utf-8"));
+    if (expectation.resumes) {
+      assert.equal(agent.args[agent.args.indexOf(SESSION_RESUME_FLAG) + 1], transcript.id, "the session they chose");
+      assert.equal(recorded.sessionId, transcript.id, "and it is what was written down");
+    } else {
+      const started = agent.args[agent.args.indexOf(SESSION_ID_FLAG) + 1];
+      assert.notEqual(started, transcript.id, "a new session is not the one on disk");
+      assert.equal(recorded.sessionId, started, "and the new id is what was written down");
+    }
+    assert.equal(asked.length, 1, "asked once");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+for (const [label, answers] of [
+  ["cancelled", ["q"]],
+  ["left unanswered", [""]],
+  ["given no answer at all", [null]],
+  ["answered with nothing that means anything", ["0", "x", "no"]],
+])
+  test(`⚠️ S2 a recovery ${label} starts nothing at all`, async () => {
+    const dir = repoProject({ state: true, sessions: true });
+    ignoreAll(dir);
+    const transcript = piTranscript(dir, "chosen00-0000-4000-8000-00000000abcd");
+    const calls = [];
+
+    const e = await runSupervisor({
+      ...resumeRun(dir, String(await freePort())),
+      sessionLister: transcript.lister,
+      interactive: true,
+      askLine: async () => answers.shift() ?? null,
+      spawn: guardAnswers(calls),
+    }).catch((x) => x);
+
+    assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
+    assert.equal(e.reason, REFUSAL.SESSION_RECOVERY_DECLINED);
+    assert.deepEqual(calls.map((c) => c.command), [], "neither Pi nor the launcher");
+    assert.equal(existsSync(join(dir, ".pi", "runtime", "kiln-session.json")), false, "and nothing is recorded");
+    const text = `${e.message} ${JSON.stringify(e.detail)}`;
+    assert.equal(text.includes(transcript.id), false, "no session id in the refusal");
+    assert.equal(text.includes(dir), false, "no path either");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+test("⚠️ S2 with no terminal the run refuses and says where the choice can be made", async () => {
+  const dir = repoProject({ state: true, sessions: true });
+  ignoreAll(dir);
+  const transcript = piTranscript(dir, "chosen00-0000-4000-8000-00000000abcd");
+  const calls = [];
+
+  const e = await runSupervisor({
+    ...resumeRun(dir, String(await freePort())),
+    sessionLister: transcript.lister,
+    // ⚠️ NOT INTERACTIVE: there is nobody to ask, and a script cannot answer this question.
+    askLine: async () => "1",
+    spawn: guardAnswers(calls),
+  }).catch((x) => x);
+
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 120)}`);
+  assert.equal(e.reason, REFUSAL.SESSION_UNRESOLVED);
+  assert.equal(e.detail.recoverable, true);
+  assert.match(e.message, /PowerShell/, "the command for each shell");
+  assert.match(e.message, /sh /);
+  assert.deepEqual(calls.map((c) => c.command), [], "and nothing was started");
+  assert.equal(e.message.includes(transcript.id), false, "no session id in the refusal");
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test("⚠️ F128 a resume opens the recorded session by id, guarded; a first run does neither", async () => {
   const dir = repoProject({ state: true, sessions: true });
   ignoreAll(dir);

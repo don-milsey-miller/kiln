@@ -42,18 +42,22 @@ import {
 import {
   SESSION,
   SESSION_PROBLEM,
+  MAX_INVALID_ANSWERS,
   RECOVERABLE_PROBLEMS,
+  RECOVERY,
   SESSION_NAME_MAX,
   SESSION_RECORD,
   STORAGE,
   TRANSCRIPT_PROBLEM,
   availableSessions,
+  chooseSession,
   inspectTranscript,
   renderSessionChoices,
   terminalSafeName,
   planSession,
   recordSession,
   sessionDirFor,
+  sessionPrecondition,
 } from "../lib/session-record.mjs";
 import { resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 
@@ -643,6 +647,117 @@ test("⚠️ the choices are numbered lines with no id, no path and no message t
   ]);
   const text = lines.join("");
   for (const leak of [SESSION_ID, OTHER_ID, "/home", "/p", "/q", "third"]) assert.equal(text.includes(leak), false, leak);
+});
+
+test("⚠️ S2 the choices are numbered, nothing is preselected, and every non-answer cancels", async () => {
+  const sessions = [
+    { id: SESSION_ID, name: "planning", createdMs: 1, modifiedMs: 3, messageCount: 4 },
+    { id: OTHER_ID, name: null, createdMs: 1, modifiedMs: 2, messageCount: 1 },
+  ];
+  const run = async (answers) => {
+    const said = [];
+    const asked = [];
+    const choice = await chooseSession({
+      sessions,
+      ask: async (q) => {
+        asked.push(q);
+        return answers.shift() ?? null;
+      },
+      print: (line) => said.push(line),
+    });
+    return { choice, said, asked };
+  };
+
+  const first = await run(["1"]);
+  assert.deepEqual(first.choice, { action: RECOVERY.RESUME, sessionId: SESSION_ID }, "a position names a session");
+  // ⚠️ THE LIST IS THE OFFER: no id, no path, and nothing marked as the one to take.
+  const shown = first.said.join(String.fromCharCode(10));
+  assert.ok(shown.includes("1. planning"));
+  assert.ok(shown.includes("2. (unnamed)"));
+  assert.equal(shown.includes(SESSION_ID), false, "no session id is shown");
+  assert.doesNotMatch(shown, /default|\[Y\/n\]|recommended/i, "and nothing is preselected");
+  assert.equal(first.asked.length, 1);
+
+  assert.deepEqual((await run(["2"])).choice, { action: RECOVERY.RESUME, sessionId: OTHER_ID });
+  assert.deepEqual((await run(["n"])).choice, { action: RECOVERY.NEW }, "a new session is a choice, never a fallback");
+  assert.deepEqual((await run(["q"])).choice, { action: RECOVERY.CANCEL, reason: "declined" });
+  assert.deepEqual((await run([""])).choice, { action: RECOVERY.CANCEL, reason: "empty" }, "an empty line is not consent");
+  assert.deepEqual((await run([null])).choice, { action: RECOVERY.CANCEL, reason: "no-answer" }, "nor is a closed input");
+
+  // ⚠️ THREE ANSWERS THAT MEAN NOTHING END THE QUESTION rather than asking for ever.
+  const stubborn = await run(["0", "3", "maybe", "1"]);
+  assert.deepEqual(stubborn.choice, { action: RECOVERY.CANCEL, reason: "unanswered" });
+  assert.equal(stubborn.asked.length, MAX_INVALID_ANSWERS, "and it stops asking");
+
+  // With nothing to return to, the only choices are a new session and cancelling.
+  const empty = await chooseSession({ sessions: [], ask: async () => "n", print: () => {} });
+  assert.deepEqual(empty, { action: RECOVERY.NEW });
+});
+
+test("⚠️ S2 a choice is only written while the state it was made against still holds", async () => {
+  const root = stateRoot({ sessions: [SESSION_ID] });
+  const dir = sessionDirOf(root);
+  try {
+    const available = await availableSessions(dir, { lister: fakeLister, projectRoot: PROJECT_CWD });
+    const before = sessionPrecondition(root, available);
+
+    // Another run recorded a session while the operator was reading the list.
+    writeFileSync(join(root, SESSION_RECORD), JSON.stringify(valid()));
+    const late = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionDir: dir,
+      sessionId: SESSION_ID,
+      choice: { action: RECOVERY.RESUME, sessionId: SESSION_ID },
+      precondition: before,
+    });
+    assert.equal(late.ok, false, "a choice made against state that has moved is not written");
+    assert.equal(late.problem, SESSION_PROBLEM.CHANGED_WHILE_CHOOSING);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, SESSION_RECORD), "utf-8")), valid(), "the other run's record stands");
+
+    // The same choice, against the state it was actually made against, is written.
+    rmSync(join(root, SESSION_RECORD));
+    const now = sessionPrecondition(root, available);
+    const written = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionDir: dir,
+      sessionId: SESSION_ID,
+      choice: { action: RECOVERY.RESUME, sessionId: SESSION_ID },
+      precondition: now,
+    });
+    assert.equal(written.ok, true);
+    assert.equal(written.action, SESSION.RESUME);
+    assert.equal(written.sessionId, SESSION_ID);
+    assert.equal(typeof written.digest, "string", "and the transcript the guard will be told to expect");
+    assert.equal(JSON.parse(readFileSync(join(root, SESSION_RECORD), "utf-8")).sessionId, SESSION_ID);
+
+    // ⚠️ AND THE CHOSEN SESSION ITSELF MUST STILL BE THERE. A caller holding an id from an older listing is
+    // asking for a session this state root does not have, whatever else agrees.
+    rmSync(join(root, SESSION_RECORD));
+    const gone = await recordSession({
+      stateRoot: root,
+      projectId: PROJECT_ID,
+      stateMode: "project",
+      projectRoot: PROJECT_CWD,
+      lister: fakeLister,
+      sessionDir: dir,
+      sessionId: OTHER_ID,
+      choice: { action: RECOVERY.RESUME, sessionId: OTHER_ID },
+      precondition: sessionPrecondition(root, available),
+    });
+    assert.equal(gone.ok, false, "a session that is not in the listing is not recorded");
+    assert.equal(gone.problem, SESSION_PROBLEM.GONE);
+    assert.equal(existsSync(join(root, SESSION_RECORD)), false, "and nothing is written");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("⚠️ a transcript Pi would rewrite while opening it is refused before Pi starts", () => {
