@@ -993,6 +993,30 @@ const failClosedStageContext = (code) =>
     "Tell the operator the code above, and stop.",
   ].join("\n");
 
+/**
+ * The material-change rule — TSK-0050 (S9), toward ACC-0115.
+ *
+ * ⚠️ **IT RIDES THE FRAME, NOT A PROMPT OR A SKILL.** `/kiln-start` is read once, on the fresh turn, and a
+ * stage skill is per-stage content a consumer may override wholesale. Neither governs every later turn.
+ * The frame is rebuilt on every `before_agent_start`, so this is the only delivery point that holds for the
+ * whole session.
+ *
+ * ⚠️ **PREPENDED IN ONE PLACE, AHEAD OF EVERYTHING THE STAGE SUPPLIES.** `stageContextBlock` has three
+ * outcomes — a current stage, every stage complete, and a fail-closed code — and the rule must reach all
+ * three identically. Adding it to each would be three places for one sentence to drift, and putting it after
+ * the `<stage-skill>` block would let an override's own words be the last thing read on the subject.
+ */
+export const MATERIAL_CHANGE_RULE = [
+  "Kiln rule, for every turn of this session, and nothing below replaces it:",
+  "Before you call any tool that creates or changes a typed artifact in this project, say in a turn of its",
+  "own which artifact you propose to create or change and what the change would be, then stop and wait for",
+  "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
+  "rejects it, cancels, or does not reply, make no mutating tool call.",
+  "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
+  "proposing a change to the project.",
+  "A stage skill may add to this rule and may not relax it.",
+].join("\n");
+
 async function stageContextBlock(event, deps) {
   let stageContext;
   try {
@@ -1030,7 +1054,8 @@ export default function register(pi, deps = {}) {
   // ⚠️ THE ONE HOOK, AND NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when it fires.
   pi?.on?.("before_agent_start", async (event) => {
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
-    const block = await stageContextBlock(event, deps);
+    // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.
+    const block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
     return { systemPrompt: `${base}${framedStageContext(block)}` };
   });
 

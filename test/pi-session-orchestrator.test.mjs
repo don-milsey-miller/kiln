@@ -36,7 +36,9 @@ import { PORTABLE_PACKAGE_ENTRY } from "../lib/pi-package-entry.mjs";
 import { mergeSettingsText } from "../lib/pi-settings.mjs";
 import { yamlString } from "../lib/project-scaffold.mjs";
 import { piToolAllowlist, withToolAllowlist } from "../bin/start-kiln.mjs";
+import { MATERIAL_CHANGE_RULE } from "../pi-package/extensions/kiln.js";
 
+const NEWLINE = String.fromCharCode(10);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sdk = await import(resolvePinnedSdk(ROOT).url);
 
@@ -292,7 +294,11 @@ function assertKilnStart(run) {
 
   const systemPrompt = first[0].content;
   const payload = framePayload(systemPrompt);
-  assert.ok(payload.startsWith("Kiln stage context: the current stage is 01-intake"), payload.slice(0, 120));
+  // ⚠️ THE GLOBAL RULE OPENS THE FRAME, IN A REAL SESSION (TSK-0050 S9, ACC-0115). The unit tests prove the
+  // hook builds it; this proves the provider actually received it, once, ahead of the stage's own content.
+  assert.ok(payload.startsWith(`${MATERIAL_CHANGE_RULE}${NEWLINE}${NEWLINE}`), payload.slice(0, 200));
+  assert.equal(payload.split("Kiln rule, for every turn of this session").length - 1, 1, "the rule reached the provider more than once");
+  assert.ok(payload.slice(MATERIAL_CHANGE_RULE.length + 2).startsWith("Kiln stage context: the current stage is 01-intake"), payload.slice(0, 260));
   // ⚠️ KILN'S FRAME, NOT PI'S BASE PROMPT (R12). Pi's own base prompt names the working directory and its install's
   // documentation paths; that text is Pi's, and what this criterion covers is what Kiln adds.
   assertNoPath(payload, run.paths, "the Kiln frame");
