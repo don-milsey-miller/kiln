@@ -890,6 +890,15 @@ const INTAKE_ENTRIES_MAX = 10;
 const INTAKE_FIELD_MAX_BYTES = 1024;
 const INTAKE_BYTES_MAX = 16 * 1024;
 
+/**
+ * How many operator-boundary refusals a status answer carries.
+ *
+ * ⚠️ **THE FILE IS ALREADY BOUNDED AT 100 AND HOLDS ONLY IDENTIFIERS AND ENUMS**, so this is not a
+ * safety limit. It is a readability one: a model asking what the project's state is wants the recent
+ * refusals, and `total` tells it how many more there are.
+ */
+const BOUNDARY_REFUSALS_RETURNED_MAX = 10;
+
 const utf8 = new TextEncoder();
 
 /** `text` cut to at most `maxBytes` of UTF-8 at a character boundary, never inside one. */
@@ -1262,6 +1271,7 @@ export default function register(pi, deps = {}) {
       const orchestration = status?.orchestration ?? {};
       const document = status?.stageOneDocument ?? {};
       const intake = status?.intake ?? {};
+      const boundary = status?.boundaryRefusals ?? {};
 
       const result = await renderForModel(
         {
@@ -1293,6 +1303,13 @@ export default function register(pi, deps = {}) {
             total: intake.total ?? 0,
             entries: (intake.entries ?? []).map((e) => ({ label: e.label, answer: e.answer, reading: e.reading })),
           },
+          // ⚠️ WHAT THE ORCHESTRATOR WAS REFUSED, WHICH IS WHY ACC-0070 IS OBSERVABLE HERE AND NOT ONLY IN A
+          // TRANSCRIPT. Each entry holds validated identifiers and enums only; the newest are the ones kept.
+          boundaryRefusals: {
+            state: boundary.state ?? null,
+            total: boundary.total ?? 0,
+            refusals: (boundary.refusals ?? []).slice(-BOUNDARY_REFUSALS_RETURNED_MAX),
+          },
         },
         roots
       );
@@ -1312,6 +1329,12 @@ export default function register(pi, deps = {}) {
         returned: entries.length,
         omitted: Math.max(0, result.intake.total - entries.length),
         entries,
+      };
+
+      result.boundaryRefusals = {
+        ...result.boundaryRefusals,
+        returned: result.boundaryRefusals.refusals.length,
+        omitted: Math.max(0, result.boundaryRefusals.total - result.boundaryRefusals.refusals.length),
       };
       return rendered(result);
     },

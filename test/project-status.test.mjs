@@ -398,3 +398,38 @@ test("\u26a0\ufe0f ACC-0069 the stage document is read once, and the intake is p
   }
   assert.equal(reads.length, 1, `the stage document was read ${reads.length} times`);
 });
+
+/* ================================================= the operator-boundary audit, TSK-0050 (S8) === */
+
+test("⚠️ ACC-0070 the status reports what the orchestrator was refused, in all four states", async () => {
+  const { recordBoundaryRefusal } = await import("../lib/operator-boundary.mjs");
+  const files = { "project.yaml": `name: ${yamlString("Fixture")}\n`, "stages/01-intake.md": "# Stage 1\n" };
+
+  const fresh = contentRootWith(files);
+  const empty = contentRootWith({ ...files, "state/operator-boundary-refusals.json": `{ "version": 1, "refusals": [] }\n` });
+  const broken = contentRootWith({ ...files, "state/operator-boundary-refusals.json": `${SECRET} {` });
+  try {
+    // ⚠️ NOTHING EVER REFUSED AND AN EMPTIED FILE ARE NOT THE SAME STATE. Reporting one for the other would
+    // say a boundary had never been tested when its record had in fact been cleared.
+    assert.deepEqual(readProjectStatus(ctxOf(fresh.contentRoot), { toolRoot: ROOT }).boundaryRefusals, {
+      state: "absent",
+      total: 0,
+      refusals: [],
+    });
+    assert.equal(readProjectStatus(ctxOf(empty.contentRoot), { toolRoot: ROOT }).boundaryRefusals.state, "empty");
+
+    // ⚠️ A CORRUPT AUDIT FILE IS A STATE, NOT A REFUSAL OF THE WHOLE CALL, and the file's bytes reach nothing.
+    const invalid = readProjectStatus(ctxOf(broken.contentRoot), { toolRoot: ROOT });
+    assert.equal(invalid.boundaryRefusals.state, "invalid");
+    assert.equal(JSON.stringify(invalid).includes(SECRET), false);
+
+    await recordBoundaryRefusal(fresh.contentRoot, { operation: "set-review-status", target: { artifactType: "task", artifactId: "TSK-0050" } });
+    const recorded = readProjectStatus(ctxOf(fresh.contentRoot), { toolRoot: ROOT }).boundaryRefusals;
+    assert.equal(recorded.state, "recorded");
+    assert.equal(recorded.total, 1);
+    assert.equal(recorded.refusals[0].operation, "set-review-status");
+    assert.deepEqual(recorded.refusals[0].target, { artifactType: "task", artifactId: "TSK-0050" });
+  } finally {
+    for (const f of [fresh, empty, broken]) rmSync(f.base, { recursive: true, force: true });
+  }
+});

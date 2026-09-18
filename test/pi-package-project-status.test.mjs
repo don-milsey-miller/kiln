@@ -116,7 +116,7 @@ test("⚠️ ACC-0068 kiln_project_status keeps its existing fields and schema, 
     const status = result.details;
     assert.equal(result.output, JSON.stringify(status, null, 2));
 
-    assert.deepEqual(Object.keys(status).sort(), ["artifactCount", "blockers", "intake", "ok", "orchestration", "project", "ready", "stageOneDocument"]);
+    assert.deepEqual(Object.keys(status).sort(), ["artifactCount", "blockers", "boundaryRefusals", "intake", "ok", "orchestration", "project", "ready", "stageOneDocument"]);
     assert.equal(status.ok, true);
     assert.equal(typeof status.ready, "boolean");
     assert.equal(Number.isInteger(status.artifactCount), true);
@@ -139,6 +139,9 @@ test("⚠️ ACC-0068 kiln_project_status keeps its existing fields and schema, 
       omitted: 0,
       entries: [],
     });
+    // ⚠️ NOTHING REFUSED IS `absent`, NOT AN EMPTY LIST WITH NO EXPLANATION (TSK-0050, ACC-0070). A project
+    // where the audit file was deleted must not look like one where nothing was ever refused.
+    assert.deepEqual(status.boundaryRefusals, { state: "absent", total: 0, refusals: [], returned: 0, omitted: 0 });
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
@@ -673,6 +676,76 @@ test("\u26a0\ufe0f ACC-0069 reading the status changes no byte and no modificati
     await invoke(statusTool(), f.contentRoot);
     assert.deepEqual(snapshot(f.contentRoot), before);
   } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+/* ================================================= the operator-boundary audit, TSK-0050 (S8) === */
+
+/** Write `count` refusals through the library, so the file is one this module could have produced. */
+async function refusals(contentRoot, count) {
+  const { recordBoundaryRefusal } = await import("../lib/operator-boundary.mjs");
+  for (let n = 0; n < count; n += 1)
+    await recordBoundaryRefusal(contentRoot, {
+      operation: "write-stage-attestation",
+      target: { stageId: "01-intake", criterion: `c${n}` },
+    });
+}
+
+test("⚠️ ACC-0070 the status answer carries the newest refusals, and says how many it left out", async () => {
+  const f = project();
+  try {
+    await refusals(f.contentRoot, 14);
+    const status = (await invoke(statusTool(), f.contentRoot)).details;
+
+    assert.equal(status.boundaryRefusals.state, "recorded");
+    assert.equal(status.boundaryRefusals.total, 14, "the file's own count, not this block's");
+    assert.equal(status.boundaryRefusals.returned, 10);
+    assert.equal(status.boundaryRefusals.omitted, 4);
+    // ⚠️ THE NEWEST ARE THE ONES KEPT. A model asking what just happened must not be handed the oldest ten.
+    assert.deepEqual(
+      status.boundaryRefusals.refusals.map((r) => r.target.criterion),
+      ["c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13"]
+    );
+    for (const entry of status.boundaryRefusals.refusals)
+      assert.deepEqual(Object.keys(entry).sort(), ["code", "occurredAt", "operation", "target"]);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0070 an audit file nobody can vouch for reads as invalid and does not refuse the status call", async () => {
+  const f = project();
+  try {
+    mkdirSync(join(f.contentRoot, "state"), { recursive: true });
+    writeFileSync(join(f.contentRoot, "state", "operator-boundary-refusals.json"), `{ "version": 1, "refusals": [{ "note": "${SECRET}" }] }`);
+
+    const status = (await invoke(statusTool(), f.contentRoot)).details;
+    // ⚠️ THE WHOLE CALL STILL ANSWERS. A corrupt audit file is a state of the project, not a reason to stop
+    // telling a model where the project is.
+    assert.equal(status.ok, true, JSON.stringify(status).slice(0, 200));
+    assert.deepEqual(status.boundaryRefusals, { state: "invalid", total: 0, refusals: [], returned: 0, omitted: 0 });
+    assertAbsent(JSON.stringify(status), [SECRET], "an invalid audit file");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0070 the audit block carries no path and no credential, and reading it changes nothing", async () => {
+  const f = project();
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = SECRET;
+  try {
+    await refusals(f.contentRoot, 2);
+    const before = snapshot(f.base);
+    const serialised = JSON.stringify((await invoke(statusTool(), f.contentRoot)).details);
+
+    assertAbsent(serialised, [SECRET, GITHUB_TOKEN, f.contentRoot, homedir()], "the audit block");
+    assert.equal(/[A-Za-z]:(\\|\/)/.test(serialised), false, "a drive-lettered path survived");
+    assert.deepEqual(snapshot(f.base), before, "reading the status wrote something");
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
     rmSync(f.base, { recursive: true, force: true });
   }
 });
