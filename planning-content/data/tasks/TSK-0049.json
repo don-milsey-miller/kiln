@@ -21,5 +21,5 @@
   "dependsOn": [
     "TSK-0048"
   ],
-  "notes": "⚠️ D15 (2026-09-13): ACC-0113 accepts persisting the operator's answer through a typed stage-document writer, moved from ACC-0068. No such writer exists yet; this task adds it. ACC-0069 is unchanged."
+  "notes": "⚠️ D15 (2026-09-13): ACC-0113 accepts persisting the operator's answer through a typed stage-document writer, moved from ACC-0068. No such writer exists yet; this task adds it. ACC-0069 is unchanged.\n\n⚠️ THE STAGE-DEFINITION BOUNDARY WITH TSK-0071 (recorded 2026-09-18). This task adds ONE OPTIONAL field, `questionSelection`, to `stages/01-intake.json` only, because ACC-0069 requires the question rule to be canonical rather than hard-coded in a prompt. It governs WHICH question to ask while a stage is questioning. It does not govern whether the next activity should be questioning, authoring, delegating, attesting or exiting, and it is not named `method`, `purpose` or `nextActivity`. The loader gains no new refusal for an absent field, so every definition that loads today still loads. See [[TSK-0071]]."
 }
