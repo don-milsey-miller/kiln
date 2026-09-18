@@ -1,0 +1,71 @@
+{
+  "id": "EVD-0110",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the exact recorded session, resumed and guarded",
+  "kind": "experiment",
+  "summary": "For ACC-0103, and it is about WHICH session ran, never that one did. THE IDENTITY IS PROVED BY THE ARGUMENT PI WAS INVOKED WITH, matched against what is on disk. A first run mints one v4 id, records it and passes it as --session-id, which creates the session it names; a rerun passes the recorded id and the record still names the same session. Both are asserted twice over, with a generator that never repeats, so a freshly minted id could never coincide with the recorded one. F121 CAME FIRST AND WAS MEASURED AGAINST THE PINNED 0.84.4: Pi stores sessions as <timestamp>_<uuid>.jsonl and keeps the id in each file's header, a different value from the uuid in the name, so a file named ...11111111-... reports id 99999999-...; deriving ids from filenames reported every real recorded session as gone. Ids now come from SessionManager.list through the package's root export, and the directory is inspected first because list answers 0 for an absent directory, a regular file and an empty one alike. F128 WAS MEASURED THE SAME WAY. --session-id for a session that has gone prints a warning and creates an empty session with that id; --session <file> for a missing file silently becomes a NEW session with a RANDOM id; --session <id> exits 1 without creating anything, and preserves the header id and the prior messages, which the stub-model probe confirmed by the history sent on the next turn. So a resume passes --session <id> and a first run passes --session-id. THAT IS NOT EXACT ON ITS OWN: Pi lists and then opens in two steps and falls back to a prefix match, so a resume also loads Kiln's guard, which at session_start compares the bound id, the transcript's canonical path and the digest of the bytes Kiln inspected. Eight ways of stopping Pi were measured in a real console: ctx.shutdown() deferred until idle and let a whole turn run, signals and process.exit left the cursor hidden, and an uncaught throw from a microtask reached Pi's crash handler, which restored input mode 503 and the cursor and exited 1 with no provider request, no transcript write and no input processed. End to end against the real CLI: a matching session continued with 1 provider request; a changed transcript and a mismatched id each stopped it with 0 requests and the verdicts transcript-changed and session-id-mismatch. FOUR SHAPES PI REWRITES WHILE OPENING were measured and are refused before spawn — an older or missing header version, an unterminated last line, an empty file, and a branch without a message or a thinking level — each changed on disk before session_start, while a current transcript did not. RECOVERY ASKS AND NEVER GUESSES: the list is numbered with no id and no path, nothing is preselected, and an empty line, a closed input, an interrupt, q, or three answers that mean nothing all cancel with nothing spawned and nothing recorded; without a terminal the run refuses with the command for each shell. A choice is written only under the session lock and only while the record's bytes, the listed sessions and the chosen session all still hold. THE FINAL RUN IS 35294728144, all four cells, 1,203 tests and 0 failures in each, with the nine S2 tests and the nine F128 tests passing in every cell. MUTATION CONTROLS RAN LOCALLY, SET BY SET. Discovery and the record, MR1-MR9: 9 active, 9 killed. The launch, MS1-MS7: 7 active, 6 killed, MS4 equivalent because a resume's minted id is discarded by the re-plan under the lock. The plan's position and the picker's rendering, MV1-MV12: 12 active, 12 killed. The transcript refusals and the preflight record, MX1-MX13: 13 active, 13 killed. The guard file, MG1-MG10: 10 active, 8 killed, MG2 and MG5 NOT EXECUTED because this host has neither POSIX mode bits nor the privilege to create a file link. The resume launch, MH1-MH8: 8 active, 8 killed. The recovery, MS2a-MS2i: 9 active, 9 killed. Every guard held: each file restored byte-identical, git status back to baseline, and no fixture left behind.",
+  "outcome": "success",
+  "observedAt": "2026-09-18",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-final": "35294728144 at commit a8d8cf8, one attempt, no job re-run, all four cells green",
+      "cell-windows-22": "node 22, 1203 tests / 1202 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1203 tests / 1202 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1203 tests / 1194 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1203 tests / 1194 pass / 0 fail / 9 skipped",
+      "s2-and-f128-per-cell": "the nine S2 tests and the nine F128 tests passed in all four cells",
+      "first-session": "one v4 id minted, recorded and passed as --session-id; the rerun passes the recorded id and the record still names it, with a non-repeating generator so a fresh id could not coincide",
+      "f121-header-ids": "pinned 0.84.4: a file named ..._11111111-1111-4111-8111-111111111111.jsonl reports header id 99999999-9999-4999-8999-999999999999; SessionManager.list answers 0 for an absent directory, a regular file and an empty directory alike; 200 sessions listed in 30 ms",
+      "f128-selectors": "--session-id for a deleted session: exit 0, warning, new empty session with that id; --session <file> for a deleted file: exit 0, new session with a RANDOM id; --session <id> for a deleted session: exit 1, nothing created; --session <id> for a live session: header id and prior messages preserved, the history sent to the model on the next turn",
+      "stop-mechanism": "interactive console, eight variants: ctx.shutdown() 1 provider request and a transcript write; throw inside the handler caught by Pi, run continued; process.exit(78), kill/emit SIGTERM and SIGINT left the cursor hidden; microtask throw exit 1, 0 requests, transcript unchanged, input mode 503 and cursor restored, message only and no stack path",
+      "guard-end-to-end": "real CLI with Kiln's guard: matching session continued with 1 provider request; changed transcript refused with transcript-changed and 0 requests; mismatched id refused with session-id-mismatch and 0 requests; the expectation file was taken in every case",
+      "transcript-refusals": "measured against the real CLI: header version 2, missing version, unterminated last line, no thinking level on the branch, no message on the branch and an empty file each changed the file before session_start; a current transcript did not",
+      "recovery": "numbered list with no id and no path and nothing preselected; resume by position, n for new, and cancel on q, an empty line, a closed input or three meaningless answers, asked at most three times",
+      "no-terminal": "a recoverable state with no terminal refuses with session-unresolved, recoverable true, and the command for PowerShell and sh; nothing spawned",
+      "revalidation": "a choice is written under the session lock only while the record's bytes, the listed session ids and the chosen session all still hold; otherwise the-sessions-changed-while-choosing or gone, with the other run's record left standing",
+      "cleanup": "the expectation and the answer are cleared on a clean run, on a guard refusal, on a guard that never answered and on an agent that could not start; cleanup deletes only the file Kiln wrote, proved by a replacement at the same name and by an in-place rewrite that keeps the inode",
+      "disclosure": "no session id, path, digest or transcript text in any refusal message or its serialized detail, in the printed list, in the child environment, or in the guard's answer, which carries a version, an outcome and a stable code; a planted id, credential, Windows path and POSIX path in the argument list reach neither the message nor the detail",
+      "mutations": "seven sets, 68 active: MR1-MR9 9 killed; MS1-MS7 6 killed and MS4 equivalent; MV1-MV12 12 killed; MX1-MX13 13 killed; MG1-MG10 8 killed with MG2 and MG5 not executed; MH1-MH8 8 killed; MS2a-MS2i 9 killed. 65 killed, 1 equivalent, 2 not executed; every guard held"
+    },
+    "omissions": [
+      {
+        "fact": "mg2-and-mg5-mutation-execution",
+        "state": "not-captured",
+        "reason": "The guard file's mode bits are a POSIX-only assertion and its symbolic-link case needs a privilege this Windows host does not have, so both mutations were NOT EXECUTED rather than killed. The tests they would have exercised ran and passed on both Ubuntu cells and on Windows."
+      },
+      {
+        "fact": "terminal-restoration-across-hosts",
+        "state": "not-captured",
+        "reason": "The stop was measured on conhost: console input mode, output mode and cursor visibility before, during and after. Terminal state that lives in the emulator rather than the console API - bracketed paste, the alternate screen, kitty keyboard - was not observed, and no other terminal host was tested."
+      },
+      {
+        "fact": "operator-input-during-startup",
+        "state": "not-observable",
+        "reason": "Pi ignores keys typed before startup completes even with no guard, so a typed-ahead probe cannot discriminate. That a keystroke cannot be processed before the guard decides rests on Pi's control flow: no event-loop yield between enabling submissions and the first session_start handler. A positive control confirmed injected keys do reach Pi once it is running."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "Every mutation set ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "CI runs ubuntu-latest and windows-latest only. Nothing here was observed on macOS."
+      }
+    ]
+  }
+}

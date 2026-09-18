@@ -1,0 +1,69 @@
+{
+  "id": "EVD-0111",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the WMI-free process table under the enforced deadline",
+  "kind": "experiment",
+  "summary": "Supplemental to ACC-0081, and it does not replace EVD-0088 or EVD-0109, which stand as written. WMI IS GONE FROM THE WINDOWS IDENTITY ROUTE. F122: in run 35097288227 the PRIMED CIM read exceeded the 10,000 ms launch preflight bound and the launch refused before either child was spawned, which is the event EVD-0109 recorded as the trigger for removing WMI wholesale. The table is now read with NtQuerySystemInformation, called from PowerShell through reflection emit: no WMI, no compiler, one snapshot carrying every process's pid, parent pid and creation FILETIME without opening any process. Measured locally against the CIM route it replaced: about 300 ms a read against about 380 ms, 283 rows with NO missing creation times where Toolhelp32 could not read 160 of 291 without elevation, parent ids equal on 282 of 282 rows and every creation time within 1 microsecond. THE FINAL RUN IS 35294728144, all four cells green, 1,203 tests and 0 failures in each. Its six Windows records are complete true, withinBudget true, unfinished empty and notObserved empty, spending 5,877 to 6,979 ms of 8,000; the launch preflight cost 465 to 691 ms and read 141 to 149 rows, against 3,057 and 3,142 ms for the cold CIM preflights in run 35086096358. The six Linux records are complete true within 5,119 to 6,240 ms and run no preflight. F133, a unit test that injected its processes but computed its allowances from the wall clock, failed twice on loaded Windows runners by turning a survivor into an identity read the deadline refused; all four teardown tests that assert a survivor now fix their budget with their own clock, their waits unchanged, and the survivor mutations still fail every one of them. F130 IS INSTRUMENTED AND OPEN: each real read now records request, child created, first stdout and stderr byte, exit, timeout, kill request and close, with the child's pid, its exit code or signal and byte counts, and after a real timeout three sequential probes isolate PowerShell starting, the native call being defined and the query. Run 35253655887 caught one stall with that instrument: the child existed after 7.2 ms and wrote nothing at all for the full bound. Nothing stalled in the final run, so the probes did not fire and the phase breakdown is still unknown.",
+  "outcome": "success",
+  "observedAt": "2026-09-18",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-final": "35294728144 at commit a8d8cf8, one attempt, no job re-run, all four cells green",
+      "f122-trigger": "35097288227 at commit b8b09b2, windows-22 natural: the primed CIM preflight timed out at 10,009.7 ms with no rows and the launch refused with process-table-not-primed before either child was spawned",
+      "reader": "NtQuerySystemInformation(SystemProcessInformation) from PowerShell through reflection emit, with PreserveSig so a too-small buffer is retried rather than thrown; no WMI, no Add-Type, no compiler",
+      "reader-local": "about 300 ms a read against about 380 ms for CIM; 283 rows, 0 missing creation times, parent ids equal on 282 of 282 rows, creation times within 1 microsecond of CIM's",
+      "mutations": "three sets, 13 active, all killed: MW1-MW7 for the WMI-free reader (the CIM route restored, pid and parent offsets swapped, the creation field read one over, PreserveSig dropped, only the first entry read, creation times dropped, 32-bit offsets on a 64-bit host); MB1-MB4 for the diagnostic (an unbounded settle, companions in parallel, companions without a timeout, a probe reporting table text); MA1-MA2 for the survivor escalation (re-enumerating at escalation, and skipping escalation once the leader exited)",
+      "windows-records": "six records, complete true, withinBudget true, unfinished empty, notObserved empty: node 22 natural 6,748 ms, interrupt 6,979 ms, enumeration 6,642 ms; node 24 natural 6,734 ms, interrupt 5,877 ms, enumeration 6,616 ms, all of an 8,000 ms budget",
+      "preflight": "ran and verified on all six Windows records at 465.5 to 690.7 ms, reading 141 to 149 rows, against 3,057 and 3,142 ms for the cold CIM preflights of run 35086096358",
+      "linux-records": "six records, complete true, withinBudget true, 5,119 to 6,240 ms, preflight ran false with reason not-windows",
+      "f133": "failed on windows-22 in runs 35250274939 and 35279620761; the four teardown tests that assert a survivor now fix their budget with their own clock, and mutations MA1 and MA2 still fail each of them",
+      "f130-instrument": "phases recorded per read; companions run only after a real timeout, sequentially, each with its own 5,000 ms bound; run 35253655887 recorded a stalled read whose child existed after 7.2 ms and wrote nothing for the full 10,000 ms bound; mutations MB1-MB4 killed",
+      "signatures": "no process-table-timeout in any cell of run 35294728144, and no companion probe fired"
+    },
+    "omissions": [
+      {
+        "fact": "f130-cause",
+        "state": "not-observable",
+        "reason": "F130 REMAINS INTERMITTENT AND UNEXPLAINED. It appeared in runs 35214314607, 35250274939 and 35253655887 and not in the three runs since. The one instrumented stall shows the silence begins after PowerShell exists and before its first byte; whether that is PowerShell's own startup, a scan of the script, or the native call itself is not distinguished. A green run does not close it."
+      },
+      {
+        "fact": "companion-probes-in-a-stall",
+        "state": "not-captured",
+        "reason": "The companions run only after a real timeout, and nothing timed out in the final run, so no phase breakdown was captured there."
+      },
+      {
+        "fact": "32-bit-windows",
+        "state": "not-captured",
+        "reason": "The reader chooses its field offsets by pointer size. Only the 64-bit branch has ever run; the 32-bit branch is covered by a mutation, not by a 32-bit platform."
+      },
+      {
+        "fact": "reserved-layout-and-runtime-defined-call",
+        "state": "not-observable",
+        "reason": "The parent pid sits in a region winternl.h marks reserved, and the call is defined in memory at runtime. Both were accepted deliberately: the layout has been stable since NT and is what Toolhelp32 reads, and a scanner that blocked the definition would make the reader fail closed."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "MW1-MW7, MB1-MB4 and MA1-MA2 ran locally on Windows against node v24.18.0, not in CI."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "CI runs ubuntu-latest and windows-latest only. Nothing here was observed on macOS."
+      }
+    ]
+  }
+}
