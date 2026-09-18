@@ -1459,7 +1459,10 @@ export default function register(pi, deps = {}) {
       } catch (e) {
         // ⚠️ THE MODULE'S OWN CODE IS THE MODEL'S CODE. Its refusals are already named for what a caller can
         // do about them, and flattening them to `refused` would tell a model nothing it could act on.
-        if (e?.name === "StageDocumentRefusal") return rendered(refusal(e.code, scrub(e.message, context.contentRoot)));
+        //
+        // ⚠️ CLASSIFIED BY CLASS, NOT BY `name`, WHICH IS WRITABLE. Anything else carrying that name would
+        // otherwise hand a model one of this module's codes for a failure that is not about the document.
+        if (e instanceof documents.StageDocumentRefusal) return rendered(refusal(e.code, scrub(e.message, context.contentRoot)));
         return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
       }
     },

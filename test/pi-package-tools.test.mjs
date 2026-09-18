@@ -21,6 +21,7 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
+import * as stageDocuments from "../lib/stage-documents.mjs";
 import { intakeSection, parseIntakeSection } from "../lib/stage-documents.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
 import { exercised, providerVisible } from "./helpers/provider-visible.mjs";
@@ -1775,6 +1776,54 @@ test("⚠️ ACC-0113 an answer carrying a credential or a machine path reaches 
     verbatim,
     "the operator's own words were altered on their way into their own document"
   );
+});
+
+test("\u26a0\ufe0f ACC-0113 an error that merely calls itself a document refusal is not given one of its codes", async () => {
+  const { contentRoot } = await project();
+
+  // \u26a0\ufe0f `name` IS WRITABLE, AND `code` IS JUST A PROPERTY. Anything can wear both. Only the class the writer
+  // actually throws may hand a model one of the writer's codes, because a model acts on those codes.
+  const impostor = Object.assign(new Error("a failure that is not about this document"), {
+    name: "StageDocumentRefusal",
+    code: "stage-document-anchor-missing",
+  });
+
+  const tools = new Map();
+  register(
+    { registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) },
+    {
+      stageDocuments: {
+        ...stageDocuments,
+        writeStageDocumentEntry: async () => {
+          throw impostor;
+        },
+      },
+    }
+  );
+
+  const before = snapshot(contentRoot);
+  const result = (await invoke(tools.get("kiln_write_stage_document"), contentRoot, { stage: "01-intake", verbatim: "a", interpretation: "b" })).details;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "refused", `an impostor was given the writer's own code: ${result.code}`);
+  assert.equal(result.message.includes("a failure that is not about this document"), true, "the refusal says nothing at all");
+  assertUnchanged(before, snapshot(contentRoot), "an impostor refusal");
+
+  // The real class still reaches its own code through the same seam.
+  const real = new Map();
+  register(
+    { registerTool: (tool) => real.set(tool.name, providerVisible(tool)) },
+    {
+      stageDocuments: {
+        ...stageDocuments,
+        writeStageDocumentEntry: async () => {
+          throw new stageDocuments.StageDocumentRefusal("stage-document-anchor-missing", "no section here");
+        },
+      },
+    }
+  );
+  const authentic = (await invoke(real.get("kiln_write_stage_document"), contentRoot, { stage: "01-intake", verbatim: "a", interpretation: "b" })).details;
+  assert.equal(authentic.code, "stage-document-anchor-missing");
 });
 
 test("⚠️ F114 every declared tool was exercised in this file, and each result and refusal carried its rendering as model-visible text", () => {
