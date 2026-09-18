@@ -169,7 +169,7 @@ test("⚠️ ACC-0071 every project-bound handler refuses a nested tool content 
   const fx = fixture();
   try {
     const tools = toolsFor(fx);
-    assert.equal(PROJECT_BOUND.length, 22, "every declared tool that has a project is covered");
+    assert.equal(PROJECT_BOUND.length, 23, "every declared tool that has a project is covered");
     assert.deepEqual(PROJECT_BOUND.filter((name) => !tools.has(name)), []);
 
     const before = snapshot(fx.base);

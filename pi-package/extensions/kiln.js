@@ -1334,4 +1334,68 @@ export default function register(pi, deps = {}) {
       }
     },
   });
+
+  /**
+   * The operator's answer, written into the stage's document (ACC-0113).
+   *
+   * ⚠️ **THE ONLY WAY A STAGE DOCUMENT IS WRITTEN.** Editing the file directly is what this replaces: a
+   * model with a file editor can rewrite a person's words while claiming to record them, and nothing in
+   * the document would show it happened.
+   *
+   * ⚠️ **BOTH FIELDS ARE REQUIRED, because the separation is the point.** Wording with no reading is a
+   * transcript, and a reading with no wording is the orchestrator's account of a conversation nobody can
+   * check. `verbatim` is stored exactly as supplied; `interpretation` is Kiln's, and is escaped.
+   */
+  pi?.registerTool?.({
+    name: "kiln_write_stage_document",
+    label: "Kiln write stage document",
+    description:
+      "Record one operator answer in a stage's document: their own words exactly as they gave them, and, " +
+      "separately, what Kiln took from them. Appends one entry; never rewrites what is already there.",
+    parameters: {
+      type: "object",
+      properties: {
+        stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 01-intake." },
+        verbatim: {
+          type: "string",
+          description:
+            "The operator's answer in their own words, passed through unchanged. Do not correct, summarise, " +
+            "translate or reformat it.",
+        },
+        interpretation: {
+          type: "string",
+          description: "One line: what Kiln takes this answer to mean. Kiln's words, kept separate from theirs.",
+        },
+      },
+      required: ["stage", "verbatim", "interpretation"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const documents = deps.stageDocuments ?? (await import("../../lib/stage-documents.mjs"));
+      try {
+        const written = await documents.writeStageDocumentEntry(context.contentRoot, params?.stage, {
+          verbatim: params?.verbatim,
+          interpretation: params?.interpretation,
+        });
+        return rendered({
+          ok: true,
+          stage: written.stageId,
+          entry: written.entry,
+          path: relativeTo(context.contentRoot, written.path),
+        });
+      } catch (e) {
+        // ⚠️ THE MODULE'S OWN CODE IS THE MODEL'S CODE. Its refusals are already named for what a caller can
+        // do about them, and flattening them to `refused` would tell a model nothing it could act on.
+        if (e?.name === "StageDocumentRefusal") return rendered(refusal(e.code, scrub(e.message, context.contentRoot)));
+        return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+      }
+    },
+  });
 }

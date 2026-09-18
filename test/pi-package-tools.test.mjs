@@ -21,6 +21,7 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
+import { intakeSection, parseIntakeSection } from "../lib/stage-documents.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
 import { exercised, providerVisible } from "./helpers/provider-visible.mjs";
 
@@ -65,7 +66,10 @@ async function project() {
   mkdirSync(contentRoot, { recursive: true });
   // `kiln_project_status` supplies the Stage 1 document and refuses without it (D19), as a real project has it.
   mkdirSync(join(contentRoot, "stages"), { recursive: true });
-  writeFileSync(join(contentRoot, "stages", "01-intake.md"), "# Stage 01 - Intake\n");
+  writeFileSync(
+    join(contentRoot, "stages", "01-intake.md"),
+    `# Stage 01 - Intake\n\n${intakeSection()}\n## Working notes\n\n_Nothing yet._\n`
+  );
   const o = { contentRoot, schemasDir: SCHEMAS, validators, schemas };
 
   const claim = await createAssertion(
@@ -169,13 +173,14 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_unlink_evidence",
       "kiln_unlink_trace",
       "kiln_write_stage_attestation",
+      "kiln_write_stage_document",
       "research_capability",
       "research_fetch",
       "research_search",
       "validation_capability",
       "validation_run",
     ],
-    "every tool this package declares: nine creations, eight mutations, two reads, activation and the two attestations"
+    "every tool this package declares: nine creations, eight mutations, two reads, activation, the two attestations and the stage-document writer"
   );
 
   for (const tool of tools.values()) {
@@ -1674,6 +1679,102 @@ test("⚠️ ACC-0109 the declaration it returns carries no credential and no ma
 
   assert.equal(text.includes(planted), false);
   assertNoMachinePath(text, [ROOT, homedir()], "a capability result");
+});
+
+/* ============================================ the stage document ============================== */
+
+test("⚠️ ACC-0113 an answer is written into the stage document, wording apart from reading, one entry at a time", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  const write = (params) => invoke(tools.get("kiln_write_stage_document"), contentRoot, params);
+  const document = () => readFileSync(join(contentRoot, "stages", "01-intake.md"), "utf-8");
+
+  const first = (await write({ stage: "01-intake", verbatim: "We keep losing the {why} behind decisions.", interpretation: "Decision rationale is not retained" })).details;
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(first.entry, "A1");
+  assert.equal(first.path, "stages/01-intake.md", "it says where it wrote, relative to the project");
+
+  const second = (await write({ stage: "01-intake", verbatim: "Mostly the architecture ones.", interpretation: "Architecture decisions first" })).details;
+  assert.equal(second.entry, "A2", "a second answer joins the first rather than replacing it");
+
+  // On disk, as the app and the next turn will read it.
+  const parsed = parseIntakeSection(document());
+  assert.deepEqual(parsed.answers, [
+    { label: 1, text: "We keep losing the {why} behind decisions." },
+    { label: 2, text: "Mostly the architecture ones." },
+  ]);
+  assert.deepEqual(parsed.readings, [
+    { label: 1, text: "Decision rationale is not retained" },
+    { label: 2, text: "Architecture decisions first" },
+  ]);
+
+  // ⚠️ THE TOOL IS THE ONLY WRITER, so the rest of the document is exactly what it was.
+  assert.ok(document().startsWith("# Stage 01 - Intake\n"), "the document's own material was rewritten");
+  assert.ok(document().endsWith("## Working notes\n\n_Nothing yet._\n"), "the document's own material was rewritten");
+});
+
+test("⚠️ ACC-0113 every stage-document refusal leaves every byte and modification time alone", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  const name = "kiln_write_stage_document";
+
+  const cases = [
+    ["a stage id that is not one", { stage: "intake", verbatim: "a", interpretation: "b" }, "invalid-request"],
+    ["a stage id that is a path", { stage: "01-intake/../../etc", verbatim: "a", interpretation: "b" }, "invalid-request"],
+    ["no wording at all", { stage: "01-intake", verbatim: "", interpretation: "b" }, "invalid-request"],
+    ["wording with no reading", { stage: "01-intake", verbatim: "a", interpretation: "" }, "invalid-request"],
+    ["a reading over two lines", { stage: "01-intake", verbatim: "a", interpretation: "one\ntwo" }, "invalid-request"],
+    ["a stage with no document", { stage: "09-handoff", verbatim: "a", interpretation: "b" }, "stage-document-missing"],
+  ];
+
+  for (const [label, params, code] of cases) {
+    const before = snapshot(contentRoot);
+    const result = (await invoke(tools.get(name), contentRoot, params)).details;
+
+    assert.equal(result.ok, false, label + ": it was accepted");
+    assert.equal(result.code, code, label + ": " + result.code);
+    assert.ok(result.message.length > 0, label + ": the refusal says something");
+    assertUnchanged(before, snapshot(contentRoot), label);
+  }
+
+  // A document without the section is refused rather than upgraded, and the general migration is TSK-0060's.
+  writeFileSync(join(contentRoot, "stages", "01-intake.md"), "# Stage 01 - Intake\n\n## Working notes\n\n_Nothing yet._\n");
+  const before = snapshot(contentRoot);
+  const stale = (await invoke(tools.get(name), contentRoot, { stage: "01-intake", verbatim: "a", interpretation: "b" })).details;
+  assert.equal(stale.code, "stage-document-anchor-missing", JSON.stringify(stale));
+  assertUnchanged(before, snapshot(contentRoot), "a document with no intake section");
+});
+
+test("⚠️ ACC-0113 an answer carrying a credential or a machine path reaches the document, and neither reaches the result", async () => {
+  const { contentRoot } = await project();
+  const planted = "sk-ant-STAGE-DOCUMENT-PLANTED-7f31";
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = planted;
+
+  // ⚠️ THE OPERATOR'S WORDS ARE NOT REDACTED ON THEIR WAY INTO THEIR OWN DOCUMENT. What is bounded is what
+  // comes BACK: the result carries a stage, an entry and a relative path, and nothing else.
+  const verbatim = "our key is " + planted + " and the repo is at " + contentRoot;
+  let result;
+  try {
+    result = await invoke(registered().get("kiln_write_stage_document"), contentRoot, {
+      stage: "01-intake",
+      verbatim,
+      interpretation: "They pasted a secret at us",
+    });
+  } finally {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+
+  const text = JSON.stringify(result);
+  assert.equal(result.details.ok, true, text);
+  assert.equal(text.includes(planted), false, "the answer's credential came back in the result");
+  assertNoMachinePath(text, [contentRoot, homedir()], "a stage-document result");
+  assert.equal(
+    parseIntakeSection(readFileSync(join(contentRoot, "stages", "01-intake.md"), "utf-8")).answers[0].text,
+    verbatim,
+    "the operator's own words were altered on their way into their own document"
+  );
 });
 
 test("⚠️ F114 every declared tool was exercised in this file, and each result and refusal carried its rendering as model-visible text", () => {

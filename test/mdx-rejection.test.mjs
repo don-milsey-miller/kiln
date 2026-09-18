@@ -145,6 +145,41 @@ test("⚠️ every REAL stage document compiles under the restricted contract", 
   assert.deepEqual(refused, [], "a stage document does not survive the contract it is written under");
 });
 
+test("⚠️ ACC-0113 a document the stage-document writer has filled still compiles under the restricted contract", async () => {
+  const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { intakeSection, writeStageDocumentEntry } = await import("../lib/stage-documents.mjs");
+
+  const base = mkdtempSync(join(tmpdir(), "kiln-mdx-intake-"));
+  const contentRoot = join(base, "planning-content");
+  const path = join(contentRoot, "stages", "01-intake.md");
+  try {
+    mkdirSync(join(contentRoot, "stages"), { recursive: true });
+    writeFileSync(path, `# Stage 1
+
+${intakeSection()}
+## Working notes
+
+Nothing yet.
+`);
+
+    // ⚠️ EVERY ONE OF THESE IS FORBIDDEN JAVASCRIPT WHEN IT IS DOCUMENT TEXT, and an ordinary answer when
+    // somebody types it at a question. The fence is what makes both true at once.
+    for (const [verbatim, interpretation] of [
+      ["We need {state} shared across <Component /> boundaries.", "Shared state across component boundaries"],
+      ['import config from "./config.js";' + String.fromCharCode(10) + 'export const x = 1;', "They pasted a module at us"],
+      ["<script>alert(1)</script>", "They pasted a script tag"],
+      ["1 < 2 && 3 > 2", "An inequality, not markup"],
+    ])
+      await writeStageDocumentEntry(contentRoot, "01-intake", { verbatim, interpretation });
+
+    await build(readFileSync(path, "utf-8"));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ F7 every stage document a REAL initializer generates compiles under the restricted contract", async () => {
   // ⚠️ THE GENERATED DOCUMENT, NOT A HAND-BUILT ONE. The contract above is checked against this
   // repository's own stage documents, which are hand-written; nothing checked what a new project is given.
