@@ -182,20 +182,36 @@ test("⚠️ an identity or a section set that does not match is a refusal of it
   }
 });
 
-test("⚠️ a link in the directory is reported and never followed", () => {
+test("⚠️ a link in the directory is reported as a link, wherever it points", (t) => {
+  // ⚠️ **THIS TEST SAYS WHEN IT DID NOT RUN.** An earlier version returned silently on a host that
+  // cannot create symlinks, so it passed locally while the code it covered was wrong, and all four CI
+  // cells failed. A skip is visible; a silent return is a false pass.
   const fx = toolRoot();
   try {
-    const target = join(fx.base, "elsewhere.md");
-    writeFileSync(target, renderRole("validation"));
+    // Two links: one pointing OUT of the directory, one pointing to a sibling INSIDE it. Both are links
+    // and neither may be read or written through, which is why the kind is decided before the path is
+    // resolved. Resolving first reported the first as a path escape and the second as an ordinary file.
+    const outside = join(fx.base, "elsewhere.md");
+    writeFileSync(outside, renderRole("validation"));
     rmSync(fx.file("validation"));
+    rmSync(fx.file("research"));
     try {
-      symlinkSync(target, fx.file("validation"), "file");
-    } catch {
-      return; // A host without symlink permission cannot exercise this; the refusal is still coded.
+      symlinkSync(outside, fx.file("validation"), "file");
+      symlinkSync(fx.file("planning"), fx.file("research"), "file");
+    } catch (error) {
+      t.skip(`this host cannot create symlinks (${error?.code ?? "unknown"})`);
+      return;
     }
+
     const result = checkRoleDefinitions(fx.base);
-    assert.equal(result.status, "refused");
-    assert.ok(codes(result).includes(SYNC_REFUSAL.LINKED_ENTRY), JSON.stringify(codes(result)));
+    assert.equal(result.status, "refused", JSON.stringify(result));
+    const linked = result.refusals.filter((r) => r.code === SYNC_REFUSAL.LINKED_ENTRY).map((r) => r.role).sort();
+    assert.deepEqual(linked, ["research", "validation"], JSON.stringify(result.refusals));
+    assert.equal(
+      codes(result).includes(SYNC_REFUSAL.PATH_ESCAPE),
+      false,
+      "a link is reported as a link, not as wherever it happens to lead"
+    );
   } finally {
     rmSync(fx.base, { recursive: true, force: true });
   }
