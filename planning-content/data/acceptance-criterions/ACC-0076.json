@@ -6,12 +6,13 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "The child inherits the orchestrator's exact selection and a scoped context",
-  "statement": "The child's reported provider, model and thinking level equal the orchestrator's, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
+  "statement": "The child's reported provider, model and thinking level equal the orchestrator's, its active tool set equals the intersection of its role's declared allowlist and the measured host registry, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
   "evaluates": [
     "CMP-0036"
   ],
   "verifies": [
     "REQ-0025",
     "REQ-0024"
-  ]
+  ],
+  "notes": "Amended 2026-09-18 under TSK-0051's review. The active-tool-set clause came from ACC-0072, which belongs to a task that owns no specialist process. It sits here because this criterion already measures what a real child reports and because TSK-0053's own statement already names the intersected tool allowlist. ACC-0072 keeps the static half: that each definition declares exactly its contract's tools and that an empty declaration fails the check."
 }

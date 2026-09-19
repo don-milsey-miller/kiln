@@ -24,5 +24,6 @@
     "TSK-0039",
     "TSK-0051",
     "TSK-0052"
-  ]
+  ],
+  "notes": "ACC-0076 gained a clause on 2026-09-18, during TSK-0051's review: the child's active tool set equals the intersection of its role's declared allowlist and the measured host registry. It came from ACC-0072, which belongs to a task that owns only the role definitions and their static check. This task's statement already named the intersected tool allowlist, so the criterion now measures what the statement already promised. Nothing else about this task's scope changed, and no outcome moved."
 }

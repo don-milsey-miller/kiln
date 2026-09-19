@@ -5,9 +5,9 @@
   "reviewStatus": "draft",
   "lifecycle": "active",
   "title": "Specialist roster",
-  "responsibility": "Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a lint error.",
+  "responsibility": "Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a role-definition check failure.",
   "satisfies": [
     "REQ-0026"
   ],
-  "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection."
+  "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection. ⚠️ THE CHECK IS THE ROLE-DEFINITION CHECK, not a \"roster lint\": #18 and #143 settled that this project has no artifact roster, and this component's \"specialist roster\" is an unrelated object. ⚠️ THIS COMPONENT DECLARES; IT DOES NOT RUN. What a real child actually receives is CMP-0036's, measured by ACC-0076."
 }
