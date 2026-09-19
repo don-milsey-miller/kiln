@@ -84,6 +84,14 @@ jobs:
       - name: Check the generated stage skills
         run: npm run skills:check
 
+      # ⚠️ THE ROLE DEFINITIONS MUST MATCH THE SPECIALIST CONTRACT, AND EVERY CELL SAYS SO. `specialists/`
+      # is generated from lib/specialists/roles.mjs merged with contractFor(role); a contract edited
+      # without regenerating would leave a child's declared tool list disagreeing with its real write
+      # boundary, and an absent `tools:` line does not narrow a child, it hands it a shell. The check
+      # writes nothing and exits non-zero naming each stale, missing or orphaned definition.
+      - name: Check the generated role definitions
+        run: npm run roles:check
+
       # `npm test` is `node --test`, which discovers `test/**` itself and exits
       # non-zero on any failing file. A non-zero exit fails the step and the
       # job on both shells — bash and, on Windows, pwsh — so there is nothing
