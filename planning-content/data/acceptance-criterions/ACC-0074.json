@@ -6,11 +6,12 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "Stdin is closed and the exact task still arrived",
-  "statement": "One test asserts both facts about the same child: its stdin was closed, and the exact delegated task reached it through the supported non-stdin channel, observed at the child. The verifier's field and its refusal reason describe task binding rather than stdin.",
+  "statement": "One test asserts both facts about the same retained child run: its stdin was closed, and the exact delegated task reached the child's model turn, observed independently through provider-side capture of the child's outbound model request rather than through anything the child reported about itself. The verifier's field and its refusal reason describe task binding rather than stdin.",
   "evaluates": [
     "CMP-0009"
   ],
   "verifies": [
     "REQ-0026"
-  ]
+  ],
+  "notes": "Clarified 2026-09-19 under TSK-0052, before implementation. The original said \"observed at the child\", which reads as a child self-report. Provider-side capture is the stronger observation and is what the compatibility spike already retains: the child is spawned with stdin closed (`stdio: [\"ignore\", \"pipe\", \"pipe\"]`) and a recording provider logs the request the child's own model turn produced, so `sentinelReachedProvider` is evidence from outside the child that the exact task arrived. A child saying it received the task would be the child vouching for itself, which is the failure REQ-0026 exists to prevent.\n\nScope: this criterion is about the VERIFIER's vocabulary and the paired measurement that feeds it. `verifyChild` is a pure function that consumes a run record; producing that record during a real specialist launch is TSK-0053's, under ACC-0076. No real specialist process, child self-report or new transport belongs here."
 }
