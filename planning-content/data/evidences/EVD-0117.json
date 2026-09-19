@@ -1,0 +1,44 @@
+{
+  "id": "EVD-0117",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "The verifier requires an observed task binding, paired with closed stdin on both retained platforms",
+  "kind": "experiment",
+  "summary": "`verifyChild` now requires an independently observed task binding rather than a delivered stdin, and one test asserts both halves of that observation over the same retained child run on both platforms (TSK-0052, against ACC-0074). WHAT CI DID AND DID NOT DO. CI REVALIDATED THE RETAINED LINUX AND WINDOWS MEASUREMENTS; IT DID NOT CREATE NEW LIVE CHILD MEASUREMENTS. The live compatibility tier remained skipped in every cell, reported as `ok 440 - the live contract re-proves against the pinned runtime # SKIP set KILN_PI_COMPAT=live ...`. What was re-proved is that the retained records from `tools/pi-compat/runs/linux.json` and `windows.json` still satisfy the contract, on four platform-and-version combinations. No specialist process was launched. THE RENAME. `CHILD_REFUSED.NO_STDIN` became `CHILD_REFUSED.NO_TASK_BINDING`, `run.stdinDelivered` became `run.taskBindingObserved`, and the detail became \"No task binding was observed for this child, so its output cannot be accepted as an answer to the delegated task.\" The wire value `task-not-delivered` is unchanged, so nothing that switches on the code had to move. The old name asked whether something arrived down a channel the design deliberately CLOSES - the child is spawned `stdio: [\"ignore\", \"pipe\", \"pipe\"]` - which read as a contradiction and invited a later implementer to reopen stdin to satisfy it. A repository-wide sweep finds no remaining `stdinDelivered` or `NO_STDIN` outside the comment recording the move. THE PAIRED ASSERTION. One named test walks both retained platform records and asserts, per record: `taskBinding.stdinClosed === true`, `taskBinding.sentinelReachedProvider === true` for the sentinel `KILN-TASK-SENTINEL-9F3A` written out in the test rather than imported, and `taskBinding.exit === 0`. Either half alone is misleading: closed stdin says only that a channel was shut, and an arrived task alone leaves open that it arrived down the forbidden one. THE OBSERVATION POINT. `sentinelReachedProvider` is computed from a recording provider's log of the request the child's own model turn produced, so it is evidence from OUTSIDE the child. A child reporting its own receipt would be the child vouching for itself, which is the failure REQ-0026 exists to prevent. ACC-0074's statement was clarified to name this before any code was written. STRICTNESS. The verifier tests `!run?.taskBindingObserved`, so only a literal `true` passes: `undefined`, `null`, `false` and a missing field are each refused, and a mutation accepting any truthy or merely-defined value is killed. The verifier CONSUMES the observation and never computes it; producing it during a real specialist launch is TSK-0053's, under ACC-0076.",
+  "outcome": "success",
+  "observedAt": "2026-09-19",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35449416450 at commit 4461ad6, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1316 tests / 1315 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1316 tests / 1315 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1316 tests / 1307 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1316 tests / 1307 pass / 0 fail / 9 skipped",
+      "what-ci-revalidated": "the retained linux and windows measurements in tools/pi-compat/runs/, re-checked against the contract in all four cells",
+      "what-ci-did-not-do": "it created no new live child measurement. The live compatibility tier stayed skipped in every cell, as `ok 440 - the live contract re-proves against the pinned runtime # SKIP set KILN_PI_COMPAT=live`. No specialist process was launched by this task or by CI",
+      "paired-test": "test/pi-compat.test.mjs, `⚠️ ACC-0074 stdin was closed and the exact task still reached the child's model turn, and that pair is what supplies taskBindingObserved`, over every retained platform record: stdinClosed true, sentinelReachedProvider true, exit 0; the pair computes taskBindingObserved; verifyChild accepts on it; and the same run with the observation withheld is refused under NO_TASK_BINDING with a detail matching /No task binding was observed/ and asserted to contain no `stdin`",
+      "wire-contract-test": "test/specialist-contract.test.mjs, `⚠️ TSK-0052 the refusal codes are a wire contract, pinned to their literals`: the whole CHILD_REFUSED table deep-equals { NO_TASK_BINDING: task-not-delivered, TIMED_OUT: timed-out, CAPABILITY_MISSING: capability-missing, SIGNATURE_MISMATCH: signature-mismatch, OUT_OF_ROLE_WRITE: out-of-role-write }, and no code matches /stdin|pipe|stdio/i",
+      "renamed-test": "test/specialist-contract.test.mjs, `output is accepted only after an observed task binding, timeout and capability all pass`, with all nine call sites passing taskBindingObserved",
+      "strictness": "`if (!run?.taskBindingObserved)` - undefined, null, false and a missing field are each refused; mutations replacing it with `=== undefined` or removing it entirely are both killed",
+      "old-vocabulary-absent": "no `stdinDelivered` and no `NO_STDIN` remain in lib/, test/, bin/, app/, pi-package/ or tools/, other than one comment in lib/specialists/contract.mjs recording that the key moved and the wire value did not",
+      "mutations": "10 written, 10 killed, restore byte-identical by sha256 after each: read the old stdin field; restore the stdin sentence; rename the key back to NO_STDIN; change the wire code; accept a child with no observed binding; accept any merely-defined binding; and, on each retained platform record separately, stdinClosed flipped false and sentinelReachedProvider flipped false",
+      "mutation-finding": "changing the wire code survived the first pass, because nothing pinned the literal that Q40 required preserved. The wire-contract test was added for that, and it now dies",
+      "limitation-no-live-child": "no live specialist child was launched. What a real child receives - its active tool set, and its inherited provider, model and thinking level - is ACC-0076's measurement under TSK-0053",
+      "limitation-retained-records": "the two platform records were produced by an earlier spike run and are revalidated rather than regenerated; regenerating them needs KILN_PI_COMPAT=live and a real consumer install",
+      "limitation-verifier-is-pure": "verifyChild consumes a boolean and cannot tell an observed binding from a claimed one. That distinction is made by whoever produces the record, which this task deliberately does not build",
+      "limitation-no-macos": "no macOS coverage; the retained records are linux and windows"
+    }
+  }
+}

@@ -10,6 +10,8 @@
     "REQ-0012"
   ],
   "implementedBy": [
-    "lib/specialists/contract.mjs"
+    "lib/specialists/contract.mjs",
+    "test/pi-compat.test.mjs",
+    "test/specialist-contract.test.mjs"
   ]
 }
