@@ -165,23 +165,42 @@ const REPORTED = () => ({
   research_fetch: RESEARCH_TOOL_SIGNATURES.research_fetch,
 });
 
-test("output is accepted only after stdin, timeout and capability all pass", () => {
+test("⚠️ TSK-0052 the refusal codes are a wire contract, pinned to their literals", () => {
+  // ⚠️ **THE KEY MOVED; THE VALUE MUST NOT.** `NO_STDIN` became `NO_TASK_BINDING` because the old name
+  // described a channel the design closes rather than the fact being checked. The CODE stayed
+  // `task-not-delivered` so nothing that switches on it has to move, and without this literal pin that
+  // promise is unenforced: a mutation changing the value survived until this test was written.
+  assert.deepEqual(
+    { ...CHILD_REFUSED },
+    {
+      NO_TASK_BINDING: "task-not-delivered",
+      TIMED_OUT: "timed-out",
+      CAPABILITY_MISSING: "capability-missing",
+      SIGNATURE_MISMATCH: "signature-mismatch",
+      OUT_OF_ROLE_WRITE: "out-of-role-write",
+    }
+  );
+  // And no code describes a transport. What is refused is a missing task binding, not a missing pipe.
+  for (const code of Object.values(CHILD_REFUSED)) assert.equal(/stdin|pipe|stdio/i.test(code), false, code);
+});
+
+test("output is accepted only after an observed task binding, timeout and capability all pass", () => {
   const c = contractFor("research");
-  const ok = verifyChild(c, { stdinDelivered: true, timedOut: false, reportedTools: REPORTED(), output: "x" });
+  const ok = verifyChild(c, { taskBindingObserved: true, timedOut: false, reportedTools: REPORTED(), output: "x" });
   assert.equal(ok.accepted, true);
 
-  assert.equal(verifyChild(c, { stdinDelivered: false, timedOut: false, reportedTools: REPORTED() }).reason, CHILD_REFUSED.NO_STDIN);
-  assert.equal(verifyChild(c, { stdinDelivered: true, timedOut: true, reportedTools: REPORTED() }).reason, CHILD_REFUSED.TIMED_OUT);
+  assert.equal(verifyChild(c, { taskBindingObserved: false, timedOut: false, reportedTools: REPORTED() }).reason, CHILD_REFUSED.NO_TASK_BINDING);
+  assert.equal(verifyChild(c, { taskBindingObserved: true, timedOut: true, reportedTools: REPORTED() }).reason, CHILD_REFUSED.TIMED_OUT);
   const { research_search, ...missing } = REPORTED();
-  assert.equal(verifyChild(c, { stdinDelivered: true, timedOut: false, reportedTools: missing }).reason, CHILD_REFUSED.CAPABILITY_MISSING);
+  assert.equal(verifyChild(c, { taskBindingObserved: true, timedOut: false, reportedTools: missing }).reason, CHILD_REFUSED.CAPABILITY_MISSING);
 });
 
 test("every refusal is structured, and none carries the output through", () => {
   const c = contractFor("research");
   for (const run of [
-    { stdinDelivered: false, timedOut: false, reportedTools: REPORTED(), output: "plausible prose" },
-    { stdinDelivered: true, timedOut: true, reportedTools: REPORTED(), output: "plausible prose" },
-    { stdinDelivered: true, timedOut: false, reportedTools: {}, output: "plausible prose" },
+    { taskBindingObserved: false, timedOut: false, reportedTools: REPORTED(), output: "plausible prose" },
+    { taskBindingObserved: true, timedOut: true, reportedTools: REPORTED(), output: "plausible prose" },
+    { taskBindingObserved: true, timedOut: false, reportedTools: {}, output: "plausible prose" },
   ]) {
     const r = verifyChild(c, run);
     assert.equal(r.accepted, false);
@@ -199,12 +218,12 @@ test("a changed or removed signature is a mismatch, not a pass", () => {
 
   const renamed = REPORTED();
   renamed.research_search = { ...RESEARCH_TOOL_SIGNATURES.research_search, input: { type: "object", properties: { q: {} }, required: ["q"] } };
-  assert.equal(verifyChild(c, { stdinDelivered: true, timedOut: false, reportedTools: renamed }).reason, CHILD_REFUSED.SIGNATURE_MISMATCH);
+  assert.equal(verifyChild(c, { taskBindingObserved: true, timedOut: false, reportedTools: renamed }).reason, CHILD_REFUSED.SIGNATURE_MISMATCH);
 
   const relaxed = REPORTED();
   relaxed.research_search = { ...RESEARCH_TOOL_SIGNATURES.research_search, input: { type: "object", properties: { query: {}, maxResults: {} }, required: [] } };
   assert.equal(
-    verifyChild(c, { stdinDelivered: true, timedOut: false, reportedTools: relaxed }).reason,
+    verifyChild(c, { taskBindingObserved: true, timedOut: false, reportedTools: relaxed }).reason,
     CHILD_REFUSED.SIGNATURE_MISMATCH,
     "dropping a REQUIRED field is a signature change even though the properties still match"
   );

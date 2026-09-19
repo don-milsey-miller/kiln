@@ -28,6 +28,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { redactionViolations, redact } from "../tools/pi-compat/lib/redact.mjs";
+import { CHILD_REFUSED, contractFor, verifyChild } from "../lib/specialists/contract.mjs";
+import { RESEARCH_TOOL_SIGNATURES } from "../lib/research/tools.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RUNS = join(ROOT, "tools", "pi-compat", "runs");
@@ -35,6 +37,9 @@ const PINNED = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
   .dependencies["@earendil-works/pi-coding-agent"];
 
 const load = (name) => JSON.parse(readFileSync(join(RUNS, name), "utf8"));
+
+/** The research role's tools, reported as a child would report them. */
+const researchTools = () => Object.fromEntries(Object.entries(RESEARCH_TOOL_SIGNATURES).map(([name, spec]) => [name, spec]));
 const platforms = () => readdirSync(RUNS).filter((f) => f.endsWith(".json"));
 
 /**
@@ -324,3 +329,50 @@ function liveSkip() {
   if (process.env.KILN_PI_COMPAT === "live") return false;
   return "set KILN_PI_COMPAT=live to re-run the spike against a real consumer install (slow: builds a project and runs npm install)";
 }
+
+/* ------------------------------------------------------------------ ACC-0074, TSK-0052 */
+
+/**
+ * The delegated task's own sentinel, as the spike sends it. Written out here rather than imported so
+ * the measurement and the assertion are two statements a reader can compare, which is the same trade
+ * every other pinned constant in this file makes.
+ */
+const TASK_SENTINEL = "KILN-TASK-SENTINEL-9F3A";
+
+test("⚠️ ACC-0074 stdin was closed and the exact task still reached the child's model turn, and that pair is what supplies taskBindingObserved", () => {
+  // ⚠️ **BOTH FACTS, ABOUT THE SAME RETAINED CHILD RUN, IN ONE TEST.** Either one alone is misleading.
+  // Closed stdin without an arrived task says only that a channel was shut. An arrived task without
+  // closed stdin leaves open the possibility that it arrived down the channel the design forbids. The
+  // pair is the claim, so it is asserted as a pair.
+  //
+  // ⚠️ **OBSERVED FROM OUTSIDE THE CHILD.** `sentinelReachedProvider` is computed from a recording
+  // provider's log of the request the child's own model turn produced. A child reporting that it
+  // received its task would be the child vouching for itself, which is the failure REQ-0026 exists to
+  // prevent.
+  for (const f of platforms()) {
+    const r = load(f);
+    const binding = r.taskBinding;
+    const where = (why) => `${f}: ${why}`;
+
+    assert.equal(binding.stdinClosed, true, where("the child's stdin was not closed"));
+    assert.equal(binding.sentinelReachedProvider, true, where(`${TASK_SENTINEL} did not reach the provider`));
+    assert.equal(binding.exit, 0, where("the run that carried the task did not finish cleanly"));
+
+    // ⚠️ THE MEASUREMENT IS THE VERIFIER'S INPUT, AND THIS IS WHERE THE TWO MEET. `verifyChild` takes
+    // `taskBindingObserved` and never computes it; this pair is what a delegation runtime will compute
+    // it from. Producing it during a real specialist launch is TSK-0053's, under ACC-0076.
+    const taskBindingObserved = binding.stdinClosed === true && binding.sentinelReachedProvider === true;
+    assert.equal(taskBindingObserved, true, where("the retained run does not supply an observed task binding"));
+
+    const contract = contractFor("research");
+    const accepted = verifyChild(contract, { taskBindingObserved, timedOut: false, reportedTools: researchTools(), output: "an answer" });
+    assert.equal(accepted.accepted, true, where(`the verifier refused an observed binding: ${JSON.stringify(accepted)}`));
+
+    // And the same run with the observation withheld is refused, under the task-binding reason.
+    const refused = verifyChild(contract, { taskBindingObserved: false, timedOut: false, reportedTools: researchTools(), output: "plausible prose" });
+    assert.equal(refused.accepted, false, where("output was accepted with no observed task binding"));
+    assert.equal(refused.reason, CHILD_REFUSED.NO_TASK_BINDING, where(refused.reason));
+    assert.match(refused.detail, /No task binding was observed/, where(refused.detail));
+    assert.equal(/stdin/i.test(refused.detail), false, where("the refusal still talks about stdin"));
+  }
+});
