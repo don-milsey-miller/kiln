@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "No role definition declares a provider, a model or a thinking level",
   "statement": "No shipped role definition declares a provider, a model or a thinking level, and the role-definition check fails one that does.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0025"
   ],
-  "notes": "Amended 2026-09-18 under TSK-0051, before implementation. This criterion previously added \"and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it\". That is a measurement of a real child, which TSK-0051 does not own; ACC-0076 already states it and belongs to TSK-0053. CMP-0035's note gives the reason the static half matters on its own: a role-shipped model would silently override the operator's project selection."
+  "notes": "Amended 2026-09-18 under TSK-0051, before implementation. This criterion previously added \"and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it\". That is a measurement of a real child, which TSK-0051 does not own; ACC-0076 already states it and belongs to TSK-0053. CMP-0035's note gives the reason the static half matters on its own: a role-shipped model would silently override the operator's project selection.",
+  "evidencedBy": [
+    "EVD-0116"
+  ]
 }

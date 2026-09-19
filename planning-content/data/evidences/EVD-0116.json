@@ -1,0 +1,39 @@
+{
+  "id": "EVD-0116",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "No role definition declares a provider, a model or a thinking level",
+  "kind": "experiment",
+  "summary": "No shipped role definition declares a provider, a model or a thinking level, and the role-definition check fails one that does (TSK-0051, against ACC-0073). SCOPE. This is a STATIC check of what the three shipped definitions declare. No specialist process was launched and none is claimed: what a real child actually receives - its active tool set, and its inherited provider, model and thinking level - is ACC-0076's measurement under TSK-0053, which owns the delegation runtime. STRUCTURAL, NOT A BLOCKLIST. The rendered frontmatter has a closed key set - name, role, description, tools, in that order and nothing else - so a `model:` line is not a field somebody forgot to reject: it is a key outside the set, and the reader refuses it as one. The authored data is closed the same way, at seven prose fields, so no role can author a model either. TEN NAMED REFUSALS. provider, model, models, thinking, thinkingLevel, reasoning, reasoningEffort, apiKey, baseUrl and api are each refused under `frontmatter-declares-model-selection` rather than as an unknown key, because a criterion that names model selection deserves a refusal that names it back, and because \"you may not choose a model here\" is a better sentence for an operator than \"unknown key\". A mutation narrowing that list to `model` alone is killed. THE SHIPPED FILES. All three are asserted to contain no provider, model, thinkingLevel, thinking, reasoning, apiKey or baseUrl line, and separately to carry no credential, no drive-lettered path, no home directory and no model name such as gpt- or claude-. WHY IT MATTERS, from CMP-0035's own note: a role-shipped model would silently override the operator's project selection, which REQ-0025 requires to be chosen by the operator from what discovery reports and recorded as reproducible project configuration.",
+  "outcome": "success",
+  "observedAt": "2026-09-19",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35447318501 at commit 587b4bf, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1314 tests / 1313 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1314 tests / 1313 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1314 tests / 1305 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1314 tests / 1305 pass / 0 fail / 9 skipped",
+      "role-definition-check": "the unconditional CI step `Check the generated role definitions` reported `[roles] clean: all 3 role definitions match the specialist contract.` in all four cells, before the suite ran",
+      "closed-key-set": "name, role, description, tools, in that order; a key outside the set is refused, a duplicate is refused, and a reordering is refused",
+      "model-selection-keys": "provider, model, models, thinking, thinkingLevel, reasoning, reasoningEffort, apiKey, baseUrl, api, each refused under frontmatter-declares-model-selection",
+      "shipped-files-clean": "test/specialist-roles.test.mjs asserts no provider, model, thinkingLevel, thinking, reasoning, apiKey or baseUrl line in any of the three files, and no credential, drive-lettered path, home directory or model name in their bytes",
+      "authored-data-closed": "lib/specialists/roles.mjs exports AUTHORED_FIELDS and a test asserts each role's keys equal that set exactly, so no role can author a model in the prose either",
+      "mutations": "within the 24-mutation set: letting a model-selection key through as an ordinary unknown key, narrowing the model-selection list to `model` alone, accepting an unknown key at all, accepting a duplicated key, and accepting the keys in any order. All killed",
+      "limitation-static": "this is what the definitions DECLARE. No specialist run was performed and no inherited provider, model or thinking level was observed; that half moved to ACC-0076 under TSK-0053 during this task's review",
+      "limitation-key-names": "the ten named keys are the ones known to select a model or a provider today. A future key with a new name would be refused as an unknown key rather than under the model-selection code, which is the conservative outcome but a less precise message"
+    }
+  }
+}

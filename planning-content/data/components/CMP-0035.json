@@ -9,5 +9,20 @@
   "satisfies": [
     "REQ-0026"
   ],
-  "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection. ⚠️ THE CHECK IS THE ROLE-DEFINITION CHECK, not a \"roster lint\": #18 and #143 settled that this project has no artifact roster, and this component's \"specialist roster\" is an unrelated object. ⚠️ THIS COMPONENT DECLARES; IT DOES NOT RUN. What a real child actually receives is CMP-0036's, measured by ACC-0076."
+  "notes": "⚠️ THE MISSING `tools:` LINE IS THE HAZARD, and it was measured: with no allowlist a child's active set came back as read, bash, edit and write plus every custom tool. Omitting the line does not narrow the child, it hands it a shell. ⚠️ NO ROLE DECLARES A MODEL in this version; a role-shipped model would silently override the operator's project selection. ⚠️ THE CHECK IS THE ROLE-DEFINITION CHECK, not a \"roster lint\": #18 and #143 settled that this project has no artifact roster, and this component's \"specialist roster\" is an unrelated object. ⚠️ THIS COMPONENT DECLARES; IT DOES NOT RUN. What a real child actually receives is CMP-0036's, measured by ACC-0076.",
+  "implementedBy": [
+    "bin/generate-specialist-roles.mjs",
+    "lib/specialists/contract.mjs",
+    "lib/specialists/parse.mjs",
+    "lib/specialists/render.mjs",
+    "lib/specialists/role-files.mjs",
+    "lib/specialists/roles.mjs",
+    "lib/tool-wire-names.mjs",
+    "specialists/planning.md",
+    "specialists/research.md",
+    "specialists/validation.md",
+    "test/specialist-role-files.test.mjs",
+    "test/specialist-roles.test.mjs",
+    "test/tool-wire-names.test.mjs"
+  ]
 }
