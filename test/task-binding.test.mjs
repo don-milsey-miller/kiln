@@ -20,6 +20,7 @@ import {
   payloadTexts,
 } from "../lib/specialists/task-frame.mjs";
 import { FD_ENV, NONCE_ENV, createTaskObserver } from "../lib/specialists/task-observer.mjs";
+import { CHILD_REPORT_TYPE } from "../lib/specialists/child-report.mjs";
 
 const NONCE = "00fece891dbd4927";
 const TASK = "Summarise what the port office needs from nightly dock-fee reconciliation.";
@@ -37,11 +38,24 @@ const payloadWith = (text) => ({
   tools: [],
 });
 
-/** An observer with a scripted environment and a captured sink. */
+/**
+ * An observer with a scripted environment and a captured sink.
+ *
+ * ⚠️ **TWO KINDS OF LINE, ROUTED BY TYPE (D46).** The observer also writes a typed child report on
+ * the same fd. `lines` is everything it wrote; `attestations` is the binding lines alone, which are
+ * the ones this file is about. Reading by position would depend on the order they were written in.
+ */
 function observer({ nonce = NONCE } = {}) {
   const lines = [];
   const it = createTaskObserver({ env: { [NONCE_ENV]: nonce, [FD_ENV]: "3" }, emit: (line) => lines.push(line) });
-  return { it, lines, attestations: () => lines.map((l) => JSON.parse(l)) };
+  const parsed = () => lines.map((l) => JSON.parse(l));
+  return {
+    it,
+    lines,
+    all: parsed,
+    reports: () => parsed().filter((l) => l.type === CHILD_REPORT_TYPE),
+    attestations: () => parsed().filter((l) => l.type === undefined),
+  };
 }
 
 /* ============================================================== the frame ===================== */
@@ -87,7 +101,7 @@ test("⚠️ D45 the first request carrying the frame is attested, with measured
   const o = observer();
   o.it.observe({ payload: payloadWith(f.text) });
 
-  assert.equal(o.lines.length, 1, "exactly one attestation");
+  assert.equal(o.attestations().length, 1, "exactly one attestation");
   assert.deepEqual(o.attestations()[0], { v: ATTESTATION_VERSION, ok: true, nonce: NONCE, units: f.units, sha256: f.sha256 });
   assert.deepEqual(judgeAttestation(o.attestations()[0], f), { taskBindingObserved: true, reason: null });
 });
@@ -105,7 +119,7 @@ test("⚠️ D45 request one without the frame and request two with it leaves th
   o.it.observe({ payload: payloadWith(f.text) });
   o.it.observe({ payload: payloadWith(f.text) });
 
-  assert.equal(o.lines.length, 1, "a later request produced a second attestation");
+  assert.equal(o.attestations().length, 1, "a later request produced a second attestation");
   assert.deepEqual(o.attestations()[0], { v: ATTESTATION_VERSION, ok: false, reason: ATTEST_FAILURE.NO_FRAME });
 
   const judged = judgeAttestation(o.attestations()[0], f);
@@ -119,7 +133,7 @@ test("⚠️ D45 the latch also closes on a successful first observation", () =>
   const o = observer();
   o.it.observe({ payload: payloadWith(f.text) });
   o.it.observe({ payload: payloadWith(f.text) });
-  assert.equal(o.lines.length, 1, "a second request was attested as well");
+  assert.equal(o.attestations().length, 1, "a second request was attested as well");
 });
 
 test("⚠️ D45 an observer with no nonce attests a failure rather than staying silent", () => {
@@ -133,6 +147,7 @@ test("⚠️ an attestation carries no task text, no payload and no path", () =>
   const f = framed();
   for (const o of [observer(), observer({ nonce: "" })]) {
     o.it.observe({ payload: { ...payloadWith(f.text), apiKey: "sk-ant-PLANTED-TASKBINDING", baseUrl: "https://example.invalid/v1" } });
+    // ⚠️ BOTH LINES, because the child report travels the same fd and must be just as clean.
     const line = o.lines.join("");
     assert.equal(line.includes("port office"), false, "the task text reached the attestation");
     assert.equal(line.includes("sk-ant-PLANTED-TASKBINDING"), false, "a credential reached the attestation");
@@ -193,4 +208,18 @@ test("⚠️ the observer measures the body rather than echoing the header's cla
   assert.notEqual(attested.sha256, f.sha256, "the observer echoed the header's digest");
   assert.notEqual(attested.units, f.units, "the observer echoed the header's length");
   assert.equal(judgeAttestation(attested, f).taskBindingObserved, false);
+});
+
+test("⚠️ D46 the observer also writes one typed child report, on the same first hook", () => {
+  // ⚠️ THE BINDING ATTESTATION IS UNCHANGED, and the report is a separate typed line. A reader
+  // routes on the type; nothing depends on which was written first.
+  const f = framed();
+  const o = observer();
+  o.it.observe({ payload: payloadWith(f.text) });
+  o.it.observe({ payload: payloadWith(f.text) });
+
+  assert.equal(o.attestations().length, 1, "more than one binding attestation");
+  assert.equal(o.reports().length, 1, "more than one child report");
+  assert.deepEqual(Object.keys(o.attestations()[0]).sort(), ["nonce", "ok", "sha256", "units", "v"], "the binding attestation was widened");
+  assert.equal(o.reports()[0].type, CHILD_REPORT_TYPE);
 });

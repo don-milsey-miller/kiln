@@ -13,11 +13,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { dirname as parentOf } from "node:path";
+import { fileURLToPath } from "node:url";
 import { contractFor } from "../lib/specialists/contract.mjs";
+import { buildChildReport } from "../lib/specialists/child-report.mjs";
+
+const REPO = join(parentOf(fileURLToPath(import.meta.url)), "..");
 import { ATTESTATION_VERSION, frameTask } from "../lib/specialists/task-frame.mjs";
 import { DELEGATION_REFUSED, delegateToSpecialist, intersectAllowlist } from "../lib/specialists/delegate.mjs";
 
@@ -25,20 +30,31 @@ import { DELEGATION_REFUSED, delegateToSpecialist, intersectAllowlist } from "..
 const FIXED_CLEANUP_MESSAGE = (await delegateToSpecialist({ role: "research", task: "x", agentDir: "d", hostRegistry: ["nothing"] }, {})).message === undefined ? "" : "The delegation's temporary material could not be removed, so the run is not reported.";
 
 const digestOf = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+/** The value following a flag in a spawned argument list. */
+const flag = (args, name) => (args.indexOf(name) < 0 ? undefined : args[args.indexOf(name) + 1]);
 const TASK = "Find what the port office already publishes about dock-fee reconciliation.";
 const HOST = () => [...contractFor("research").tools];
 
-/** Every `kiln-delegate-*` workspace currently under the temp directory. */
-const workspaces = () =>
-  readdirSync(tmpdir())
-    .filter((n) => n.startsWith("kiln-delegate-"))
-    .map((n) => join(tmpdir(), n));
+/**
+ * The workspaces THIS FILE's delegations created, by the path each child was actually given.
+ *
+ * ⚠️ **SCANNING THE TEMPORARY DIRECTORY IS NOT SAFE HERE.** Another test file creates workspaces
+ * under the same prefix, `node --test` runs files concurrently, and a global scan therefore counts a
+ * live workspace belonging to a run that has not finished as material this file leaked. Both files
+ * passed alone and failed together until each tracked its own.
+ */
+const created = new Set();
+const workspaces = () => [...created].filter((path) => existsSync(path));
 
 /**
  * A scripted child. It records what it was spawned with, optionally reads the prompt file the runtime
  * wrote, and emits whatever the case asks for.
  */
-function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, stdout = null, hang = false } = {}) {
+/**
+ * A scripted child. ⚠️ IT EMITS BOTH FD-3 LINES: the binding attestation, unchanged, and the typed
+ * child report the gate now reads. `report` scripts the second one; `"none"` omits it entirely.
+ */
+function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, stdout = null, hang = false, report = "matching", reportOver = {} } = {}) {
   const calls = [];
   const spawn = (command, args, options) => {
     const child = new EventEmitter();
@@ -55,15 +71,40 @@ function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, st
     const promptFile = readdirSync(promptDir)[0];
     const promptPath = join(promptDir, promptFile);
     const body = readFileSync(promptPath, "utf8");
+    created.add(options.cwd);
     calls.push({ command, args, options, promptPath, promptBody: body, promptMode: statSync(promptPath).mode & 0o777 });
 
     const nonce = options.env.KILN_TASK_NONCE;
     const task = body.slice(body.indexOf(">>>\n") + 4, body.indexOf(`\n<<<KILN-TASK-END nonce=${nonce}>>>`));
 
     queueMicrotask(() => {
-      const tools = sessionTools ?? Object.fromEntries(Object.entries(contractFor("research").toolSignatures));
-      child.stdout.emit("data", `${JSON.stringify({ type: "session", tools })}\n`);
+      // Pi's real events: a session line with no tools, and an assistant message naming the selection.
+      child.stdout.emit("data", `${JSON.stringify({ type: "session", version: 3, id: "x", cwd: options.cwd })}\n`);
+      child.stdout.emit(
+        "data",
+        `${JSON.stringify({ type: "message_end", message: { role: "assistant", content: [], provider: flag(args, "--provider"), model: flag(args, "--model") } })}\n`
+      );
       if (stdout !== null) child.stdout.emit("data", stdout);
+
+      if (report !== "none") {
+        // ⚠️ **THE REAL BUILDER, NOT AN IMITATION OF IT.** A hand-written report drifts from what the
+        // observer actually sends: the first version copied raw signatures where the observer sends
+        // REDUCED ones, and every case failed as `child-report-malformed` for that reason alone.
+        const signatures = sessionTools ?? Object.fromEntries(Object.entries(contractFor("research").toolSignatures));
+        const activeTools = [...(flag(args, "--tools") ?? "").split(",").filter(Boolean)].sort();
+        const line = {
+          ...buildChildReport({
+            pi: {
+              getActiveTools: () => activeTools,
+              getAllTools: () => activeTools.map((name) => ({ name, parameters: signatures[name]?.input })), 
+            },
+            ctx: { model: { provider: flag(args, "--provider"), id: flag(args, "--model") }, thinkingLevel: flag(args, "--thinking") },
+          }),
+          ...reportOver,
+        };
+        attestPipe.emit("data", `${JSON.stringify(line)}\n`);
+        if (report === "duplicate") attestPipe.emit("data", `${JSON.stringify(line)}\n`);
+      }
 
       if (attest === "bound") attestPipe.emit("data", `${JSON.stringify({ v: ATTESTATION_VERSION, ok: true, nonce, units: task.length, sha256: digestOf(task) })}\n`);
       else if (attest === "no-frame") attestPipe.emit("data", `${JSON.stringify({ v: ATTESTATION_VERSION, ok: false, reason: "frame-absent-from-first-request" })}\n`);
@@ -119,7 +160,7 @@ const deps = (script, extra = {}) => {
 const request = (over = {}) => ({
   role: "research",
   task: TASK,
-  toolRoot: "D:/nowhere",
+  toolRoot: REPO,
   agentDir: join(tmpdir(), "kiln-delegate-agent-fixture"),
   provider: "openai-codex",
   model: "gpt-5.6-sol",
@@ -161,7 +202,22 @@ test("⚠️ ACC-0076 the child is launched with closed stdin, the intersected a
   assert.equal(args[args.indexOf("--model") + 1], "gpt-5.6-sol");
   assert.equal(args[args.indexOf("--thinking") + 1], "medium");
   assert.deepEqual(args[args.indexOf("--tools") + 1].split(","), [...contractFor("research").tools]);
-  assert.ok(args[args.indexOf("-e") + 1].endsWith("task-observer.mjs"), "the observer was not loaded");
+  // ⚠️ **THE ISOLATION FLAGS, MEASURED BEFORE THEY WERE RELIED ON.** A first real run showed the
+  // provider receiving Pi's generic coding-assistant prompt, no role definition, and no tools at all.
+  for (const flagName of ["--no-extensions", "--no-skills", "--no-context-files", "--no-builtin-tools", "--system-prompt"])
+    assert.ok(args.includes(flagName), `missing ${flagName}`);
+
+  // Exactly two explicit extensions, in order: Kiln's package, then the observer.
+  const loaded = args.map((a, i) => (a === "-e" ? args[i + 1] : null)).filter(Boolean);
+  assert.equal(loaded.length, 2, `explicit extensions: ${JSON.stringify(loaded)}`);
+  assert.ok(loaded[0].endsWith(join("pi-package", "extensions", "kiln.js")), loaded[0]);
+  assert.ok(loaded[1].endsWith("task-observer.mjs"), loaded[1]);
+
+  // The system prompt is the canonical role definition, byte for byte.
+  const systemPrompt = flag(args, "--system-prompt");
+  assert.equal(systemPrompt, readFileSync(join(REPO, "specialists", "research.md"), "utf-8"), "the role definition was rebuilt rather than read");
+  assert.ok(systemPrompt.includes("Research specialist"));
+  assert.ok(systemPrompt.includes("Forbidden actions"));
 
   // ⚠️ THE TASK IS IN THE FILE AND NOWHERE ELSE.
   assert.equal(args.join(" ").includes(TASK), false, "the task reached argv");
@@ -211,7 +267,7 @@ test("⚠️ ACC-0076 a silent observer is a refusal, not a pass", async () => {
 
 test("⚠️ D43 the existing gate runs on every path, so a bound child with the wrong tools is still refused", async () => {
   // ⚠️ NO PERMISSIVE PATH. The binding is good; the child reported no tools, and `verifyChild` refuses.
-  const script = scriptedChild({ sessionTools: {} });
+  const script = scriptedChild({ reportOver: { activeTools: [], toolSignatures: {} } });
   const result = await delegateToSpecialist(request(), deps(script));
   assert.equal(result.ok, false);
   assert.equal(result.code, "capability-missing");
@@ -393,6 +449,7 @@ test("⚠️ F28 a real child that never exits is stopped by the supervisor's ow
 
   let pid = null;
   const realSpawn = (command, args, options) => {
+    created.add(options.cwd);
     // Ignore the agent's own arguments; run a sleeper with the same stdio contract.
     const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { ...options, env: { ...options.env } });
     pid = child.pid;
@@ -484,4 +541,64 @@ test("⚠️ no case in this file leaves a workspace behind", () => {
   // taken inside itself, so material left by ANOTHER case is invisible to it. Two cases that inject a
   // failing remover leaked one workspace each until they were made to clean up after themselves.
   assert.deepEqual(workspaces(), [], `workspaces survived this file: ${workspaces().join(", ")}`);
+});
+
+/* ============================================ the launch protocol's own guards ================ */
+
+test("⚠️ a role definition that is present but empty refuses too", async () => {
+  // ⚠️ TWO CAUSES, ONE OUTCOME: a file that is missing throws, and a file that is empty does not. Both
+  // leave the child with no role, so both refuse - and a mutation removing either guard must die.
+  const base = mkdtempSync(join(tmpdir(), "kiln-empty-role-"));
+  mkdirSync(join(base, "specialists"), { recursive: true });
+  writeFileSync(join(base, "specialists", "research.md"), "   \n\n  \n");
+  const script = scriptedChild();
+  try {
+    const result = await delegateToSpecialist(request({ toolRoot: base }), deps(script));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, DELEGATION_REFUSED.NO_ROLE_DEFINITION);
+    assert.equal(script.calls.length, 0, "a child was launched with an empty role");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a role whose definition cannot be read refuses before spawning", async () => {
+  // ⚠️ AN EMPTY SYSTEM PROMPT WOULD LEAVE PI'S CODING-ASSISTANT DEFAULT IN PLACE, which is the exact
+  // state a real run measured and the whole reason `--system-prompt` is passed at all.
+  const script = scriptedChild();
+  const result = await delegateToSpecialist(request({ toolRoot: join(tmpdir(), "kiln-no-specialists-here") }), deps(script));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, DELEGATION_REFUSED.NO_ROLE_DEFINITION);
+  assert.equal(script.calls.length, 0, "a child was launched with no role to be");
+});
+
+test("⚠️ an injected extension list that is not a list is ignored, not spread", async () => {
+  // ⚠️ THE SEAM IS INJECTION ONLY, and a caller that hands it something odd must not be able to change
+  // what `-e` receives. Spreading a string would put its characters on the command line.
+  const script = scriptedChild();
+  for (const junk of ["not-a-list", 7, { path: "x" }, null]) {
+    script.calls.length = 0;
+    const result = await delegateToSpecialist(request(), { ...deps(script), extraExtensions: junk });
+    assert.equal(result.ok, true, JSON.stringify(junk));
+    const loaded = script.calls[0].args.map((a, i) => (a === "-e" ? script.calls[0].args[i + 1] : null)).filter(Boolean);
+    assert.equal(loaded.length, 2, `${JSON.stringify(junk)}: ${JSON.stringify(loaded)}`);
+  }
+});
+
+test("⚠️ D46 the gate reads the JUDGED report, never the raw one the child sent", async () => {
+  // ⚠️ A RUNTIME THAT TOOK `reports[0].toolSignatures` DIRECTLY would accept a report the judge refused -
+  // a duplicate, a contradiction, an unsorted list - because the signatures would still be there to read.
+  for (const over of [{ provider: "somewhere-else" }, { activeTools: ["research_search", "kiln_create_evidence"] }]) {
+    const script = scriptedChild({ reportOver: over });
+    const result = await delegateToSpecialist(request(), deps(script));
+    assert.equal(result.ok, false, JSON.stringify(over));
+    assert.equal(result.code, "capability-missing", `${JSON.stringify(over)}: ${result.code}`);
+    assert.equal(result.observation.childReportAccepted, false);
+  }
+
+  // And a duplicated report is refused even though each copy is individually well formed.
+  const duplicated = scriptedChild({ report: "duplicate" });
+  const result = await delegateToSpecialist(request(), deps(duplicated));
+  assert.equal(result.ok, false);
+  assert.equal(result.observation.childReportReason, "child-report-duplicated");
 });
