@@ -266,6 +266,94 @@ async function refuseUnconfirmed(context, deps, operation, target) {
 }
 
 /**
+ * What this session is running under, from the live invocation context — TSK-0053 (F32).
+ *
+ * ⚠️ **THE CONTEXT, NOT THE TRANSCRIPT.** An earlier version walked `model_change` and
+ * `thinking_level_change` entries and treated a session with no thinking record as `off`. Neither is
+ * safe: the transcript is history, and a session can be running at a level nothing wrote an entry for,
+ * so inferring `off` would hand a child a level the orchestrator is not using. `ctx.model` and
+ * `ctx.thinkingLevel` are what this turn is actually running under.
+ *
+ * ⚠️ **ALL THREE, OR NONE.** A child that inherited two of the three would be answering under a
+ * selection the operator never made, which REQ-0025 forbids.
+ */
+function inheritedSelection(ctx) {
+  const provider = ctx?.model?.provider;
+  const model = ctx?.model?.id;
+  const thinkingLevel = ctx?.thinkingLevel;
+  if (typeof provider !== "string" || provider.length === 0) return null;
+  if (typeof model !== "string" || model.length === 0) return null;
+  if (typeof thinkingLevel !== "string" || thinkingLevel.length === 0) return null;
+  return { provider, model, thinkingLevel };
+}
+
+/**
+ * The tool names this host has actually registered — TSK-0053 (F33).
+ *
+ * ⚠️ **`pi.getAllTools()`, NEVER THE PACKAGE DECLARATION.** ACC-0076 asks for the intersection of the
+ * role's allowlist with the MEASURED host registry. Substituting `signature.json` would answer a
+ * different question: what this package claims, rather than what this session holds.
+ *
+ * ⚠️ A HOST THAT CANNOT BE MEASURED IS NOT AN EMPTY HOST. `null` refuses upstream; an empty array
+ * would silently intersect to nothing and read as a role with no tools.
+ */
+function measureHostRegistry(deps, pi) {
+  const measure = deps?.measureHostRegistry ?? (() => pi?.getAllTools?.());
+  let tools;
+  try {
+    tools = measure();
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(tools)) return null;
+  const names = tools.map((tool) => tool?.name).filter((name) => typeof name === "string" && name.length > 0);
+  return names.length > 0 ? names : null;
+}
+
+/**
+ * A delegation that was accepted: the role, the answer, and what was observed about the run.
+ *
+ * ⚠️ **NO NONCE, NO DIGEST, NO TEMPORARY LOCATION.** The binding's machinery is Kiln's business; what a
+ * caller needs is whether it held.
+ */
+const deliveredResult = (result) => ({
+  ok: true,
+  role: result.role,
+  output: result.output ?? null,
+  observed: observedForModel(result.observation),
+});
+
+/**
+ * A delegation that was refused: a stable code and a fixed message.
+ *
+ * ⚠️ **NO CHILD OUTPUT ON A REFUSAL.** The whole point of the gate is that unverified prose is not an
+ * answer, and returning it beside the refusal would hand a caller the very text it was told not to use.
+ */
+const refusedResult = (result) => ({
+  ok: false,
+  code: result?.code ?? "refused",
+  message: result?.message ?? "The delegation was refused.",
+  observed: observedForModel(result?.observation),
+});
+
+/** The part of an observation a model may see. Identifiers and booleans only. */
+function observedForModel(observation) {
+  if (observation === null || typeof observation !== "object") return null;
+  return {
+    role: observation.role ?? null,
+    provider: observation.provider ?? null,
+    model: observation.model ?? null,
+    thinkingLevel: observation.thinkingLevel ?? null,
+    activeTools: Array.isArray(observation.activeTools) ? observation.activeTools : [],
+    droppedFromAllowlist: Array.isArray(observation.droppedFromAllowlist) ? observation.droppedFromAllowlist : [],
+    taskBindingObserved: observation.taskBindingObserved === true,
+    timedOut: observation.timedOut === true,
+    aborted: observation.aborted === true,
+    treeStopped: observation.treeStopped === true,
+  };
+}
+
+/**
  * The creation tools, as an explicit table.
  *
  * ⚠️ **WRITTEN OUT, NEVER DERIVED FROM THE NAME.** `kiln_create_acceptance_criterion` maps to
@@ -1362,6 +1450,96 @@ export default function register(pi, deps = {}) {
         omitted: Math.max(0, result.boundaryRefusals.total - result.boundaryRefusals.refusals.length),
       };
       return rendered(result);
+    },
+  });
+
+  /**
+   * `kiln_delegate` — CMP-0032, TSK-0053, against ACC-0111.
+   *
+   * ⚠️ **A SCHEMA AND A RENDERING, AND NOTHING ELSE.** Every rule of the delegation belongs to
+   * `lib/specialists/delegate.mjs`: the launch arguments, the task binding, the model inheritance, the
+   * intersected allowlist, the timeout, the teardown and the cleanup. This wrapper calls that runtime
+   * exactly once and renders what comes back. A rule restated here would be a second answer that drifts
+   * from the first, which is the failure this criterion exists to prevent.
+   *
+   * ⚠️ **THE MODEL CHOOSES A ROLE AND A TASK. IT CHOOSES NOTHING ELSE.** The agent directory, tool
+   * root, host registry, provider, model, thinking level, timeout and abort signal all come from trusted
+   * invocation context. A parameter for any of them would let a delegated child be pointed at another
+   * model, another directory or an unbounded run by whatever asked for the delegation.
+   */
+  pi?.registerTool?.({
+    name: "kiln_delegate",
+    label: "Kiln delegate",
+    description:
+      "Delegate one task to a specialist: research, planning or validation. The child runs with its " +
+      "role's tools, this session's exact provider, model and thinking level, and a bounded timeout. " +
+      "Its answer is used only after Kiln observes that the task reached it and that it held the tools " +
+      "its role requires.",
+    parameters: {
+      type: "object",
+      properties: {
+        role: { type: "string", enum: ["research", "planning", "validation"], description: "Which specialist does the work." },
+        task: { type: "string", minLength: 1, maxLength: 32000, description: "The one task the specialist is to perform. It sees this and nothing else of the conversation." },
+      },
+      required: ["role", "task"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const roots = { contentRoot: context.contentRoot, toolRoot: context.toolRoot };
+      const refuse = async (code, message) => rendered(await renderForModel(refusal(code, message), roots));
+
+      // ⚠️ THE SELECTION IS READ FROM THE SESSION, NOT ASKED FOR. `model_change` and
+      // `thinking_level_change` are what this session actually resolved, which is what the child must
+      // inherit; a parameter would let a caller send a child somewhere else.
+      const selection = inheritedSelection(ctx);
+      if (selection === null) return refuse("no-model-selection", "This session has not resolved a provider and model, so a child could not inherit one.");
+
+      // ⚠️ THE AGENT DIRECTORY COMES FROM THE LIBRARY, NOT FROM THIS FILE. The entry point reads no
+      // environment at all - a fixture copies only `pi-package/` and a source scan holds it to that - so
+      // the one module that knows which variable names it resolves it.
+      const specialists = deps.specialists ?? (await import("../../lib/specialists/delegate.mjs"));
+      const agentDir = deps.agentDir ?? specialists.sessionAgentDirectory();
+      if (typeof agentDir !== "string" || agentDir.length === 0)
+        return refuse("no-agent-directory", "This session has no isolated agent directory, so a child could not be given one.");
+
+      // ⚠️ **MEASURED, NOT DECLARED (F33).** `signature.json` is what the package CLAIMS to offer; the
+      // intersection ACC-0076 requires is against what this host actually registered. A declaration can
+      // name a tool no running session has, and a session can hold tools no declaration mentions.
+      const hostRegistry = measureHostRegistry(deps, pi);
+      if (hostRegistry === null) return refuse("no-host-registry", "This host's tool registry could not be measured.");
+
+      const runtime = deps.delegate ?? specialists.delegateToSpecialist;
+      let result;
+      try {
+        result = await runtime(
+          {
+            role: params?.role,
+            task: params?.task,
+            toolRoot: context.toolRoot,
+            agentDir,
+            provider: selection.provider,
+            model: selection.model,
+            thinkingLevel: selection.thinkingLevel,
+            hostRegistry,
+            signal,
+          },
+          {}
+        );
+      } catch (e) {
+        // ⚠️ A DEFECT IN THE RUNTIME IS NOT PROSE FOR A MODEL. Its message can carry a path.
+        return refuse("delegation-failed", "The delegation could not be completed.");
+      }
+
+      // ⚠️ EVERY RESULT AND EVERY REFUSAL GOES THROUGH THE SAME CLEANER, and a refusal carries the
+      // observation only when there is one: no nonce, no digest, no temporary location, no child output.
+      return rendered(await renderForModel(result?.ok === true ? deliveredResult(result) : refusedResult(result), roots));
     },
   });
 

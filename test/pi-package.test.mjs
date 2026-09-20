@@ -46,6 +46,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_create_requirement",
   "kiln_create_runbook_step",
   "kiln_create_task",
+  "kiln_delegate",
   "kiln_link_evidence",
   "kiln_link_trace",
   "kiln_lint",

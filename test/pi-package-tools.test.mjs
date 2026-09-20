@@ -167,6 +167,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_create_requirement",
       "kiln_create_runbook_step",
       "kiln_create_task",
+      "kiln_delegate",
       "kiln_link_evidence",
       "kiln_link_trace",
       "kiln_lint",
@@ -187,7 +188,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "validation_capability",
       "validation_run",
     ],
-    "every tool this package declares: nine creations, eight mutations, two reads, activation, the two attestations and the stage-document writer"
+    "every tool this package declares: nine creations, eight mutations, two reads, activation, the two attestations, the stage-document writer and delegation"
   );
 
   for (const tool of tools.values()) {
