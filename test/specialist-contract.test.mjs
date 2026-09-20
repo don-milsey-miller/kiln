@@ -26,6 +26,7 @@ import {
   signaturesMatch,
   verifyChild,
 } from "../lib/specialists/contract.mjs";
+import { ROLES as ROSTER_ROLES, canonicalCapabilitiesFor, requiredCapabilitiesFor } from "../lib/specialists/roster.mjs";
 import { AUTH_SOURCE, resolveProviderCredentials, validateCustomDeclaration } from "../lib/pi-provider-credentials.mjs";
 import { RESEARCH_TOOL_SIGNATURES } from "../lib/research/tools.mjs";
 import { VALIDATION_TOOL_SIGNATURES } from "../lib/validation/tools.mjs";
@@ -511,4 +512,26 @@ test("the forbidden list names the failure each role is most likely to commit", 
   for (const role of ["research", "validation"])
     assert.ok(contractFor(role).forbidden.some((f) => /requirements or decisions/.test(f)), role);
   for (const role of ROLES) assert.ok(contractFor(role).forbidden.includes("shell execution"), role);
+});
+
+test("⚠️ TSK-0071 the roster and the contract are one table, not two", () => {
+  // ⚠️ **THE ROSTER MOVED SO THE STAGE LOADER COULD READ IT WITHOUT THIS MODULE.**
+  // `lib/specialists/roles.mjs` imports nothing; `contract.mjs` reaches the tool registry and, through
+  // it, `ajv`, which the stage-skill CLI's copied tree does not install. Two tables would drift in
+  // exactly the way a definition-versus-contract mismatch is supposed to surface, so this asserts there
+  // is one: what `contractFor` reports IS what the roster declares, for every role and in order.
+  assert.deepEqual([...ROLES], [...ROSTER_ROLES]);
+  for (const role of ROLES) {
+    assert.deepEqual(contractFor(role).requiredCapabilities, requiredCapabilitiesFor(role), role);
+    assert.deepEqual(canonicalCapabilitiesFor(role), [...new Set(contractFor(role).requiredCapabilities)].sort(), role);
+  }
+
+  // ⚠️ AN UNKNOWN ROLE GETS NULL, NEVER AN EMPTY LIST. `[]` is what `planning` declares, and a
+  // caller that could not tell the two apart would treat a typo as a role requiring nothing.
+  assert.deepEqual(requiredCapabilitiesFor("planning"), []);
+  assert.equal(requiredCapabilitiesFor("archaeology"), null);
+  assert.equal(canonicalCapabilitiesFor("archaeology"), null);
+
+  // ⚠️ THE DECLARED ORDER IS NOT SORTED, which is why the canonical form exists at all.
+  assert.notDeepEqual(requiredCapabilitiesFor("research"), canonicalCapabilitiesFor("research"));
 });

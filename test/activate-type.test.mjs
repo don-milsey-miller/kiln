@@ -91,7 +91,24 @@ test("a type no stage produces is refused — activation would strand it", async
     // with no producer to reach the reachability guard for a type that IS authorable.
     const fakeRoot = mkdtempSync(join(tmpdir(), "vpw-root-"));
     mkdirSync(join(fakeRoot, "stages"));
-    writeFileSync(join(fakeRoot, "stages", "01-intake.json"), JSON.stringify({ id: "01-intake", produces: [], exitCriteria: [] }));
+    // ⚠️ A COMPLETE DEFINITION, BECAUSE THE LOADER NOW REQUIRES ONE (TSK-0071). What this case is
+    // about is `produces` being empty; the other fields are here so the load reaches that check rather
+    // than refusing earlier for a missing field, which would pass this assertion for the wrong reason.
+    writeFileSync(
+      join(fakeRoot, "stages", "01-intake.json"),
+      JSON.stringify({
+        id: "01-intake",
+        produces: [],
+        exitCriteria: [],
+        purpose: "A stage that produces nothing, so nothing can be activated into it.",
+        method: { summary: "Do nothing.", steps: ["Do nothing."] },
+        nextActivity: { rule: "Exit.", activities: ["exit"], constraints: ["Produce nothing."] },
+        delegations: [],
+        mutationBoundary: { mayMutate: [], mayNotTouch: ["Anything at all."] },
+        approvalBoundary: { approves: "Nothing.", requires: ["Nothing."] },
+        completionSummary: { format: "One line.", includes: ["Nothing."] },
+      })
+    );
     await assert.rejects(
       () => setTypeActivation("component", "activate", { ...o, toolRoot: fakeRoot }),
       /No stage produces "component"/
