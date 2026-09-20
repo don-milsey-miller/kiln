@@ -11,5 +11,16 @@
     "REQ-0024",
     "REQ-0025"
   ],
-  "notes": "⚠️ CORRECTED 2026-09-19 (TSK-0052 landed). This note used to say the verifier contradicted the spawn contract, because `verifyChild` refused unless `stdinDelivered` was true while the approved contract closes stdin. That is fixed: the field is now `taskBindingObserved`, the refusal key is `CHILD_REFUSED.NO_TASK_BINDING` with the wire value `task-not-delivered` unchanged, and one test asserts both facts at once over each retained platform record - stdin closed, and the exact task reaching the child's model turn.\n\n⚠️ WHAT REMAINS FOR THIS COMPONENT. `verifyChild` CONSUMES the observation and never makes it. Producing it during a real launch is this component's own work, under TSK-0053: a private Kiln observer extension loaded explicitly into the child inspects the final provider payload in `before_provider_request` and attests, over a dedicated extra pipe, that the framed task was there. Model output and ordinary JSON events are not acceptable sources, because both let the child vouch for itself; nor is writing or hashing the prompt file, which proves preparation rather than consumption."
+  "notes": "⚠️ CORRECTED 2026-09-19 (TSK-0052 landed). This note used to say the verifier contradicted the spawn contract, because `verifyChild` refused unless `stdinDelivered` was true while the approved contract closes stdin. That is fixed: the field is now `taskBindingObserved`, the refusal key is `CHILD_REFUSED.NO_TASK_BINDING` with the wire value `task-not-delivered` unchanged, and one test asserts both facts at once over each retained platform record - stdin closed, and the exact task reaching the child's model turn.\n\n⚠️ WHAT REMAINS FOR THIS COMPONENT. `verifyChild` CONSUMES the observation and never makes it. Producing it during a real launch is this component's own work, under TSK-0053: a private Kiln observer extension loaded explicitly into the child inspects the final provider payload in `before_provider_request` and attests, over a dedicated extra pipe, that the framed task was there. Model output and ordinary JSON events are not acceptable sources, because both let the child vouch for itself; nor is writing or hashing the prompt file, which proves preparation rather than consumption.",
+  "implementedBy": [
+    "lib/specialists/delegate.mjs",
+    "lib/specialists/task-observer.mjs",
+    "lib/specialists/task-frame.mjs",
+    "lib/specialists/child-report.mjs",
+    "lib/specialists/contract.mjs",
+    "test/delegate.test.mjs",
+    "test/delegate-real-child.test.mjs",
+    "test/task-binding.test.mjs",
+    "test/child-report.test.mjs"
+  ]
 }

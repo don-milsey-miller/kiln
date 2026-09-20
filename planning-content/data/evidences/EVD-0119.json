@@ -1,0 +1,46 @@
+{
+  "id": "EVD-0119",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "kiln_delegate adds a schema and a rendering, and restates none of the runtime's rules",
+  "kind": "experiment",
+  "summary": "The registered `kiln_delegate` tool performs a delegation by calling the delegation runtime once and adds no rule of its own (TSK-0053, against ACC-0111). THE SCHEMA. Two parameters: `role`, an enum of the three specialist roles, and `task`, bounded at 32000 characters to match the runtime's own limit, with `additionalProperties: false`. Fourteen names are asserted absent - provider, model, thinkingLevel, thinking, agentDir, toolRoot, hostRegistry, tools, timeoutMs, timeout, signal, hostEnv, env, cwd - because a parameter for any of them would let a caller point a child at another model, another directory or an unbounded run. EVERYTHING ELSE COMES FROM TRUSTED CONTEXT. Provider, model and thinking level from the live invocation context rather than the session transcript, which is history and can lack a thinking entry entirely; the agent directory from the library, because the package entry point is held by source scan to reading no environment at all; the host registry MEASURED through `pi.getAllTools()` rather than substituted from `signature.json`, which is a claim about the package and not about this session; the tool root and content root from the shared project context; the abort signal from the invocation. The timeout is never named, so it stays the runtime's. NO RULE IS RESTATED. A source scan over the wrapper, comments stripped, asserts it contains none of `--mode`, `--tools`, `stdio`, `spawn(`, `mkdtemp`, `rmSync`, `nonce`, `sha256`, `digest`, `stopTree`, `trackDescendants`, `setTimeout`, `verifyChild` or `intersect`, and none of `declaredToolNames`, `signature.json`, `SIGNATURE` or `packageRootOf`. A recording double proves the runtime is called exactly once. RENDERING AND REFUSALS. Every success and every refusal goes through the same model-facing cleaner every other handler uses, and returns valid text content beside the existing output and details fields. A refusal carries a stable code and never the child's output. A leak sweep proves no credential, content root, home directory, drive-lettered path, nonce, digest, temporary location, raw child output or echoed task survives. The tool's own content root is refused through the existing shared project-bound refusal, and a throwing runtime becomes `delegation-failed` with the filesystem error and its path gone. EVIDENCE STRENGTH, STATED RATHER THAN BLENDED. A REAL PINNED-PI CHILD covers two paths and only two: a successful run and a run the provider never answers, which the bounded timeout must end. Every other path - a refused binding, an abort, a failed launch, a surviving workspace, a throwing remover, an unconfirmed teardown - is covered by DETERMINISTIC TESTS against a scripted child, because those states cannot be produced reliably from a real one. CI RE-RAN THE LOOPBACK MEASUREMENTS AND CONTACTED NO REMOTE PROVIDER: the child talks to a loopback HTTP server on 127.0.0.1, so no credential, no cost and no network variability enters, and nothing here is evidence about any real model's behaviour. THE MUTATION SETS RAN LOCALLY, NOT IN CI, on Windows only.",
+  "outcome": "success",
+  "observedAt": "2026-09-20",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35523333075 at commit dbaf362, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1384 tests / 1383 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1384 tests / 1383 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1384 tests / 1375 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1384 tests / 1375 pass / 0 fail / 9 skipped",
+      "wrapper-tests": "test/pi-package-delegate.test.mjs, 18 tests, all four cells",
+      "schema": "role (enum of three) and task (minLength 1, maxLength 32000), additionalProperties false; fourteen redirecting parameter names asserted absent",
+      "single-call": "a recording runtime double asserts exactly one call, with role, task, toolRoot, agentDir, provider, model, thinkingLevel, hostRegistry and signal, and no timeoutMs",
+      "trusted-context": "provider/model/thinking from ctx.model and ctx.thinkingLevel, each required; a stale transcript saying otherwise is proven not to be read; the agent directory required with no environment fallback; the host registry measured through pi.getAllTools()",
+      "no-restated-rules": "a comment-stripped source scan of the wrapper for fourteen runtime rules and five package-declaration references",
+      "rendering": "content array with one text part, output equal to JSON.stringify(details, null, 2), and details keys exactly ok/role/output/observed on success",
+      "disclosure": "a leak sweep over a deliberately leaky runtime result: planted credential, content root, home directory, drive-lettered path, nonce, digest, temporary location, raw child output and the task itself all proven absent",
+      "shared-refusals": "ACC-0071's project-bound refusal reached unchanged; a throwing runtime becomes delegation-failed with no ENOENT and no path",
+      "declaration": "kiln_delegate added to pi-package/signature.json and to the four declared-name lists; PROJECT_BOUND is now 24",
+      "mutations-wrapper": "21 written, 21 killed, locally on Windows; two survived the first pass and both were real gaps, closed by a direct-call case proving invented parameters are ignored and by four partial-selection records",
+      "mutations-not-in-ci": "no mutation set runs in CI",
+      "limitation-loopback": "the runtime the wrapper calls is exercised against a loopback provider; CI contacted no remote provider",
+      "limitation-double": "the wrapper's own tests drive a recording runtime double, which is what lets them prove the wrapper adds nothing; what the runtime then does is ACC-0076's",
+      "limitation-refusal-matrix": "the full refusal matrix is not claimed here; ACC-0075 and TSK-0054 own it",
+      "limitation-no-macos": "no macOS coverage"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "id": "EVD-0118",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "A real specialist child inherits the selection, holds the intersected tools, and leaves nothing behind",
+  "kind": "experiment",
+  "summary": "One real pinned-Pi child per CI cell, launched by the production delegation runtime, measured for its selection, its tools, its role, its task, its binding and its cleanup (TSK-0053, against ACC-0076). EVIDENCE STRENGTH, STATED RATHER THAN BLENDED. A REAL PINNED-PI CHILD covers two paths and only two: a successful run and a run the provider never answers, which the bounded timeout must end. Every other path - a refused binding, an abort, a failed launch, a surviving workspace, a throwing remover, an unconfirmed teardown - is covered by DETERMINISTIC TESTS against a scripted child, because those states cannot be produced reliably from a real one. CI RE-RAN THE LOOPBACK MEASUREMENTS AND CONTACTED NO REMOTE PROVIDER: the child talks to a loopback HTTP server on 127.0.0.1, so no credential, no cost and no network variability enters, and nothing here is evidence about any real model's behaviour. THE MUTATION SETS RAN LOCALLY, NOT IN CI, on Windows only. THE RETAINED RUN, IN ALL FOUR CELLS. `test/delegate-real-child.test.mjs` spawns the pinned agent against a loopback provider and asserts six facts from one run. The child's reported provider, model and thinking level equal the orchestrator's - `kiln-loopback`, `loopback-model`, `medium` - taken from the child's own live context, never from a flag the parent set and never inferred. Its active tool set equals the intersection of the research role's declared allowlist with the measured host registry, exactly eight names: research_capability, research_fetch, research_search, kiln_create_assertion, kiln_create_evidence, kiln_create_question, kiln_link_evidence, kiln_unlink_evidence. Six built-in tools are asserted absent. The provider receives the canonical `specialists/research.md` as the system prompt, compared byte for byte, with all seven of its sections present and Pi's own coding-assistant prompt proven gone. It receives a task-scoped payload: exactly one user message carrying the framed task, and no parent conversation. stdin is closed. The binding is observed. Temporary material is removed and the tree is confirmed stopped. THE LAUNCH PROTOCOL WAS CORRECTED AFTER MEASUREMENT, NOT BEFORE. A first real run showed the provider receiving Pi's generic coding-assistant prompt, no role definition at all, and no `tools` key whatsoever - the child was told it was a coding assistant and offered nothing, and the gate refused it as `capability-missing`. The protocol now passes `--no-extensions --no-skills --no-context-files --no-builtin-tools --system-prompt <role>` and loads exactly two explicit extensions, Kiln's package and the task-binding observer, in that order. THE CHILD REPORT (D46). Pi's native JSON events were measured and report the provider and the model on assistant messages but NOT the thinking level and NOT any tool name; the `session` event carries `{type, version, id, timestamp, cwd}` alone. A second typed line on fd 3 therefore carries what the child holds - provider, model and thinking level from its live context, active tools from its live registry, and signatures reduced to the two fields the contract compares. The binding attestation is unchanged byte for byte and the two lines are routed by type. A missing, duplicated, malformed, unsorted, out-of-bounds or contradictory report yields no signatures at all, so the gate refuses. TWO DEFECTS WERE CAUGHT BEFORE ACCEPTANCE AND ARE RECORDED AS SUCH. (1) RAW-STDOUT DISCLOSURE: the runtime returned the child's whole event stream as its answer, and Pi's `agent_end` event echoes the user message - so the framed task, its nonce and its digest travelled back inside the delegation's own result. The retained real-child test caught it; the runtime now returns the text of the last assistant message. (2) NUL SEPARATOR: `lib/specialists/child-report.mjs` joined tool names on a literal U+0000 to compare sortedness, which is invisible in source and made git treat the file as binary. A comma is sufficient because the name pattern admits no separator, and the reason is recorded in the file. F130 IS RECORDED AS NOT RECURRING, NOT RESOLVED. `A8 each companion is a separate process` passed in every cell of this run, at 1.30 s on windows-latest node 24, and has passed in every cell of the last several runs. Its cause was never established beyond the phase evidence pointing at PowerShell process startup rather than reflection emit or the native query. This task spawns child processes under a bounded timeout, so the areas overlap, and it remains a watch item.",
+  "outcome": "success",
+  "observedAt": "2026-09-20",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35523333075 at commit dbaf362, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1384 tests / 1383 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1384 tests / 1383 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1384 tests / 1375 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1384 tests / 1375 pass / 0 fail / 9 skipped",
+      "real-child-success": "test/delegate-real-child.test.mjs `one real specialist child: the role, its tools, its report, its task and its cleanup`, all four cells, 1.41 s on windows-latest node 24",
+      "real-child-timeout": "test/delegate-real-child.test.mjs `a real child that is never answered is stopped, and leaves nothing behind`, all four cells, 5.28 s: the loopback provider never replies, the 4 s bound ends the run, `timed-out`, `treeStopped: true`, nothing leaked",
+      "inherited-selection": "provider kiln-loopback, model loopback-model, thinking level medium, each from the child's own ctx and cross-checked against Pi's assistant events and the request",
+      "tool-intersection": "exactly 8: research_capability, research_fetch, research_search, kiln_create_assertion, kiln_create_evidence, kiln_create_question, kiln_link_evidence, kiln_unlink_evidence; bash, read, write, edit, ls and grep asserted absent",
+      "canonical-role": "the --system-prompt value equals specialists/research.md byte for byte; seven section markers present; `expert coding assistant`, `coding agent harness` and `editing code` absent",
+      "scoped-task": "one user message carrying the framed task; a planted parent-conversation marker reaches the provider in no run",
+      "closed-stdin": "stdio [ignore, pipe, pipe, pipe]; fd 3 carries the two typed lines and nothing else",
+      "binding-observed": "taskBindingObserved true, from the first outbound provider request only; the latch closes on the first hook whether it succeeded or failed",
+      "discovered-extensions": "an extension planted in the agent directory's settings does not run, proven by a marker file it would have written",
+      "cleanup-and-teardown": "0 leaked workspaces in every retained run; treeStopped true; teardown through the supervisor's own trackDescendants and stopTree, stopped then read then torn down",
+      "deterministic-coverage": "test/delegate.test.mjs (25), test/task-binding.test.mjs (12), test/child-report.test.mjs (10): refused bindings, forged attestations, a silent observer, aborts, failed launches, an unreadable and an empty role definition, a non-list injection, cleanup failure by a returning and by a throwing remover, an unconfirmed teardown, and every child-report rejection reason",
+      "mutations-runtime": "28 written, 28 killed, locally on Windows; restore byte-identical by sha256 after each",
+      "mutations-wrapper": "21 written, 21 killed, locally on Windows",
+      "mutations-protocol": "26 written, 26 killed, locally on Windows",
+      "mutations-not-in-ci": "no mutation set runs in CI; all three were run on this host only",
+      "limitation-loopback": "the provider is a loopback server on 127.0.0.1. CI re-ran that measurement and contacted no remote provider, so nothing here is evidence about a real model's behaviour",
+      "limitation-two-real-paths": "the real child covers success and timeout only; refusal, abort, failed launch and the cleanup paths are deterministic tests against a scripted child",
+      "limitation-one-role": "the retained run exercises the research role; planning and validation are covered by the contract and the generated definitions, not by a real child",
+      "limitation-no-macos": "no macOS coverage",
+      "limitation-refusal-matrix": "the full refusal matrix is not claimed here. ACC-0075 and TSK-0054 own malformed events, nonzero exit, provider mismatch and out-of-role writes, and neither is changed by this record",
+      "defect-raw-stdout": "the runtime returned the child's whole event stream as its answer, carrying the framed task, nonce and digest back to the caller; caught by the retained real-child test before acceptance and corrected to return the last assistant message's text",
+      "defect-nul-separator": "lib/specialists/child-report.mjs joined tool names on a literal U+0000, which made git treat the file as binary; caught at commit time before acceptance and replaced with a comma, with the reason recorded in the file",
+      "f130": "not recurring, not resolved: passed in every cell of this run at 1.30 s on windows-latest node 24; its cause was never established and it remains a watch item"
+    }
+  }
+}
