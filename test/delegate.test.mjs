@@ -240,7 +240,10 @@ test("⚠️ REQ-0024 no credential reaches the child's environment or the resul
 /* ============================================================ the binding gate ================ */
 
 test("⚠️ ACC-0076 a child whose first request lacked the frame is refused, and its output is not returned", async () => {
-  const script = scriptedChild({ attest: "no-frame", stdout: `${JSON.stringify({ type: "message", text: "A confident, plausible answer." })}\n` });
+  // ⚠️ A VALID EVENT CARRYING THE PROSE. Strict validation (D47) refuses an unrecognised line before
+  // the binding is ever judged, so a fixture emitting `{type: "message"}` would test event validation
+  // rather than the binding it means to.
+  const script = scriptedChild({ attest: "no-frame", stdout: `${JSON.stringify({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "A confident, plausible answer." }] } })}\n` });
   const result = await delegateToSpecialist(request(), deps(script));
 
   assert.equal(result.ok, false);
@@ -588,11 +591,17 @@ test("⚠️ an injected extension list that is not a list is ignored, not sprea
 test("⚠️ D46 the gate reads the JUDGED report, never the raw one the child sent", async () => {
   // ⚠️ A RUNTIME THAT TOOK `reports[0].toolSignatures` DIRECTLY would accept a report the judge refused -
   // a duplicate, a contradiction, an unsorted list - because the signatures would still be there to read.
-  for (const over of [{ provider: "somewhere-else" }, { activeTools: ["research_search", "kiln_create_evidence"] }]) {
+  // ⚠️ D48: A WRONG PROVIDER IS NOT A MISSING CAPABILITY, and a caller told the latter would look
+  // for the wrong fix. A report that is merely unusable still fails as a child that cannot
+  // demonstrate its tools.
+  for (const [over, code] of [
+    [{ provider: "somewhere-else" }, "child-selection-mismatch"],
+    [{ activeTools: ["research_search", "kiln_create_evidence"] }, "capability-missing"],
+  ]) {
     const script = scriptedChild({ reportOver: over });
     const result = await delegateToSpecialist(request(), deps(script));
     assert.equal(result.ok, false, JSON.stringify(over));
-    assert.equal(result.code, "capability-missing", `${JSON.stringify(over)}: ${result.code}`);
+    assert.equal(result.code, code, `${JSON.stringify(over)}: ${result.code}`);
     assert.equal(result.observation.childReportAccepted, false);
   }
 

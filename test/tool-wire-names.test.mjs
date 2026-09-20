@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { CREATE_TOOL_NAMES, MUTATION_TOOL_NAMES, TYPE_ACTIVATION_TOOL_NAME, UnknownOperationError, createToolName, mutationToolName } from "../lib/tool-wire-names.mjs";
+import { CREATE_TOOL_NAMES, KNOWN_TOOL_NAMES, MUTATION_TOOL_NAMES, TYPE_ACTIVATION_TOOL_NAME, UnknownOperationError, createToolName, mutationToolName, toolOperation } from "../lib/tool-wire-names.mjs";
 import { MUTATION_TOOLS, TYPED_TOOLS } from "../lib/tools/registry.mjs";
 import register from "../pi-package/extensions/kiln.js";
 
@@ -68,4 +68,34 @@ test("⚠️ the names are not derivable from the operation, which is why they a
   assert.equal(CREATE_TOOL_NAMES["acceptance-criterion"], "kiln_create_acceptance_criterion");
   assert.equal(CREATE_TOOL_NAMES["runbook-step"], "kiln_create_runbook_step");
   assert.equal(MUTATION_TOOL_NAMES.reviseArtifact, "kiln_revise_artifact");
+});
+
+test("⚠️ F41 every registered tool is classified, and nothing else is", () => {
+  // ⚠️ **AN UNCLASSIFIED TOOL FAILS CLOSED AT RUNTIME.** `readChildEvents` refuses a stream naming
+  // a tool absent from `KNOWN_TOOL_NAMES`, so a tool added to the package and not classified here
+  // would make every legitimate run that used it unreadable. That is safe and wrong, and it would
+  // show up as an unexplained refusal rather than as a failing test unless this compares the two.
+  const names = registered();
+  assert.deepEqual([...KNOWN_TOOL_NAMES].sort(), [...names].sort());
+
+  // Each one resolves to an operation, and the write ones resolve to something `mayWrite` can judge.
+  for (const name of names) {
+    const operation = toolOperation(name);
+    assert.notEqual(operation, null, `${name} is registered but unclassified`);
+    assert.ok(["create", "mutate", "write", "read"].includes(operation.kind), `${name}: ${operation.kind}`);
+  }
+
+  // ⚠️ A NAME NOBODY REGISTERS RESOLVES TO NOTHING, rather than to a harmless-looking read.
+  for (const invented of ["kiln_exfiltrate_everything", "kiln_create_sprint", "", "research", null, 7])
+    assert.equal(toolOperation(invented), null, String(invented));
+});
+
+test("⚠️ F40 a create and a mutation resolve to the operation `mayWrite` judges", () => {
+  // The write boundary is stated as types and registry entries, so a wire name must resolve back to
+  // one of those and not merely to "a write".
+  assert.deepEqual(toolOperation("kiln_create_evidence"), { kind: "create", create: "evidence" });
+  assert.deepEqual(toolOperation("kiln_set_review_status"), { kind: "mutate", mutate: "setReviewStatus" });
+  assert.deepEqual(toolOperation("kiln_write_stage_attestation"), { kind: "write" });
+  assert.deepEqual(toolOperation(TYPE_ACTIVATION_TOOL_NAME), { kind: "write" });
+  assert.deepEqual(toolOperation("research_search"), { kind: "read" });
 });

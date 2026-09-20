@@ -178,6 +178,11 @@ test("⚠️ TSK-0052 the refusal codes are a wire contract, pinned to their lit
       CAPABILITY_MISSING: "capability-missing",
       SIGNATURE_MISMATCH: "signature-mismatch",
       OUT_OF_ROLE_WRITE: "out-of-role-write",
+      // ⚠️ TSK-0054 EXTENDED THIS TABLE AND CHANGED NOTHING IN IT. The five above are the wire
+      // contract as it shipped; these three are new facts, not renamings.
+      NONZERO_EXIT: "child-exited-nonzero",
+      EVENTS_MALFORMED: "child-events-malformed",
+      SELECTION_MISMATCH: "child-selection-mismatch",
     }
   );
   // And no code describes a transport. What is refused is a missing task binding, not a missing pipe.

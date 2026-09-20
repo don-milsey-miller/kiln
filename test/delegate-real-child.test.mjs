@@ -295,3 +295,82 @@ test("⚠️ production launches exactly two explicit extensions, and names no t
   assert.equal(loaded.some((p) => p.endsWith("provider.js")), false, "a test extension reached a production launch");
   assert.deepEqual(workspaces(), [], "a workspace survived");
 });
+
+/* ============================================ #67's own control, with a real child ============ */
+
+test("⚠️ ACC-0075 a real child that answers confidently with none of Kiln's tools is refused, and its prose is not used", { timeout: 180_000 }, async () => {
+  // ⚠️ **DECISION #67's OWN CASE, AS A REAL PROCESS.** The child exits zero, emits a well-formed event
+  // stream and produces a plausible answer — and holds nothing, because its tool root's package
+  // registers no tools at all. Everything about the run looks right except the one thing that matters.
+  //
+  // ⚠️ THE NO-OP PACKAGE IS A TOOL ROOT, NOT A PRODUCTION SEAM. The runtime always loads
+  // `<toolRoot>/pi-package/extensions/kiln.js`; pointing it at a root whose package registers nothing is
+  // how a toolless child is produced without giving production a way to be one.
+  const SENTINEL = "REAL-TOOLLESS-PROSE-SENTINEL";
+  const base = mkdtempSync(join(tmpdir(), "kiln-toolless-"));
+  const agentDir = join(base, "agent");
+  const toolRoot = join(base, "toolroot");
+  mkdirSync(agentDir, { recursive: true });
+  mkdirSync(join(toolRoot, "pi-package", "extensions"), { recursive: true });
+  mkdirSync(join(toolRoot, "specialists"), { recursive: true });
+
+  // The canonical role definition, so the only thing wrong with this child is its tools.
+  writeFileSync(join(toolRoot, "specialists", "research.md"), readFileSync(join(REPO, "specialists", "research.md"), "utf-8"));
+  writeFileSync(join(toolRoot, "pi-package", "extensions", "kiln.js"), "export default function register() {}\n");
+
+  const provider = await loopback({ answer: true });
+  const providerExt = join(base, "provider.js");
+  writeFileSync(providerExt, PROVIDER_EXT(provider.port).replace("The port office needs same-day figures.", SENTINEL));
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    JSON.stringify({ defaultProvider: "kiln-loopback", defaultModel: "loopback-model", defaultProjectTrust: "always", packages: [], extensions: [], skills: [], prompts: [] }, null, 2) + "\n"
+  );
+
+  const primitives = await loadSupervisorPrimitives();
+  try {
+    const result = await delegateToSpecialist(
+      {
+        role: "research",
+        task: TASK,
+        toolRoot,
+        agentDir,
+        provider: "kiln-loopback",
+        model: "loopback-model",
+        thinkingLevel: "medium",
+        hostRegistry: [...contractFor("research").tools],
+        hostEnv: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+        timeoutMs: 90_000,
+      },
+      {
+        resolveAgent: () => resolvePinnedAgent(REPO),
+        trackDescendants: primitives.trackDescendants,
+        stopTree: primitives.stopTree,
+        extraExtensions: [providerExt],
+        spawn: (command, args, options) => {
+          created.add(options.cwd);
+          return spawn(command, args, options);
+        },
+      }
+    );
+
+    assert.equal(result.ok, false, `a toolless child was accepted: ${JSON.stringify(result).slice(0, 300)}`);
+    assert.equal(result.code, "capability-missing", result.code);
+
+    // ⚠️ EVERYTHING ELSE ABOUT THE RUN WAS FINE. That is what makes this the #67 case rather than a
+    // child that simply failed.
+    assert.equal(result.observation.exit.code, 0, "the child did not exit zero, so this is not the case");
+    assert.equal(result.observation.taskBindingObserved, true, "the task did not reach it, so this is not the case");
+    assert.deepEqual(result.observation.reportedActiveTools, [], "the child held tools after all");
+
+    // ⚠️ AND THE PROSE IS NOT READ: not selected, not returned, not in the refusal or its details.
+    const serialised = JSON.stringify(result);
+    assert.equal(serialised.includes(SENTINEL), false, "the rejected prose reached the result");
+    assert.equal("output" in result, false, "a refusal carried an output field");
+
+    // The provider really was asked, so the prose really existed to be withheld.
+    assert.equal(provider.seen.length, 1, "the child never reached its model turn");
+  } finally {
+    await provider.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
