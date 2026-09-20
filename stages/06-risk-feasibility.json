@@ -18,6 +18,68 @@
       "mechanised": false
     }
   ],
+  "purpose": "Name what could make this fail, and get every load-bearing assertion to the confidence it needs.",
+  "method": {
+    "summary": "Register the risks with their mitigations, and raise each load-bearing assertion to its required rung.",
+    "steps": [
+      "Read the design and the assertions the plan rests on.",
+      "Author one risk per credible failure, with its severity and its mitigation.",
+      "Delegate to the validation specialist to run the declared check behind any assertion below its required rung.",
+      "Link the returned evidence to the assertion it bears on.",
+      "For each high-severity risk, record either a mitigation or the operator's accepted-risk signoff as an attestation.",
+      "Retire a risk that no longer applies with `setLifecycle` rather than deleting it.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking question first; delegate to validation when an assertion is below its rung; author or revise while any high-severity risk lacks a mitigation or a signoff; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "delegate",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "An assertion below its required rung is not treated as settled (#25, #42).",
+      "A high-severity risk is mitigated or has an accepted-risk signoff; it is not carried silently."
+    ]
+  },
+  "delegations": [
+    {
+      "role": "validation",
+      "capabilities": [
+        "validation_capability",
+        "validation_run"
+      ]
+    }
+  ],
+  "mutationBoundary": {
+    "mayMutate": [
+      "linkEvidence",
+      "reviseArtifact",
+      "setLifecycle",
+      "unlinkEvidence",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A component's design."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That every high-severity risk is mitigated or accepted, by the operator.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The risks and the mitigation or signoff behind each.",
+      "Assertions still below their required rung."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

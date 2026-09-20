@@ -18,6 +18,68 @@
       "mechanised": false
     }
   ],
+  "purpose": "Answer what the plan does not yet know from sources outside it, and reconcile the ones that disagree.",
+  "method": {
+    "summary": "Retrieve, record each finding against the source it came from, and resolve or surface contradictions.",
+    "steps": [
+      "Read the requirement set and the unknowns the earlier stages left flagged.",
+      "Delegate retrieval to the research specialist, one question per task.",
+      "Record each finding with the source that was fetched for it, and link the evidence to what it bears on.",
+      "Where sources disagree, resolve the contradiction or surface it as an unresolved one.",
+      "Classify each unsettled unknown for resolution in Stage 4 or validation in Stage 6, and name that destination in the completion summary.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking question first; delegate to research when retrieval is needed; author or revise while any flagged unknown is unanswered; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "delegate",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "Every recorded claim names a source that was retrieved for it.",
+      "An unknown is answered, classified for a later stage, or surfaced; it is never left unaccounted for."
+    ]
+  },
+  "delegations": [
+    {
+      "role": "research",
+      "capabilities": [
+        "research_capability",
+        "research_fetch",
+        "research_search"
+      ]
+    }
+  ],
+  "mutationBoundary": {
+    "mayMutate": [
+      "linkEvidence",
+      "reviseArtifact",
+      "unlinkEvidence",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A requirement's statement.",
+      "The scope boundary."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That every flagged unknown is answered, classified for a later stage, or surfaced.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The findings and the sources behind them.",
+      "Unknowns still open, and the stage each was classified for."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

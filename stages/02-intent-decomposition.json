@@ -23,6 +23,65 @@
       "mechanised": false
     }
   ],
+  "purpose": "Turn the recorded request into requirements that can each be tested, and draw the line around what is out of scope.",
+  "method": {
+    "summary": "Decompose the intake into testable requirements, name the non-goals, and get artifact type activation approved.",
+    "steps": [
+      "Read the recorded intake and the project's current requirement set.",
+      "Ask the operator about any ambiguity the intake leaves in what is in and out of scope.",
+      "Author one requirement per distinct testable obligation, and record the non-goals as the scope boundary.",
+      "Delegate to the planning specialist when the decomposition needs work larger than this conversation.",
+      "Propose the artifact types this project needs and record the operator's activation decision (#39).",
+      "Revise any requirement the operator corrects, then set the confirmed requirement set to approved.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking scope question first; delegate to planning when the decomposition needs specialist work; author or revise while any obligation is undecomposed; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "delegate",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "Do not author an artifact of a type whose activation the operator has not approved (#39).",
+      "A requirement that cannot be tested is not decomposed far enough."
+    ]
+  },
+  "delegations": [
+    {
+      "role": "planning",
+      "capabilities": []
+    }
+  ],
+  "mutationBoundary": {
+    "mayMutate": [
+      "reviseArtifact",
+      "setReviewStatus",
+      "setTypeActivation",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "The intake document's recorded answers."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "The requirement set, the scope boundary and the activated artifact types.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The requirements as decomposed.",
+      "The non-goals that mark the scope boundary.",
+      "The artifact types activated for this project."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

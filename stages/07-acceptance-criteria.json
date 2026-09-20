@@ -13,6 +13,59 @@
       "mechanised": false
     }
   ],
+  "purpose": "State, per requirement, what would make it demonstrably done without a judgment call.",
+  "method": {
+    "summary": "Write one testable criterion per requirement and check that each reads pass or fail on its own.",
+    "steps": [
+      "Read the approved requirement set.",
+      "Author one acceptance criterion per requirement, stated so it reads pass or fail without a judgment call.",
+      "Ask the operator about any requirement whose done-ness cannot be stated objectively.",
+      "Trace each criterion to the requirement it verifies.",
+      "Set each criterion the operator accepts to approved.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking question first; author or revise while any requirement lacks an objective criterion; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "A criterion needing judgment to evaluate is not a criterion.",
+      "A requirement with no criterion is not covered."
+    ]
+  },
+  "delegations": [],
+  "mutationBoundary": {
+    "mayMutate": [
+      "linkTrace",
+      "reviseArtifact",
+      "setReviewStatus",
+      "unlinkTrace",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A requirement's statement.",
+      "Any acceptance criterion's outcome."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That each criterion is objective, by the operator.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The criteria, per requirement.",
+      "The definition of done for this project."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

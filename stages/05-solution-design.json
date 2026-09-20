@@ -26,6 +26,67 @@
       "mechanised": false
     }
   ],
+  "purpose": "Design a structure every requirement traces into, and settle the data model and the storage target.",
+  "method": {
+    "summary": "Design the components and the data model, then trace every requirement to a component.",
+    "steps": [
+      "Read the approved requirements and the decisions Stage 4 recorded.",
+      "Delegate design work to the planning specialist where the structure is larger than this conversation.",
+      "Author the components, the data model, the API specs and the wireframes the requirements need.",
+      "Choose the storage target and record why.",
+      "Trace every requirement to the component that carries it, and check that none is left untraced.",
+      "Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking question first; delegate to planning when the design needs specialist work; author or revise while any requirement is untraced or the storage target is unchosen; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "delegate",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "A requirement with no component behind it is not designed for.",
+      "The storage target is chosen here, not deferred to implementation."
+    ]
+  },
+  "delegations": [
+    {
+      "role": "planning",
+      "capabilities": []
+    }
+  ],
+  "mutationBoundary": {
+    "mayMutate": [
+      "linkTrace",
+      "reviseArtifact",
+      "setReviewStatus",
+      "unlinkTrace",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A requirement's statement.",
+      "A decision recorded in Stage 4."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "The data model and the design, by the operator.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The components and how they fit together.",
+      "The data model and the storage target chosen.",
+      "The requirement-to-component trace."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

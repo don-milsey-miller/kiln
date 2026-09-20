@@ -14,6 +14,57 @@
       "mechanised": false
     }
   ],
+  "purpose": "Put every blocking gap in front of the operator with its options, and record what they decide.",
+  "method": {
+    "summary": "Register each gap with its options and tradeoffs, ask, and record the decision.",
+    "steps": [
+      "Read the unknowns Stage 3 classified here and the requirements they block.",
+      "Author one register entry per blocking gap, with its options and their tradeoffs.",
+      "Ask the operator to decide one gap at a time.",
+      "Record each decision, resolve the question it answers, and revise any artifact the decision changes.",
+      "Set each recorded decision to approved once the operator has confirmed its wording.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a blocking question first; author or revise while any blocking gap lacks a recorded decision; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "Do not decide on the operator's behalf; a gap they have not answered is still open.",
+      "A gap that blocks nothing is not raised here."
+    ]
+  },
+  "delegations": [],
+  "mutationBoundary": {
+    "mayMutate": [
+      "resolveQuestion",
+      "reviseArtifact",
+      "setReviewStatus",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A requirement's statement."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That every blocking gap has a recorded user decision.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "Each gap and the decision that settled it.",
+      "Questions left open, and why they do not block."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

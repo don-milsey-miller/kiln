@@ -24,6 +24,70 @@
       "mechanised": false
     }
   ],
+  "purpose": "Hand each assigned person a slice they can start from without coming back to ask.",
+  "method": {
+    "summary": "Slice per role, rest every runbook step on an assertion at or above threshold, and clear the critical questions.",
+    "steps": [
+      "Read the task set, the acceptance criteria and the evidence behind them.",
+      "Author the runbook and one step per action, each resting on an assertion at or above the threshold (#57).",
+      "Delegate to the planning specialist where a slice needs its steps written for a role.",
+      "Slice the package per assigned role and check that each slice stands on its own.",
+      "Resolve every critical question, or ask the operator to settle it (DEC-0014).",
+      "Link each step's evidence to the step it supports.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Resolve a critical question first; delegate to planning when a role slice needs its steps written; author or revise while any slice is incomplete or any step rests below the threshold; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "author",
+      "delegate",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "A step resting on an assertion below the threshold does not ship (#57).",
+      "A question that blocks active handoff content, or makes a handoff criterion unevaluable, is critical (DEC-0014)."
+    ]
+  },
+  "delegations": [
+    {
+      "role": "planning",
+      "capabilities": []
+    }
+  ],
+  "mutationBoundary": {
+    "mayMutate": [
+      "linkEvidence",
+      "linkTrace",
+      "resolveQuestion",
+      "reviseArtifact",
+      "setLifecycle",
+      "unlinkEvidence",
+      "unlinkTrace",
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "A task's statement.",
+      "An acceptance criterion."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That each role slice can be started without coming back to ask.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "Each role slice and what it contains.",
+      "The steps and the assertions underneath them.",
+      "Questions closed as non-critical, and why."
+    ]
+  },
   "provenance": {
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",

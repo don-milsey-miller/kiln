@@ -26,6 +26,53 @@
       "mechanised": false
     }
   ],
+  "purpose": "Record what the operator is asking for, in their own words, before any solution is named.",
+  "method": {
+    "summary": "Run the intake question loop until the recorded request answers every exit criterion.",
+    "steps": [
+      "Read the `intake` block `kiln_project_status` returns; it is the state every question is chosen from.",
+      "Ask the one question `questionSelection` chooses.",
+      "Record the answer with `kiln_write_stage_document`: the operator's words in `verbatim`, Kiln's reading in `interpretation`.",
+      "Run `kiln_lint`, then re-read the `intake` block before choosing the next question.",
+      "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
+    ]
+  },
+  "nextActivity": {
+    "rule": "Question while the recorded intake leaves a blocking uncertainty; attest once every exit criterion holds; exit only after attestation.",
+    "activities": [
+      "question",
+      "attest",
+      "exit"
+    ],
+    "constraints": [
+      "Do not propose, name or imply a solution, a technology or a design.",
+      "Do not author a typed artifact; this stage produces none."
+    ]
+  },
+  "delegations": [],
+  "mutationBoundary": {
+    "mayMutate": [
+      "writeStageAttestation",
+      "writeStageDocument"
+    ],
+    "mayNotTouch": [
+      "Another stage's document.",
+      "Any typed artifact, because this stage produces none."
+    ]
+  },
+  "approvalBoundary": {
+    "approves": "That the recorded request is what the operator meant.",
+    "requires": [
+      "The operator confirms the exact stage attestation or advance through Kiln's interactive confirmation channel during that invocation."
+    ]
+  },
+  "completionSummary": {
+    "format": "A concise Markdown handoff with bullets under Completed, Decisions, Open items, and Next activity.",
+    "includes": [
+      "The request as recorded, in the operator's terms.",
+      "Which stages this project needs."
+    ]
+  },
   "questionSelection": {
     "rule": "Choose each question from the current `kiln_project_status.intake` state by information value and blocking impact: ask the single question whose answer would most reduce the highest-impact uncertainty preventing Stage 1 from understanding the operator's request.",
     "afterAnswer": [
