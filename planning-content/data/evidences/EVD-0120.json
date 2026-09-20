@@ -1,0 +1,50 @@
+{
+  "id": "EVD-0120",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Every refusal cause is checked, in a fixed order, and a refused child's answer is not read",
+  "kind": "experiment",
+  "summary": "Every cause ACC-0075 names now has a check, in a fixed order, and none of a refused child's substantive output is used (TSK-0054). EVIDENCE STRENGTH, STATED RATHER THAN BLENDED. ONE REAL PINNED-PI CHILD covers the criterion's own control case and only that: a child that exits zero, emits a well-formed transcript and answers confidently while holding none of Kiln's tools. Every other cause - signature drift, an out-of-role write, a nonzero exit, a timeout, malformed events, a missing binding, a selection mismatch - is covered by DETERMINISTIC TESTS against a scripted child, because those states cannot be produced reliably from a real one. CI RE-RAN THE LOOPBACK MEASUREMENT AND CONTACTED NO REMOTE PROVIDER: the real child talks to a loopback HTTP server on 127.0.0.1, so nothing here is evidence about any real model's behaviour, and nothing here is evidence about what a specialist DOES with a task it accepts. THE CONTROL CASE, IN ALL FOUR CELLS. `test/delegate-real-child.test.mjs` spawns the pinned agent against a tool root whose Kiln extension registers nothing. The child exits zero, its task binding is observed true, its report lists zero active tools, and the delegation refuses `capability-missing`. Its prose is not returned and the refusal carries no `output` field at all. EIGHT CAUSES, EIGHT CHECKS, ONE ORDER. `test/refusal-matrix.test.mjs` has one case per cause and the order itself is a contract with its own test: timeout or abort, then malformed events, then a nonzero exit, then the task binding, then the selection, then out-of-role writes, then capabilities and signatures. All six ADJACENT PAIRS are genuine double failures, and a companion test proves each loser would have won alone, so a pair proves an order rather than passing with the later check deleted. NOT READ, OPERATIONALLY. A confident, plausible answer carrying a sentinel is emitted on every refusal path. A case passes only when that string appears nowhere in the result, its message, its observation or anything nested. `answerFrom` runs only after the gate accepts, so the ordering enforces it rather than the refusal path happening to drop it. TWO NEW WIRE CODES AND ONE RECLASSIFICATION (D47, D48). `child-exited-nonzero` and `child-events-malformed` are different facts from the five already coded; `child-selection-mismatch` separates a child answering under a provider or model nobody asked for from a child that cannot demonstrate its tools. Every existing literal is unchanged. ABSENCE STAYS PRIMARY (D49). `--tools` and the measured registry keep an out-of-role tool unavailable. The event-stream check is a fail-safe for a boundary that did not hold, and STARTING is the fact: a handler that failed may already have mutated state. FIVE REVIEW FINDINGS WERE CORRECTED BEFORE THE MUTATION GATE, and are recorded as caught before acceptance. F39 the binding now refuses at its own step rather than at `verifyChild`, so a child that was never given the task is never refused for a wrong model instead. F40 the write boundary is `mayWrite` over the canonical operation a wire name resolves to, not membership of `active`, which is the role's tools INTERSECTED with the host registry. F41 a tool name this host does not register makes the stream unreadable and is never copied anywhere. F42 the event types the gate consumes are shape-checked, and the answer and the native selection are read only from `message_end` and `turn_end`. F43 the matrix fixture takes a list of faults so precedence can be tested at all; `bindingDetail` is gone and `durationMs` is restored. ONE DEFECT WAS CAUGHT BY A REAL CHILD RATHER THAN BY REVIEW. The first F42 shape rule required a `message` field on `message_update`. A teed real run showed an update carries `usage` and `assistantMessageEvent` and no message at all, and both real-child tests failed until the rule was narrowed to what Pi actually emits. The shapes in this record are measured, not assumed. F130 IS RECORDED AS NOT RECURRING, NOT RESOLVED. `A8 each companion is a separate process` passed on both Windows cells of this run and is skipped on Linux. Its cause was never established, and it remains a watch item.",
+  "outcome": "success",
+  "observedAt": "2026-09-20",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35536142753 at commit 5f423b7, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1405 tests / 1404 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1405 tests / 1404 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1405 tests / 1396 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1405 tests / 1396 pass / 0 fail / 9 skipped",
+      "skips-are-platform-guards": "Windows skips only the opt-in live Pi contract; Linux skips that plus four F122 Windows process-table reads, the case-insensitive root comparison, A8, and two POSIX cwd-deletion cases",
+      "control-case": "test/delegate-real-child.test.mjs `a real child that answers confidently with none of Kiln's tools is refused, and its prose is not used`, all four cells: exit 0, taskBindingObserved true, reportedActiveTools [], refused `capability-missing`, sentinel absent from the serialised result, no `output` field",
+      "matrix-tests": "test/refusal-matrix.test.mjs, 18 tests, all four cells: one case per ACC-0075 cause, the six adjacent precedence pairs, the single-fault controls, the event reader, the two F42 extraction rules, the two F40 boundary cases, the F41 unknown-name case and a workspace-leak check",
+      "wire-codes": "eight: task-not-delivered, timed-out, capability-missing, signature-mismatch, out-of-role-write, child-exited-nonzero, child-events-malformed, child-selection-mismatch; the five pre-existing literals unchanged and pinned by test/specialist-contract.test.mjs",
+      "precedence-order": "timeout or abort, malformed events, nonzero exit, task binding, selection, out-of-role write, capabilities and signatures; all six adjacent pairs built as real double failures, each loser proven to win alone",
+      "tool-catalogue": "KNOWN_TOOL_NAMES and the names pi-package/extensions/kiln.js registers are identical sets of 30, compared in both directions: 9 creates, 8 mutations, 3 other writes, 10 reads; every registered name classifies and five invented or ill-typed names resolve to null",
+      "event-vocabulary": "12 measured Pi event types; session carries {type, version, id, timestamp, cwd}; message_start, message_end and turn_end carry `message`; message_update carries `usage` and `assistantMessageEvent` and NO message; the answer and the native selection are read only from message_end and turn_end",
+      "disclosure-scan": "a direct scan over all eight causes plus one acceptance, with the nonce, task digest, workspace path, prompt directory and agent directory captured from the spawn seam: no rejected prose, no raw tool name, no credential (TAVILY_API_KEY was present in the host environment), no absolute path, no nonce and no digest in any result; 12 runs added zero entries to temporary storage",
+      "mutations": "38 written, 38 killed, locally on Windows; restore byte-identical by sha256 after each. Coverage: each of the seven checks removed, each of the six adjacent pairs reordered, raw tool-name disclosure, premature answer extraction, event-shape weakening, the write boundary and the observation fields",
+      "mutation-survivors-diagnosed": "four survived the first pass. Three were coverage gaps, now closed by tests: the unreadable line's content reported back, a user turn read as the assistant's answer, and `mayWrite` swapped for allowlist membership in a case where the two agree. One was equivalent - `void answer` moves nothing - and was re-cut as extracting the answer at the step-1 timeout refusal, which is killed",
+      "mutations-not-in-ci": "no mutation set runs in CI; the set was run on this host only",
+      "defect-message-update-shape": "the first F42 shape rule required a `message` field on `message_update`, which no real update carries; both real-child tests failed, a teed real run supplied the measured shapes, and the rule was narrowed before acceptance",
+      "limitation-loopback": "the real child talks to a loopback server on 127.0.0.1. CI re-ran that measurement and contacted no remote provider, so nothing here is evidence about a real model's behaviour",
+      "limitation-one-real-cause": "the real child covers the toolless control case only; the other seven causes are deterministic tests against a scripted child",
+      "limitation-not-specialist-behaviour": "this record says what happens to a child's answer, not what a specialist does with a task it is given; no claim is made about research, planning or validation behaviour",
+      "limitation-one-role": "the matrix exercises the research role; planning and validation are covered by the contract and the generated definitions",
+      "limitation-no-macos": "no macOS coverage",
+      "f130": "not recurring, not resolved: `A8 each companion is a separate process` passed on windows-latest node 24 at 1.03 s and node 22 at 1.47 s, and is skipped on Linux. Its cause was never established and it remains a watch item",
+      "f133": "did not recur: no wall-clock-budget failure and no retry in any cell of this run"
+    }
+  }
+}

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A child without the Kiln capability signature is refused, not read",
   "statement": "A child that exits zero, emits a well-formed transcript and returns plausible prose without Kiln's tools causes the delegation to fail loudly; none of its substantive output is used. The same holds for signature drift, an out-of-role write, a nonzero exit, a timeout, malformed JSON events, a missing task binding and a provider or model mismatch.",
   "evaluates": [
@@ -12,5 +12,8 @@
   ],
   "verifies": [
     "REQ-0026"
+  ],
+  "evidencedBy": [
+    "EVD-0120"
   ]
 }
