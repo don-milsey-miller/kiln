@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "platform": "linux",
+    "node": "v24.11.0",
+    "pinned": "0.84.4",
+    "piVersion": "0.84.4",
+    "ranAt": "2026-09-21T14:26:46.690Z",
+    "launchArgs": [
+      "--no-session",
+      "--no-extensions",
+      "--no-skills",
+      "--no-prompt-templates",
+      "--no-themes",
+      "--no-context-files",
+      "--no-approve",
+      "--offline"
+    ],
+    "environmentNames": [
+      "HOME",
+      "LANG",
+      "PATH",
+      "PI_CODING_AGENT_DIR",
+      "TERM"
+    ],
+    "isolation": "HOME, PI_CODING_AGENT_DIR and the working directory are fresh temporary directories",
+    "terminal": "script(1) pseudo-terminal, Linux only",
+    "controlTimeoutSeconds": 20
+  },
+  "controls": [
+    {
+      "label": "both-tty",
+      "streams": "stdin TTY, stdout TTY",
+      "piExit": 124,
+      "timedOut": true,
+      "piElapsedMs": 20124,
+      "signals": {
+        "bracketedPasteEnabled": true,
+        "cursorHidden": true,
+        "alternateScreen": false
+      },
+      "tuiObserved": true,
+      "firstText": "────────────────────────────────────────────────────────────────────────────────\n                                                                                \n────────────────────────────────────────────────────────────────────────────────\n<TMP>/kiln-login-AJ4rGc/project\n0.0%/0 (auto)                                                            unknown pi v0.84.4                                                                     \n escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o     \n more                                                                           \n Pr"
+    },
+    {
+      "label": "stdin-closed",
+      "streams": "stdin /dev/null, stdout TTY",
+      "piExit": 0,
+      "timedOut": false,
+      "piElapsedMs": 322,
+      "signals": {
+        "bracketedPasteEnabled": false,
+        "cursorHidden": false,
+        "alternateScreen": false
+      },
+      "tuiObserved": false,
+      "firstText": ""
+    },
+    {
+      "label": "stdin-open-pipe",
+      "streams": "stdin an open pipe, stdout TTY",
+      "piExit": 124,
+      "timedOut": true,
+      "piElapsedMs": 19312,
+      "signals": {
+        "bracketedPasteEnabled": false,
+        "cursorHidden": false,
+        "alternateScreen": false
+      },
+      "tuiObserved": false,
+      "firstText": ""
+    },
+    {
+      "label": "stdout-pipe",
+      "streams": "stdin TTY, stdout a pipe",
+      "piExit": 0,
+      "timedOut": false,
+      "piElapsedMs": 244,
+      "signals": {
+        "bracketedPasteEnabled": false,
+        "cursorHidden": false,
+        "alternateScreen": false
+      },
+      "tuiObserved": false,
+      "firstText": ""
+    },
+    {
+      "label": "both-pipes",
+      "streams": "stdin an open pipe, stdout a pipe",
+      "piExit": 124,
+      "timedOut": true,
+      "piElapsedMs": 20017,
+      "signals": {
+        "bracketedPasteEnabled": false,
+        "cursorHidden": false,
+        "alternateScreen": false
+      },
+      "tuiObserved": false,
+      "firstText": ""
+    }
+  ]
+}

@@ -1,0 +1,423 @@
+
+ pi v0.84.4
+ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown Warning: No models available. Use /login to log into a provider via OAuth or API key. See:
+   <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/providers.md
+   <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/models.md
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown/                                                                                                                                                                                  → settings       Open settings menu
+  model          <provider/model> — Select model (opens selector UI)
+  tree           Navigate session tree (switch branches)
+  thinking       <level> — Set thinking level
+  scoped-models  Enable/disable models for Ctrl+P cycling
+  (1/24)
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown/l                                                                                                                                                                                 → login          <provider> — Configure provider authentication
+  logout         Remove provider authentication
+  llama          [t] Manage llama.cpp router models
+  clone          Duplicate the current session at the current position
+  reload         Reload keybindings, extensions, skills, prompts, themes, and context files
+  (1/8)                                                                                                                                                                            /lo                                                                                                                                                                                → login       <provider> — Configure provider authentication
+  logout      Remove provider authentication
+  clone       Duplicate the current session at the current position
+  reload      Reload keybindings, extensions, skills, prompts, themes, and context files
+  changelog   Show changelog entries
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown
+/log                                                                                                                                                                                 changelog   Show changelog entries
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown
+
+/logi                                                                                                                                                                              <TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown
+
+/login                                                                                                                                                                             ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Select authentication method:
+
+ → Sign in with an account
+   Sign in with an API key
+
+ ↑↓ navigate  enter select  escape/ctrl+c cancel
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown   Sign in with an account
+ → Sign in with an API key                                                                                                                                                          Select provider to configure:
+
+>
+
+ → Amazon Bedrock • unconfigured
+   Ant Ling • unconfigured
+   Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (1/40)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown   Amazon Bedrock • unconfigured
+ → Ant Ling • unconfigured
+   Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (2/40)                                                                                                                                                                             Ant Ling • unconfigured
+ → Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (3/40)                                                                                                                                                                             Anthropic • unconfigured
+ → Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (4/40)                                                                                                                                                                             Azure OpenAI • unconfigured
+ → Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (5/40)                                                                                                                                                                             Ant Ling • unconfigured
+   Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+ → Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+   (6/40)                                                                                                                                                                             Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+ → Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+   Fireworks • unconfigured
+   (7/40)                                                                                                                                                                             Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+ → Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+   Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+   (8/40)                                                                                                                                                                             Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+ → DeepSeek • unconfigured
+   Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+   Google • unconfigured
+   (9/40)                                                                                                                                                                             Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+ → Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+   Google • unconfigured
+   Google Vertex AI • unconfigured
+   (10/40)                                                                                                                                                                            Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+   Fireworks • unconfigured
+ → GitHub Copilot • unconfigured
+   Google • unconfigured
+   Google Vertex AI • unconfigured
+   Groq • unconfigured
+   (11/40)                                                                                                                                                                            Cloudflare Workers AI • unconfigured
+   DeepSeek • unconfigured
+   Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+ → Google • unconfigured
+   Google Vertex AI • unconfigured
+   Groq • unconfigured
+   Hugging Face • unconfigured
+   (12/40)                                                                                                                                                                            DeepSeek • unconfigured
+   Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+   Google • unconfigured
+ → Google Vertex AI • unconfigured
+   Groq • unconfigured
+   Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+   (13/40)                                                                                                                                                                            Fireworks • unconfigured
+   GitHub Copilot • unconfigured
+   Google • unconfigured
+   Google Vertex AI • unconfigured
+ → Groq • unconfigured
+   Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+   (14/40)                                                                                                                                                                            GitHub Copilot • unconfigured
+   Google • unconfigured
+   Google Vertex AI • unconfigured
+   Groq • unconfigured
+ → Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+   MiniMax • unconfigured
+   (15/40)                                                                                                                                                                            Google • unconfigured
+   Google Vertex AI • unconfigured
+   Groq • unconfigured
+   Hugging Face • unconfigured
+ → Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+   MiniMax • unconfigured
+   MiniMax CN • unconfigured
+   (16/40)                                                                                                                                                                            Google Vertex AI • unconfigured
+   Groq • unconfigured
+   Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+ → llama.cpp • unconfigured
+   MiniMax • unconfigured
+   MiniMax CN • unconfigured
+   Mistral • unconfigured
+   (17/40)                                                                                                                                                                            Groq • unconfigured
+   Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+ → MiniMax • unconfigured
+   MiniMax CN • unconfigured
+   Mistral • unconfigured
+   Moonshot AI • unconfigured
+   (18/40)                                                                                                                                                                            Hugging Face • unconfigured
+   Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+   MiniMax • unconfigured
+ → MiniMax CN • unconfigured
+   Mistral • unconfigured
+   Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+   (19/40)                                                                                                                                                                            Kimi For Coding • unconfigured
+   llama.cpp • unconfigured
+   MiniMax • unconfigured
+   MiniMax CN • unconfigured
+ → Mistral • unconfigured
+   Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+   NVIDIA • unconfigured
+   (20/40)                                                                                                                                                                            llama.cpp • unconfigured
+   MiniMax • unconfigured
+   MiniMax CN • unconfigured
+   Mistral • unconfigured
+ → Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+   NVIDIA • unconfigured
+   OpenAI • unconfigured
+   (21/40)                                                                                                                                                                            MiniMax • unconfigured
+   MiniMax CN • unconfigured
+   Mistral • unconfigured
+   Moonshot AI • unconfigured
+ → Moonshot AI CN • unconfigured
+   NVIDIA • unconfigured
+   OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   (22/40)                                                                                                                                                                            MiniMax CN • unconfigured
+   Mistral • unconfigured
+   Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+ → NVIDIA • unconfigured
+   OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   (23/40)                                                                                                                                                                            Mistral • unconfigured
+   Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+   NVIDIA • unconfigured
+ → OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   (24/40)                                                                                                                                                                         > [THROWAWAY-KEY-REDACTED]
+
+   No matching providers
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown
+
+
+
+
+
+
+
+> <REDACTED-KEY>                                                                                                                                > <REDACTED-KEY>                                                                                                                                 > <REDACTED-KEY>                                                                                                                                  > <REDACTED-KEY>                                                                                                                                   > <REDACTED-KEY>                                                                                                                                    > <REDACTED-KEY>                                                                                                                                     > <REDACTED-KEY>                                                                                                                                      > <REDACTED-KEY>                                                                                                                                       > <REDACTED-KEY>                                                                                                                                        > <REDACTED-KEY>                                                                                                                                         > <REDACTED-KEY>                                                                                                                                          > <REDACTED-KEY>                                                                                                                                           > <REDACTED-KEY>                                                                                                                                            > <REDACTED-KEY>                                                                                                                                             > <REDACTED-KEY>                                                                                                                                              > <REDACTED-KEY>                                                                                                                                               > <REDACTED-KEY>                                                                                                                                                > <REDACTED-KEY>                                                                                                                                                 > <REDACTED-KEY>                                                                                                                                                  > <REDACTED-KEY>                                                                                                                                                   > <REDACTED-KEY>                                                                                                                                                    > <REDACTED-KEY>                                                                                                                                                     > <REDACTED-KEY>                                                                                                                                                      > <REDACTED-KEY>                                                                                                                                                       > <REDACTED-KEY>                                                                                                                                                        > <REDACTED-KEY>                                                                                                                                                         > <REDACTED-KEY>                                                                                                                                                          > <REDACTED-KEY>                                                                                                                                                           > <REDACTED-KEY>                                                                                                                                                            > <REDACTED-KEY>                                                                                                                                                             > <REDACTED-KEY>                                                                                                                                                              > <REDACTED-KEY>                                                                                                                                                               > <REDACTED-KEY>                                                                                                                                                                > <REDACTED-KEY>                                                                                                                                                                 > <REDACTED-KEY>                                                                                                                                                                  > <REDACTED-KEY>                                                                                                                                                                   > <REDACTED-KEY>                                                                                                                                                                    > <REDACTED-KEY>                                                                                                                                                                     > <REDACTED-KEY>                                                                                                                                                                      > sk-kiln-th                                                                                                                                                                       > sk-kiln-t                                                                                                                                                                        > sk-kiln-                                                                                                                                                                         > sk-kiln
+
+ → Xiaomi Token Plan SGP • unconfigured
+   Xiaomi Token Plan AMS • unconfigured
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown> sk-kil                                                                                                                                                                           > sk-ki
+
+ → Xiaomi Token Plan SGP • unconfigured
+   Xiaomi Token Plan AMS • unconfigured
+   Cloudflare Workers AI • unconfigured
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown> sk-k                                                                                                                                                                             > sk-                                                                                                                                                                              > sk
+
+ → DeepSeek • unconfigured
+   Radius • unconfigured
+   Fireworks • unconfigured
+   Azure OpenAI • unconfigured
+   Xiaomi Token Plan SGP • unconfigured
+   Cerebras • unconfigured
+   Xiaomi Token Plan AMS • unconfigured
+   Baseten • unconfigured
+   (1/13)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown> s
+
+ → Xiaomi Token Plan SGP • unconfigured
+   llama.cpp • unconfigured
+   Baseten • unconfigured
+   Mistral • unconfigured
+   DeepSeek • unconfigured
+   Moonshot AI • unconfigured
+   Moonshot AI CN • unconfigured
+   Radius • unconfigured
+   (1/15)                                                                                                                                                                          >
+
+ → Amazon Bedrock • unconfigured
+   Ant Ling • unconfigured
+   Anthropic • unconfigured
+   Azure OpenAI • unconfigured
+   Baseten • unconfigured
+   Cerebras • unconfigured
+   Cloudflare AI Gateway • unconfigured
+   Cloudflare Workers AI • unconfigured
+   (1/40)                                                                                                                                                                          > O
+
+ → OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   Azure OpenAI • unconfigured
+   Google • unconfigured
+   Google Vertex AI • unconfigured
+   Moonshot AI • unconfigured
+   (1/27)                                                                                                                                                                          > Op
+
+ → OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   Azure OpenAI • unconfigured
+   Anthropic • unconfigured
+   GitHub Copilot • unconfigured
+   Qwen Token Plan • unconfigured
+   (1/26)                                                                                                                                                                          > Ope
+
+ → OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   Azure OpenAI • unconfigured
+   Qwen Token Plan • unconfigured
+   Qwen Token Plan CN • unconfigured
+   Groq • unconfigured                                                                                                                                                             > Open
+
+ → OpenAI • unconfigured
+   OpenCode Go • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   Azure OpenAI • unconfigured
+   Qwen Token Plan • unconfigured
+   Qwen Token Plan CN • unconfigured
+   Qwen Token Plan Individual • unconfigured
+   (1/19)                                                                                                                                                                          > OpenA
+
+ → OpenAI • unconfigured
+   Azure OpenAI • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   OpenCode Go • unconfigured
+   Qwen Token Plan • unconfigured
+   Qwen Token Plan CN • unconfigured
+   Google • unconfigured
+   (1/18)                                                                                                                                                                          > OpenAI
+
+ → OpenAI • unconfigured
+   Azure OpenAI • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   OpenCode Go • unconfigured
+   Qwen Token Plan • unconfigured
+   Google • unconfigured
+   Qwen Token Plan Individual • unconfigured
+   (1/16)                                                                                                                                                                             OpenAI • unconfigured
+ → Azure OpenAI • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   OpenCode Go • unconfigured
+   Qwen Token Plan • unconfigured
+   Google • unconfigured
+   Qwen Token Plan Individual • unconfigured
+   (2/16)                                                                                                                                                                           → OpenAI • unconfigured
+   Azure OpenAI • unconfigured
+   OpenCode Zen • unconfigured
+   OpenRouter • unconfigured
+   OpenCode Go • unconfigured
+   Qwen Token Plan • unconfigured
+   Google • unconfigured
+   Qwen Token Plan Individual • unconfigured
+   (1/16)                                                                                                                                                                           Login to OpenAI
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Enter OpenAI API key
+>
+ (escape/ctrl+c to cancel, enter to submit)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/0 (auto)                                                                                                                                                               unknown> [THROWAWAY-KEY-REDACTED]                                                                                                                               > [THROWAWAY-KEY-REDACTED]                                                                                                                                Saved API key for OpenAI. Selected gpt-5.5. Credentials saved to <TMP>/kiln-login-0chjWf/agent/auth.json
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-0chjWf/project
+0.0%/272k (auto)                                                                                                                                             gpt-5.5 • thinking off

@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "platform": "linux",
+    "node": "v24.11.0",
+    "pinned": "0.84.4",
+    "piVersion": "0.84.4",
+    "ranAt": "2026-09-21T15:51:18.342Z",
+    "launchArgs": [
+      "--no-session",
+      "--no-extensions",
+      "--no-skills",
+      "--no-prompt-templates",
+      "--no-themes",
+      "--no-context-files",
+      "--no-approve",
+      "--offline"
+    ],
+    "environmentNames": [
+      "HOME",
+      "LANG",
+      "PATH",
+      "PI_CODING_AGENT_DIR",
+      "TERM"
+    ],
+    "isolation": "HOME, PI_CODING_AGENT_DIR and the working directory are fresh temporary directories",
+    "terminal": "script(1) pseudo-terminal, Linux only"
+  },
+  "interactive": {
+    "piExit": 0,
+    "scriptExit": 0,
+    "piElapsedMs": 36810,
+    "signals": {
+      "bracketedPasteEnabled": true,
+      "cursorHidden": true,
+      "alternateScreen": false
+    },
+    "tuiObserved": true,
+    "loginTyped": true,
+    "keyOccurrencesRedacted": 3
+  },
+  "authBefore": {
+    "exit": 1,
+    "result": {
+      "status": "not_ready",
+      "provider": "openai",
+      "reason": "credentials_not_configured"
+    }
+  },
+  "authAfter": {
+    "exit": 0,
+    "result": {
+      "status": "ready",
+      "provider": "openai",
+      "authType": "api_key"
+    }
+  },
+  "stored": {
+    "authFilePresent": true,
+    "shape": {
+      "openai": {
+        "type": "api_key"
+      }
+    },
+    "storedKeyIsTheThrowawayKey": true
+  },
+  "limits": [
+    "auth check --no-refresh confirms locally configured authentication; it does not show the key works against a provider",
+    "Linux only: observed under script(1) in a pseudo-terminal, not in a Windows terminal",
+    "the throwaway key is not a credential; account authentication is TSK-0066's"
+  ]
+}

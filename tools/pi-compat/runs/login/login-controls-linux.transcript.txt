@@ -1,0 +1,52 @@
+
+===== both-tty (stdin TTY, stdout TTY) =====
+
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-AJ4rGc/project
+0.0%/0 (auto)                                                            unknown pi v0.84.4
+ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o
+ more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or
+ extend Pi.
+
+
+ Warning: fd not found. Offline mode enabled, skipping download.
+ Warning: ripgrep not found. Offline mode enabled, skipping download.
+
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-AJ4rGc/project
+0.0%/0 (auto)                                                            unknown Warning: No models available. Use /login to log into a provider via OAuth or
+ API key. See:
+
+ <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/providers.
+ md
+
+ <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/models.md
+
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+<TMP>/kiln-login-AJ4rGc/project
+0.0%/0 (auto)                                                            unknown
+
+
+
+===== stdin-closed (stdin /dev/null, stdout TTY) =====
+
+
+
+===== stdin-open-pipe (stdin an open pipe, stdout TTY) =====
+
+
+
+===== stdout-pipe (stdin TTY, stdout a pipe) =====
+
+
+
+===== both-pipes (stdin an open pipe, stdout a pipe) =====
