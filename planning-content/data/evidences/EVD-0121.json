@@ -1,0 +1,58 @@
+{
+  "id": "EVD-0121",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Every stage declares its operating instructions, and every stage skill carries them",
+  "kind": "experiment",
+  "summary": "Every canonical stage definition declares the seven fields ACC-0112 names, the loader refuses one that omits or malforms any of them, every generated stage skill carries them from its definition, and the check fails by name when the two drift apart (TSK-0071). FIVE THINGS ARE SHOWN SEPARATELY, BECAUSE THEY ARE DIFFERENT KINDS OF FACT. (1) THE NINE AUTHORED DEFINITIONS. Each of `stages/*.json` gained `purpose`, `method`, `nextActivity`, `delegations`, `mutationBoundary`, `approvalBoundary` and `completionSummary` - 117 leaf slots across nine files, 516 added lines and no deletions. The content was drafted from the existing definitions, the generated skills and the repository's own recorded decisions, and reviewed as a nine-by-seven matrix before anything was written. Where a source did not settle the wording, the gap was named rather than filled, and four of those gaps were then settled as NEW canonical instructions (D57-D61) rather than presented as facts recovered from older artifacts. (2) THE LOADER'S REFUSALS. `lib/stages.mjs` refuses a definition that omits a field, gives it an unknown key, empties a list that must not be empty, repeats an entry, leaves a sorted list unsorted or puts a line break inside a line. Three vocabularies are checked rather than trusted: activities must be a duplicate-free SUBSEQUENCE of a semantic order, so a stage cannot claim it exits before it authors; a delegation's capabilities must EQUAL its role contract's, sorted and unique, and are never derived from it; `mayMutate` names canonical non-creation operations, so a wire name or a creation is refused. Two permissions are iffs rather than implications, because either half alone would let a definition say a thing in one place and unsay it in another. Every refusal names the stage and the field. (3) THE GENERATED SKILLS. Each skill carries all seven under six headings, with `approvalBoundary` and `mutationBoundary` sharing `## Boundaries`. The headings and two labels are the generator's; every substantive line is the definition's, asserted value by value including each delegated capability by name. An empty declaration renders as exactly `[]` and nothing else. The `## Not in this skill` section, which existed only to announce that these fields were undeclared, is gone. (4) THE DRIFT CHECK. Thirteen cases change one field to another loader-valid value, leave the generated file untouched, and assert `checkStageSkills` reports exactly that skill stale. A pristine-copy control asserts no drift, so each case measured a real change rather than a noisy tree. (5) FOUR-CELL CI. Run 35562380088 at commit 00fa519, one attempt and no job re-run, all four cells green with 1433 tests and zero failing assertions anywhere. `skills:check` and `roles:check` ran clean in every cell, which is what proves the generator and its nine output files stayed one consistency unit. THE MUTATION SETS RAN LOCALLY, ON WINDOWS ONLY, AND NOT IN CI. Thirty-seven loader mutations and thirty generator mutations, one at a time, each file restored byte-identical by sha256. FIVE DEFECTS WERE CAUGHT BEFORE ACCEPTANCE AND ARE RECORDED AS SUCH, THREE OF THEM BY MEASUREMENT RATHER THAN REVIEW. F55: the roster was written over `lib/specialists/roles.mjs`, which already held the authored role prose; six suites failed, the file was restored from HEAD byte-identical, and the roster went to `roster.mjs`. F56: importing `contractFor` into the stage loader pulled the tool registry and `ajv` into the stage-skill CLI's copied tree and made it unloadable, which a retained fixture caught; the roster moved to a module that imports nothing. F57: eight mutations survived on one weak assertion - the test looked for the field name anywhere in the refusal, and the cross-check refusals quote the other field by name - so an exact-prefix assertion replaced it. F58: the generator's `stringList` accepted an empty array, rendering a heading with nothing under it. F59: the generator wrote \"this stage delegates to no specialist\" beside an empty list, which is a conclusion the GENERATOR drew and reads like an instruction the definition gave. F130 REMAINS AN UNRESOLVED WATCH ITEM. `A8 each companion is a separate process` passed on both Windows cells of this run and is skipped on Linux. Its cause was never established, and nothing in this task investigated it.",
+  "outcome": "success",
+  "observedAt": "2026-09-21",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "35562380088 at commit 00fa519, one attempt, no job re-run, all four cells green, zero failing assertions in any cell",
+      "cell-windows-22": "node 22, 1433 tests / 1432 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "node 24, 1433 tests / 1432 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "node 22, 1433 tests / 1424 pass / 0 fail / 9 skipped",
+      "cell-ubuntu-24": "node 24, 1433 tests / 1424 pass / 0 fail / 9 skipped",
+      "earlier-ci-runs": "35542470089 at c3cb6b1 proved the loader in four cells; 35536963966 at e7470fb was the preceding green baseline. Neither was re-run",
+      "checks-in-every-cell": "`[roles] clean: all 3 role definitions match the specialist contract.` and `[stage-skills] clean: all 9 generated skills match stages/.`",
+      "authored-definitions": "9 files, 117 leaf slots, 516 insertions and 0 deletions in commit ef6851d; reviewed as a nine-by-seven matrix before any file was written",
+      "new-canonical-instructions": "D57-D62: method steps, next-activity priority rules, the approval sentence and the completion-summary format are newly authored instructions, not facts recovered from older artifacts. They are marked as such rather than attributed to a source",
+      "loader-tests": "test/stage-declared-fields.test.mjs, 17 tests: presence, line and list shape, closed key sets, the activity subsequence, delegation-to-contract equality, the non-creation vocabulary, both iffs, the attestation implication, and that no canonical prose lives in the loader",
+      "generator-tests": "test/stage-skill-operating-instructions.test.mjs, 8 tests: exact rendering value by value, the shipped nine, the `[]` rendering, the removal, the description bound, and the drift cases",
+      "generator-guard-tests": "test/stage-skills.test.mjs, 15 tests, including 18 direct refusal cases for the seven and a description driven past Pi's 1024-character bound",
+      "rendering-shape": "six headings - Purpose, Method, Next activity, Delegations, Boundaries, Completion summary - with both boundary fields under Boundaries; every substantive line is the definition's, asserted value by value",
+      "empty-declarations": "`delegations: []` and `mayMutate: []` render as exactly `[]` beneath their label, with no explanatory sentence. A generator-authored explanation is an inference, and two mutations that add one back are killed",
+      "drift-cases": "13 fields, each changed to another loader-valid value with the generated file left untouched; `checkStageSkills` reports exactly the one skill stale, and a pristine copy reports none",
+      "description-bound": "the widened description is 284 to 312 characters against Pi's PI_DESCRIPTION_MAX of 1024, measured across all nine; a description that would exceed it is refused rather than truncated, and one at exactly 1024 still generates",
+      "mutations-loader": "37 written, 37 killed, locally on Windows; each file restored byte-identical by sha256 after every mutation",
+      "mutations-generator": "30 written, 30 killed, locally on Windows; same restore discipline",
+      "mutations-not-in-ci": "neither mutation set runs in CI; both were run on this host only, and on Windows only",
+      "mutation-survivors-diagnosed": "eight loader mutations and four generator mutations survived their first pass. Eight were one weak assertion (F57). Three were untested generator guards, now covered. One was a real defect (F58). One generator mutation was equivalent and re-cut",
+      "defect-f55": "the roster was written over lib/specialists/roles.mjs, which already held the authored role prose; caught by six failing suites, restored from HEAD byte-identical before any commit",
+      "defect-f56": "importing `contractFor` into the stage loader pulled the tool registry and ajv into the stage-skill CLI's copied tree; caught by the retained ACC-0066 process fixture, which runs the CLI with no node_modules",
+      "defect-f57": "the refusal assertions matched a field name anywhere in the message, and the cross-check refusals quote the other field by name; replaced with an exact prefix plus a reason fragment",
+      "defect-f58": "the generator's stringList accepted an empty array, so a heading could render with nothing under it; six renderable lists now refuse empty while delegations, mayMutate and capabilities still accept it",
+      "defect-f59": "the generator wrote an explanatory sentence beside an empty `[]`, which is a conclusion it drew rather than an instruction the definition gave; removed, and pinned by tests on both the generator source and every shipped skill",
+      "roster-parity": "lib/specialists/roster.mjs holds one capability table; test/specialist-contract.test.mjs asserts contractFor(role).requiredCapabilities equals requiredCapabilitiesFor(role) for every role in declared order, and that an unknown role yields null rather than []",
+      "roster-ownership-gap": "lib/specialists/roster.mjs is not yet listed under any component. It belongs to CMP-0035, the specialist roster, not to either component this record updates, and adding it there was outside this gate's scope",
+      "limitation-no-runtime-behaviour": "this record says the seven are declared, carried and checked. It says nothing about whether an agent following them produces better planning, which no test here measures",
+      "limitation-generator-scope": "the generator checks renderability only. Vocabulary and cross-field rules are the loader's, and bin/generate-stage-skills.mjs loads through it; a caller building a definition set another way gets the generator's narrower guard",
+      "limitation-no-macos": "no macOS coverage",
+      "f130": "unresolved watch item, not recurring: `A8 each companion is a separate process` passed on windows-latest node 22 at 1.97 s and node 24 at 1.33 s, and is skipped on Linux. Its cause was never established and nothing in this task investigated it",
+      "f133": "did not recur: no wall-clock-budget failure and no retry in any cell of this run"
+    }
+  }
+}

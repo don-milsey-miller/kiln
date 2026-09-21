@@ -28,6 +28,7 @@
     "test/stage-skills-packaged.test.mjs",
     "test/pi-package.test.mjs",
     "test/pi-package-load.test.mjs",
-    "test/stage-skill-overrides.test.mjs"
+    "test/stage-skill-overrides.test.mjs",
+    "test/stage-skill-operating-instructions.test.mjs"
   ]
 }
