@@ -17,6 +17,7 @@
     "lib/specialists/render.mjs",
     "lib/specialists/role-files.mjs",
     "lib/specialists/roles.mjs",
+    "lib/specialists/roster.mjs",
     "lib/tool-wire-names.mjs",
     "specialists/planning.md",
     "specialists/research.md",
