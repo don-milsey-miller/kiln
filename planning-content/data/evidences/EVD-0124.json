@@ -1,0 +1,75 @@
+{
+  "id": "EVD-0124",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a real OAuth /login makes a built-in model discoverable, and removing the credential takes it away (Windows, manual, account-bound)",
+  "kind": "experiment",
+  "summary": "TSK-0066, toward ACC-0091. MANUAL, ACCOUNT-BOUND AND SINGLE-INSTANCE, ON WINDOWS: one operator, one real subscription, one run, in a native Windows terminal. It is not a suite result. The operator attests the account held an active ChatGPT Pro subscription at the time of the run. The harness did not measure the account tier, and no account details are recorded. WHAT WAS NAMED BEFORE THE RUN. Provider openai-codex and built-in model gpt-5.5, passed on the command line to tools/pi-compat/oauth-check.mjs at 77bb878. The harness refuses unless that model is in the pinned catalogue and is unavailable at baseline. THE ISOLATION. PI_CODING_AGENT_DIR and the working directory were fresh temporary directories. Every child, Pi included, received the allowlisted environment only: OS and runtime names plus PI_CODING_AGENT_DIR, and no credential name. The TUI was given the operator's terminal and was not captured, because Pi displays entered credentials (F13, EVD-0123). WHAT WAS OBSERVED. Each reading is a fresh process constructing a fresh ModelRuntime with allowModelNetwork false and a fresh ModelRegistry, and each had to exit 0. At baseline, openai-codex/gpt-5.5 was in the catalogue, not in getAvailable(), hasConfiguredAuth() was false, and the provider was not configured. The operator ran /login in Pi 0.84.4's full TUI, signed in with the subscription in the browser and exited with /quit. Pi exited 0. After the login, the model was in getAvailable(), hasConfiguredAuth() was true, and the provider was configured from the stored source. The isolated auth.json held one openai-codex entry of type oauth, which is recorded by type only. THE REVOCATION CONTROL. The harness removed the openai-codex entry from the isolated auth.json and read again. The model was no longer in getAvailable(), hasConfiguredAuth() was false, the provider was not configured, and the file held no provider entries. That is what distinguishes availability caused by the login from availability that was already there. WHAT THIS DOES NOT SHOW. Discovery and its loss are all this establishes. No model request was made and no token refresh was attempted, so it does not show the credential authenticates a request. Removal was local: the harness deleted the stored entry, and the session was not revoked at the provider. SANITIZATION. Before saving, the harness refused the record if it contained any 8-character run of any stored credential value, the username or the home path, or anything the redaction scan flags. It saved, so none was present. No credential value is retained in this evidence. Pi stored the credential in the isolated auth.json during the login, and after the run the isolated directory, that file included, was deleted and its removal verified. No kiln-oauth-* directory remained. test/pi-compat-oauth.test.mjs checks the label, the pin, the target, the launch arguments and the environment names, the three readings, the stored credential's shape only, the removal, the no-request limit, the redaction scan, and the absence of JWT-shaped values, authorisation headers, long opaque values, email addresses and credential field names. Six altered copies of the record each failed it, and the record was restored byte-identical by sha256. The harness's own failure paths are covered by test/pi-compat-oauth-harness.test.mjs.",
+  "outcome": "success",
+  "observedAt": "2026-09-21",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "label": "manual, account-bound, single-instance; Windows; not a suite result",
+      "platform": "Windows, native terminal, node v24.18.0",
+      "pi-version": "0.84.4, the pin",
+      "harness": "tools/pi-compat/oauth-check.mjs at 77bb878",
+      "record": "tools/pi-compat/runs/oauth/oauth-windows.json, ran 2026-09-21T19:13:03Z",
+      "target": "openai-codex / gpt-5.5, named on the command line before the run",
+      "launch-args": "--no-session --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-approve --offline",
+      "environment": "allowlisted OS and runtime names plus PI_CODING_AGENT_DIR; no credential name",
+      "tui": "given the operator's terminal and not captured",
+      "discovery": "each reading a fresh process with a fresh ModelRuntime (allowModelNetwork: false) and ModelRegistry, required to exit 0",
+      "baseline": "in catalogue; not available; hasConfiguredAuth false; provider not configured",
+      "login": "the operator completed /login with the subscription; Pi exit 0",
+      "after-login": "available; hasConfiguredAuth true; provider configured, source stored",
+      "stored-after-login": "one openai-codex entry of type oauth; recorded by type only",
+      "revocation": "the harness removed the openai-codex entry from the isolated auth.json",
+      "after-removal": "not available; hasConfiguredAuth false; provider not configured; no provider entries",
+      "sanitization": "enforced at capture: no 8-character run of any stored credential value, no username, no home path, no redaction finding; no credential value is retained in this evidence",
+      "cleanup": "Pi stored the credential in the isolated auth.json during the login; after the run the isolated directory, that file included, was deleted and its removal verified; no kiln-oauth-* directory remained",
+      "retained-test": "test/pi-compat-oauth.test.mjs: 5 tests, 5 pass locally",
+      "test-sensitivity": "six altered record copies each failed it; restored byte-identical by sha256",
+      "harness-test": "test/pi-compat-oauth-harness.test.mjs: 8 tests, 8 pass locally, including the refusal to overwrite this record",
+      "subscription": "active ChatGPT Pro subscription at the time of the run, by operator attestation; not measured by the harness; no account details recorded"
+    },
+    "omissions": [
+      {
+        "fact": "model-request",
+        "state": "not-captured",
+        "reason": "No model request was made. Availability shows a usable credential is configured, not that it authenticates a request."
+      },
+      {
+        "fact": "token-refresh",
+        "state": "not-captured",
+        "reason": "No token refresh was attempted, and discovery ran with allowModelNetwork false."
+      },
+      {
+        "fact": "provider-side-revocation",
+        "state": "not-captured",
+        "reason": "The credential was removed from the isolated auth.json. The session was not revoked at the provider."
+      },
+      {
+        "fact": "other-providers-and-platforms",
+        "state": "not-captured",
+        "reason": "One provider, one model, one subscription, on Windows. Nothing is inferred for other providers or for Linux."
+      },
+      {
+        "fact": "ci",
+        "state": "not-captured",
+        "reason": "The run needs a real subscription and an operator, so it never runs in CI. The retained test has not yet run in CI."
+      }
+    ]
+  }
+}

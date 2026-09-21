@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0025"
   ],
-  "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication."
+  "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication.",
+  "evidencedBy": [
+    "EVD-0124"
+  ]
 }
