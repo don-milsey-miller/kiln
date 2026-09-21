@@ -46,7 +46,12 @@ const EXPECTED = Object.freeze([
   "kiln-stage-09-handoff",
 ]);
 
-/** A minimal definition that satisfies every in-scope field, for the refusal and escaping cases. */
+/**
+ * A minimal definition that satisfies every in-scope field, for the refusal and escaping cases.
+ *
+ * ⚠️ **IT DECLARES THE SEVEN BECAUSE A DEFINITION DOES (TSK-0071).** A fixture missing them would
+ * refuse for that, and every case below would pass on a refusal about the wrong field.
+ */
 const minimal = (over = {}) => ({
   id: "01-sample",
   name: "Sample",
@@ -54,8 +59,24 @@ const minimal = (over = {}) => ({
   produces: ["requirement"],
   producesProse: "A sample stage.",
   exitCriteria: [{ id: "sample-done", describe: "The sample is done.", mechanised: false }],
+  purpose: "To be a sample.",
+  method: { summary: "Sample something.", steps: ["Sample it."] },
+  nextActivity: { rule: "Sample, then exit.", activities: ["author", "attest", "exit"], constraints: ["Sample only once."] },
+  delegations: [],
+  mutationBoundary: { mayMutate: ["writeStageAttestation"], mayNotTouch: ["Anything else."] },
+  approvalBoundary: { approves: "The sample.", requires: ["The sample exists."] },
+  completionSummary: { format: "One line.", includes: ["What was sampled."] },
   ...over,
 });
+
+/** Everything under one heading, up to the next one. */
+function section(content, heading) {
+  const from = content.indexOf(heading);
+  if (from < 0) return "";
+  const rest = content.slice(from + heading.length);
+  const next = rest.search(/^## /m);
+  return next < 0 ? rest : rest.slice(0, next);
+}
 
 /** Expect a refusal that names the stage and the field, and nothing generated. */
 const refuses = (definitions, stageId, field) =>
@@ -113,29 +134,33 @@ test("⚠️ ACC-0066 nothing a definition does not declare is written as if it 
     assert.equal(discovery.content.includes(candidate.note), false);
   }
 
-  // The deferred fields are named as absent, and nowhere described as present.
+  // ⚠️ **THE SECTIONS ARE EXACTLY WHAT THE DEFINITION CALLS FOR, IN ORDER (TSK-0071).** The six that
+  // ACC-0112 adds are now unconditional, because every definition declares all seven; `## Choosing the
+  // next question` remains conditional, because only a definition that declares the rule gets it. A
+  // template supplying either would read exactly like a definition that did.
+  const BASE = [
+    "## Purpose",
+    "## Decision owner",
+    "## Outputs",
+    "## Exit criteria",
+    "## Method",
+    "## Next activity",
+    "## Delegations",
+    "## Boundaries",
+    "## Completion summary",
+  ];
   for (const skill of generateStageSkills(DEFINITIONS)) {
-    // ⚠️ THE FIFTH SECTION EXISTS ONLY WHERE A DEFINITION DECLARES THE RULE. A stage without the field gets
-    // no section at all, because a template that supplied one would read exactly like a definition that did.
     const declares = DEFINITIONS[skill.stageId].questionSelection !== undefined;
     assert.deepEqual(
       skill.content.match(/^## .*$/gm),
-      declares
-        ? ["## Decision owner", "## Outputs", "## Exit criteria", "## Choosing the next question", "## Not in this skill"]
-        : ["## Decision owner", "## Outputs", "## Exit criteria", "## Not in this skill"],
+      declares ? [...BASE, "## Choosing the next question"] : BASE,
       `${skill.name}: exactly the generated sections its definition calls for, in order`
     );
 
-    // ⚠️ DECLARING THE QUESTION RULE DEFERS THE CHOICE OF ACTIVITY STILL. Which question to ask and whether
-    // the next activity should be questioning at all are different fields, and only one of them exists.
-    assert.match(
-      skill.content,
-      declares
-        ? /## Not in this skill\n\nThis stage's purpose, its method, how to choose the next activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet\.\n$/
-        : /## Not in this skill\n\nThis stage's purpose, its method, how to choose the next question or activity, its allowed delegations, its mutation and approval boundaries and its completion summary are not stated here, because its canonical definition does not declare them yet\.\n$/,
-      `${skill.name}: the deferred sentence does not match what its definition declares`
-    );
-    assert.equal(/^## (Purpose|Method|Next|Delegation|Mutation|Approval|Completion)/m.test(skill.content), false, `${skill.name}: a deferred field has a section`);
+    // ⚠️ **NOTHING STILL ANNOUNCES THE SEVEN AS ABSENT.** The section existed only to say they were
+    // undeclared; a document that renders them and still says they are missing contradicts itself.
+    assert.equal(skill.content.includes("Not in this skill"), false, `${skill.name}: the deferred section survives`);
+    assert.equal(skill.content.includes("does not declare them yet"), false, `${skill.name}: the deferred sentence survives`);
   }
 });
 
@@ -214,33 +239,24 @@ test("⚠️ ACC-0069 a question rule that is not one is refused, naming the sta
 });
 
 
-test("⚠️ F88 producesProse stays output prose: rendered once, inside Outputs, and never relabelled as purpose", () => {
-  // ⚠️ **A FIELD RELABELLED IS A FIELD INFERRED.** `producesProse` says what a stage emits. The first
-  // generator printed it under Purpose, which told an agent what the stage is FOR on the strength of a
-  // field that never said so. Wherever it appears, it must sit inside the Outputs section, and the only
-  // place the word purpose may appear is the sentence saying the definition does not declare one.
+test("⚠️ F88 producesProse stays output prose, and purpose is the definition's own", () => {
+  // ⚠️ **THE FIRST GENERATOR PRINTED `producesProse` UNDER PURPOSE.** That field says what a stage
+  // EMITS; relabelling it is inference by another route, and it is refused for the same reason a
+  // template default is. Now that a purpose exists, the check is sharper: the two both appear, each
+  // under its own heading, and neither is the other.
   for (const skill of generateStageSkills(DEFINITIONS)) {
     const def = DEFINITIONS[skill.stageId];
-    const { body } = parseFrontmatter(skill.content);
+    const purposeSection = section(skill.content, "## Purpose");
+    const outputsSection = section(skill.content, "## Outputs");
 
-    assert.equal(body.split(def.producesProse).length - 1, 1, `${skill.name}: the output prose appears other than exactly once`);
+    assert.ok(purposeSection.includes(def.purpose), `${skill.name}: the purpose section does not carry the declared purpose`);
+    assert.equal(purposeSection.includes(def.producesProse), false, `${skill.name}: producesProse was relabelled as purpose`);
+    assert.ok(outputsSection.includes(def.producesProse), `${skill.name}: producesProse is not under Outputs`);
+    assert.notEqual(def.purpose, def.producesProse, `${skill.name}: the definition itself repeats producesProse`);
 
-    const outputs = body.indexOf("\n## Outputs\n");
-    const next = body.indexOf("\n## ", outputs + 1);
-    const at = body.indexOf(def.producesProse);
-    assert.ok(outputs !== -1 && at > outputs && at < next, `${skill.name}: the output prose is not inside the Outputs section`);
-
-    // Exactly one mention, and it is the sentence saying the definition declares no purpose.
-    const mentions = [...skill.content.matchAll(/purpose/gi)].map((m) => m.index);
-    const sentence = "This stage's purpose, its method";
-    assert.equal(mentions.length, 1, `${skill.name}: purpose is mentioned ${mentions.length} times`);
-    assert.equal(mentions[0], skill.content.indexOf(sentence) + "This stage's ".length, `${skill.name}: purpose is mentioned somewhere other than the not-declared sentence`);
+    // ⚠️ ONCE, AND IN ONE PLACE. Rendered twice it would read as two separate statements.
+    assert.equal(skill.content.split(def.producesProse).length - 1, 1, `${skill.name}: producesProse is rendered more than once`);
   }
-
-  // And a definition whose prose is shaped like a purpose statement is still printed as output prose.
-  const [skill] = generateStageSkills({ "01-sample": minimal({ producesProse: "The purpose of this stage is to decide everything." }) });
-  assert.ok(skill.content.includes("## Outputs\n\nThe purpose of this stage is to decide everything.\n"));
-  assert.equal(/^## Purpose/m.test(skill.content), false);
 });
 
 test("⚠️ ACC-0066 generation is byte-deterministic: same definitions, same bytes, whatever the input order or working directory", () => {
@@ -290,7 +306,9 @@ test("⚠️ ACC-0066 Pi's own frontmatter parser reads exactly the generated na
     assert.equal(typeof frontmatter.description, "string");
     assert.ok(frontmatter.description.length > 0 && frontmatter.description.length <= 1024, `${skill.name}: description length`);
     assert.ok(frontmatter.description.includes(skill.stageId), `${skill.name}: the description does not say when it applies`);
-    assert.equal(/purpose/i.test(frontmatter.description), false, `${skill.name}: the description claims a purpose the definition does not declare`);
+    // ⚠️ IT NOW NAMES A PURPOSE BECAUSE THE DEFINITION DECLARES ONE (TSK-0071). The old assertion
+    // guarded against a description promising a field nothing carried; the guard is now the other way.
+    assert.match(frontmatter.description, /its purpose, method, next activity/, `${skill.name}: the description does not name what the skill carries`);
 
     // The generated header names its source and says not to edit.
     assert.ok(body.startsWith(`<!-- Generated by lib/stage-skills.mjs from stages/${skill.stageId}.json. Do not edit this file`), `${skill.name}: header`);
@@ -341,6 +359,51 @@ test("⚠️ ACC-0066 an id that would not be a loadable Pi skill name is refuse
   refuses({ "01-a": minimal({ id: "01-a" }), "01-a-copy": minimal({ id: "01-a" }) }, "01-a", "id");
   assert.throws(() => generateStageSkills(null), StageSkillError);
   assert.throws(() => generateStageSkills([]), StageSkillError);
+});
+
+test("⚠️ ACC-0112 the generator refuses a declared field it cannot render, naming the stage and the field", () => {
+  // ⚠️ **THE LOADER REFUSES FIRST IN PRODUCTION, AND THAT IS NOT A REASON TO SKIP THIS.**
+  // `generateStageSkills` takes a definition SET, not a loaded one, and a caller that built it another
+  // way would otherwise render a document with a hole in it. These cases call the generator directly.
+  refuses({ "01-sample": minimal({ purpose: undefined }) }, "01-sample", "purpose");
+  refuses({ "01-sample": minimal({ purpose: "two\nlines" }) }, "01-sample", "purpose");
+  refuses({ "01-sample": minimal({ method: undefined }) }, "01-sample", "method");
+  refuses({ "01-sample": minimal({ method: { summary: "", steps: ["x"] } }) }, "01-sample", "method.summary");
+  refuses({ "01-sample": minimal({ method: { summary: "s", steps: [] } }) }, "01-sample", "method.steps");
+  refuses({ "01-sample": minimal({ method: { summary: "s", steps: "not a list" } }) }, "01-sample", "method.steps");
+  refuses({ "01-sample": minimal({ nextActivity: undefined }) }, "01-sample", "nextActivity");
+  refuses({ "01-sample": minimal({ nextActivity: { rule: "r", activities: [], constraints: ["c"] } }) }, "01-sample", "nextActivity.activities");
+  refuses({ "01-sample": minimal({ nextActivity: { rule: "r", activities: ["exit"], constraints: [] } }) }, "01-sample", "nextActivity.constraints");
+  refuses({ "01-sample": minimal({ delegations: undefined }) }, "01-sample", "delegations");
+  refuses({ "01-sample": minimal({ delegations: "research" }) }, "01-sample", "delegations");
+  refuses({ "01-sample": minimal({ delegations: [{ role: "", capabilities: [] }] }) }, "01-sample", "delegations[0].role");
+  refuses({ "01-sample": minimal({ mutationBoundary: undefined }) }, "01-sample", "mutationBoundary");
+  refuses({ "01-sample": minimal({ mutationBoundary: { mayMutate: ["x"], mayNotTouch: [] } }) }, "01-sample", "mutationBoundary.mayNotTouch");
+  refuses({ "01-sample": minimal({ approvalBoundary: undefined }) }, "01-sample", "approvalBoundary");
+  refuses({ "01-sample": minimal({ approvalBoundary: { approves: "a", requires: [] } }) }, "01-sample", "approvalBoundary.requires");
+  refuses({ "01-sample": minimal({ completionSummary: undefined }) }, "01-sample", "completionSummary");
+  refuses({ "01-sample": minimal({ completionSummary: { format: "f", includes: [] } }) }, "01-sample", "completionSummary.includes");
+
+  // ⚠️ AN EMPTY LIST IS FINE WHERE THE DEFINITION MAY DECLARE ONE. `delegations` and `mayMutate` are
+  // the two, and refusing them here would contradict the loader that accepts them.
+  const bare = minimal({ delegations: [], mutationBoundary: { mayMutate: [], mayNotTouch: ["Anything."] } });
+  assert.ok(generateStageSkills({ "01-sample": bare })[0].content.includes("## Boundaries"));
+});
+
+test("⚠️ ACC-0066 a description Pi would not load is refused rather than truncated", () => {
+  // ⚠️ **THE BOUND IS PI'S, AND IT IS MEASURED HERE RATHER THAN ASSUMED.** The sentence grew when it
+  // started naming all seven fields, so the guard has to be driven past 1024 characters by something.
+  // A long stage name does it, and truncating instead would ship a description Pi silently drops.
+  const short = generateStageSkills({ "01-sample": minimal() })[0].content.match(/^description: "(.*)"$/m)[1];
+  assert.ok(short.length < 1024, `the baseline description is already ${short.length}`);
+
+  const long = minimal({ name: "S".repeat(1024) });
+  refuses({ "01-sample": long }, "01-sample", "description");
+
+  // Just under the bound still generates, so the refusal is a bound and not a blanket.
+  const fits = minimal({ name: "S".repeat(1024 - short.length + "Sample".length) });
+  const description = generateStageSkills({ "01-sample": fits })[0].content.match(/^description: "(.*)"$/m)[1];
+  assert.equal(description.length, 1024, `boundary description is ${description.length}`);
 });
 
 test("⚠️ ACC-0066 the generator owns kiln-stage-* names and no other, so kiln-planning is never its to judge", () => {

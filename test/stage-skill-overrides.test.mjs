@@ -60,7 +60,8 @@ const PACKAGE_SKILLS = Object.freeze([
 
 /** The packaged description, stated from the stage definition rather than read back through Pi's parser. */
 const PACKAGED_DESCRIPTION =
-  `Kiln planning stage 01, ${loadStageDefinitions(ROOT)["01-intake"].name}: its decision owner, outputs and exit criteria ` +
+  `Kiln planning stage 01, ${loadStageDefinitions(ROOT)["01-intake"].name}: its purpose, method, next activity, allowed ` +
+  `delegations, mutation and approval boundaries, completion summary, decision owner, outputs and exit criteria ` +
   `as the canonical stage definition declares them. Use when the project's current stage is 01-intake.`;
 const OVERRIDE_DESCRIPTION = "A consumer override of stage 01, first version.";
 const EDITED_DESCRIPTION = "A consumer override of stage 01, edited version.";
