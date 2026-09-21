@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The capability signature is observed in a loaded session, and drift is detected",
   "statement": "Once the Kiln package exists, a real Pi run reports its capability signature in the loaded session, and a deliberate change to a measured tool signature causes a comparing consumer to refuse. Both halves are required: presence alone does not show that a consumer would notice its absence.",
   "evaluates": [
@@ -13,6 +13,7 @@
   "verifies": [
     "REQ-0026"
   ],
+  "notes": "PASS 2026-09-21 on EVD-0106 and EVD-0122. Presence: a real loaded session calls kiln_capability and receives the shipped declaration (EVD-0106). Drift: real sessions on Windows and Linux, Pi 0.84.4, read every research tool signature from the live registry, and verifyChild accepts the unmodified package and refuses a changed research_fetch as signature-mismatch without returning its output (EVD-0122). CI run 35591168378 at d927151 passed in all four cells, and the live tier re-proved it on ubuntu-latest node 24 only. LIMIT: verifyChild compares property names and the required list only, so a type-only change is not detected and this criterion does not cover one.",
   "evidencedBy": [
     "EVD-0106",
     "EVD-0122"
