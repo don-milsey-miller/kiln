@@ -53,7 +53,7 @@ it actually verifies — and each has an acceptance criterion there:
 | Not proved | Why | Now owned by |
 | --- | --- | --- |
 | Pi's interactive `/login` in the full TUI, and what the same launch does with no TTY (Pi 0.84.4 has no authentication-only launch) | The suite does not perform the manual login, because it needs a real terminal. The Linux observation is recorded (`EVD-0123`, `ACC-0090`), and `test/pi-compat-login.test.mjs` checks that record in every run | `TSK-0065` → `CMP-0027` |
-| OAuth for a built-in provider | Verified only by a real `/login` plus a revocation control; a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
+| OAuth for a built-in provider | The suite does not perform the account-bound login. One manual Windows run has verified discovery after a real `/login` and its loss after removal (`EVD-0124`, `ACC-0091`), and `test/pi-compat-oauth.test.mjs` checks that record in every run. No model request or token refresh was tested, and a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
 
 ⚠️ **Kiln's own no-TTY refusal is a third thing, and it is not here either.** It was split out of the
 TUI task on 2026-09-03: the criterion demanded a stated Kiln recovery route, which cannot be observed

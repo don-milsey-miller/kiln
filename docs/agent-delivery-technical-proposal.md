@@ -506,9 +506,11 @@ supported POSIX platform that:
 - project trust can be approved, denied, detected, and revoked through Pi's supported behavior;
 - `ModelRuntime` and `ModelRegistry` discover saved **API-key** authentication and custom/local
   models without network access and without exposing credential material — ✅ proved, with a
-  no-credential control. **`AuthStorage` is not importable**, and **OAuth is supported but not yet
-  verified** — by decision it is verified only by a manual account-bound run, never by a fabricated
-  credential (`DEC-0032`, `TSK-0066`);
+  no-credential control. **`AuthStorage` is not importable**. **OAuth discovery is verified** by one
+  manual, account-bound Windows run, never by a fabricated credential (`DEC-0032`, `TSK-0066`,
+  `EVD-0124`, `ACC-0091`): after a real `/login` to `openai-codex`, a fresh registry found `gpt-5.5`
+  available, and after the stored credential was removed it did not. No model request or token
+  refresh was made;
 - the full interactive Pi TUI owns the terminal while `/login` runs, its exit outcome can be
   distinguished from configured authentication, and what the same launch does with stdin or stdout
   not a TTY is recorded — ✅ **observed on Linux only** by a manually invoked check (`TSK-0065`,
@@ -585,8 +587,9 @@ publishes only `.`, `./rpc-entry` and `./client`, so a deep import is blocked. `
 is exported from the root for a one-off presence read and returns the credential itself, so a caller
 must test presence and never retain or log the value.
 
-⚠️ **THE OAUTH ROUTE IS SUPPORTED AND NOT YET VERIFIED** (`DEC-0032`). Kiln supports OAuth through
-Pi's public interactive `/login` flow; what has not happened is the run that proves it. That run is
+⚠️ **THE OAUTH ROUTE'S DISCOVERY IS VERIFIED BY ONE MANUAL RUN** (`DEC-0032`, `EVD-0124`,
+`ACC-0091`). Kiln supports OAuth through Pi's public interactive `/login` flow. The run that proves
+discovery was made on 2026-09-21 against a real `openai-codex` subscription on Windows, and is
 deliberately **manual and account-bound, outside CI**: an isolated Pi configuration directory and a
 sanitized environment, `/login` against a real subscription, then a **freshly constructed**
 `ModelRuntime` and `ModelRegistry` showing the chosen built-in model in `getAvailable()` and passing
@@ -600,8 +603,10 @@ stayed unavailable — a fact about provider composition, not about OAuth. The A
 that way precisely because a stored API key IS the whole mechanism; an OAuth token is one artefact of
 a live flow.
 
-Until `TSK-0066` passes, this document and every other may describe OAuth as a **supported** Pi
-route, and **no acceptance criterion may state it as verified**.
+`TSK-0066` has passed on that run. What is verified is registry discovery after a real login and
+its loss after the stored credential was removed, for one provider on Windows. No model request or
+token refresh was made, the removal was local rather than a provider-side revocation, and nothing is
+inferred for other providers or for Linux.
 
 The same approval permits a presence-only check for the known provider variables required by the
 selected Pi integration and for `TAVILY_API_KEY`; it never permits enumerating the environment. A
@@ -633,7 +638,8 @@ The TUI owned the terminal while `/login` saved an OpenAI API key, and a separat
 authentication, not that a key works against a provider. Pi displays an entered key in plain text, so
 setup must hand the terminal to Pi directly and never log or tee `/login` (F13). Saving the key also
 selected a session model, so Kiln must still require its own explicit model choice (F14). Windows
-terminal behaviour is not observed, and OAuth remains `TSK-0066`'s.
+terminal behaviour is not observed. OAuth discovery is `TSK-0066`'s, verified by one manual Windows
+run (`EVD-0124`).
 
 V1 does not install, start, update, monitor, or stop llama.cpp, vLLM, Ollama, LM Studio, model files,
 or their supporting hardware/runtime. The project manager owns that local inference service and must
@@ -1639,9 +1645,9 @@ the model, and prove the observation point was reached before believing an absen
 - **OAuth, for a built-in provider.** The API-key path *is* proved, with a control. OAuth is now
   **decided rather than open** (`DEC-0032`): it ships on Pi's public `/login` route and is verified
   by a manual account-bound run with a revocation control, never by a fabricated credential. The run
-  is `TSK-0066` and its acceptance `ACC-0091`, both outstanding. Nothing in Phase 2's other work
-  depends on it — but until it passes, no acceptance criterion may be written as though it were
-  verified.
+  is `TSK-0066` and its acceptance `ACC-0091`. It has since passed on one manual, account-bound
+  Windows run (`EVD-0124`), which verifies registry discovery after a real login and its loss after
+  removal, and makes no claim about a model request or token refresh.
 - **Attribution of the Windows environment injection.** The observable is retained and reproduced on
   both platforms; which layer supplies the names is not established and `AST-0045` no longer claims
   it.
@@ -1664,7 +1670,7 @@ established none of them, and each became a scheduled task with an acceptance cr
 sentence in a component description — which is the same failure, at smaller scale, that this whole
 cycle was opened to undo. The capability signature has since been measured by `TSK-0067`, and the
 interactive `/login` has been observed on Linux only by `TSK-0065`. OAuth discovery for a built-in
-provider (`TSK-0066`) remains open.
+provider has been verified by one manual Windows run under `TSK-0066`, outside this suite.
 
 ### 21.4 Phase 1 exit state
 
