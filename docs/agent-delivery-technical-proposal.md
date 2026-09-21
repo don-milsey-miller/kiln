@@ -511,9 +511,12 @@ supported POSIX platform that:
   credential (`DEC-0032`, `TSK-0066`);
 - the full interactive Pi TUI owns the terminal while `/login` runs, its exit outcome can be
   distinguished from configured authentication, and what the same launch does with stdin or stdout
-  not a TTY is recorded — ⏳ **not proved**; it needs a real terminal and is scheduled as a manually
-  invoked check (`TSK-0065`). Pi 0.84.4 has no authentication-only launch, so this is the full TUI
-  (F7), and without a TTY on either stream Pi selects print mode instead of the TUI (F8);
+  not a TTY is recorded — ✅ **observed on Linux only** by a manually invoked check (`TSK-0065`,
+  `EVD-0123`, `ACC-0090`; CI run 35637876646 at `3a66adb` passed the retained test). Pi 0.84.4 has no
+  authentication-only launch, so this is the full TUI (F7). With stdin or stdout not a TTY the TUI
+  never rendered: two runs exited 0 silently and two were still running at a 20 s timeout, and none
+  refused (F8). The auth check afterwards proves local configuration, not a working provider key, and
+  nothing here describes a Windows terminal;
 - default and overridden Pi configuration directories resolve as expected and remain reachable by a
   restricted specialist child;
 - `pi install -l` writes an observed package reference that can be normalized to the portable project
@@ -624,11 +627,13 @@ authentication succeeded, and do not reload `AuthStorage`: it is not importable,
 step above records. Local-provider setup must likewise end in a registry entry that resolves through
 the pinned Pi instance.
 
-⚠️ **The interactive half of this is not proved** (`TSK-0065`). That the TUI owns the terminal while
-`/login` runs, that its exit can be told apart from configured authentication, and what the same
-launch does with stdin or stdout not a TTY, all need a real terminal and are scheduled as a manually
-invoked check. `pi auth check --no-refresh` can confirm locally configured authentication after the
-TUI exits. It does not prove a key works against a provider. Implement to this text, but do not record it as verified until that runs.
+⚠️ **The interactive half of this was observed on Linux only** (`TSK-0065`, `EVD-0123`, `ACC-0090`).
+The TUI owned the terminal while `/login` saved an OpenAI API key, and a separate
+`pi auth check --no-refresh` went from not ready to ready. That confirms locally configured
+authentication, not that a key works against a provider. Pi displays an entered key in plain text, so
+setup must hand the terminal to Pi directly and never log or tee `/login` (F13). Saving the key also
+selected a session model, so Kiln must still require its own explicit model choice (F14). Windows
+terminal behaviour is not observed, and OAuth remains `TSK-0066`'s.
 
 V1 does not install, start, update, monitor, or stop llama.cpp, vLLM, Ollama, LM Studio, model files,
 or their supporting hardware/runtime. The project manager owns that local inference service and must
@@ -1642,7 +1647,8 @@ the model, and prove the observation point was reached before believing an absen
   it.
 - **Pi's interactive `/login` and what the same launch does with no TTY** (`TSK-0065`). Pi 0.84.4 has
   no authentication-only launch, so the check uses the full TUI (F7). It needs a real terminal, so it
-  is a manually invoked check rather than a suite cell. ⚠️ Kiln's OWN refusal and
+  is a manually invoked check rather than a suite cell. It has since been observed on Linux only
+  (`EVD-0123`, `ACC-0090`), and the suite's retained test checks that record. ⚠️ Kiln's OWN refusal and
   recovery messaging is a separate obligation (`TSK-0068`, against the setup component) — it was
   split out because a criterion demanding a Kiln recovery route cannot be evaluated before setup
   exists.
@@ -1656,8 +1662,9 @@ the model, and prove the observation point was reached before believing an absen
 OAuth discovery and the capability signature among what the suite establishes. On 2026-09-03 it
 established none of them, and each became a scheduled task with an acceptance criterion rather than a
 sentence in a component description — which is the same failure, at smaller scale, that this whole
-cycle was opened to undo. The capability signature has since been measured by `TSK-0067`. The
-authentication TUI (`TSK-0065`) and OAuth discovery for a built-in provider (`TSK-0066`) remain open.
+cycle was opened to undo. The capability signature has since been measured by `TSK-0067`, and the
+interactive `/login` has been observed on Linux only by `TSK-0065`. OAuth discovery for a built-in
+provider (`TSK-0066`) remains open.
 
 ### 21.4 Phase 1 exit state
 

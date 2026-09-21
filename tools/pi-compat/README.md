@@ -52,7 +52,7 @@ it actually verifies — and each has an acceptance criterion there:
 
 | Not proved | Why | Now owned by |
 | --- | --- | --- |
-| Pi's interactive `/login` in the full TUI, and what the same launch does with no TTY (Pi 0.84.4 has no authentication-only launch) | Needs a real terminal, so it is a manually invoked check rather than a suite cell | `TSK-0065` → `CMP-0027` |
+| Pi's interactive `/login` in the full TUI, and what the same launch does with no TTY (Pi 0.84.4 has no authentication-only launch) | The suite does not perform the manual login, because it needs a real terminal. The Linux observation is recorded (`EVD-0123`, `ACC-0090`), and `test/pi-compat-login.test.mjs` checks that record in every run | `TSK-0065` → `CMP-0027` |
 | OAuth for a built-in provider | Verified only by a real `/login` plus a revocation control; a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
 
 ⚠️ **Kiln's own no-TTY refusal is a third thing, and it is not here either.** It was split out of the
