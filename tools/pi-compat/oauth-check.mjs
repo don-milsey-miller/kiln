@@ -19,10 +19,12 @@
  * ⚠️ **THE TUI IS NOT LOGGED.** Pi displays entered credentials (F13, EVD-0123). The TUI gets the
  * operator's terminal directly, and nothing captures it.
  *
- * ⚠️ **THE STORED CREDENTIAL NEVER OUTLIVES THE RUN.** The isolated directory is removed on every exit
- * path this process can see: completion, refusal, an exception, and SIGINT, SIGTERM or SIGHUP. A
- * process killed outright runs nothing, so each run first removes any `kiln-oauth-*` directory an
- * earlier run left behind.
+ * ⚠️ **THE STORED CREDENTIAL NEVER OUTLIVES THE RUN UNREPORTED.** The isolated directory is removed on
+ * every exit path this process can see: completion, refusal, an exception, and SIGINT, SIGTERM or
+ * SIGHUP. Its removal is verified, and a directory that survives is reported and exits 3. A process
+ * killed outright runs nothing, so a run that finds any `kiln-oauth-*` directory refuses to start,
+ * and `--remove-leftovers <names>` deletes only the folders the operator names, once they know no
+ * other check is running.
  *
  * ⚠️ **AVAILABILITY IS NOT A WORKING REQUEST.** `getAvailable()` and `hasConfiguredAuth()` say a usable
  * credential is configured. No model request and no token refresh is made, and the record claims
@@ -34,7 +36,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { spikeEnv } from "./lib/consumer.mjs";
@@ -52,20 +54,34 @@ const PROVIDER = flag("--provider");
 const MODEL = flag("--model");
 const DRY = args.includes("--dry-run");
 const SELF_TEST = flag("--self-test");
-const FAULTS = ["throw-after-credential", "leak-in-record", "leak-path-in-record", "discover-nonzero"];
+const REMOVE_LEFTOVERS = args.includes("--remove-leftovers");
+const FAULTS = ["throw-after-credential", "leak-in-record", "leak-path-in-record", "discover-nonzero", "cleanup-survives"];
 
 /* ------------------------------------------------------------------ cleanup, on every exit path */
 
 let WORK = null;
+/**
+ * Remove the isolated directory, and say so only once it is gone.
+ *
+ * ⚠️ A FAILED DELETION IS NOT SWALLOWED. If the directory survives, the path is kept, the operator is
+ * told to remove it, and the run exits nonzero. The message names the directory, never its contents.
+ */
 function cleanup() {
-  if (WORK) {
+  if (!WORK) return;
+  // The self-test fault skips the deletion, so the verification below is what is exercised.
+  if (SELF_TEST !== "cleanup-survives")
     try { rmSync(WORK, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
-    WORK = null;
+  if (existsSync(WORK)) {
+    console.error(`oauth-check: the isolated configuration could not be deleted and may still hold a credential. Delete the folder ${basename(WORK)} from your temp directory.`);
+    process.exitCode = 3;
+    return;
   }
+  WORK = null;
 }
 process.on("exit", cleanup);
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
-  process.on(signal, () => { cleanup(); process.exit(130); });
+  // The exit listener above does the cleanup, and reports once if it fails.
+  process.on(signal, () => process.exit(130));
 
 function fail(message) {
   console.error(`oauth-check: ${message}`);
@@ -80,11 +96,31 @@ const OUT = join(RUNS, `oauth-${platformName}.json`);
 // ⚠️ A RETAINED REAL-ACCOUNT RECORD IS NEVER OVERWRITTEN, and this is checked before anyone logs in.
 if (!DRY && !SELF_TEST && existsSync(OUT)) fail(`${join("runs", "oauth", `oauth-${platformName}.json`)} already exists; a retained record is not overwritten`);
 
-// ⚠️ WHAT A KILLED RUN LEFT BEHIND. Nothing runs in a process killed outright, so the next run removes it.
-for (const entry of readdirSync(tmpdir()))
-  if (entry.startsWith(WORK_PREFIX)) {
-    try { rmSync(join(tmpdir(), entry), { recursive: true, force: true }); console.log(`  removed a leftover isolated directory from an earlier run`); } catch {}
+/**
+ * ⚠️ A LEFTOVER IS REFUSED, NOT REMOVED. A directory with this prefix may be one a killed run left
+ * behind, or another run's that is still in use, and nothing here can tell them apart safely. So a
+ * run stops before creating its own, and removing leftovers is a separate command the operator gives
+ * once they know no other check is running.
+ */
+const leftovers = readdirSync(tmpdir()).filter((e) => e.startsWith(WORK_PREFIX));
+if (REMOVE_LEFTOVERS) {
+  // ⚠️ ONLY THE FOLDERS THE OPERATOR NAMES. A blanket removal could take another run's live directory.
+  const named = (flag("--remove-leftovers") ?? "").split(",").map((n) => n.trim()).filter(Boolean);
+  if (named.length === 0) fail("--remove-leftovers takes the folder names a refused run listed, comma-separated");
+  for (const name of named)
+    if (!name.startsWith(WORK_PREFIX) || /[\\/]/.test(name) || name.includes(".."))
+      fail(`--remove-leftovers only removes ${WORK_PREFIX}* folders directly in the temp directory`);
+  let remaining = 0;
+  for (const name of named) {
+    try { rmSync(join(tmpdir(), name), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
+    if (existsSync(join(tmpdir(), name))) remaining++;
   }
+  if (remaining) fail(`${remaining} named folder(s) could not be deleted; delete them from your temp directory`);
+  console.log(`  removed ${named.length} named leftover folder(s)`);
+  process.exit(0);
+}
+if (leftovers.length)
+  fail(`found ${leftovers.length} ${WORK_PREFIX}* folder(s) in your temp directory (${leftovers.join(", ")}). They may hold a credential from an interrupted run, or belong to a check that is still running. If no other oauth-check is running, rerun with --remove-leftovers ${leftovers.join(",")}.`);
 
 const piPkg = join(REPO, "node_modules", "@earendil-works", "pi-coding-agent");
 const manifest = JSON.parse(readFileSync(join(piPkg, "package.json"), "utf8"));
@@ -263,11 +299,11 @@ try {
   console.log(`
   after login  : available=${afterLogin.available} hasConfiguredAuth=${afterLogin.hasConfiguredAuth}
   after removal: available=${afterRemoval.available} hasConfiguredAuth=${afterRemoval.hasConfiguredAuth}
-  saved ${join("tools", "pi-compat", "runs", "oauth", `oauth-${platformName}.json`)}
-  The isolated configuration, including the stored token, is deleted on exit.`);
+  saved ${join("tools", "pi-compat", "runs", "oauth", `oauth-${platformName}.json`)}`);
 } catch (e) {
   // ⚠️ THE ERROR'S CLASS ONLY. A message could quote a credential or a path.
   fail(`stopped by an unexpected ${e?.name ?? "error"}; the isolated configuration is being deleted`);
 } finally {
   cleanup();
+  if (!WORK && !DRY && !SELF_TEST) console.log("  deleted the isolated configuration, including the stored token (verified)");
 }

@@ -6,16 +6,17 @@
  * the stored credential on every exit path it can see, never prints a credential value, refuses a
  * discovery child that did not exit 0, and never saves a record from a self-test.
  *
- * ⚠️ **A PROCESS KILLED OUTRIGHT RUNS NOTHING.** That case is covered by the sweep at startup, which is
- * tested here by leaving a directory behind and running the harness again.
+ * ⚠️ **A PROCESS KILLED OUTRIGHT RUNS NOTHING.** What it leaves behind stops the next run. That is tested
+ * by leaving a directory behind: the run refuses and leaves it, `--remove-leftovers` deletes only the
+ * folder it is given, and a second leftover it was not given survives.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,15 +60,53 @@ for (const [fault, reason] of [
   });
 }
 
-test("a directory left by a killed run is removed by the next run", () => {
+test("a leftover directory stops the next run, and only --remove-leftovers deletes it", () => {
   const left = mkdtempSync(join(tmpdir(), "kiln-oauth-"));
-  mkdirSync(join(left, "agent"), { recursive: true });
-  writeFileSync(join(left, "agent", "auth.json"), JSON.stringify({ "openai-codex": { type: "oauth" } }));
+  try {
+    mkdirSync(join(left, "agent"), { recursive: true });
+    writeFileSync(join(left, "agent", "auth.json"), JSON.stringify({ "openai-codex": { type: "oauth" } }));
 
-  const r = run(["--dry-run"]);
-  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-  assert.equal(existsSync(left), false, "the leftover directory survived");
-  assert.match(r.stdout, /removed a leftover isolated directory/);
+    // ⚠️ IT MAY BE ANOTHER RUN'S, SO IT IS NOT TOUCHED.
+    const refused = run(["--dry-run"]);
+    assert.equal(refused.status, 2, `${refused.stdout}\n${refused.stderr}`);
+    assert.match(refused.stderr, /found 1 kiln-oauth-\* folder\(s\).*--remove-leftovers/s);
+    assert.equal(existsSync(join(left, "agent", "auth.json")), true, "a refused run deleted the leftover");
+
+    // ⚠️ ONLY THE NAMED FOLDER GOES. A second one, which could be another run's, is left alone.
+    const other = mkdtempSync(join(tmpdir(), "kiln-oauth-"));
+    try {
+      const removed = run(["--remove-leftovers", basename(left)]);
+      assert.equal(removed.status, 0, `${removed.stdout}\n${removed.stderr}`);
+      assert.equal(existsSync(left), false, "--remove-leftovers left the named directory");
+      assert.equal(existsSync(other), true, "--remove-leftovers deleted a directory it was not given");
+
+      const unnamed = run(["--remove-leftovers"]);
+      assert.equal(unnamed.status, 2, "--remove-leftovers without names was not refused");
+      assert.equal(existsSync(other), true);
+      const escape = run(["--remove-leftovers", "../kiln-oauth-x"]);
+      assert.equal(escape.status, 2, "a name outside the temp directory was not refused");
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(left, { recursive: true, force: true });
+  }
+});
+
+test("self-test cleanup-survives: a directory that is not deleted is reported, and the run exits 3", () => {
+  const r = run(["--self-test", "cleanup-survives"]);
+  const work = ((r.stdout.match(/^WORK=(.+)$/m) ?? [])[1] ?? "").trim();
+  try {
+    assert.ok(work, "the self-test did not report its isolated directory");
+    assert.equal(r.status, 3, `${r.stdout}\n${r.stderr}`);
+    assert.match(r.stderr, /could not be deleted and may still hold a credential/);
+    assert.equal(/deleted the isolated configuration/.test(r.stdout), false, "the run claimed a deletion that did not happen");
+    for (const value of PLANTED)
+      for (let i = 0; i + 8 <= value.length; i++)
+        assert.equal(`${r.stdout}\n${r.stderr}`.includes(value.slice(i, i + 8)), false, "the output carries part of a planted credential value");
+  } finally {
+    if (work) rmSync(work, { recursive: true, force: true });
+  }
 });
 
 test("the dry run takes a baseline, saves nothing and leaves nothing behind", () => {
