@@ -93,8 +93,6 @@ if (SELF_TEST && !FAULTS.includes(SELF_TEST)) fail(`unknown self-test fault; exp
 
 const platformName = process.platform === "win32" ? "windows" : process.platform;
 const OUT = join(RUNS, `oauth-${platformName}.json`);
-// ⚠️ A RETAINED REAL-ACCOUNT RECORD IS NEVER OVERWRITTEN, and this is checked before anyone logs in.
-if (!DRY && !SELF_TEST && existsSync(OUT)) fail(`${join("runs", "oauth", `oauth-${platformName}.json`)} already exists; a retained record is not overwritten`);
 
 /**
  * ⚠️ A LEFTOVER IS REFUSED, NOT REMOVED. A directory with this prefix may be one a killed run left
@@ -119,6 +117,11 @@ if (REMOVE_LEFTOVERS) {
   console.log(`  removed ${named.length} named leftover folder(s)`);
   process.exit(0);
 }
+
+// ⚠️ A RETAINED REAL-ACCOUNT RECORD IS NEVER OVERWRITTEN, and this is checked before anyone logs in.
+// It follows --remove-leftovers, which always exits above and never reaches the login.
+if (!DRY && !SELF_TEST && existsSync(OUT)) fail(`${join("runs", "oauth", `oauth-${platformName}.json`)} already exists; a retained record is not overwritten`);
+
 if (leftovers.length)
   fail(`found ${leftovers.length} ${WORK_PREFIX}* folder(s) in your temp directory (${leftovers.join(", ")}). They may hold a credential from an interrupted run, or belong to a check that is still running. If no other oauth-check is running, rerun with --remove-leftovers ${leftovers.join(",")}.`);
 

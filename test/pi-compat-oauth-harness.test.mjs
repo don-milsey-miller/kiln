@@ -80,11 +80,14 @@ test("a leftover directory stops the next run, and only --remove-leftovers delet
       assert.equal(existsSync(left), false, "--remove-leftovers left the named directory");
       assert.equal(existsSync(other), true, "--remove-leftovers deleted a directory it was not given");
 
+      // Each refused for its own reason, not for some other guard's.
       const unnamed = run(["--remove-leftovers"]);
       assert.equal(unnamed.status, 2, "--remove-leftovers without names was not refused");
+      assert.match(unnamed.stderr, /takes the folder names a refused run listed/);
       assert.equal(existsSync(other), true);
       const escape = run(["--remove-leftovers", "../kiln-oauth-x"]);
       assert.equal(escape.status, 2, "a name outside the temp directory was not refused");
+      assert.match(escape.stderr, /only removes kiln-oauth-\* folders directly in the temp directory/);
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
