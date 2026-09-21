@@ -20,5 +20,6 @@
   "dependsOn": [
     "TSK-0029",
     "TSK-0033"
-  ]
+  ],
+  "notes": "⚠️ LOGIN SELECTS A MODEL; KILN STILL REQUIRES ITS OWN CHOICE (F14, EVD-0123). After an API-key /login, Pi printed 'Selected gpt-5.5' and the session switched to that model. Whether Pi persisted it was not established. Kiln must still require its own explicit model choice after login and must not treat the model Pi selected as the operator's selection."
 }

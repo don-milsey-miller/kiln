@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0022"
   ],
-  "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation. ⚠️ AMENDED 2026-09-21 (F7, F8): Pi 0.84.4 has no authentication-only launch, so the observation is of the full interactive TUI with /login typed into it, and the no-TTY runs are recorded as the print-mode runs they are."
+  "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation. ⚠️ AMENDED 2026-09-21 (F7, F8): Pi 0.84.4 has no authentication-only launch, so the observation is of the full interactive TUI with /login typed into it, and the no-TTY runs are recorded as the print-mode runs they are.",
+  "evidencedBy": [
+    "EVD-0123"
+  ]
 }
