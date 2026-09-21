@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "label": "manual, account-bound, single-instance; not a suite result",
+    "platform": "win32",
+    "node": "v24.18.0",
+    "pinned": "0.84.4",
+    "piVersion": "0.84.4",
+    "ranAt": "2026-09-21T19:13:03.300Z",
+    "provider": "openai-codex",
+    "model": "gpt-5.5",
+    "launchArgs": [
+      "--no-session",
+      "--no-extensions",
+      "--no-skills",
+      "--no-prompt-templates",
+      "--no-themes",
+      "--no-context-files",
+      "--no-approve",
+      "--offline"
+    ],
+    "environmentNames": [
+      "COMSPEC",
+      "LANG",
+      "LC_ALL",
+      "NUMBER_OF_PROCESSORS",
+      "OS",
+      "PATH",
+      "PATHEXT",
+      "PI_CODING_AGENT_DIR",
+      "PROCESSOR_ARCHITECTURE",
+      "SHELL",
+      "SystemDrive",
+      "SystemRoot",
+      "TEMP",
+      "TERM",
+      "TMP",
+      "windir"
+    ],
+    "isolation": "PI_CODING_AGENT_DIR and the working directory are fresh temporary directories; the TUI was not logged",
+    "discovery": "each reading is a fresh process constructing a fresh ModelRuntime (allowModelNetwork: false) and ModelRegistry, and must exit 0",
+    "revocation": "the provider's entry was removed from the isolated auth.json"
+  },
+  "baseline": {
+    "label": "baseline",
+    "freshProcess": true,
+    "inCatalogue": true,
+    "available": false,
+    "hasConfiguredAuth": false,
+    "providerAuthStatus": {
+      "configured": false,
+      "source": null
+    }
+  },
+  "login": {
+    "piExit": 0
+  },
+  "afterLogin": {
+    "label": "after-login",
+    "freshProcess": true,
+    "inCatalogue": true,
+    "available": true,
+    "hasConfiguredAuth": true,
+    "providerAuthStatus": {
+      "configured": true,
+      "source": "stored"
+    }
+  },
+  "storedAfterLogin": {
+    "present": true,
+    "providers": {
+      "openai-codex": {
+        "type": "oauth"
+      }
+    }
+  },
+  "afterRemoval": {
+    "label": "after-removal",
+    "freshProcess": true,
+    "inCatalogue": true,
+    "available": false,
+    "hasConfiguredAuth": false,
+    "providerAuthStatus": {
+      "configured": false,
+      "source": null
+    }
+  },
+  "storedAfterRemoval": {
+    "present": true,
+    "providers": {}
+  },
+  "limits": [
+    "availability and hasConfiguredAuth show a usable credential is configured; no model request or token refresh was made",
+    "manual, account-bound and single-instance: one operator, one subscription, one run"
+  ]
+}
