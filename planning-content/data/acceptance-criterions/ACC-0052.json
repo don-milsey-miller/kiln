@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Nothing is read before permission, and a decline reads nothing at all",
   "statement": "Before the inspection prompt is answered, no read of Pi's authentication store, no load of the custom-model registry and no credential-variable presence check has occurred — observed by instrumenting those access points, not by reading the code. A declined inspection performs none of them, contacts nothing, and leaves setup honestly partial rather than reporting that nothing is configured.",
   "evaluates": [
@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0023"
+  ],
+  "notes": "PASS 2026-09-21 on EVD-0125. The consent boundary is observed at Node's own modules: with the recorder started before the module is imported, nothing touched Pi's authentication store, its custom-model file, a credential variable or the network before the answer, after a decline, or for any answer other than true. A decline reports connections as not inspected, unknown rather than absent. Granted runs are the positive control, showing the recorder detects those reads. CI run 35648974488 passed the tests in all four cells. Consent persistence (TSK-0034) and placement in setup (TSK-0060) are not part of this result.",
+  "evidencedBy": [
+    "EVD-0125"
   ]
 }

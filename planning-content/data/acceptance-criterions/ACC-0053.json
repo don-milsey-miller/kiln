@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Inspection results report availability and never credential material",
   "statement": "The presented result contains provider display names, exact model identifiers and present-or-absent for the research credential, and is asserted to contain no key, token, header, environment value or credential-derived fingerprint. No external service is contacted during the inspection.",
   "evaluates": [
@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0024",
     "REQ-0023"
+  ],
+  "notes": "PASS 2026-09-21 on EVD-0125. The granted result holds provider display names, exact model IDs from getAvailable() and present-or-absent for the research credential, and nothing else; getAll() is never called, and a provider whose status alone says configured is not listed. No network attempt was made and no credential value, header or credential field reached the result. LIMIT: this is configured availability under Pi's registry. No provider request was made or shown to succeed. CI run 35648974488 passed the tests in all four cells.",
+  "evidencedBy": [
+    "EVD-0125"
   ]
 }

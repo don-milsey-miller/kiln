@@ -1,0 +1,72 @@
+{
+  "id": "EVD-0125",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: connection inspection reads nothing before consent or after a decline, and reports configured availability only",
+  "kind": "experiment",
+  "summary": "TSK-0033, toward ACC-0052 and ACC-0053, at d182b29 with the task wording amended in d212437. lib/connection-inspection.mjs asks before it looks, and only an answer of exactly true is consent. After consent it builds a fresh Pi ModelRuntime with allowModelNetwork false and a ModelRegistry, and lists getAvailable() models confirmed by hasConfiguredAuth(), by provider display name and exact model ID, plus present or absent for the research credential. Pi reads its authentication store, custom-model file and provider credential variables itself during that step. Kiln's only own presence check is the research credential, in the same process.env. HOW IT IS OBSERVED. test/helpers/access-recorder.mjs wraps every fs and fs.promises function at Node's built-in modules and calls syncBuiltinESMExports, so code that imported a function by name, Pi's bundle included, is recorded too. It replaces process.env with a Proxy that records reads of the 44 known provider credential variables and the research variable, and it makes fetch, http, https, net, tls and dns record the attempt and throw. The operator's real environment is neither read nor offered. The fixture is an isolated Pi agent directory with a stored API key for openai, a custom models.json provider with an inline key, and a status-only trap: a stored OAuth record for a models.json provider, which Pi reports as configured while its model is not available. Every credential value in the fixture is a sentinel that works nowhere. ACC-0052: NOTHING BEFORE CONSENT OR AFTER A DECLINE. (1) In a fresh process, the recorder starts before the module is imported and watches every auth.json and models.json on the machine by file name, as well as the fixture directory. Importing the module and then declining recorded no filesystem, variable or network access at the import, at the prompt or at the end. (2) In the test process, a decline recorded nothing at the prompt or afterwards, never loaded Pi's runtime, and returned not-inspected for both connections and the research credential, described as unknown rather than absent, with no provider list. (3) Eight answers other than true (undefined, null, \"yes\", \"true\", 1, an object, an array, and a promise of \"true\") were each treated as a decline and recorded nothing. (4) THE POSITIVE CONTROL. In granted runs, in the test process and in a fresh process, the counts were still zero at the prompt, and afterwards the recorder saw the auth.json read, the models.json load, a provider variable read (ANTHROPIC_API_KEY) and the research presence check. That shows the recorder detects the real reads, so the empty records for a decline are absences rather than blind spots. ACC-0053: CONFIGURED AVAILABILITY AND NOTHING ELSE. (1) The granted result has exactly five fields: the decision, whether it was inspected, the providers, the research credential and a summary. Each provider entry has exactly its id, its display name and its model IDs. (2) It listed exactly the three providers with models available under Pi's registry (openai from the stored key, anthropic from the environment variable, and the custom provider), and each display name and model ID matched an independently constructed registry. The total equalled that registry's available set and was smaller than its catalogue. The status-only provider, which the registry reports configured, was not listed. (3) A registry subclass recorded the calls: getAvailable() was called and getAll() was not, and the test fails if getAll() is called. (4) The research credential was reported absent when the variable was missing or empty and present when set. (5) No network attempt was recorded in any run. (6) No 8-character run of any sentinel value, and no header or credential field name, appeared in any result. WHAT THIS DOES NOT SHOW. Inspection reports configured availability: models Pi finds with configured authentication. It does not show a request to any provider would succeed, and no request was made. Persisting the grant and reopening the prompt when choices change are TSK-0034's, and placing the step in setup is TSK-0060's. MUTATIONS, RUN LOCALLY ON WINDOWS. Eight changes to the module each failed the tests: getAll() in place of getAvailable(), a research-variable read at import, an auth.json read at import, loading the SDK before asking, checking research presence before asking, taking a truthy answer as consent, listing providers in a declined result, and a credential field in the result. The module was restored byte-identical by sha256 after each. One earlier harness defect was found this way and fixed before commit: the fresh-process path matcher had lost a backslash and missed Windows paths, which let the auth.json-at-import mutation survive. CI. GitHub Actions run 35648974488 at d212437, attempt 1 with no job re-run, passed in all four cells, and all seven inspection tests passed in every cell.",
+  "outcome": "success",
+  "observedAt": "2026-09-21",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "lib/connection-inspection.mjs at d182b29; TSK-0033 wording amended in d212437",
+      "pi-version": "0.84.4, the pin",
+      "tests": "test/connection-inspection.test.mjs, 7 tests; test/helpers/access-recorder.mjs",
+      "recorder": "every fs and fs.promises function wrapped with syncBuiltinESMExports; process.env replaced by a Proxy recording the 44 provider credential variables and TAVILY_API_KEY; fetch, http, https, net, tls and dns record and throw",
+      "fixture": "an isolated Pi agent directory: a stored openai API key, a custom models.json provider with an inline key, and a status-only OAuth record for a models.json provider; all values are sentinels",
+      "acc-0052-fresh-process": "the recorder starts before the module is imported and watches every auth.json and models.json by file name; import plus decline recorded nothing at import, at the prompt or after",
+      "acc-0052-decline": "no watched access at the prompt or after, Pi's runtime never loaded, result not-inspected and described as unknown rather than absent, with no provider list",
+      "acc-0052-non-true": "undefined, null, \"yes\", \"true\", 1, an object, an array and a promise of \"true\" each declined with nothing recorded",
+      "acc-0052-positive-control": "granted runs, in process and in a fresh process: zero at the prompt, then the auth.json read, the models.json load, the ANTHROPIC_API_KEY read and the research presence check were recorded",
+      "acc-0053-shape": "result fields exactly decision, inspected, providers, researchCredential, summary; each provider exactly provider, displayName, models",
+      "acc-0053-listing": "exactly openai, anthropic and the custom provider; display names and model IDs match an independent registry; the total equals its available set and is below its catalogue; the status-only provider is not listed",
+      "acc-0053-methods": "getAvailable() observed; getAll() not called, and the test fails if it is",
+      "acc-0053-research": "absent when missing or empty, present when set",
+      "acc-0053-network": "no network attempt recorded in any run",
+      "acc-0053-no-credential": "no 8-character run of any sentinel and no header or credential field name in any result",
+      "scope": "configured availability only; no provider request was made or shown to succeed",
+      "mutations": "8 of 8 killed locally on Windows, the module restored byte-identical by sha256 after each",
+      "harness-defect-caught": "the fresh-process path matcher had lost a backslash and missed Windows paths; replaced by a path.basename match before commit",
+      "full-suite-local": "npm test on Windows before push: 1458 tests, 1453 pass, 0 fail, 5 skipped",
+      "ci-run": "GitHub Actions run 35648974488 at d212437, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell",
+      "cell-windows-22": "job 106496327784, 1458 tests / 1457 pass / 0 fail / 1 skipped; 7 inspection tests pass",
+      "cell-windows-24": "job 106496327481, 1458 tests / 1457 pass / 0 fail / 1 skipped; 7 inspection tests pass",
+      "cell-ubuntu-22": "job 106496327947, 1458 tests / 1448 pass / 0 fail / 10 skipped; 7 inspection tests pass",
+      "cell-ubuntu-24": "job 106496327993, 1458 tests / 1448 pass / 0 fail / 10 skipped; 7 inspection tests pass; live tier 6 of 6"
+    },
+    "omissions": [
+      {
+        "fact": "provider-request",
+        "state": "not-captured",
+        "reason": "Inspection reports configured availability. No request was made to any provider, so nothing shows a request would succeed."
+      },
+      {
+        "fact": "real-operator-environment",
+        "state": "not-captured",
+        "reason": "Every run used an isolated agent directory and a controlled environment. The operator's own store and variables were never read."
+      },
+      {
+        "fact": "consent-persistence-and-setup-placement",
+        "state": "not-captured",
+        "reason": "Persisting the grant and reopening the prompt are TSK-0034's; placing the step in setup is TSK-0060's."
+      },
+      {
+        "fact": "mutations-in-ci",
+        "state": "not-captured",
+        "reason": "The eight mutations ran locally on Windows only."
+      }
+    ]
+  }
+}
