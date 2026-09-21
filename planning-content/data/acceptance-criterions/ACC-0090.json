@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Pi's interactive /login is observed owning the terminal, and the no-TTY controls are recorded",
   "statement": "A manually invoked check records, against the pinned runtime alone: that the full interactive Pi TUI, launched against an isolated Pi configuration, owns the terminal while `/login` completes through the built-in `openai` API-key route with a throwaway key; that its exit is distinguished from configured authentication by a separate `pi auth check --provider openai --json --no-refresh` afterwards, which confirms locally configured authentication and does not prove the key works against a provider; and, with the same arguments and stdin, stdout or both not a TTY, which mode Pi selected and the bounded outcome (exit and code, error, or still running at a stated timeout), stated as observed rather than as required. Those controls are not the interactive mode and are not described as it. A sanitized transcript is retained, and the entered key is not recorded. No claim is made here about Kiln's refusal or recovery messaging, about OAuth, or about usable account authentication.",
   "evaluates": [
@@ -13,7 +13,7 @@
   "verifies": [
     "REQ-0022"
   ],
-  "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation. ⚠️ AMENDED 2026-09-21 (F7, F8): Pi 0.84.4 has no authentication-only launch, so the observation is of the full interactive TUI with /login typed into it, and the no-TTY runs are recorded as the print-mode runs they are.",
+  "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation. ⚠️ AMENDED 2026-09-21 (F7, F8): Pi 0.84.4 has no authentication-only launch, so the observation is of the full interactive TUI with /login typed into it, and the no-TTY runs are recorded as the print-mode runs they are. ✅ PASS 2026-09-21 on EVD-0123. Pi 0.84.4 has no authentication-only launch, so the full interactive TUI was observed owning the terminal while /login saved an OpenAI API key, and a separate pi auth check --no-refresh went from not_ready to ready. With stdin or stdout not a TTY the TUI never rendered: two runs exited 0 silently and two were still running at the 20 s timeout, and none refused. The sanitized transcripts are retained, and CI run 35632352056 passed the retained test in all four cells. LIMITS: the terminal observation is Linux only, under script(1), and says nothing about Windows terminals. The auth check proves local configuration, not a working provider key; account authentication is TSK-0066.",
   "evidencedBy": [
     "EVD-0123"
   ]
