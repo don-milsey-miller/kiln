@@ -509,10 +509,11 @@ supported POSIX platform that:
   no-credential control. **`AuthStorage` is not importable**, and **OAuth is supported but not yet
   verified** — by decision it is verified only by a manual account-bound run, never by a fabricated
   credential (`DEC-0032`, `TSK-0066`);
-- the authentication-only Pi TUI can be launched with exclusive terminal ownership, its exit outcome
-  can be distinguished from proven authentication, and a non-TTY path can refuse without hanging —
-  ⏳ **not proved**; it needs a real terminal and is scheduled as a manually invoked check
-  (`TSK-0065`);
+- the full interactive Pi TUI owns the terminal while `/login` runs, its exit outcome can be
+  distinguished from configured authentication, and what the same launch does with stdin or stdout
+  not a TTY is recorded — ⏳ **not proved**; it needs a real terminal and is scheduled as a manually
+  invoked check (`TSK-0065`). Pi 0.84.4 has no authentication-only launch, so this is the full TUI
+  (F7), and without a TTY on either stream Pi selects print mode instead of the TUI (F8);
 - default and overridden Pi configuration directories resolve as expected and remain reachable by a
   restricted specialist child;
 - `pi install -l` writes an observed package reference that can be normalized to the portable project
@@ -614,18 +615,20 @@ If no usable model is available, setup explains the supported routes:
   vLLM-compatible endpoints; and
 - the separately validated local-provider helper where the existing design elects to use it.
 
-For OAuth or saved API-key setup, launch the pinned Pi TUI in an authentication-only step and tell the
-user to run `/login` and exit when complete. After it exits, **rediscover through the supported
+For OAuth or saved API-key setup, launch the full interactive pinned Pi TUI and tell the user to run
+`/login` and exit when complete. Pi 0.84.4 has no authentication-only launch: `pi auth` offers only
+`check`, `print-api-key` and `print-bearer-token`, and `/login` exists only inside the TUI (F7). After it exits, **rediscover through the supported
 surface** — construct a fresh `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })`
 and a new `ModelRegistry`, then re-read `getAvailable()` and `hasConfiguredAuth()`. Do not assume
 authentication succeeded, and do not reload `AuthStorage`: it is not importable, as the discovery
 step above records. Local-provider setup must likewise end in a registry entry that resolves through
 the pinned Pi instance.
 
-⚠️ **The interactive half of this is not proved** (`TSK-0065`). That the TUI can be launched with
-exclusive terminal ownership, that its exit can be told apart from proven authentication, and that a
-non-TTY invocation refuses rather than hanging, all need a real terminal and are scheduled as a
-manually invoked check. Implement to this text, but do not record it as verified until that runs.
+⚠️ **The interactive half of this is not proved** (`TSK-0065`). That the TUI owns the terminal while
+`/login` runs, that its exit can be told apart from configured authentication, and what the same
+launch does with stdin or stdout not a TTY, all need a real terminal and are scheduled as a manually
+invoked check. `pi auth check --no-refresh` can confirm locally configured authentication after the
+TUI exits. It does not prove a key works against a provider. Implement to this text, but do not record it as verified until that runs.
 
 V1 does not install, start, update, monitor, or stop llama.cpp, vLLM, Ollama, LM Studio, model files,
 or their supporting hardware/runtime. The project manager owns that local inference service and must
@@ -634,7 +637,9 @@ credential/configuration contract, zero-cost status checks, and the approved liv
 local inference may be designed later and is outside this implementation.
 
 The complete interactive v1 setup path assumes a local terminal with attached stdin/stdout. Before
-launching `/login`, setup must check that it has a real TTY. This matters because a pipe, CI job, IDE
+launching the Pi TUI for `/login`, setup must check that both stdin and stdout are TTYs. Checking
+stdin alone is not enough: Pi selects print mode whenever either stream is not a TTY, so the TUI
+would never appear, and with stdin an open pipe Pi reads it until it closes (F8). This matters because a pipe, CI job, IDE
 background task, or redirected command has nobody who can safely answer prompts; waiting anyway is a
 hang, not authentication. OAuth may also open a system browser or bind a callback on the machine that
 runs Pi, which is not necessarily the machine where a user is sitting during SSH or remote execution.
@@ -1323,7 +1328,7 @@ Add tests for:
   refusal against setup's explicit root;
 - non-destructive `.pi/settings.json` merge and malformed-file refusal;
 - model registry selection, unknown IDs, and unavailable configured models;
-- TTY detection before `/login`, non-TTY refusal when auth is missing, preconfigured non-interactive
+- TTY detection of both stdin and stdout before `/login`, non-TTY refusal when auth is missing, preconfigured non-interactive
   success, cancellation/EOF/nonzero auth exits, and rediscovery rather than assumed login success;
 - no Pi user-auth/custom-model read or credential-variable presence check before inspection consent;
 - inspection refusal, including proof that it performs no user/host configuration reads and leaves
@@ -1635,8 +1640,9 @@ the model, and prove the observation point was reached before believing an absen
 - **Attribution of the Windows environment injection.** The observable is retained and reproduced on
   both platforms; which layer supplies the names is not established and `AST-0045` no longer claims
   it.
-- **Pi's authentication-only TUI and what it does with no TTY** (`TSK-0065`). It needs a real
-  terminal, so it is a manually invoked check rather than a suite cell. ⚠️ Kiln's OWN refusal and
+- **Pi's interactive `/login` and what the same launch does with no TTY** (`TSK-0065`). Pi 0.84.4 has
+  no authentication-only launch, so the check uses the full TUI (F7). It needs a real terminal, so it
+  is a manually invoked check rather than a suite cell. ⚠️ Kiln's OWN refusal and
   recovery messaging is a separate obligation (`TSK-0068`, against the setup component) — it was
   split out because a criterion demanding a Kiln recovery route cannot be evaluated before setup
   exists.
