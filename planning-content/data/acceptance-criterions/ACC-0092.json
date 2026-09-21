@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0026"
+  ],
+  "evidencedBy": [
+    "EVD-0106",
+    "EVD-0122"
   ]
 }

@@ -41,6 +41,7 @@ apply throughout, both learned here the hard way:
 | `QST-0030` How is a task bound with stdin closed? | The `-p` argument, seen at the provider | Read from the provider's received request, never from the model's reply |
 | `QST-0031` Do the 0.80.6 findings hold? | Four hold, one not re-tested | Each re-measured rather than assumed |
 | `QST-0033` Is OAuth discovery provable? | **Decided, not open.** api_key is proved here; OAuth is verified only by a manual account-bound run (`DEC-0032`) | A fabricated OAuth record validates a storage shape, not usable authentication — so this suite deliberately does not attempt it |
+| `TSK-0067` Is a changed Kiln tool signature refused? | Yes. Real sessions load the shipped package and a copy whose `research_fetch` gains a required property. Every research tool signature is read from Pi's live registry at `session_start`, and `verifyChild(contractFor("research"))` refuses the changed one as `signature-mismatch` without returning its output (`EVD-0122`) | The unmodified package in the same setup is accepted. The expected signature comes from the unedited contract, not the package copy. Task binding, timeout and output are held test inputs. Only property names and the required list are compared, so a type-only change is not detected |
 
 ### What this suite does NOT establish
 
@@ -53,9 +54,8 @@ it actually verifies — and each has an acceptance criterion there:
 | --- | --- | --- |
 | Pi's authentication-only TUI, and what it does with no TTY | Needs a real terminal, so it is a manually invoked check rather than a suite cell | `TSK-0065` → `CMP-0027` |
 | OAuth for a built-in provider | Verified only by a real `/login` plus a revocation control; a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
-| The Kiln capability signature | It belongs to a package that does not exist yet | `TSK-0067` → `CMP-0031` |
 
-⚠️ **Kiln's own no-TTY refusal is a fourth thing, and it is not here either.** It was split out of the
+⚠️ **Kiln's own no-TTY refusal is a third thing, and it is not here either.** It was split out of the
 TUI task on 2026-09-03: the criterion demanded a stated Kiln recovery route, which cannot be observed
 before the setup command exists. It is now `TSK-0068` against `CMP-0039`, downstream of both setup and
 the Pi observation above. A criterion that cannot be evaluated when its task completes is a

@@ -14,7 +14,7 @@
     "REQ-0022",
     "REQ-0025"
   ],
-  "notes": "⚠️ IT CANNOT BE MEASURED YET AND SAYING SO IS THE POINT. The signature belongs to a package that does not exist; a spike cannot prove a property of something unbuilt, and claiming it did is the failure this cycle exists to prevent. Blocked on CMP-0031.",
+  "notes": "The Kiln package exists, and both halves of ACC-0092 now have evidence. Presence: a real loaded Pi session calls kiln_capability and receives the shipped signature.json unchanged (ACC-0109, EVD-0106). Drift: the compatibility suite loads the shipped package and a copy whose research_fetch gains a required property into real Pi sessions, reads every research tool signature from the live registry, and verifyChild(contractFor(\"research\")) accepts the unmodified package and refuses the changed one as signature-mismatch without returning its output (EVD-0122, commit 7c3b8a1). The retained and live tiers apply the same assertion, and the retained records were taken on Windows and WSL Ubuntu 24.04 against Pi 0.84.4. verifyChild compares property names and the required list only, so a type-only change is not detected, and widening that comparison is outside this task. The full test result is local, and the live tier and CI have not run for 7c3b8a1. ACC-0092 stays not-evaluated until EVD-0122 is reviewed.",
   "dependsOn": [
     "TSK-0043"
   ],

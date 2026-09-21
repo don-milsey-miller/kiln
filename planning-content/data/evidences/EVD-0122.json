@@ -1,0 +1,70 @@
+{
+  "id": "EVD-0122",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a changed tool signature read from a real Pi session is refused by verifyChild",
+  "kind": "experiment",
+  "summary": "The drift half of ACC-0092, for TSK-0067, at commit 7c3b8a1. The presence half is ACC-0109 on EVD-0106, where a real loaded session calls kiln_capability and receives the shipped signature.json unchanged. That declaration lists tool names only, so it cannot show a parameter-schema change. This record observes the schemas themselves. WHAT RAN. The Pi compatibility spike builds a clean consumer with its own npm install and resolves the pinned CLI from it. It copies the shipped Kiln package from tracked files into two projects inside that consumer, records trust for each through ProjectTrustStore, and names the package in each project's .pi/settings.json. In one project the package is unmodified. In the other, the copy of pi-package/extensions/kiln.js has research_fetch's schema changed to add a property kilnDriftProbe and make it required. The spike refuses to continue unless that change lands exactly once. Each project runs a real Pi session in rpc mode with --no-session and --offline, answering one get_state query. WHERE IT WAS OBSERVED. An observer loaded with -e reads Pi's live registry at session_start through pi.getAllTools(), reduced by the product's own buildChildReport from the consumer's copy of lib/specialists/child-report.mjs. It also keeps research_fetch's raw parameters. All three research-role tools are taken from that reading, and none is supplied by the harness. THE CONSUMER AND ITS EXPECTED SIGNATURE. verifyChild(contractFor(\"research\"), run) judges each reading. The expected signature is contractFor(\"research\").toolSignatures from lib/specialists/contract.mjs, which the run does not edit, and the retained assertion checks that it does not carry the drift property. The package declares its research schemas in its own table in kiln.js, so the change moves only the observed side. Task binding observed, not timed out, and a fixed output string are held constant as test inputs. No task was delegated and no Kiln child was launched. THE POSITIVE CONTROL. On both platforms the unmodified session exited 0, answered its state query, reached session_start and loaded the package. All three research tools matched the expected signature, and verifyChild accepted the run and returned the output. THE REFUSAL. On both platforms the drifted session exited 0, answered, reached session_start and loaded the package. Pi's registry held research_fetch with properties url, maxBytes and kilnDriftProbe and required [url, kilnDriftProbe]. verifyChild refused the run as signature-mismatch and did not return the output. research_capability and research_search still matched, so the refusal is attributable to research_fetch alone. BOTH TIERS APPLY ONE ASSERTION. assertContract() in test/pi-compat.test.mjs checks the pinned version, both observation points, exit status, the answered query, package loading, the full research tool set from the registry, the unmodified acceptance, the changed schema in the registry, the refusal and its attribution, and the unedited expected side. It also re-judges both retained readings with the current verifyChild, so a later change to the consumer is tested against what Pi actually held. Applied to the Windows record and to six altered copies of it, it passed the real record and failed each altered copy with its own message: the drift accepted, the drifted reading replaced by the unmodified one, the observation point unreached, one research tool missing, the unmodified run refused, and the change absent from the registry. THE LIMIT. verifyChild compares property names and the required list only. A change to a property's type, enum, bounds or description leaves both unchanged and would be accepted. This record proves detection of an added required property and makes no claim about type-only changes. WHERE THE RECORDS CAME FROM. The working tree held an unrelated uncommitted deletion of a tracked file that the consumer build copies. Rather than alter it, the Windows record was produced from a temporary git worktree at 583b947 plus the three edited files, and the Linux record from a clean clone at the same commit plus the same files, in WSL Ubuntu 24.04, through tools/pi-compat/posix-bootstrap.sh. WHAT HAS NOT RUN. The full npm test result is local only: 1433 tests, 1428 passed, 0 failed, 5 skipped, on Windows. node --test test/pi-compat.test.mjs passed 5 of 5 with the live tier skipped. The live tier (KILN_PI_COMPAT=live) has not run locally or in CI, and no CI run exists for 7c3b8a1 because it has not been pushed.",
+  "outcome": "success",
+  "observedAt": "2026-09-21",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "commit": "7c3b8a1, local, not pushed",
+      "pi-version": "0.84.4 on both platforms, installed in the consumer and matching the pin",
+      "record-windows": "tools/pi-compat/runs/windows.json, capabilitySignature; win32, node v24.18.0, ran 2026-09-21T10:04:00Z, fresh consumer install",
+      "record-linux": "tools/pi-compat/runs/linux.json, capabilitySignature; WSL Ubuntu 24.04, node v24.11.0, ran 2026-09-21T10:32:00Z, fresh consumer install",
+      "observation-point": "session_start in a real Pi session; pi.getAllTools() reduced by buildChildReport, with research_fetch's raw parameters kept beside it",
+      "expected-signature": "contractFor(\"research\").toolSignatures from lib/specialists/contract.mjs, not edited; asserted free of the drift property",
+      "consumer": "verifyChild(contractFor(\"research\"), run)",
+      "held-inputs": "taskBindingObserved true, timedOut false, output KILN-SIGNATURE-HELD-OUTPUT-51D0; test inputs, not a delegated task",
+      "mutation": "the drifted project's copy of pi-package/extensions/kiln.js: research_fetch gains property kilnDriftProbe, and required becomes [url, kilnDriftProbe]",
+      "positive-control": "unmodified package on both platforms: exit 0, answered, observation point reached, package loaded, all three research tools matched, accepted, output returned",
+      "registry-observation": "drifted package on both platforms: research_fetch properties url, maxBytes, kilnDriftProbe; required [url, kilnDriftProbe]",
+      "refusal": "drifted package on both platforms: exit 0, answered, observation point reached, package loaded, refused as signature-mismatch, output not returned; research_capability and research_search matched, research_fetch did not",
+      "assertion": "assertContract() in test/pi-compat.test.mjs, applied to both retained records and to the live tier; re-judges the retained readings with the current verifyChild",
+      "assertion-sensitivity": "applied locally to the Windows record and to six altered copies: the record passed and each altered copy failed with its own message",
+      "retained-test": "node --test test/pi-compat.test.mjs: 5 pass, 0 fail, 1 skipped (the live tier)",
+      "full-suite": "npm test, local on Windows: 1433 tests, 1428 pass, 0 fail, 5 skipped",
+      "limitation-type-only": "verifyChild compares property names and the required list only; a type, enum, bounds or description change is not detected, and this record makes no claim about one"
+    },
+    "omissions": [
+      {
+        "fact": "live-tier",
+        "state": "not-captured",
+        "reason": "KILN_PI_COMPAT=live has not run for this commit, locally or in CI. The retained records were produced by run-all.mjs, which calls the same runSpike()."
+      },
+      {
+        "fact": "ci",
+        "state": "not-captured",
+        "reason": "7c3b8a1 has not been pushed, so no CI run exists for it. The full-suite result is local only."
+      },
+      {
+        "fact": "type-only-change",
+        "state": "not-captured",
+        "reason": "The consumer does not compare property types, so a type-only change would be accepted. Detecting one would mean widening reduceSignature and signaturesMatch, which is outside TSK-0067."
+      },
+      {
+        "fact": "delegated-task",
+        "state": "not-captured",
+        "reason": "Task binding, timeout and output were held constant as test inputs. No Kiln delegation launched a child, and ACC-0075 owns refusal during a real delegation."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "Windows and Linux only."
+      }
+    ]
+  }
+}

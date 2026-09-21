@@ -518,8 +518,11 @@ supported POSIX platform that:
 - `pi install -l` writes an observed package reference that can be normalized to the portable project
   entry only after canonical equivalence is proved;
 - the installed package loads its extensions, tools, skills and prompts — ✅ proved, prompts via a
-  packaged template whose expanded body is observed at the provider. **The capability signature is
-  not proved**: it belongs to the Kiln package, which does not exist yet (`TSK-0067`);
+  packaged template whose expanded body is observed at the provider. **The capability signature was
+  not proved** here on 2026-09-03, because the Kiln package did not exist then. The package now
+  exists, and `TSK-0067` has measured the signature: a real session returns the shipped declaration
+  (`EVD-0106`), and a changed `research_fetch` signature read from Pi's live registry is refused by
+  `verifyChild` (`EVD-0122`);
 - project-local and externally supplied session/runtime locations resolve without committing an
   absolute user path — ✅ proved, all three routes;
 - a closed-stdin child can receive a bound task through the selected non-interactive mechanism —
@@ -1637,14 +1640,18 @@ the model, and prove the observation point was reached before believing an absen
   recovery messaging is a separate obligation (`TSK-0068`, against the setup component) — it was
   split out because a criterion demanding a Kiln recovery route cannot be evaluated before setup
   exists.
-- **The Kiln capability signature** (`TSK-0067`). It belongs to a package that does not exist yet; a
-  spike cannot prove a property of something unbuilt.
+- **The Kiln capability signature** (`TSK-0067`). On 2026-09-03 it belonged to a package that did not
+  exist yet, and a spike cannot prove a property of something unbuilt. The package now exists, and
+  `TSK-0067` has measured the signature: presence in `EVD-0106`, and refusal of a changed tool
+  signature by `verifyChild` in `EVD-0122`, on Windows and Linux against Pi 0.84.4. A type-only change
+  is not detected, because the consumer compares property names and the required list only.
 
 ⚠️ **`CMP-0041` was narrowed to match.** Its responsibility previously listed the authentication TUI,
-OAuth discovery and the capability signature among what the suite establishes. It does not establish
-them, and each is now a scheduled task with an acceptance criterion rather than a sentence in a
-component description — which is the same failure, at smaller scale, that this whole cycle was opened
-to undo.
+OAuth discovery and the capability signature among what the suite establishes. On 2026-09-03 it
+established none of them, and each became a scheduled task with an acceptance criterion rather than a
+sentence in a component description — which is the same failure, at smaller scale, that this whole
+cycle was opened to undo. The capability signature has since been measured by `TSK-0067`. The
+authentication TUI (`TSK-0065`) and OAuth discovery for a built-in provider (`TSK-0066`) remain open.
 
 ### 21.4 Phase 1 exit state
 
