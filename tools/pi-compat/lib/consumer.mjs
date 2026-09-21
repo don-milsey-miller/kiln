@@ -79,7 +79,7 @@ export const FORBIDDEN_IN_CHILD = [
 ];
 
 /** Tracked files only — `git ls-files`, so an uncommitted local file cannot make the run pass. */
-function trackedFiles() {
+export function trackedFiles() {
   const out = execFileSync("git", ["ls-files", "-z"], { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 << 20 });
   return out.split("\0").filter(Boolean);
 }

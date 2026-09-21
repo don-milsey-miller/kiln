@@ -6,15 +6,17 @@
  * provider credentials in its environment still cannot reach a paid provider.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   ENV_AUTH_MODEL, ENV_AUTH_VAR, FAKE_MODEL, FAKE_PROVIDER, PROMPT_MARKER, REPO_ROOT,
-  createConsumer, modelArgs, pinnedPiVersion, resolvePiFromConsumer, spikeEnv, writeFakeModels,
+  createConsumer, modelArgs, pinnedPiVersion, resolvePiFromConsumer, spikeEnv, trackedFiles, writeFakeModels,
   writeProbePackage, FORBIDDEN_IN_CHILD,
 } from "./consumer.mjs";
 import { PROBE_EXTENSION, reachedObservationPoint } from "./probe.mjs";
+import { contractFor, signaturesMatch, verifyChild } from "../../../lib/specialists/contract.mjs";
 
 const AUTH_PROVIDER = "kiln-authtest";
 const AUTH_MODEL = "auth-probe-model";
@@ -57,6 +59,12 @@ export async function runSpike({ port = 8099, keep = null, install = true, onLog
   mkdirSync(agentDir, { recursive: true });
   writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProjectTrust: "never" }, null, 2) + "\n");
   writeFakeModels(agentDir, port);
+
+  /* ---------------------------------------------------- P. the capability signature, and drift */
+
+  results.capabilitySignature = await proveCapabilitySignature({ dir, tool, agentDir, CLI, resolved, captured });
+  onLog(`capability signature: unmodified accepted=${results.capabilitySignature.unmodified.verdict.accepted}, ` +
+    `drifted refused=${results.capabilitySignature.drifted.verdict.reason}`);
 
   const MARKER = join(dir, "marker.txt");
   const REPORT = join(dir, "report.json");
@@ -545,6 +553,154 @@ async function proveAuthDiscovery({ agentDir, port, ModelRuntime, ModelRegistry 
     // against a real account, which is account-bound and cannot run in CI.
     oauthProvedForCustomProvider: false,
     oauthRemainsOpenForBuiltInProviders: true,
+  };
+}
+
+/** The tool the drift row changes, and the required property it adds. */
+export const DRIFT_TOOL = "research_fetch";
+export const DRIFT_PROPERTY = "kilnDriftProbe";
+/** What `verifyChild` is handed as the child's output, so a returned output is recognisable. */
+export const HELD_OUTPUT = "KILN-SIGNATURE-HELD-OUTPUT-51D0";
+
+/**
+ * The observer loaded with `-e` beside the Kiln package. It reads Pi's live registry once the session
+ * exists and reduces it with the product's own `buildChildReport`, imported from the consumer's copy.
+ */
+const signatureObserver = (childReportUrl) => `
+import { writeFileSync } from "node:fs";
+import { buildChildReport } from ${JSON.stringify(childReportUrl)};
+
+export default function (pi) {
+  pi.on("session_start", (_event, ctx) => {
+    const report = buildChildReport({ pi, ctx });
+    const raw = (pi.getAllTools() ?? []).find((t) => t.name === ${JSON.stringify(DRIFT_TOOL)});
+    writeFileSync(process.env.KILN_SIGNATURE_OUT, JSON.stringify({
+      activeTools: report.activeTools,
+      toolSignatures: report.toolSignatures,
+      driftToolParameters: raw?.parameters ?? null,
+    }));
+  });
+}
+`;
+
+/**
+ * TSK-0067, toward ACC-0092: a changed tool signature in the package a real Pi session loads is read
+ * from that session's registry and refused by the existing consumer, `verifyChild`.
+ *
+ * ⚠️ **THE EXPECTED SIGNATURE IS `contractFor("research")`, AND NOTHING HERE EDITS IT.** The Kiln
+ * package declares its research schemas in its own table in `extensions/kiln.js`. The change is made
+ * to a copy of that file inside the consumer, so the expected side and the observed side are two
+ * statements, and only one of them moves.
+ *
+ * ⚠️ **ONLY THE SIGNATURE IS MEASURED.** `taskBindingObserved`, `timedOut` and the output are held
+ * constant and recorded as test inputs. No task is delegated and no child is launched by Kiln.
+ *
+ * ⚠️ **THE CHANGE IS ONE THE CONSUMER COMPARES.** `verifyChild` compares property names and the
+ * required list, not types (F1). A type-only change would pass it, so this row adds a required
+ * property, and it makes no claim about type changes.
+ */
+async function proveCapabilitySignature({ dir, tool, agentDir, CLI, resolved, captured }) {
+  const { ProjectTrustStore } = await import(resolved.indexUrl);
+  const store = new ProjectTrustStore(agentDir);
+  const root = join(dir, "signature");
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(root, { recursive: true });
+
+  const observer = join(root, "observer.js");
+  writeFileSync(observer, signatureObserver(pathToFileURL(join(tool, "lib", "specialists", "child-report.mjs")).href));
+
+  // A project holding the shipped package, copied from tracked files as the consumer itself is.
+  const project = (name) => {
+    const p = join(root, name);
+    for (const rel of trackedFiles().filter((f) => f.startsWith("pi-package/"))) {
+      const dest = join(p, ".planning", rel);
+      mkdirSync(dirname(dest), { recursive: true });
+      cpSync(join(REPO_ROOT, rel), dest);
+    }
+    mkdirSync(join(p, ".pi"), { recursive: true });
+    writeFileSync(join(p, ".pi", "settings.json"), JSON.stringify({ packages: ["../.planning/pi-package"] }, null, 2) + "\n");
+    store.set(realpathSync(p), true);
+    return p;
+  };
+
+  const unmodifiedDir = project("unmodified");
+  const driftedDir = project("drifted");
+
+  // ⚠️ THE CHANGE, AND IT MUST LAND EXACTLY ONCE. A replacement that matched nothing would leave the
+  // two projects identical, and the refusal below would then be caused by something else.
+  const extension = join(driftedDir, ".planning", "pi-package", "extensions", "kiln.js");
+  const shipped = readFileSync(extension, "utf8");
+  const anchor = /properties: \{ url: \{ type: "string" \}, maxBytes: \{ type: "integer", minimum: 1024 \} \},(\r?\n\s*)required: \["url"\],/g;
+  const occurrences = [...shipped.matchAll(anchor)].length;
+  if (occurrences !== 1)
+    throw new Error(`The ${DRIFT_TOOL} schema anchor occurs ${occurrences} times in the Kiln extension; the drift row cannot place its change.`);
+  writeFileSync(extension, shipped.replace(anchor,
+    `properties: { url: { type: "string" }, maxBytes: { type: "integer", minimum: 1024 }, ${DRIFT_PROPERTY}: { type: "string" } },$1required: ["url", "${DRIFT_PROPERTY}"],`));
+
+  const contract = contractFor("research");
+  const held = { taskBindingObserved: true, timedOut: false, output: HELD_OUTPUT };
+
+  const observe = async (cwd, label) => {
+    const out = join(root, `${label}.json`);
+    rmSync(out, { force: true });
+    const child = spawn(process.execPath, [CLI, ...modelArgs(), "-e", observer, "--mode", "rpc", "--no-session", "--offline"], {
+      cwd,
+      env: spikeEnv({ agentDir, extra: { KILN_SIGNATURE_OUT: out } }),
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    });
+    let stdout = "";
+    let stderr = "";
+    // A state query is finished when it is answered, and closing stdin is how the session is asked to end.
+    child.stdout.on("data", (d) => {
+      stdout += d;
+      if (stdout.includes('"command":"get_state"')) child.stdin.end();
+    });
+    child.stderr.on("data", (d) => (stderr += d));
+    child.stdin.write(`${JSON.stringify({ id: "1", type: "get_state" })}\n`);
+    const status = await new Promise((done) => {
+      const timer = setTimeout(() => { child.kill(); done(null); }, 120_000);
+      child.on("exit", (code) => { clearTimeout(timer); done(code); });
+    });
+    captured.push({ label: `signature ${label}`, status, stdout, stderr });
+
+    const reading = existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null;
+    const signatures = reading?.toolSignatures ?? {};
+    // Only the research role's tools are handed to the consumer, and each came from the registry.
+    const reportedTools = Object.fromEntries(contract.requiredCapabilities.filter((n) => n in signatures).map((n) => [n, signatures[n]]));
+    const verdict = verifyChild(contract, { ...held, reportedTools });
+    return {
+      exit: status,
+      // ⚠️ THE OBSERVATION POINT IS THE OBSERVER'S OWN WRITE, which happens only once session_start fires.
+      reachedObservationPoint: reading !== null,
+      answered: /"command":"get_state","success":true/.test(stdout),
+      packageLoaded: (reading?.activeTools ?? []).includes("kiln_capability"),
+      reportedTools,
+      driftToolParameters: reading?.driftToolParameters ?? null,
+      matchesExpected: Object.fromEntries(contract.requiredCapabilities.map((n) => [n, signaturesMatch(contract.toolSignatures[n], reportedTools[n])])),
+      verdict: { accepted: verdict.accepted, reason: verdict.reason ?? null, outputReturned: verdict.output === HELD_OUTPUT },
+    };
+  };
+
+  const unmodified = await observe(unmodifiedDir, "unmodified");
+  const drifted = await observe(driftedDir, "drifted");
+
+  return {
+    piVersion: resolved.version,
+    consumer: "verifyChild(contractFor(\"research\"), run)",
+    expectedSource: "contractFor(\"research\").toolSignatures, from lib/specialists/contract.mjs, not edited",
+    expected: Object.fromEntries(contract.requiredCapabilities.map((n) => [n, {
+      properties: Object.keys(contract.toolSignatures[n]?.input?.properties ?? {}).sort(),
+      required: [...(contract.toolSignatures[n]?.input?.required ?? [])].sort(),
+    }])),
+    observationPoint: "session_start in a real Pi session, via pi.getAllTools() reduced by buildChildReport",
+    heldInputs: { ...held, note: "test inputs held constant; no task was delegated and no Kiln child was launched" },
+    comparisonLimit: "verifyChild compares property names and the required list only; a type-only change is not detected",
+    unmodified,
+    drifted: {
+      mutation: { tool: DRIFT_TOOL, addedRequiredProperty: DRIFT_PROPERTY, file: ".planning/pi-package/extensions/kiln.js (the drifted project's copy)" },
+      ...drifted,
+    },
   };
 }
 

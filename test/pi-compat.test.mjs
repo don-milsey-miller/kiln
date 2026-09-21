@@ -39,6 +39,13 @@ const PINNED = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
 const load = (name) => JSON.parse(readFileSync(join(RUNS, name), "utf8"));
 
 /** The research role's tools, reported as a child would report them. */
+/**
+ * TSK-0067's drift property and held output, written out rather than imported from the spike, so the
+ * measurement and the assertion are two statements a reader can compare.
+ */
+const DRIFT_PROPERTY = "kilnDriftProbe";
+const HELD_OUTPUT = "KILN-SIGNATURE-HELD-OUTPUT-51D0";
+
 const researchTools = () => Object.fromEntries(Object.entries(RESEARCH_TOOL_SIGNATURES).map(([name, spec]) => [name, spec]));
 const platforms = () => readdirSync(RUNS).filter((f) => f.endsWith(".json"));
 
@@ -174,6 +181,42 @@ export function assertContract(r, where) {
     at("getAll() no longer returns the whole catalogue — the getAvailable() instruction may be stale"));
   assert.equal(a.withOAuth.statusDisagreesWithAvailability, true,
     at("the auth status/availability disagreement no longer reproduces — re-check the launch gate"));
+
+  /* -- TSK-0067: the capability signature, read from a real session, and drift refused -------- */
+  const s = r.capabilitySignature;
+  assert.ok(s, at("no capability-signature row was recorded"));
+  assert.equal(s.piVersion, PINNED, at("the signature row ran against a different Pi version"));
+  const contract = contractFor("research");
+  // ⚠️ THE EXPECTED SIDE DID NOT MOVE. The drift is in the package copy, never in the contract.
+  assert.equal(contract.toolSignatures.research_fetch.input.properties[DRIFT_PROPERTY], undefined,
+    at("the expected signature carries the drift property, so the comparison is not independent"));
+  for (const [label, run] of [["unmodified", s.unmodified], ["drifted", s.drifted]]) {
+    assert.equal(run.reachedObservationPoint, true, at(`the ${label} session never reached session_start`));
+    assert.equal(run.packageLoaded, true, at(`the ${label} session did not load the Kiln package`));
+    assert.equal(run.exit, 0, at(`the ${label} session did not finish cleanly`));
+    assert.equal(run.answered, true, at(`the ${label} session did not answer its state query`));
+    // Every tool the consumer judges was read from the registry, not supplied by this harness.
+    assert.deepEqual(Object.keys(run.reportedTools).sort(), [...contract.requiredCapabilities].sort(),
+      at(`the ${label} session did not report every research tool from its registry`));
+  }
+  // The positive control: the shipped package passes the consumer.
+  assert.deepEqual(s.unmodified.verdict, { accepted: true, reason: null, outputReturned: true },
+    at("the unmodified package was refused, so a refusal of the drifted one would prove nothing"));
+  // The changed schema is what the live registry held.
+  assert.ok(s.drifted.driftToolParameters?.properties?.[DRIFT_PROPERTY], at("the registry did not hold the changed schema"));
+  assert.ok(s.drifted.driftToolParameters.required.includes(DRIFT_PROPERTY), at("the drift property was not required"));
+  assert.deepEqual(s.drifted.verdict, { accepted: false, reason: CHILD_REFUSED.SIGNATURE_MISMATCH, outputReturned: false },
+    at("the drifted package was not refused as a signature mismatch"));
+  // Diagnosis: only the changed tool differs.
+  assert.deepEqual(s.drifted.matchesExpected, { research_capability: true, research_search: true, research_fetch: false },
+    at("the refusal is not attributable to the changed tool alone"));
+  // ⚠️ RE-JUDGED NOW, not only as recorded, so the current consumer is held to the retained reading.
+  const held = { taskBindingObserved: true, timedOut: false, output: HELD_OUTPUT };
+  const now = verifyChild(contract, { ...held, reportedTools: s.unmodified.reportedTools });
+  assert.equal(now.accepted, true, at(`the current consumer refuses the unmodified reading: ${now.reason}`));
+  const nowDrifted = verifyChild(contract, { ...held, reportedTools: s.drifted.reportedTools });
+  assert.equal(nowDrifted.reason, CHILD_REFUSED.SIGNATURE_MISMATCH, at(`the current consumer does not refuse the drifted reading: ${nowDrifted.reason}`));
+  assert.equal("output" in nowDrifted, false, at("the refusal returned the child's output"));
 }
 
 /* ------------------------------------------------------------------ the retained record */
