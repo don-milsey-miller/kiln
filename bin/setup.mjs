@@ -38,6 +38,7 @@ import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
 import { initializeProject } from "../lib/initialize-project.mjs";
+import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
 
 const TOOL_ROOT = canonicalPath(resolve(join(dirname(fileURLToPath(import.meta.url)), "..")));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -79,6 +80,8 @@ export const EXIT = Object.freeze({
   INSTALL: 5,
   STATE: 6,
   SETUP: 7,
+  /** A project nobody has trusted, or one somebody denied: the scaffold is fine, the agent is not ready. */
+  TRUST: 8,
 });
 
 export class SetupCommandRefusal extends Error {
@@ -91,7 +94,7 @@ export class SetupCommandRefusal extends Error {
 }
 
 /** The options this slice reads. The whole argument surface, and its `--help`, belong to TSK-0061. */
-const VALUED = new Set(["--project-root", "--name", "--description", "--local-state"]);
+const VALUED = new Set(["--project-root", "--name", "--description", "--local-state", "--trust"]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
 export function parseArgs(argv) {
@@ -113,8 +116,14 @@ export function parseArgs(argv) {
     if (flag === "--name") out.name = value;
     if (flag === "--description") out.description = value;
     if (flag === "--local-state") out.localState = value;
+    if (flag === "--trust") out.trust = value;
   }
   if (out.localState !== "project" && out.localState !== "user") return { error: `--local-state is "project" or "user", got ${JSON.stringify(out.localState)}.` };
+  // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
+  // mistake about the one decision that must never be defaulted (ACC-0108), so it is refused rather than read as
+  // approval.
+  if (out.trust !== undefined && out.trust !== "approve" && out.trust !== "deny")
+    return { error: `--trust is "approve" or "deny", got ${JSON.stringify(out.trust)}.` };
   return out;
 }
 
@@ -146,6 +155,26 @@ export function resolvePaths({ projectRoot: explicit = null, env = process.env }
         { named, owner, contentRoot }
       );
   }
+  // ⚠️ **SETUP CAN ONLY SET UP THE CONTENT ROOT THE INITIALIZER OWNS, AND SAYS SO RATHER THAN MAKING A SECOND.**
+  // `PLANNING_CONTENT_DIR` selects which content a run READS; the initializer creates `<project>/planning-content`
+  // by its own single rule. A run that accepted another selection would print one content root, create a second,
+  // and commit a skill-override entry for whichever of the two it happened to be holding.
+  const owned = join(owner, CONTENT_DIR_NAME);
+  if (pathIdentityKey(contentRoot) !== pathIdentityKey(canonicalPath(owned)))
+    throw new SetupCommandRefusal(
+      EXIT.PATHS,
+      `The selected content root is not the one this command can create.
+` +
+        `  selected: ${contentRoot}  (${candidate.how})
+  owned:    ${owned}
+` +
+        `Setting up a project whose content lives elsewhere is not supported yet: the initializer creates ` +
+        `${CONTENT_DIR_NAME}/ beside the project, and a run that accepted another selection would create a second ` +
+        `content root and register a skill-override path for whichever one it was holding. Nothing was read or ` +
+        `written. Unset the override, or run setup against the project that owns that content.`,
+      { selected: contentRoot, owned: canonicalPath(owned), how: candidate.how }
+    );
+
   return {
     toolRoot: TOOL_ROOT,
     projectRoot: owner,
@@ -293,7 +322,7 @@ async function runPhases({ paths, args, ask, print, modules }) {
     // what gives the owner's append the containment check, the identity recorded before anything is written and
     // the writeability probe; the owner refuses a transaction that did not plan it. A run that needs no fix
     // plans no write to it, so an already-covered project keeps the file entirely out of the transaction.
-    files: [projectRecordTarget(), ...(coverageFix ? [{ path: ".gitignore" }] : [])],
+    files: [projectRecordTarget(), modules.settings.settingsTarget(), ...(coverageFix ? [{ path: ".gitignore" }] : [])],
     journal: { path: "state:runtime/setup-transaction.json", validate: modules.journalValidate },
   };
 
@@ -302,7 +331,15 @@ async function runPhases({ paths, args, ask, print, modules }) {
     async (tx) => {
       // ⚠️ DECLARED ONLY WHEN IT IS GOING TO RUN, so the journal's phase list is what this run set out to do
       // rather than a fixed menu with a permanently pending entry on every already-covered project.
-      tx.declarePhases([...(coverageFix ? ["state-coverage"] : []), "initialize", "state-protection", "project-identity"]);
+      tx.declarePhases([
+        ...(coverageFix ? ["state-coverage"] : []),
+        "initialize",
+        "state-protection",
+        "project-identity",
+        "runtime-pin",
+        "trust",
+        "registration",
+      ]);
 
       // ⚠️ FIRST, BECAUSE EVERY LATER PHASE WRITES INTO THE PATHS IT PROTECTS (REQ-0027). The ignore owner does
       // its own classification against a fresh read — the plan above is a statement about the file as it was —
@@ -331,10 +368,110 @@ async function runPhases({ paths, args, ask, print, modules }) {
       // ⚠️ THE JOURNAL ONLY NOW: it lives in the runtime directory, which has just been protected and created.
       await tx.beginJournal();
       await tx.setRecovery(resumeCommand(paths.projectRoot), "setup was interrupted after the journal began");
-      return { initialized, identity };
+
+      // ⚠️ THE PINNED RUNTIME BEFORE ANYTHING ASKS IT QUESTIONS. The trust store and the package loader are Pi's,
+      // so a version that is not the one this checkout was measured against is a refusal rather than a surprise
+      // three phases later.
+      const pinned = await tx.phase("runtime-pin", () => modules.runtime.resolvePinnedAgent(paths.toolRoot));
+      print(`pinned runtime ${pinned.version}`);
+
+      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules }));
+      if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, pinned, trust, registered: null };
+
+      const registered = await tx.phase("registration", () => register({ tx, paths, print, modules }));
+      return { initialized, identity, pinned, trust, registered };
     },
     { lock: { reuseHeld: true } }
   );
+}
+
+/**
+ * The project's trust decision: obtained, never assumed (ACC-0108).
+ *
+ * ⚠️ **AN UNAPPROVED PROJECT IS A CHILD THAT SILENTLY LOADS NONE OF KILN'S TOOLS.** AST-0042 measured it on the
+ * pinned runtime: no error, no warning, no non-zero exit. That is why a run with nobody to ask refuses instead
+ * of carrying on, and why `--trust` has to be spelled out rather than implied by `--non-interactive`.
+ *
+ * ⚠️ **AND A DENIAL IS AN ANSWER, NOT A FAILURE.** The scaffold this run has already written stays, and it stays
+ * valid; what the operator is told is that the agent is not ready and what would make it ready.
+ */
+async function decideTrust({ paths, args, ask, print, modules }) {
+  const { TRUST, readTrust, grantTrust, denyTrust } = modules.trust;
+  // ⚠️ THE AGENT DIRECTORY IS ASKED OF PI, AND NAMED EXPLICITLY. `pi-trust` has no default for it on purpose:
+  // Pi's own default is the operator's home store, and defaulting to it would record a decision in the wrong
+  // place. Resolving it here rather than at import keeps Pi's SDK out of a run that refuses earlier.
+  const agentDir = await modules.runtime.resolvePinnedAgentDir(paths.toolRoot);
+  const where = { projectRoot: paths.projectRoot, agentDir, toolRoot: paths.toolRoot };
+
+  // ⚠️ **AN EXPLICIT ANSWER OUTRANKS A RECORDED ONE, IN BOTH DIRECTIONS.** `--trust approve` is the operator
+  // answering now; treating a recorded denial as final would leave them rerunning a command that cannot change
+  // anything, which is how an operator concludes the flag does not work.
+  if (args.trust === "deny") {
+    const denied = await denyTrust(where);
+    print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
+    return denied;
+  }
+  if (args.trust === "approve") {
+    const granted = await grantTrust(where);
+    print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
+    return granted;
+  }
+
+  const current = await readTrust(where);
+  if (current.state !== TRUST.MISSING) {
+    // ⚠️ WHICH DIRECTORY ANSWERED. Pi may answer a project from a decision recorded against an ancestor, and an
+    // operator told "denied" is entitled to know which directory they denied.
+    print(`trust ${current.state} for ${current.recordedFor ?? current.projectRoot}`);
+    return current;
+  }
+
+  if (args.nonInteractive)
+    throw new SetupCommandRefusal(
+      EXIT.TRUST,
+      `This project has no trust decision, and a run with nobody to ask must not make one.\n` +
+        `  project: ${paths.projectRoot}\n` +
+        `An unapproved project starts an agent that loads none of Kiln's tools and reports nothing wrong, so ` +
+        `assuming approval would produce exactly that. Rerun with --trust approve, or interactively.`,
+      { projectRoot: paths.projectRoot }
+    );
+
+  // ⚠️ THE CANONICAL DIRECTORY IS IN THE QUESTION, because that is what the decision applies to.
+  print(`Kiln needs this project trusted before its agent can load the project's package and tools:`);
+  print(`  ${paths.projectRoot}`);
+  const answer = String((await ask("Trust this project? (yes/no) ")) ?? "").trim().toLowerCase();
+  if (answer === "yes" || answer === "y") {
+    const granted = await grantTrust(where);
+    print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
+    return granted;
+  }
+  // ⚠️ ANYTHING THAT IS NOT A YES IS A NO, AND IT IS RECORDED AS ONE. A closed input answers `null` here, and
+  // recording that as a denial is what keeps "nobody has been asked" distinct from "somebody said no".
+  const denied = await denyTrust(where);
+  print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
+  return denied;
+}
+
+/**
+ * Register Kiln's package and the selected content root's skill overrides, through the planned merge (D27).
+ *
+ * ⚠️ **BOTH ENTRIES ARE PROVED BEFORE EITHER IS WRITTEN.** The package entry has to reach this checkout's
+ * package directory and the skills entry has to reach the selected content root's `skills-overrides/`; a
+ * spelling that does not is a committed path pointing at nothing, on every clone.
+ */
+async function register({ tx, paths, print, modules }) {
+  const settingsDir = dirname(paths.settingsPath);
+  const { packageEntry, packageEntryEquivalents } = modules.packageEntry.provePortableEntryTarget({
+    settingsDir,
+    packageRoot: modules.package.packageRootFor(paths.toolRoot),
+  });
+  const { skillsEntry } = modules.settings.skillOverrideEntry({ projectRoot: paths.projectRoot, contentRoot: paths.contentRoot });
+
+  const result = await modules.settings.applyKilnRegistration({
+    transaction: tx,
+    registration: { packageEntry, packageEntryEquivalents, skillsEntry },
+  });
+  print(`package ${packageEntry} and skills ${skillsEntry} registered${result.changed ? "" : " (unchanged)"}`);
+  return { ...result, packageEntry, skillsEntry };
 }
 
 /** The state library's own three choices, rendered as it returned them. */
@@ -357,7 +494,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   if (args.error) {
     warn(args.error);
-    warn("This slice takes --project-root <path>, --name <text>, --description <text>, --local-state project, --non-interactive, --resume.");
+    warn(
+      "This slice takes --project-root <path>, --name <text>, --description <text>, --local-state project, " +
+        "--trust approve|deny, --non-interactive, --resume."
+    );
     return EXIT.ARGUMENTS;
   }
   if (args.help) {
@@ -390,13 +530,31 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         localState: await import("../lib/local-state.mjs"),
         init: await import("../lib/initialize-project.mjs"),
         gitignore: await import("../lib/project-gitignore.mjs"),
+        runtime: await import("../lib/pi-runtime.mjs"),
+        trust: await import("../lib/pi-trust.mjs"),
+        settings: await import("../lib/pi-settings.mjs"),
+        package: await import("../lib/pi-package.mjs"),
+        packageEntry: await import("../lib/pi-package-entry.mjs"),
         crypto: await import("node:crypto"),
         journalValidate: await journalValidator(),
       };
 
-      // 6 to 9: the plan, the initializer, the identity and state protection, the journal.
-      await runPhases({ paths, args, ask, print, modules });
-      print("setup complete for this slice: paths, runtime, dependencies, initialization, state protection, identity, journal");
+      // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the pinned runtime,
+      // the trust decision and the registration.
+      const done = await runPhases({ paths, args, ask, print, modules });
+
+      // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
+      // before this point is valid and stays: the content scaffold, the ignore block, the project identity and
+      // the protected runtime directory. What is missing is the one thing an operator can grant later, so the
+      // exit code distinguishes it from a refusal and the message says what would change it.
+      if (done.trust.state !== modules.trust.TRUST.APPROVED) {
+        warn(`This project is not trusted, so Kiln's agent is not ready. The project itself is set up and valid.`);
+        warn(`  project: ${paths.projectRoot}`);
+        warn(`Rerun setup with --trust approve to grant it. Kiln's planning content and its browser-only start are unaffected.`);
+        return EXIT.TRUST;
+      }
+
+      print("setup complete for this slice: paths, runtime, dependencies, initialization, state protection, identity, journal, trust, registration");
       return EXIT.OK;
     });
   } catch (e) {

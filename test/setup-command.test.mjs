@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -23,14 +23,26 @@ import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 
-/** A fresh consumer project: a Git repository with nothing of Kiln's in it yet. */
+/**
+ * A fresh consumer project: a Git repository with nothing of Kiln's in it yet, and this checkout as its
+ * `.planning`.
+ *
+ * ⚠️ **THE LAYOUT IS THE REAL ONE, BECAUSE SLICE 2 COMMITS A PATH THAT DEPENDS ON IT.** Kiln registers its
+ * package as `../.planning/pi-package`, and it writes that entry only after proving it resolves to the package
+ * directory of the checkout that is running. A fixture whose `.planning` was somewhere else would exercise the
+ * refusal on every case rather than the registration. The link is a junction on Windows, which needs no
+ * privilege, and a directory symlink elsewhere; `canonicalPath` resolves both, which is why the proof holds
+ * through it.
+ */
 function project({ ignored = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "kiln-setup-"));
   const dir = join(root, "project");
   mkdirSync(dir);
   execFileSync("git", ["init", "-q"], { cwd: dir });
+  symlinkSync(ROOT, join(dir, ".planning"), process.platform === "win32" ? "junction" : "dir");
   if (ignored) writeFileSync(join(dir, ".gitignore"), blockText());
-  return { root, dir, contentRoot: join(dir, "planning-content") };
+  // ⚠️ AN AGENT DIRECTORY PER PROJECT, so a trust decision here is never the operator's own store.
+  return { root, dir, contentRoot: join(dir, "planning-content"), agentDir: join(root, "agent") };
 }
 
 /**
@@ -44,7 +56,8 @@ function tree(dir) {
   const out = {};
   const walk = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
-      if (entry.name === ".git" || entry.name === ".planning-init.lock") continue;
+      // ⚠️ `.planning` IS THIS CHECKOUT, not the project's content: walking it would digest the whole tool.
+      if (entry.name === ".git" || entry.name === ".planning" || entry.name === ".planning-init.lock") continue;
       const p = join(d, entry.name);
       if (entry.isDirectory()) walk(p);
       else out[relative(dir, p).split("\\").join("/")] = `sha256:${createHash("sha256").update(readFileSync(p)).digest("hex")}`;
@@ -55,16 +68,23 @@ function tree(dir) {
 }
 
 /** Run the real command against a project, with npm and the operator replaced. */
-async function setup(p, argv = [], { answer = "fix-ignore", install, env = {} } = {}) {
+async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, trust = "approve" } = {}) {
   const printed = [];
-  const seen = { atInstall: null, installs: 0 };
+  const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
+  const savedAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PLANNING_CONTENT_DIR = p.contentRoot;
+  // ⚠️ PI'S OWN STATE GOES IN THE FIXTURE, not in the operator's home: the trust decision is recorded for real.
+  process.env.PI_CODING_AGENT_DIR = p.agentDir;
   for (const [k, v] of Object.entries(env)) process.env[k] = v;
   try {
-    const code = await main(["--project-root", p.dir, "--name", "Test Project", ...argv], {
+    const code = await main(["--project-root", p.dir, "--name", "Test Project", ...(trust ? ["--trust", trust] : []), ...argv], {
       print: (line) => printed.push(line),
-      ask: async () => answer,
+      // ⚠️ EVERY QUESTION IS RECORDED, not just answered: "did not ask" is the assertion a non-interactive run needs.
+      ask: async (question) => {
+        seen.asks.push(question);
+        return answer;
+      },
       install:
         install ??
         (() => {
@@ -78,6 +98,8 @@ async function setup(p, argv = [], { answer = "fix-ignore", install, env = {} } 
   } finally {
     if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
     else process.env.PLANNING_CONTENT_DIR = saved;
+    if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
     for (const k of Object.keys(env)) delete process.env[k];
   }
 }
@@ -423,5 +445,188 @@ test("⚠️ the bootstrap install is `npm ci --ignore-scripts`, whichever npm i
   } finally {
     if (saved === undefined) delete process.env.npm_execpath;
     else process.env.npm_execpath = saved;
+  }
+});
+
+/* ============================================== slice 2 ======================================== */
+
+/** What the pinned runtime discovers in a project, asked of Pi's own loader and nothing else. */
+async function discover(p) {
+  const { resolvePinnedSdk } = await import("../lib/pi-runtime.mjs");
+  const { DefaultResourceLoader, ProjectTrustStore, hasTrustRequiringProjectResources } = await import(resolvePinnedSdk(ROOT).url);
+  const loader = new DefaultResourceLoader({ cwd: p.dir, agentDir: p.agentDir });
+  await loader.reload({
+    resolveProjectTrust: async () => {
+      if (!hasTrustRequiringProjectResources(p.dir)) return true;
+      const decision = new ProjectTrustStore(p.agentDir).get(p.dir);
+      return decision === null ? false : decision;
+    },
+  });
+  return {
+    tools: loader.getExtensions().extensions.flatMap((e) => [...e.tools.keys()]).sort(),
+    errors: loader.getExtensions().errors.map((e) => String(e.error)),
+    skills: loader.getSkills().skills.map((sk) => sk.name).sort(),
+  };
+}
+
+const settingsOf = (p) => JSON.parse(readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8"));
+
+test("⚠️ setup registers the package itself, and the pinned runtime loads what it wrote", async () => {
+  // D27: Kiln writes the entry through its own planned merge rather than running `pi install -l` against the
+  // project. What makes that more than a claim about a string is the runtime: Pi's own loader is pointed at the
+  // project and asked what it found.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p);
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+
+    const settings = settingsOf(p);
+    assert.deepEqual(settings.packages, ["../.planning/pi-package"]);
+    assert.deepEqual(settings.skills, ["../planning-content/skills-overrides"]);
+    // ⚠️ AND NO SELECTION. The registration merge writes two keys; a provider nobody chose is not one of them.
+    for (const key of ["defaultProvider", "defaultModel", "defaultThinkingLevel"])
+      assert.equal(Object.hasOwn(settings, key), false, `${key} was committed before anybody chose one`);
+
+    const found = await discover(p);
+    assert.deepEqual(found.errors, [], "the registered package did not load");
+    assert.ok(found.tools.includes("kiln_project_status"), `the package's tools are missing: ${found.tools.join(", ")}`);
+    assert.ok(found.skills.includes("kiln-planning"), `the package's skills are missing: ${found.skills.join(", ")}`);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ R9 the skill-override entry is derived from the content root, and a root setup cannot own is refused", async () => {
+  // The entry used to be fixed at `../planning-content/skills-overrides`, while the content root can be selected
+  // elsewhere. Two halves: the entry setup writes is derived from the resolved content root and proved to resolve
+  // back to it, and a selection this command cannot create is refused instead of quietly making a second root.
+  const { skillOverrideEntry, SETTINGS_REFUSAL } = await import("../lib/pi-settings.mjs");
+
+  const p = project({ ignored: true });
+  try {
+    // The derivation, over a content directory with another name: the entry follows the directory.
+    mkdirSync(join(p.dir, "kiln-content", "skills-overrides"), { recursive: true });
+    assert.deepEqual(skillOverrideEntry({ projectRoot: p.dir, contentRoot: join(p.dir, "kiln-content") }), {
+      skillsEntry: "../kiln-content/skills-overrides",
+      directory: join(p.dir, "kiln-content", "skills-overrides"),
+    });
+    // A content root with no overrides directory is not a Kiln content root, and registers nothing.
+    assert.throws(
+      () => skillOverrideEntry({ projectRoot: p.dir, contentRoot: join(p.dir, "empty-content") }),
+      (e) => e.reason === SETTINGS_REFUSAL.SKILL_OVERRIDE_MISSING
+    );
+    // And one outside the project cannot be committed at all: the entry would be this machine's own path.
+    assert.throws(
+      () => skillOverrideEntry({ projectRoot: p.dir, contentRoot: join(p.root, "outside-content") }),
+      (e) => e.reason === SETTINGS_REFUSAL.SKILL_OVERRIDE_OUTSIDE
+    );
+
+    // The command refuses a selection it cannot create, before anything is read or written.
+    const q = project();
+    try {
+      q.contentRoot = join(q.dir, "kiln-content");
+      const o = await setup(q);
+      assert.equal(o.code, EXIT.PATHS);
+      assert.equal(existsSync(join(q.dir, "planning-content")), false, "a second content root was created");
+      assert.equal(existsSync(join(q.dir, ".pi")), false, "runtime state was written for a refused selection");
+    } finally {
+      rmSync(q.root, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the registration merge preserves every unrelated setting and adds each entry once", async () => {
+  const p = project({ ignored: true });
+  try {
+    mkdirSync(join(p.dir, ".pi"));
+    writeFileSync(
+      join(p.dir, ".pi", "settings.json"),
+      JSON.stringify({ defaultModel: "somebody-elses-choice", packages: ["../their-package"], theirKey: { kept: true } }, null, 2) + "\n"
+    );
+
+    assert.equal((await setup(p)).code, EXIT.OK);
+    const after = settingsOf(p);
+    assert.deepEqual(after.packages, ["../their-package", "../.planning/pi-package"], "an unrelated package entry was disturbed");
+    assert.deepEqual(after.theirKey, { kept: true }, "an unrelated key was lost");
+    assert.equal(after.defaultModel, "somebody-elses-choice", "the registration merge overwrote a selection");
+
+    // A rerun adds nothing a second time and changes no bytes.
+    const bytes = readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8");
+    assert.equal((await setup(p)).code, EXIT.OK);
+    assert.equal(readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8"), bytes, "a rerun rewrote the settings file");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0108 trust is obtained and never assumed, and a denial leaves a working project", async () => {
+  // A non-interactive run with no decision recorded.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p, ["--non-interactive"], { trust: null });
+    assert.equal(o.code, EXIT.TRUST);
+    // ⚠️ IT NEITHER PROMPTED NOR ASSUMED. A run with nobody to ask that reaches the question at all would take
+    // whatever a closed input returns as an answer, which is the defaulting this criterion exists to forbid.
+    assert.deepEqual(o.seen.asks, [], "a non-interactive run asked a question");
+    assert.equal(existsSync(join(p.dir, ".pi", "settings.json")), false, "the package was registered for an untrusted project");
+    assert.equal(existsSync(join(p.dir, "planning-content", "project.yaml")), true, "the scaffold was not written");
+
+    // Nothing was decided on its behalf: the store still has no answer, so Pi loads no project resources.
+    const found = await discover(p);
+    assert.deepEqual(found.tools, [], "an unapproved project loaded the package's tools");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // An explicit denial: an answer, not a failure.
+  const q = project({ ignored: true });
+  try {
+    const o = await setup(q, [], { trust: "deny" });
+    assert.equal(o.code, EXIT.TRUST);
+    assert.equal(existsSync(join(q.dir, ".pi", "settings.json")), false, "a denied project was registered anyway");
+    assert.equal(existsSync(join(q.dir, "planning-content", "project.yaml")), true, "the scaffold did not survive a denial");
+    assert.equal(existsSync(join(q.dir, ".pi", "runtime", "setup-transaction.json")), false, "a denial left a journal to resume");
+
+    // ⚠️ AND THE DENIAL IS RECORDED, so the next run knows somebody said no rather than asking again.
+    const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
+    const recorded = await readTrust({ projectRoot: q.dir, agentDir: q.agentDir, toolRoot: ROOT });
+    assert.equal(recorded.state, TRUST.DENIED);
+
+    // Rerunning with an approval turns the same project into a ready one.
+    const again = await setup(q, [], { trust: "approve" });
+    assert.equal(again.code, EXIT.OK, again.printed.join("\n"));
+    assert.deepEqual(settingsOf(q).packages, ["../.planning/pi-package"]);
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
+  }
+
+  // Interactively: the canonical directory is in the question, and "no" is a denial rather than a crash.
+  const r = project({ ignored: true });
+  try {
+    const o = await setup(r, [], { trust: null, answer: "no" });
+    assert.equal(o.code, EXIT.TRUST);
+    assert.ok(o.seen.asks.some((q2) => /trust/i.test(q2)), `the operator was not asked: ${o.seen.asks.join(" | ")}`);
+    assert.ok(o.printed.some((l) => l.includes(r.dir)), "the directory the decision applies to was not shown");
+  } finally {
+    rmSync(r.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the package entry is written only after it is proved to reach THIS checkout's package", async () => {
+  // A `.planning` that is not this checkout: the portable entry would resolve somewhere else, so it is refused
+  // rather than committed, and the settings file is not created at all.
+  const p = project({ ignored: true });
+  try {
+    rmSync(join(p.dir, ".planning"), { recursive: true, force: true });
+    mkdirSync(join(p.root, "other", "pi-package"), { recursive: true });
+    symlinkSync(join(p.root, "other"), join(p.dir, ".planning"), process.platform === "win32" ? "junction" : "dir");
+
+    const o = await setup(p);
+    assert.equal(o.code, EXIT.SETUP);
+    assert.equal(existsSync(join(p.dir, ".pi", "settings.json")), false, "an unproved entry was committed");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
   }
 });
