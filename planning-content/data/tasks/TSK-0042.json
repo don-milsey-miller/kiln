@@ -23,5 +23,6 @@
   ],
   "dependsOn": [
     "TSK-0041"
-  ]
+  ],
+  "notes": "⚠️ LAUNCH CONSUMES THIS KEY (TSK-0037, B1). The expected compatibility key must be computable at every launch from the current runtime inputs, independently of the stored record, and passed to checkLaunch as expectedKey. A different-model one-run override must have a route to obtain matching compatibility proof for that model, so the override TSK-0037 offers as a remedy can start a run."
 }

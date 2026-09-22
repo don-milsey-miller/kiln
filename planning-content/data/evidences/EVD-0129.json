@@ -1,0 +1,76 @@
+{
+  "id": "EVD-0129",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: launch checks refuse an unavailable recorded selection by name, before any credential when consent is missing, and substitute nothing",
+  "kind": "experiment",
+  "summary": "TSK-0037, toward ACC-0056 and ACC-0054, as COMPONENT PROOF ONLY. The implementation is commit d509fbb, and the sha256 of each file is in the facts. lib/launch-checks.mjs holds the checks; they are NOT wired into launch, because the expected compatibility key they compare against is computed by TSK-0042, which does not exist yet (B1). THE CHECKS, IN ORDER. (1) The recorded provider, model and thinking level from .pi/settings.json, exactly, or an explicit one-run override. (2) This host's model-use grant for that exact provider and model. (3) The credential contract. (4) Pi's registry, built from the pinned SDK with allowModelNetwork false: the custom-model file loads, the model is found by both IDs exactly, authentication is configured, and its source is one the contract accepts. (5) The thinking level by Pi's own getSupportedThinkingLevels, refused rather than clamped. (6) The package and tools, validated against what registration produces. (7) A valid compatibility record whose key matches an expected key supplied by the caller. Steps 1 to 3 read only Kiln's own files. A failure of Pi itself to load at any stage is pi-load-failed, naming the stage and never repeating the error. Every refusal names the provider and model, states that nothing was started or substituted, and offers a setup rerun or the override, stated with the flags it actually needs: --provider, --model and --thinking for a different model, which is confirmed for this run only, or --thinking alone. HOW IT IS OBSERVED. The real pinned registry over an isolated Pi agent directory holding a stored OpenAI key, with real catalogue model IDs chosen at test time, and test/helpers/access-recorder.mjs watching that directory, OPENAI_API_KEY and ANTHROPIC_API_KEY, and the network. RESULTS. (1) The recorded selection passes every check, with the stored source, the validated tools and the passed record, and nothing contacted; the recorder sees the auth.json read. (2) ACC-0056, REMOVED MODEL: a recorded model ID absent from Pi's catalogue is refused as model-not-found naming openai and that ID, although other OpenAI models are available, and no result is returned. (3) ACC-0056, ABSENT AUTHENTICATION: an empty authentication store and environment is refused as authentication-absent naming the recorded IDs, and an unrelated provider's key in the environment changes nothing. (4) ACC-0054: no grant, and a declined grant, are each refused with zero reads of Pi's agent directory, zero credential-variable reads and no network attempt, although OPENAI_API_KEY is set. (5) A provider with no credential contract is refused before Pi is read. (6) A malformed custom-model file is refused without repeating its contents. (7) A committed thinking level the model does not support is refused, naming off as the supported level. (8) A package that does not load as declared is refused. (9) The compatibility record: missing, malformed, a stored failure, a different thinking level and a different expected piVersion are each refused under their own reason; a key in another order matches; no expected key is compatibility-unverifiable. (10) OVERRIDE: unconfirmable and declined overrides are refused with zero credential access; a confirmed override shows the billing statement and 'This is for this run only' with zero reads before the answer, then gets every check; a removed override model is refused by name; a thinking-only override asks nothing and is checked by Pi's rule; settings and the consent record stay byte-identical. (11) An incomplete override, an invalid thinking level, a changed model without --thinking, and no recorded selection are refused. (12) F1: the override remedy states --thinking as required for a different model, matching what resolveSelection enforces. (13) F2: ten failures at the sdk, runtime, registry, lookup and thinking-rule stages, including an incomplete SDK, a missing rule and a rule returning a non-list, are each pi-load-failed naming the stage, with neither the error's message nor a key sentinel it carried in the refusal. LIMITS. B1: the expected key must be computed from the current runtime inputs by TSK-0042 (on TSK-0041's canary contract), never read from the stored record; until then every real launch would be compatibility-unverifiable, so the checks are not wired into launch and TSK-0037 stays in progress, now depending on TSK-0042. A different-model one-run override has no route to matching compatibility proof yet, so as offered it cannot start a run; TSK-0042 carries that requirement. D13: a custom provider's credential declaration is an input with no stored source yet, so a custom provider is refused as credential-contract until setup supplies one. No model was called. MUTATIONS, RUN LOCALLY ON WINDOWS. Sixteen changes each failed the tests: the registry read before consent, another model of the provider substituted, absent authentication not refused, an unsupported level clamped, the expected key not compared, a missing record tolerated, no expected key tolerated, an override used without confirmation, a custom-model error ignored, the package not validated, no grant treated as granted, a contract refusal ignored, stage failures escaping, the error message repeated, the thinking list unchecked, and --thinking shown as optional. Each was restored byte-identical by sha256. CI had not run on d509fbb when this was recorded, and its result is added separately.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commit d509fbb74e270b991ef66bc3ea1579fb8ca68ddb",
+      "lib/launch-checks.mjs": "sha256:d9f0e83ba70b75ade16e8de49ad5dc56c6f53de4107e1ce1e2d6072a3bf33c81",
+      "test/launch-checks.test.mjs": "sha256:935e5e3c84bce7e2764542af1b793c0f0c2721514cc85f3c0269e4b38517ec0d",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/launch-checks.test.mjs 13 tests: 13 pass, 0 fail",
+      "observation": "real pinned registry over an isolated agent directory with a stored OpenAI key; catalogue model IDs chosen at test time; access recorder on the agent directory, OPENAI_API_KEY, ANTHROPIC_API_KEY and the network",
+      "happy-path": "passes with authSource stored, validated tools and a passed record; auth.json read observed; no network attempt",
+      "acc-0056-removed-model": "gpt-kiln-removed-0 refused as model-not-found naming openai and the ID; other OpenAI models available and none used",
+      "acc-0056-absent-auth": "empty auth store and environment refused as authentication-absent naming the recorded IDs; an unrelated ANTHROPIC_API_KEY changes nothing",
+      "acc-0054-no-consent": "no grant and a declined grant refused with zero agent-directory reads, zero credential-variable reads and no network, with OPENAI_API_KEY set",
+      "other-refusals": "credential-contract before Pi is read; custom-models-error without the file's contents; thinking-level-not-supported naming off; package-invalid",
+      "compatibility": "missing, malformed, stored failure, different thinking level, different expected piVersion each refused by reason; reordered key matches; no expected key is compatibility-unverifiable",
+      "override": "unconfirmable and declined refused with zero credential access; confirmed shows the billing statement and 'This is for this run only' with zero reads before the answer; removed override model refused by name; thinking-only override asks nothing; settings and consent byte-identical",
+      "f1-override-flags": "remedy: --provider <id> --model <id> --thinking <level> for a different model, or --thinking <level> alone; resolveSelection refuses a changed model without --thinking",
+      "f2-pi-load-failures": "sdk (throws, incomplete), runtime, registry (constructor, getError), lookup (find, getAvailable), thinking-rule (throws, missing, non-list): each pi-load-failed naming the stage, with no error message or key sentinel in the refusal",
+      "decisions-reviewed": "D10 no grant refuses and points to setup; D11 a different-model override is confirmed per run and never recorded, a thinking-only override asks nothing; D12 a model override requires --thinking; D13 custom declarations are an integration input",
+      "mutations": "16 of 16 killed locally on Windows, each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1520 tests, 1515 pass, 0 fail, 5 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "launch-wiring",
+        "state": "not-captured",
+        "reason": "The checks are not wired into bin/start-kiln.mjs. The expected key must come from TSK-0042's computation over the current runtime inputs, which does not exist yet (B1)."
+      },
+      {
+        "fact": "acc-0056-and-acc-0054-evaluation",
+        "state": "not-captured",
+        "reason": "No real launch runs these checks yet. This is component proof."
+      },
+      {
+        "fact": "override-compatibility-route",
+        "state": "not-captured",
+        "reason": "A different-model one-run override has no route to matching compatibility proof yet, so it cannot start a run. TSK-0042 carries the requirement."
+      },
+      {
+        "fact": "ci-run",
+        "state": "not-captured",
+        "reason": "CI had not run on d509fbb when this was recorded. Only local Windows results are recorded here, and the CI result is added separately."
+      },
+      {
+        "fact": "auth-source-refusal",
+        "state": "not-captured",
+        "reason": "No fixture makes Pi report a forbidden source such as runtime or fallback. The mapping is mapAuthSource from lib/pi-provider-canary.mjs, tested there."
+      },
+      {
+        "fact": "model-request",
+        "state": "not-captured",
+        "reason": "No model was called."
+      }
+    ]
+  }
+}
