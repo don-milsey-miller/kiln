@@ -13,8 +13,9 @@
   "verifies": [
     "REQ-0025"
   ],
-  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0129 is component proof for TSK-0037: against the real pinned registry, a recorded model removed from Pi's catalogue and absent authentication are each refused by a specific reason naming the recorded provider and model, with a setup rerun and an explicit one-run override offered and nothing substituted. The checks are not wired into launch: the expected compatibility key comes from TSK-0042 (B1), and a different-model override still needs a route to compatibility proof. This criterion is evaluated on a real launch once both exist.",
+  "notes": "⚠️ NOT EVALUATED PENDING CI, 2026-09-22. EVD-0129 is the component proof; EVD-0132 measures the integrated launch path through the real command: a removed recorded model and absent authentication are each refused by name with both remedies and no supervisor started, a mismatched compatibility record is refused before anything starts, and nothing is substituted. Evaluated once CI passes on the wiring.",
   "evidencedBy": [
-    "EVD-0129"
+    "EVD-0129",
+    "EVD-0132"
   ]
 }
