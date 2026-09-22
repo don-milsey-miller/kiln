@@ -924,28 +924,46 @@ test("the tool's own repository is a project whose ignore file the owner reports
   assert.deepEqual(covers.uncovered, [], "this checkout ignores every rule the owner writes");
 });
 
-test("⚠️ a transaction supplied to the owner is authenticated, and it authorises one project's file", async () => {
-  // The setup command applies the block inside a declared phase, so the write is part of the planned run
-  // rather than beside it. What makes that more than a comment is that the lease is checked: an object that
-  // looks like a transaction holds no lock, and a real one is open over a project it names itself.
+test("⚠️ a transaction supplied to the owner must have PLANNED this file, not merely be open", async () => {
+  // The setup command applies the block inside a declared phase, so the write is part of the planned run rather
+  // than beside it. A lease and a phase are not the plan: what makes the write planned is the target, which is
+  // where containment, the recorded identity and the writeability probe come from.
   const dir = repo();
   const elsewhere = repo();
   const plan = planIgnoreBlock(dir);
+  const target = { path: ".gitignore" };
 
   await assert.rejects(() => applyIgnoreBlock(plan, { transaction: { projectRoot: dir, active: true } }), /not a setup transaction/);
   assert.equal(existsSync(ignoreFile(dir)), false, "a forged lease wrote the file");
 
+  // Open over this very project, and this file is not in its plan.
+  await runTransaction({ projectRoot: dir }, async (tx) => {
+    await assert.rejects(
+      () => applyIgnoreBlock(plan, { transaction: tx }),
+      (e) => e instanceof IgnoreRefusal && e.reason === "not-planned" && /write plan/.test(e.message),
+      "an unplanned target must be refused"
+    );
+    assert.equal(existsSync(ignoreFile(dir)), false, "an unplanned write happened anyway");
+  });
+
   let captured = null;
-  await runTransaction({ projectRoot: elsewhere }, async (tx) => {
+  await runTransaction({ projectRoot: elsewhere, files: [target] }, async (tx) => {
     captured = tx;
-    // Open over `elsewhere`, asked to write in `dir`: the path comes from the transaction, not the caller.
-    await assert.rejects(() => applyIgnoreBlock(plan, { transaction: tx }), /open over/);
+    // Planned over `elsewhere`, asked to write in `dir`: the plan answers, not the caller.
+    await assert.rejects(() => applyIgnoreBlock(plan, { transaction: tx }), /not in this transaction's write plan/);
     assert.equal(existsSync(ignoreFile(dir)), false, "another project's transaction wrote this project's file");
 
     const mine = planIgnoreBlock(elsewhere);
     const result = await applyIgnoreBlock(mine, { transaction: tx });
     assert.equal(result.changed, true);
     assert.deepEqual(findBlock(read(elsewhere)).interior, [...IGNORE_RULES]);
+
+    // ⚠️ AND THE PLAN NOW DESCRIBES WHAT IS THERE. Its entry was recorded before the append, so a journal
+    // flushed afterwards would otherwise publish an identity the file no longer matches.
+    assert.equal(result.planned.state, "present");
+    const entry = tx.journalRecord().fileIdentities.find((f) => f.path === ".gitignore");
+    assert.equal(entry.state, "present", "the plan still describes the file as it was before the write");
+    assert.equal(entry.digest, result.planned.digest);
   });
 
   // And the lease expires with the transaction: holding the object is not holding the lock.

@@ -38,6 +38,7 @@ import {
   REFUSAL,
   SETUP_LOCK_FILE,
   SetupRefusal,
+  adoptPlannedWrite,
   planTransaction,
   transactionState,
   removeJournalFile,
@@ -938,12 +939,18 @@ test("a transaction is live only inside its body, and the ledger says so", async
     // ⚠️ THE WHOLE SHAPE, because `roots` is now an authorisation and a collaborator decides where
     // it may write from it. A test that checked only the two fields it already knew would not have
     // noticed the third arriving, and an authorisation nobody asserts is one nobody is holding.
-    assert.deepEqual(insideState, { projectRoot: root, active: true, roots: { project: root }, stateMode: null });
+    const planned = [join(root, ".pi", "settings.json")];
+    assert.deepEqual(insideState, { projectRoot: root, active: true, roots: { project: root }, stateMode: null, plannedFiles: planned });
     assert.deepEqual(
       transactionState(captured),
-      { projectRoot: root, active: false, roots: { project: root }, stateMode: null },
+      { projectRoot: root, active: false, roots: { project: root }, stateMode: null, plannedFiles: planned },
       "revoked on the way out"
     );
+    // ⚠️ `plannedFiles` IS AN AUTHORISATION TOO, and it is the plan's rather than the caller's: a collaborator
+    // that writes a file itself asks it whether that file was planned. A copy, like the rest, so a caller cannot
+    // push a path into the plan and then be told it is there.
+    assert.throws(() => insideState.plannedFiles.push(join(root, "elsewhere.json")), TypeError, "the planned list is not frozen");
+    assert.deepEqual(transactionState(captured).plannedFiles, planned, "the planned list was mutable from outside");
 
     // ⚠️ A RETAINED HANDLE USED TO STILL WRITE. The lockfile is gone, so this write would have had
     // no exclusion behind it at all.
@@ -1056,6 +1063,54 @@ test("work can only be enrolled through a real, live transaction", async () => {
       (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_REVOKED
     );
     assert.equal(ran, false, "and the work must not have run either way");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a write is adopted only for a planned target, only while the transaction is live", async () => {
+  // The .gitignore owner writes its own file, because it appends against a read taken at the moment of writing.
+  // Adopting is how the plan learns what that write left behind. It is not a way into the plan: every other
+  // path is refused, the journal included, and the identity is read from the file rather than supplied.
+  const root = project();
+  try {
+    let captured = null;
+    await runTransaction(
+      { projectRoot: root, files: [{ path: ".gitignore" }], journal: { path: ".pi/runtime/setup-transaction.json", validate: validateJournal } },
+      async (tx) => {
+        captured = tx;
+        tx.declarePhases(["state-coverage"]);
+        assert.deepEqual(transactionState(tx).plannedFiles, [join(root, ".gitignore")], "the journal is not a collaborator's target");
+
+        for (const unplanned of [join(root, ".pi", "settings.json"), join(root, ".pi", "runtime", "setup-transaction.json")])
+          assert.throws(
+            () => adoptPlannedWrite(tx, unplanned),
+            (e) => e instanceof SetupRefusal && e.reason === REFUSAL.UNPLANNED_TARGET,
+            `${unplanned} must not be adoptable`
+          );
+
+        // The identity comes from the file: adopting an absent one says absent, and adopting it after a write
+        // says what is there, with no digest the caller could have invented.
+        assert.deepEqual(adoptPlannedWrite(tx, join(root, ".gitignore")), { target: "project:.gitignore", state: "absent", digest: null });
+        writeFileSync(join(root, ".gitignore"), ".planning/\n", "utf-8");
+        const adopted = adoptPlannedWrite(tx, join(root, ".gitignore"));
+        assert.equal(adopted.state, "present");
+        assert.match(adopted.digest, /^sha256:[0-9a-f]{64}$/);
+        await tx.beginJournal();
+        const entry = tx.journalRecord().fileIdentities.find((f) => f.path === ".gitignore");
+        assert.deepEqual({ state: entry.state, digest: entry.digest }, { state: "present", digest: adopted.digest });
+      }
+    );
+
+    assert.throws(
+      () => adoptPlannedWrite(captured, join(root, ".gitignore")),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_REVOKED,
+      "a finished transaction has no plan to record into"
+    );
+    assert.throws(
+      () => adoptPlannedWrite({ projectRoot: root, active: true }, join(root, ".gitignore")),
+      (e) => e instanceof SetupRefusal && e.reason === REFUSAL.TRANSACTION_REVOKED
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

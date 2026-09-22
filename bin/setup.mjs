@@ -289,7 +289,11 @@ async function runPhases({ paths, args, ask, print, modules }) {
     projectRoot: paths.projectRoot,
     stateRoot: roots.root,
     stateMode: STATE_MODE.PROJECT,
-    files: [projectRecordTarget()],
+    // ⚠️ THE IGNORE FILE IS A PLANNED TARGET WHEN THIS RUN INTENDS TO CHANGE IT, and only then. Planning it is
+    // what gives the owner's append the containment check, the identity recorded before anything is written and
+    // the writeability probe; the owner refuses a transaction that did not plan it. A run that needs no fix
+    // plans no write to it, so an already-covered project keeps the file entirely out of the transaction.
+    files: [projectRecordTarget(), ...(coverageFix ? [{ path: ".gitignore" }] : [])],
     journal: { path: "state:runtime/setup-transaction.json", validate: modules.journalValidate },
   };
 
