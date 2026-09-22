@@ -1,0 +1,74 @@
+{
+  "id": "EVD-0134",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: setup verifies the pinned runtime before it plans, obtains the trust decision without ever assuming one, and registers its package and skill overrides through its own planned merge",
+  "kind": "experiment",
+  "summary": "TSK-0060 SLICE 2, toward ACC-0108 and — not yet evaluated — ACC-0106, ACC-0107, ACC-0043, ACC-0045 and ACC-0085. The implementation is commit 309e26c with its two review fixes in b1d455e; the sha256 of each file is in the facts. WHAT THE SLICE ADDS, IN D26'S ORDER. Immediately after the dynamic imports and BEFORE the transaction is planned, the installed Pi is held to this checkout's pin: everything past that point is Pi's — the trust store, the package the settings register, the loader that reads them — so a version this checkout was never measured against is a fact about the install, known as soon as the imports resolve. Inside the transaction, after the journal opens, two phases run: `trust` obtains the project's trust decision, and `registration` writes Kiln's package entry and the content root's skill-override entry through the transaction's own settings merge. REGISTRATION IS KILN'S PLANNED MERGE, NOT `pi install -l` (D27). `.pi/settings.json` is a planned target whose recorded identity is what makes the merge refuse a file that moved; `pi install -l` writes that file itself, so inside the plan it would have to be adopted — widening the rule that stops a concurrent edit being laundered in — and outside the plan it would write a project file the transaction has not contained or probed. `applyKilnRegistration` writes two keys and leaves every other key alone, because the phase runs before any model is chosen and assigning one to satisfy the full settings writer would commit a selection nobody made. Both writers now share one write path — Pi's settings lock held across the transaction's compare-before-write — and both ask the ledger which files the transaction planned rather than reading the transaction object's shape. THE TWO ENTRIES ARE PROVED BEFORE EITHER IS WRITTEN. `provePortableEntryTarget` refuses unless `../.planning/pi-package`, resolved from `.pi/settings.json`, canonicalises to the package directory of the checkout that is running; `skillOverrideEntry` derives the entry for the resolved content root and resolves it back to that directory before returning it, refusing a directory outside the project — a committed path that only works on one machine — or a content root with no `skills-overrides/`. TRUST IS OBTAINED AND NEVER ASSUMED (ACC-0108). `--trust approve` records an approval with no prompt, and it answers over a recorded decision, because it is the operator answering now. An interactive run prints the canonical directory the decision applies to and asks. A run with nobody to ask refuses WITHOUT REACHING THE QUESTION: measured as zero questions asked, not merely a non-zero exit. Only an explicit yes approves and only an explicit no denies; a closed input, an empty line and an unreadable answer leave the trust store with no decision and refuse, because a denial is a decision every later run reads back as somebody having said no. A DENIAL IS AN ANSWER: the content scaffold, the project identity and the protected runtime directory all stay, the journal is removed, nothing is registered, and the command exits 8 saying what would change it. MEASURED THROUGH THE REAL COMMAND, AND THEN THROUGH PI. Fifteen of the nineteen cases run `main()` against a temporary Git repository whose `.planning` is this checkout — the other four hold exported functions directly, the import graph being a static scan of the source rather than a run — the real layout, which is what makes the package entry's proof meaningful — with its own agent directory, so the trust decision is recorded for real and never in the operator's own store. RESULTS. (1) After a complete run, `.pi/settings.json` holds `packages: [\"../.planning/pi-package\"]` and `skills: [\"../planning-content/skills-overrides\"]` and NO provider, model or thinking level, and Pi's own DefaultResourceLoader, pointed at that project, loads the package with no errors and reports its tools (kiln_project_status among them) and its skills (kiln-planning among them). (2) An existing settings file keeps its unrelated key, its third-party package entry and a `defaultModel` somebody else chose; a rerun changes no bytes. (3) A `.planning` that is not this checkout refuses, and `.pi/settings.json` is never created — though the refusal currently reaches the operator as a `PackageEntryRefusal` stack trace rather than as a plain refusal, because the command's failure reporting does not know that class yet. What the control establishes, that nothing was written, is unaffected; the reporting is carried into TSK-0060's full exit-code mapping. (4) A non-interactive run with no decision exits 8, asks nothing, registers nothing, and leaves a valid scaffold; Pi then loads none of the package's tools, which is the same measurement from the other side. (5) An explicit denial exits 8, leaves the scaffold and no journal, records the denial, and a rerun with `--trust approve` completes and registers. (6) Each of a closed input, an empty line and \"maybe later\" exits 8 with the trust store still holding no decision. (7) A version mismatch — the real resolver held to a version this checkout does not have — exits 4 with the consumer project byte-identical, no `.pi` and no content root. LIMITS. R9 IS HALF CLOSED. The skill-override entry is no longer a fixed spelling: it is derived from the resolved content root and proved to resolve back to it, which is measured directly on `skillOverrideEntry` with a differently-named content directory. But the command refuses every content root other than `<project>/planning-content`, because `initializeProject` creates that one by its own single rule and a run that accepted another selection would print one content root and create a second. Until setup can own a content root the initializer does not create, the command's behaviour for a selected root elsewhere is that refusal, and the mutation that puts the fixed spelling back is not observable through the command. `--local-state user` still refuses by name. Consent, discovery, selection, the credential contract, research, the preflight canary, the live model check, read-back and the full exit-code mapping are slices 3 and 4; the spanning criteria stay not-evaluated until the integration record. No provider, network or npm registry was reached: npm is a seam in every case, and the loader makes no model request. CI. GitHub Actions run 35776222911 at b1d455e, attempt 1 with no job re-run, passed in all four cells, with the setup command's 19 tests running in every cell; the live compatibility tier ran in the ubuntu Node 24 cell and passed 6 of 6. MUTATIONS, RUN LOCALLY ON WINDOWS. Fourteen changes across two sets, each restored byte-identical by sha256. Twelve were caught: trust assumed when nobody can be asked, an unapproved project registered anyway, a denial reported as success, an answer that is not yes taken as one, an unreadable answer taken as approval, any answer that is not yes recorded as a denial, the package entry written without proof, a content root setup cannot own accepted, the registration merge writing a selection as well, an override outside the project committed, the runtime verified after the plan again, and a runtime refusal given the wrong exit class. TWO SURVIVE, both stated above: putting the fixed skill-override spelling back, which no supported layout can distinguish while every non-default content root is refused; and the derived entry's resolve-back proof, which is defensive — every path that would trip it is already refused by the containment check.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commits 309e26c (slice 2) and b1d455e (the two review fixes)",
+      "bin/setup.mjs": "sha256:b62300180603a3d90bb93beb842bc2a29860d45ee8fd1f191d4d30002ac46d6e",
+      "lib/pi-settings.mjs": "sha256:e2deafdb88743f38947ed988af2f2f966678d56a489bbddad44ac0cc6a0ebc4c",
+      "lib/pi-package-entry.mjs": "sha256:6779a1498fd509a1f8b226b81dc570a56d1afb1f5ee0d1e6118aca17b19ae432",
+      "test/setup-command.test.mjs": "sha256:9f58c351291822790e1e85e7c0e6fb7f9fe3546e104de6f64031ed2f72610677",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 19 tests, 15 of which run the real main() against a temporary project whose .planning is this checkout, with npm and the operator's answer as the only seams. The other four hold exported functions directly: the pre-install import graph is a static scan of the source, and the engines check, the argument parsing and the install arguments are called as functions. Plus test/pi-settings.test.mjs, test/pi-package-entry.test.mjs and test/pi-package-load.test.mjs, 55 together.",
+      "order": "the pinned version is verified immediately after the dynamic imports and before the transaction plan; trust and registration are declared phases after the journal opens",
+      "registration-writer": "lib/pi-settings.mjs applyKilnRegistration, through transaction.merge under Pi's settings lock; it writes only `packages` and `skills`",
+      "package-entry-proof": "provePortableEntryTarget: ../.planning/pi-package must canonicalise, from .pi/settings.json, to this checkout's pi-package directory; a .planning that is not this checkout refuses and no settings file is created; that refusal still prints as a PackageEntryRefusal stack trace, which the full exit-code mapping owes",
+      "skill-entry-proof": "skillOverrideEntry derives the entry from the resolved content root and resolves it back to that directory; outside the project and a missing skills-overrides/ are separate refusals",
+      "pi-loads-what-setup-wrote": "Pi's own DefaultResourceLoader against the project setup wrote: no load errors, kiln_project_status present among the package's tools, kiln-planning present among its skills",
+      "settings-preserved": "an unrelated key, a third-party package entry and somebody else's defaultModel all survive; a rerun changes no bytes",
+      "trust-non-interactive": "exit 8, zero questions asked, nothing registered, scaffold valid, and Pi loads none of the package's tools",
+      "trust-denial": "exit 8, denial recorded, scaffold and identity intact, no journal left; a rerun with --trust approve completes and registers",
+      "trust-unreadable-answers": "a closed input, an empty line and an unreadable answer each exit 8 with the trust store still holding no decision",
+      "version-mismatch": "the real resolver held to a version this checkout does not have: exit 4, consumer project byte-identical, no .pi, no content root",
+      "mutations": "14 run locally on Windows across two sets, 12 killed, 2 survive (both stated in the limits); each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1579 tests, 1574 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 509 artifacts",
+      "ci-run": "GitHub Actions run 35776222911 at b1d455e, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell; the slice's first commit 309e26c also passed all four cells (run 35774700087)",
+      "cell-windows-22": "job 106910001085, 1579 tests / 1578 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 106910000871, 1579 tests / 1578 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 106910001041, 1579 tests / 1569 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 106910001114, 1579 tests / 1569 pass / 0 fail / 10 skipped",
+      "live-tier": "ubuntu-latest Node 24 cell only (job 106910001114), KILN_PI_COMPAT=live: 6 of 6 pass; skipped in the other three cells"
+    },
+    "omissions": [
+      {
+        "fact": "content-root-elsewhere",
+        "state": "not-captured",
+        "reason": "R9 is half closed: the skill-override entry is derived and proved rather than fixed, but the command refuses every content root other than <project>/planning-content, because the initializer creates that one by its own rule. Setup owning another root is still owed."
+      },
+      {
+        "fact": "real-npm-install",
+        "state": "not-captured",
+        "reason": "npm is a seam in every case; what is asserted about the bootstrap is in EVD-0133."
+      },
+      {
+        "fact": "later-slices",
+        "state": "not-captured",
+        "reason": "Consent, discovery, selection, the credential contract, research, the preflight canary, the live model check, read-back and the full exit-code mapping are slices 3 and 4."
+      },
+      {
+        "fact": "user-local-state",
+        "state": "not-captured",
+        "reason": "--local-state user refuses by name, so ACC-0085 stays not evaluated until every supported state path is implemented."
+      }
+    ]
+  }
+}
