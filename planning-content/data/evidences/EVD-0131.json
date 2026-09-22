@@ -1,0 +1,77 @@
+{
+  "id": "EVD-0131",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the compatibility key is computed from the request the canary actually made, only an approved and matching pass is recorded, and no carried or mismatched record is reused",
+  "kind": "experiment",
+  "summary": "TSK-0042, toward ACC-0060 and ACC-0062 and for TSK-0037's launch check, as COMPONENT PROOF ONLY. The implementation is commit 9f1d427, and the sha256 of each file is in the facts. Neither the setup command nor bin/start-kiln.mjs calls these functions yet. THE KEY. lib/compatibility-record.mjs computes all eight determinants from current runtime inputs, never from the stored record: the selection, the model as Pi resolves it, the pinned Pi version, and the EFFECTIVE base URL. Determinant 7 carries the thinking value Pi sends: the model's mapping where it has one, null where it marks the level unsupported, the level itself otherwise, and none for a model that does not reason. Determinant 8 digests the canary protocol as handed to Pi (tool name, description, schema, system prompt, request template with a placeholder challenge, token ceiling, success-predicate version). The package capability signature is not in the key (DEC-0033). R9, THE EFFECTIVE ENDPOINT. Pi can replace a model's baseUrl with one its authentication supplies at request time. resolveEffectiveBaseUrl asks Pi's own authentication resolution with fetch refused; a resolution that would need the network leaves the endpoint unestablished, and then there is no key: setup sends no canary and reports not ready, and launch refuses record reuse (compatibility-uncacheable). R8, THE REQUEST THE CANARY MADE. The canary child resolves its own model from its isolated agent directory, so it reports a bounded projection: the four key fields it computes from its own resolved model and effective endpoint (API type, endpoint identity and source, classified request profile), or a key refusal, and the scheme, host, port and path of each request it sent, observed at fetch. No URL, query, header, credential or unbounded configuration value is reported. proofProblem accepts a pass as proof of a key only when those fields equal the key's, at least one request was observed, and every request lies under the key's endpoint on a path-segment boundary. THE RECORD. Only a passed canary that proves its key is written, and reading and writing both go through the consent record's gate: the ignore block and Git's answer about the record's actual path. A tracked, committed, unignored or unverifiable record is untrusted and never reused (D20). SETUP'S CHECK. lib/live-model-check.mjs reuses a trusted record matching every determinant without asking; otherwise it asks with the section 6.4 prompt naming the provider, the exact model and the possible charge. A run that cannot ask needs --live-model-check approve. deny or a no is a choice: not ready, no request, nothing recorded. A pass that cannot be recorded proves this run only and is reported as awaiting a per-run check, not ready (D21). LAUNCH. lib/launch-checks.mjs's zeroCostPreflight (checks 1 to 6) now also establishes the effective endpoint, and checkLaunch computes the key itself. A different-model one-run override never uses the record, even one matching it, and takes its own approved live check for that run (D17). The project's own selection is proved by a trusted matching record, or refuses to setup (D18); where its record cannot be trusted, each run needs its own check. The canary runner is supplied by the caller (D19). RESULTS. (1) ACC-0060: the prompt names the provider display name, the exact model ID and that the provider may charge, and the canary runs only after the answer. Five declines (false, null, a string, deny, deny with an ask) are choices with no request and no record. A run that cannot ask refuses naming the model and --live-model-check approve; approve runs without asking; with a matching record no flag is needed. (2) ACC-0062: a matching record is reused with nothing asked or sent; a change of provider, model, thinking level, Pi version, API type, endpoint, request profile or canary digest each reopens approval, and declining leaves the record byte-identical. (3) The digest changes with each of its seven parts, ignores key order, and holds exactly those parts. (4) A failed canary, and a runner returning no pass, record nothing and leave an existing record byte-identical. (5) A query-routed endpoint is not checked at all until an identity is declared; with one, the record is keyed declared and holds no query. (6) R9: an unestablishable endpoint sends no canary and, at launch, refuses with no network attempt observed; authentication that supplies a base URL makes that the keyed endpoint, and at launch makes a record taken at the catalogue endpoint mismatch on endpointIdentity. (7) R8: another resolved API type or request profile, a request elsewhere, a request on a sibling path, no observed request and a key refusal in the child each fail the pass in setup and at launch, and nothing is recorded. End to end with the real canary, a child handed a model configuration that does not reason, while the host's does, fails with canary-inputs-differ on effectiveRequestProfile. (8) D20: a force-added record committed and cloned is untrusted in the clone; setup asks again, and launch refuses without a per-run check and passes with one. (9) D21: tracked, unverifiable and unignored locations each leave a pass unrecorded and report awaiting a per-run check, not ready. (10) D17: a stored record matching the override model does not stand in for the override's own approved check. (11) END TO END: the zero-cost preflight, the approved live check with the real canary against a loopback endpoint, then checkLaunch: setup records under the computed key and launch accepts that record with no further request. LIMITS. No billable provider was called; every canary used a loopback endpoint through Pi's openai-completions client. Only fetch-based provider clients are observable; a client that does not use fetch leaves no observed request, which fails the proof rather than passing it. The effective endpoint is established by refusing fetch; a resolution that reached the network another way would not be refused. Wiring into setup (TSK-0060) and into bin/start-kiln.mjs (TSK-0037) is not done, so the criteria are not evaluated. MUTATIONS, RUN LOCALLY ON WINDOWS. Thirty-nine mutations were run across the key, digest, effective endpoint, proof, record gate, setup check, launch and child; thirty-seven failed the tests. Two are equivalent: allowing a failed canary to be recorded is still refused by the record schema, and accepting a runner that returns no pass at launch is still refused by the proof check. Each was restored byte-identical by sha256. CI had not run on 9f1d427 when this was recorded, and its result is added separately.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commit 9f1d427e6143935fc3ace7087d10e8a798a26d78",
+      "lib/compatibility-record.mjs": "sha256:b1d8ca40116fee03f5076408569adb9588fd9b222243c6a902c3cffb17983ac8",
+      "lib/live-model-check.mjs": "sha256:c806cc0a027f4f0cfc35d95f854dbc7205ebe358fe570809c6c6796556042c34",
+      "lib/launch-checks.mjs": "sha256:1aa45effebdb60ff54c57bf175d15f2233cd51b0592dc598b3671547a1c2ab2d",
+      "lib/live-canary.mjs": "sha256:e468db3b74e88875a050fbaba04113d5830208fc6618a06fc2bed9a340d9c998",
+      "lib/live-canary-child.mjs": "sha256:fee19fabb51c1f7e8d4dd7e0b99c545242ca400839b5c384b06b7ff65cd6c734",
+      "test/launch-checks.test.mjs": "sha256:30b1bebb09e2b9306d51e9d00c5f52047513b6c83f71ccf0a02ed0162dca8eca",
+      "test/live-canary.test.mjs": "sha256:63a30a9bd1d23950b187c155f35de3de38a18b9a6e39b954fc74bbcddfa4810f",
+      "test/live-model-check.test.mjs": "sha256:20f662112db53ccba4af2b5a497e19cbe56d74d06fd3492233b91e6fa0bc48d4",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/live-model-check.test.mjs 16, test/launch-checks.test.mjs 16, test/live-canary.test.mjs 8: 40 pass, 0 fail",
+      "acc-0060-approval": "prompt names provider display name, exact model ID and possible charge; canary runs only after the answer",
+      "acc-0060-decline": "false, null, a string, deny, deny with an ask: choices, not ready, no request, no record",
+      "acc-0060-non-interactive": "refuses naming the model and --live-model-check approve; approve runs without asking; a matching record needs no flag",
+      "acc-0062-invalidation": "provider, model, thinking level, Pi version, API type, endpoint, request profile and canary digest each reopen approval; declining leaves the record byte-identical",
+      "digest": "each of the seven parts changes it; key order does not; exactly those parts",
+      "r9-effective-endpoint": "unestablishable endpoint: no canary in setup, compatibility-uncacheable at launch with no network attempt; an authentication-supplied base URL is keyed and makes a catalogue-endpoint record mismatch on endpointIdentity",
+      "r8-request-made": "another API type or request profile, a request elsewhere, a sibling path, no request and a child key refusal each fail the pass in setup and at launch; end to end, a child handed a non-reasoning configuration against a reasoning host model fails on effectiveRequestProfile",
+      "d20-carried-record": "force-added, committed and cloned: untrusted in the clone; setup asks again; launch refuses without a per-run check and passes with one",
+      "d21-unrecorded-pass": "tracked, unverifiable and unignored locations: pass unrecorded, awaiting per-run-check, not ready",
+      "d17-override": "a stored record matching the override model does not replace the override's approved live check",
+      "end-to-end": "zeroCostPreflight, approved live check with the real canary to a loopback endpoint, then checkLaunch: recorded under the computed key and accepted with no further request",
+      "mutations": "39 run locally on Windows, 37 killed, 2 equivalent (a failed canary recorded: refused by the schema; a no-pass runner at launch: refused by proofProblem); each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1547 tests, 1542 pass, 0 fail, 5 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "criteria-evaluation",
+        "state": "not-captured",
+        "reason": "Setup (TSK-0060) and bin/start-kiln.mjs (TSK-0037) do not call these functions yet, and no billable provider was called. This is component proof."
+      },
+      {
+        "fact": "billable-provider",
+        "state": "not-captured",
+        "reason": "Every canary used a loopback endpoint through Pi's openai-completions client."
+      },
+      {
+        "fact": "non-fetch-clients",
+        "state": "not-captured",
+        "reason": "Only fetch-based provider clients are observed. A client that does not use fetch leaves no observed request, which fails the proof."
+      },
+      {
+        "fact": "non-fetch-network-during-resolution",
+        "state": "not-captured",
+        "reason": "The effective endpoint is established with fetch refused. An authentication resolution that reached the network another way would not be refused."
+      },
+      {
+        "fact": "ci-run",
+        "state": "not-captured",
+        "reason": "CI had not run on 9f1d427 when this was recorded. Only local Windows results are recorded here, and the CI result is added separately."
+      }
+    ]
+  }
+}

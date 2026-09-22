@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0012",
     "REQ-0023"
+  ],
+  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0131 is component proof for TSK-0042: the section 6.4 prompt names the provider, the exact model and the possible charge; declining is a choice with no request and no record; a run that cannot ask needs --live-model-check approve. Setup does not yet call the check (TSK-0060).",
+  "evidencedBy": [
+    "EVD-0131"
   ]
 }
