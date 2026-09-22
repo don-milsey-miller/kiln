@@ -126,11 +126,18 @@ function tree(dir) {
  */
 const PICKED = ["--provider", "openai", "--model", "gpt-4o", "--thinking", "off"];
 
-async function setup(p, argv = [], { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED } = {}) {
+async function setup(p, argv = [], { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED, tavily = null } = {}) {
   const printed = [];
   const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
   const savedAgentDir = process.env.PI_CODING_AGENT_DIR;
+  const savedTavily = process.env.TAVILY_API_KEY;
+  // ⚠️ **THE RESEARCH CREDENTIAL IS THE FIXTURE'S, NEVER THE OPERATOR'S.** Its presence decides whether setup asks
+  // about web research at all, so a machine that happens to have one runs a different path from a machine that
+  // does not — which is a test that passes or fails on whose computer it is. Absent unless a case asks for it, and
+  // then an obvious fake. No case answers yes: a yes is what makes the probe contact Tavily.
+  if (tavily === null) delete process.env.TAVILY_API_KEY;
+  else process.env.TAVILY_API_KEY = tavily;
   process.env.PLANNING_CONTENT_DIR = p.contentRoot;
   // ⚠️ PI'S OWN STATE GOES IN THE FIXTURE, not in the operator's home: the trust decision is recorded for real.
   process.env.PI_CODING_AGENT_DIR = p.agentDir;
@@ -159,6 +166,8 @@ async function setup(p, argv = [], { answer, answers, install, env = {}, trust =
     else process.env.PLANNING_CONTENT_DIR = saved;
     if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
+    if (savedTavily === undefined) delete process.env.TAVILY_API_KEY;
+    else process.env.TAVILY_API_KEY = savedTavily;
     for (const k of Object.keys(env)) delete process.env[k];
   }
 }
@@ -872,13 +881,13 @@ test("⚠️ a changed selection clears this host's approval for the old model b
 });
 
 test("⚠️ the research decision is its own, and is recorded separately from the model's", async () => {
-  // No Tavily key on this host: the outcome is that there is no credential, nothing is probed, and the project's
-  // committed choice says so. The operator is told how to enable it later.
+  // No Tavily key on this host: there is nothing to ask about, nothing is probed, and no grant is recorded.
   const p = project({ ignored: true });
   try {
     const o = await setup(p);
     assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
-    assert.ok(o.printed.some((l) => /web research/i.test(l)), o.printed.join(" | "));
+    assert.equal(o.seen.asks.some((q) => /^Optional web research/i.test(q)), false, "a host with no key was asked about one");
+    assert.ok(o.printed.some((l) => /Tavily/i.test(l)), o.printed.join(" | "));
     assert.equal(consentOf(p).research ?? null, null, "a research grant was recorded without a credential");
 
     // Asked to disable it explicitly, the project records the choice rather than leaving it unstated.
@@ -887,6 +896,21 @@ test("⚠️ the research decision is its own, and is recorded separately from t
     assert.equal(JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).research?.provider ?? "none", "none");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ **A KEY ON THE HOST IS A QUESTION, NOT AN ENABLEMENT.** With one present the operator is asked, and a no
+  // records the project's choice without the connection ever being checked. No case here answers yes: the probe
+  // is what contacts Tavily, and what a probe does is measured in the research component's own tests against an
+  // injected fetch.
+  const q = project({ ignored: true });
+  try {
+    const o = await setup(q, [], { tavily: "kiln-setup-TAVILY-SENTINEL-not-a-key" });
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.ok(o.seen.asks.some((a) => /^Optional web research/i.test(a)), o.seen.asks.join(" | "));
+    assert.equal(JSON.parse(readFileSync(join(q.dir, ".pi", "kiln.json"), "utf-8")).research?.provider ?? "none", "none");
+    assert.equal(consentOf(q).research ?? null, null, "a declined connection recorded a research grant");
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
   }
 });
 
