@@ -1,0 +1,72 @@
+{
+  "id": "EVD-0128",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a model is used only after an explicit, confirmed choice, and its grant is bound to the exact model and cleared before a change",
+  "kind": "experiment",
+  "summary": "TSK-0036, toward ACC-0055 and ACC-0054, as COMPONENT PROOF ONLY. The implementation is commit 2dd4930, and the sha256 of each file is in the facts. lib/model-selection.mjs chooses, confirms and persists the project's model, and records this host's model-use grant. CHOOSING. The choices are exactly the models a granted inspection listed, by provider display name and exact model ID, with nothing marked as a default. A choice is a number the operator typed, or --provider and --model checked against that list. Pi's global default is never read, and the first entry is never taken: an empty answer, q, 0, a number off the list, a non-integer, a name or a closed input cancels with nothing written. No thinking level is assumed; it comes from --thinking or an answer. CONFIRMING. Every selection is confirmed, including a single listed model whose ID looks like an alias (kiln-latest). The prompt names the provider display name and ID, the exact model ID and the thinking level, and states that intake turns and specialist work will run on it using this computer's connection, may consume billable tokens or provider quota, and that the account, limits, pricing plan and charges are the operator's. Only true is a yes. A run that cannot ask refuses, even with valid flags. PERSISTING. On a yes to a changed selection, this host's model-use grant is cleared first, the exact provider, model and thinking level are merged into .pi/settings.json through applyKilnSettings (DEC-0028), and the grant is recorded for exactly that provider and model. If the grant cannot be cleared, the change is refused before anything is written or granted. A committed selection, as another operator or a Pi login (F14) may leave it, is offered for confirmation on a host with no grant and never used on the strength of the file. RESULTS. (1) Single model: no, a closed input and a non-boolean answer write neither file; yes writes the exact IDs and a grant of exactly granted, decidedAt, provider and model. (2) No default: nine answers other than a listed number cancel before any confirmation. (3) The list is exactly the three available models, with no default marker. (4) Committed selection on a new host: confirmation asked once, settings byte-identical after the yes, the grant recorded, and an unchanged rerun reused without asking. A no to that unchanged selection is recorded as this host's decline and reported without asking again. (5) DECLINED CHANGE: with A approved at high, a proposed --thinking low answered no leaves settings and the consent record byte-identical, and the approved selection is still reused without asking; a declined change of model through the flags does the same. (6) Flags: an invalid thinking level, a provider or model alone, an unknown provider and an unavailable model are refused before any prompt, with nothing written. (7) The merge keeps keys Kiln does not own. (8) ROUND TRIP: A to B clears A's grant before B is written and grants B on its own yes. B to A through Kiln asks, and a no leaves B and its grant. A hand edit back to A makes B's grant stale, and the next setup asks for A. (9) Clear before write: a concurrent edit that makes the settings merge refuse still leaves A's grant cleared and the selection unchanged. (10) REFUSED WITHOUT A CLEAR: with Git unavailable, and with the consent record tracked, a change from A to B is refused as grant-not-cleared with settings and the consent record byte-identical. (11) An uninspected host has nothing to choose from. LIMITS. Nothing here calls a model, so billable use enabled is observed as the grant and the settings. How a fresh non-interactive setup supplies model-use confirmation is TSK-0061's; provider and model flags alone do not grant it. Parsing the flags, placing the step in setup (TSK-0060) and the launch checks that read the grant (TSK-0037) are not connected, so ACC-0055 and ACC-0054 are not evaluated here. MUTATIONS, RUN LOCALLY ON WINDOWS. Eight changes each failed the tests: no clear before the write, the clear after the write, proceeding when the clear fails, a truthy answer as confirmation, a single model skipping confirmation, a committed selection used with no grant, an empty answer taking the first entry, and recording a decline for a declined change. Each was restored byte-identical by sha256. CI had not run on 2dd4930 when this was recorded, and its result is added separately.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commit 2dd49305c7e32848bd94023f5d5fe1fbd8d4d53a",
+      "lib/model-selection.mjs": "sha256:97c28b7bb5d8e035616988a3b2c23bd13a60c34e4a6e24c4bc97d541d9700249",
+      "test/model-selection.test.mjs": "sha256:8606d5a8f1e10ef3b9861f395d9810d16913c861abae561e51f25ca7c6d975b7",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1",
+      "tests": "test/model-selection.test.mjs 13 tests: 13 pass, 0 fail",
+      "observation": "the consent record and .pi/settings.json after each step, compared byte for byte where a no or a refusal must change nothing; no model is called",
+      "single-model": "kiln-latest as the only model: no, closed input and a string answer write neither file; yes writes exact IDs and a grant of exactly granted, decidedAt, provider, model",
+      "no-default": "null, undefined, empty, q, 0, 4, 1.0, ' first' and a provider name each cancel before any confirmation; an empty thinking answer cancels",
+      "listing": "exactly: Anthropic — claude-opus-5, Anthropic — claude-sonnet-5, OpenAI — gpt-5; no default marker",
+      "committed-selection": "new host: one confirmation, settings byte-identical after yes, grant recorded, rerun reused without asking; a no records this host's decline and is reported without asking",
+      "declined-change": "A approved at high; --thinking low answered no: settings and consent record byte-identical, selection still reused without asking; a declined model change through the flags likewise",
+      "flag-validation": "invalid thinking, provider alone, model alone, unknown provider, unavailable model (two cases): refused before any prompt, nothing written; a run that cannot ask refuses",
+      "settings-merge": "keys Kiln does not own (theme, a third-party package) kept",
+      "round-trip": "A to B clears A's grant before writing B; B to A asks and a no leaves B and its grant; a hand edit back to A makes B's grant stale and the next setup asks for A",
+      "clear-before-write": "a concurrent-edit refusal of the settings merge leaves A's grant cleared and the selection unchanged",
+      "refused-without-clear": "Git unavailable and a tracked consent record: A to B refused as grant-not-cleared, settings and consent record byte-identical",
+      "decisions-reviewed": "D5 no assumed thinking level; D6 a run that cannot ask refuses; D7 a no to the unchanged selection is recorded; D8 a thinking change is confirmed and a declined change keeps the grant; D9 an unavailable committed selection is not replaced silently",
+      "mutations": "8 of 8 killed locally on Windows, each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1502 tests, 1497 pass, 0 fail, 5 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "acc-0055-and-acc-0054-evaluation",
+        "state": "not-captured",
+        "reason": "Setup (TSK-0060) and the launch checks (TSK-0037) do not yet exercise these paths. This is component proof."
+      },
+      {
+        "fact": "ci-run",
+        "state": "not-captured",
+        "reason": "CI had not run on 2dd4930 when this was recorded. Only local Windows results are recorded here, and the CI result is added separately."
+      },
+      {
+        "fact": "model-request",
+        "state": "not-captured",
+        "reason": "No model was called. Billable use enabled is observed as the grant and the settings."
+      },
+      {
+        "fact": "non-interactive-confirmation",
+        "state": "not-captured",
+        "reason": "How a fresh non-interactive setup supplies model-use confirmation is TSK-0061's. Provider and model flags alone do not grant it."
+      },
+      {
+        "fact": "thinking-support-per-model",
+        "state": "not-captured",
+        "reason": "The thinking level is checked against Pi's level list only. Whether the chosen model supports thinking is not checked here."
+      }
+    ]
+  }
+}

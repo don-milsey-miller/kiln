@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0025",
     "REQ-0023"
+  ],
+  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0128 is component proof for TSK-0036: a single listed model is shown by display name and exact ID and confirmed before it is assigned, no answer other than a listed number chooses anything, Pi's global default is never read, and a committed selection is not used on a host without confirmation. This criterion is evaluated once setup (TSK-0060) exercises the path.",
+  "evidencedBy": [
+    "EVD-0128"
   ]
 }

@@ -13,9 +13,10 @@
   "verifies": [
     "REQ-0023"
   ],
-  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0126 is component proof for TSK-0034: clone controls for project-local and per-user state, negative controls for a force-added record (R1), a staged but uncommitted removal (R5) and an unignored record in a parent repository (R6), and the no-Git limit (R4). EVD-0127 is component proof for TSK-0035: the research choice writer clears this host's research grant before it writes the choice, so Tavily to none to Tavily asks again, and a failed probe changes nothing. This criterion is evaluated once the model selection writer (TSK-0036) with its clearGrants call and the launch path are connected, because the provider-change clause depends on a writer that does not exist yet.",
+  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0126 is component proof for TSK-0034: clone controls for project-local and per-user state, negative controls for a force-added record (R1), a staged but uncommitted removal (R5) and an unignored record in a parent repository (R6), and the no-Git limit (R4). EVD-0127 is component proof for TSK-0035: the research choice writer clears this host's research grant before it writes the choice, so Tavily to none to Tavily asks again, and a failed probe changes nothing. EVD-0128 is component proof for TSK-0036: the model selection writer clears this host's model-use grant before it writes a changed selection, refuses the change when the grant cannot be cleared, and changing away and back reopens approval. This criterion is evaluated once setup (TSK-0060) and the launch path (TSK-0037) exercise these writers and grants.",
   "evidencedBy": [
     "EVD-0126",
-    "EVD-0127"
+    "EVD-0127",
+    "EVD-0128"
   ]
 }

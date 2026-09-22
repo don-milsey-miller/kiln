@@ -19,5 +19,6 @@
   ],
   "dependsOn": [
     "TSK-0060"
-  ]
+  ],
+  "notes": "⚠️ NON-INTERACTIVE MODEL-USE CONFIRMATION IS UNRESOLVED (EVD-0128). selectModel refuses when it cannot ask, because --provider and --model alone do not grant model use. This task must decide how a fresh non-interactive setup supplies that confirmation. ⚠️ THE HELP MUST NAME --research tavily AS THE WAY TO ENABLE RESEARCH LATER (EVD-0127), matching the hint every user-disabled research outcome carries."
 }
