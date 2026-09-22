@@ -19,6 +19,8 @@ import { GRANT, consentLocation, recordGrant } from "../lib/consent-record.mjs";
 import { COMPATIBILITY_RECORD, LAUNCH_REFUSAL, LaunchRefusal, REMEDIES, checkLaunch, resolveSelection } from "../lib/launch-checks.mjs";
 import { blockText } from "../lib/project-gitignore.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
+import { OBSERVED_KEY_FIELDS, computeCompatibilityKey } from "../lib/compatibility-record.mjs";
+import { CanaryRefusal } from "../lib/pi-provider-canary.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const PROJECT_ID = "abcdefabcdefabcdefabcdefabcdef01";
@@ -41,19 +43,35 @@ const CATALOGUE = await (async () => {
 
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
-function keyFor({ provider, model, thinkingLevel }) {
-  return {
-    provider,
-    model,
-    thinkingLevel,
-    piVersion: "0.84.4",
-    apiType: "openai-responses",
-    endpointIdentity: { scheme: "https", hostname: "api.openai.com", port: 443, pathname: "/v1" },
-    endpointIdentitySource: "derived",
-    effectiveRequestProfile: { reasoning: false, compat: {}, compatStructured: {}, unboundedInputs: { categories: [] } },
-    preflightContractDigest: "sha256:" + "b".repeat(64),
-  };
+const SDK = await import(resolvePinnedSdk(ROOT).url);
+const PI_VERSION = resolvePinnedSdk(ROOT).version;
+
+/** The key setup would record: computed from the model Pi resolves over this agent directory. */
+async function keyFor(agentDir, selection) {
+  const r = new SDK.ModelRegistry(await SDK.ModelRuntime.create({ authPath: join(agentDir, "auth.json"), modelsPath: join(agentDir, "models.json"), allowModelNetwork: false }));
+  const model = r.find(selection.provider, selection.model);
+  return model ? computeCompatibilityKey({ selection, model, piVersion: PI_VERSION }) : null;
 }
+
+/** A canary result that proves `key`: its observed fields and one request under its endpoint, as the child reports them. */
+const proofFor = (key, over = {}) => ({
+  passed: true,
+  challengeEchoed: true,
+  observed: Object.fromEntries(OBSERVED_KEY_FIELDS.map((f) => [f, key[f]])),
+  requests: [{ ...key.endpointIdentity, pathname: `${key.endpointIdentity.pathname}/responses` }],
+  ...over,
+});
+
+/** The SDK with the registry's resolved model, or its authentication, changed the way a host could change them. */
+const sdkWith = (patch) => ({
+  ...SDK,
+  ModelRegistry: class extends SDK.ModelRegistry {
+    constructor(...a) {
+      super(...a);
+      Object.assign(this, patch(this));
+    }
+  },
+});
 
 /**
  * A launchable project: a committed selection, this host's grant for it, a stored key in Pi's agent
@@ -77,8 +95,8 @@ async function launchable({ model = CATALOGUE.plain, thinkingLevel = "off", stor
 
   const location = consentLocation({ projectRoot: dir });
   if (grant) await recordGrant(location, { grant: GRANT.MODEL_USE, granted: grant === true, choice: { model: selection } });
-  const expectedKey = keyFor(selection);
-  if (record)
+  const expectedKey = await keyFor(agentDir, selection);
+  if (record && expectedKey)
     writeFileSync(
       join(stateRoot, COMPATIBILITY_RECORD),
       JSON.stringify({ recordVersion: 1, key: expectedKey, result: { outcome: "passed", observedAt: "2026-09-22T00:00:00Z", challengeEchoed: true } }, null, 2)
@@ -96,7 +114,6 @@ async function launch(p, opts = {}) {
       location: p.location,
       stateRoot: p.stateRoot,
       agentDir: p.agentDir,
-      expectedKey: p.expectedKey,
       ...opts,
       ...(opts.ask ? { ask: (q) => (atAsk.push(rec.counts()), opts.ask(q)) } : {}),
     });
@@ -233,66 +250,208 @@ test("a package that does not load as declared is refused", async () => {
   }
 });
 
-test("⚠️ the compatibility record must exist, be valid, and match this exact launch", async () => {
+test("⚠️ the compatibility record must exist, be valid, and match the key computed for this exact launch", async () => {
   const p = await launchable();
   const path = join(p.stateRoot, COMPATIBILITY_RECORD);
   const good = readFileSync(path, "utf8");
+  const withKey = (patch) => JSON.stringify({ ...JSON.parse(good), key: { ...JSON.parse(good).key, ...patch } });
   try {
+    assert.equal((await launch(p)).result.proof, "record");
+
     rmSync(path);
     refusedNaming(await launch(p), LAUNCH_REFUSAL.COMPATIBILITY_MISSING, p.selection);
+    // ⚠️ The project's own cacheable selection is proved by setup's record: a canary runner changes nothing.
+    const offered = await launch(p, { ask: () => true, canary: async () => { throw new Error("a canary ran for the recorded selection"); } });
+    refusedNaming(offered, LAUNCH_REFUSAL.COMPATIBILITY_MISSING, p.selection);
 
     writeFileSync(path, "{not json");
     refusedNaming(await launch(p), LAUNCH_REFUSAL.COMPATIBILITY_INVALID, p.selection);
     writeFileSync(path, JSON.stringify({ ...JSON.parse(good), result: { outcome: "failed", observedAt: "2026-09-22T00:00:00Z" } }));
     refusedNaming(await launch(p), LAUNCH_REFUSAL.COMPATIBILITY_INVALID, p.selection);
 
-    const other = JSON.parse(good);
-    other.key.thinkingLevel = "low";
-    writeFileSync(path, JSON.stringify(other));
-    const thinking = await launch(p);
-    refusedNaming(thinking, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
-    assert.equal(thinking.refusal.detail.field, "thinkingLevel");
+    // Each determinant the record differs on is named.
+    for (const [patch, field] of [
+      [{ thinkingLevel: "low" }, "thinkingLevel"],
+      [{ piVersion: "0.85.0" }, "piVersion"],
+      [{ apiType: "anthropic-messages" }, "apiType"],
+      [{ endpointIdentity: { scheme: "https", hostname: "proxy.example", port: 443, pathname: "/v1" } }, "endpointIdentity"],
+      [{ preflightContractDigest: "sha256:" + "c".repeat(64) }, "preflightContractDigest"],
+    ]) {
+      writeFileSync(path, withKey(patch));
+      const o = await launch(p);
+      refusedNaming(o, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
+      assert.deepEqual(o.refusal.detail.fields, [field]);
+    }
 
+    // The launch's own inputs move the key too: a different pinned Pi version no longer matches the record.
     writeFileSync(path, good);
-    const stale = await launch(p, { expectedKey: { ...p.expectedKey, piVersion: "0.85.0" } });
-    refusedNaming(stale, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
-    assert.deepEqual(stale.refusal.detail.fields, ["piVersion"]);
+    const moved = await launch(p, { access: { ...(await import("../lib/model-selection.mjs")).defaultThinkingAccess, piVersion: () => "0.85.0" } });
+    refusedNaming(moved, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
+    assert.deepEqual(moved.refusal.detail.fields, ["piVersion"]);
 
-    // Key order is not meaning.
-    const reordered = Object.fromEntries(Object.entries(p.expectedKey).reverse());
-    assert.ok((await launch(p, { expectedKey: reordered })).result);
-
-    // With no expected key there is nothing to show the record matches.
-    refusedNaming(await launch(p, { expectedKey: null }), LAUNCH_REFUSAL.COMPATIBILITY_UNVERIFIABLE, p.selection);
+    // Key order in the stored record is not meaning.
+    const reordered = JSON.parse(good);
+    reordered.key = Object.fromEntries(Object.entries(reordered.key).reverse());
+    writeFileSync(path, JSON.stringify(reordered));
+    assert.equal((await launch(p)).result.proof, "record");
   } finally {
     cleanup(p);
   }
 });
 
-test("⚠️ a one-run override is confirmed, checked exactly, and changes neither settings nor consent", async () => {
+test("⚠️ a selection whose key cannot be computed refuses: no record or canary could be shown to be about it", async () => {
   const p = await launchable();
-  const bytes = () => ({ settings: readFileSync(join(p.stateRoot, "settings.json")), consent: readFileSync(p.location.path) });
+  const { defaultThinkingAccess } = await import("../lib/model-selection.mjs");
+  const find = SDK.ModelRegistry.prototype.find;
+  // An endpoint that routes by query cannot be a cache identity.
+  const routed = { ...defaultThinkingAccess, loadSdk: async () => sdkWith((r) => ({ find: (...a) => { const m = find.apply(r, a); return m ? { ...m, baseUrl: `${m.baseUrl}?route=eu` } : m; } })) };
+  try {
+    for (const opts of [{}, { ask: () => true, canary: async () => { throw new Error("a canary ran"); } }]) {
+      const o = await launch(p, { access: routed, ...opts });
+      refusedNaming(o, LAUNCH_REFUSAL.COMPATIBILITY_UNCACHEABLE, p.selection);
+      assert.equal(o.refusal.detail.uncacheable, "endpoint-identity-unavailable");
+    }
+    // A declared identity makes it computable again, and the record then decides.
+    const declared = await launch(p, { access: routed, declared: { endpointIdentity: { scheme: "https", hostname: "api.openai.com", port: 443, pathname: "/v1" } } });
+    refusedNaming(declared, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
+    assert.deepEqual(declared.refusal.detail.fields, ["endpointIdentitySource"]);
+  } finally {
+    cleanup(p);
+  }
+});
+
+test("⚠️ R9 the endpoint is the one authentication sends the request to, and an unestablishable one refuses record reuse", async () => {
+  const p = await launchable();
+  const { defaultThinkingAccess } = await import("../lib/model-selection.mjs");
+  try {
+    // Authentication that replaces the model's base URL: the record, taken at the catalogue endpoint, no longer matches.
+    const replaced = { ...defaultThinkingAccess, loadSdk: async () => sdkWith(() => ({ getProviderAuth: async () => ({ auth: { apiKey: "x", baseUrl: "https://proxy.example/openai/v1" } }) })) };
+    const moved = await launch(p, { access: replaced });
+    refusedNaming(moved, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, p.selection);
+    assert.deepEqual(moved.refusal.detail.fields, ["endpointIdentity"]);
+
+    // Authentication that cannot resolve without the network: the endpoint is unestablished, and the record is not reused.
+    let fetched = 0;
+    const needsNetwork = { ...defaultThinkingAccess, loadSdk: async () => sdkWith(() => ({ getProviderAuth: async () => { fetched++; await fetch("https://oauth.example/token"); return { auth: {} }; } })) };
+    const o = await launch(p, { access: needsNetwork, ask: () => true, canary: async () => { throw new Error("a canary ran"); } });
+    refusedNaming(o, LAUNCH_REFUSAL.COMPATIBILITY_UNCACHEABLE, p.selection);
+    assert.equal(o.refusal.detail.uncacheable, "effective-endpoint-unestablished");
+    assert.equal(fetched, 1);
+    assert.deepEqual(o.net, [], "the network was reached while establishing the endpoint");
+  } finally {
+    cleanup(p);
+  }
+});
+
+test("⚠️ D20 a force-added record in a clone is not reused; the run needs its own live check", async () => {
+  const p = await launchable();
+  const second = mkdtempSync(join(tmpdir(), "kiln-launch-clone-"));
+  try {
+    git(p.dir, "add", "-A");
+    git(p.dir, "add", "-f", ".pi/runtime/model-compatibility.json", ".pi/runtime/consent.json");
+    git(p.dir, "-c", "user.name=kiln-test", "-c", "user.email=kiln-test@example.invalid", "commit", "-q", "-m", "carried");
+    const clone = join(second, "project");
+    git(second, "clone", "-q", p.dir, clone);
+    const q = { ...p, dir: clone, stateRoot: join(clone, ".pi"), location: consentLocation({ projectRoot: clone }) };
+    // This host grants model use for itself; the record is the one the clone carried.
+    rmSync(join(clone, ".pi", "runtime", "consent.json"));
+    git(clone, "rm", "-q", "--cached", ".pi/runtime/consent.json");
+    git(clone, "-c", "user.name=kiln-test", "-c", "user.email=kiln-test@example.invalid", "commit", "-q", "-m", "own consent");
+    await recordGrant(q.location, { grant: GRANT.MODEL_USE, granted: true, choice: { model: p.selection } });
+
+    const refused = await launch(q);
+    refusedNaming(refused, LAUNCH_REFUSAL.COMPATIBILITY_NEEDS_CANARY, p.selection);
+    assert.equal(refused.refusal.detail.untrusted, "tracked");
+    const ran = [];
+    const ok = await launch(q, { ask: () => true, canary: async (ctx) => (ran.push(ctx.selection), proofFor(p.expectedKey)) });
+    assert.equal(ok.result?.proof, "this-run", ok.refusal?.message);
+    assert.equal(ran.length, 1);
+  } finally {
+    cleanup(p);
+    rmSync(second, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a one-run override is confirmed, proved for this run by its own live check, and changes neither settings, consent nor the record", async () => {
+  const p = await launchable();
+  const bytes = () => ({
+    settings: readFileSync(join(p.stateRoot, "settings.json")),
+    consent: readFileSync(p.location.path),
+    record: readFileSync(join(p.stateRoot, COMPATIBILITY_RECORD)),
+  });
   const before = bytes();
   const override = { provider: "openai", model: CATALOGUE.reasoner, thinking: "high" };
+  const target = { provider: "openai", model: CATALOGUE.reasoner };
+  const overrideKey = await keyFor(p.agentDir, { ...target, thinkingLevel: "high" });
+  const passing = async () => proofFor(overrideKey);
   try {
     // A run that cannot ask, or a no, refuses before any credential is touched.
-    const cannot = await launch(p, { override });
-    refusedNaming(cannot, LAUNCH_REFUSAL.OVERRIDE_NOT_CONFIRMED, { provider: "openai", model: CATALOGUE.reasoner });
+    const cannot = await launch(p, { override, canary: passing });
+    refusedNaming(cannot, LAUNCH_REFUSAL.OVERRIDE_NOT_CONFIRMED, target);
     untouched(cannot, "unconfirmed override");
-    const no = await launch(p, { override, ask: () => false });
-    refusedNaming(no, LAUNCH_REFUSAL.OVERRIDE_NOT_CONFIRMED, { provider: "openai", model: CATALOGUE.reasoner });
+    const no = await launch(p, { override, ask: () => false, canary: passing });
+    refusedNaming(no, LAUNCH_REFUSAL.OVERRIDE_NOT_CONFIRMED, target);
     untouched(no, "declined override");
 
-    // Confirmed: every check runs for the override, which here has no matching compatibility record.
+    // Confirmed, with no canary runner: the record cannot prove the override, so the run refuses.
+    refusedNaming(await launch(p, { override, ask: () => true }), LAUNCH_REFUSAL.COMPATIBILITY_NEEDS_CANARY, target);
+
+    // Confirmed, the live check is its own approval, named with the model and the possible charge.
     const prompts = [];
-    const yes = await launch(p, { override, ask: (q) => (prompts.push(q), true) });
-    assert.deepEqual(yes.atAsk, [{ fs: 0, env: 0, net: 0 }], "a credential was touched before the override was confirmed");
+    const ran = [];
+    const yes = await launch(p, {
+      override,
+      ask: (q) => (prompts.push(q), true),
+      canary: async (ctx) => (ran.push({ ...ctx.selection, promptsSoFar: prompts.length }), proofFor(overrideKey)),
+    });
+    assert.deepEqual(yes.atAsk[0], { fs: 0, env: 0, net: 0 }, "a credential was touched before the override was confirmed");
+    assert.ok(yes.result, yes.refusal?.message);
+    assert.equal(yes.result.proof, "this-run");
+    assert.equal(prompts.length, 2);
     assert.match(prompts[0], /This is for this run only/);
     assert.match(prompts[0], /billable tokens or provider quota/);
-    refusedNaming(yes, LAUNCH_REFUSAL.COMPATIBILITY_MISMATCH, { provider: "openai", model: CATALOGUE.reasoner });
+    assert.match(prompts[1], /^Live model check/);
+    assert.match(prompts[1], new RegExp(`using ${CATALOGUE.reasoner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(prompts[1], /Your provider may charge for\nthis request/);
+    assert.match(prompts[1], /not recorded/);
+    assert.deepEqual(ran, [{ provider: "openai", model: CATALOGUE.reasoner, thinkingLevel: "high", promptsSoFar: 2 }], "the canary ran before its approval");
+
+    // The live check declined, or failing, refuses; the canary is not run without its approval.
+    const declined = [];
+    const d = await launch(p, { override, ask: (q) => !q.startsWith("Live model check"), canary: async () => (declined.push(1), proofFor(overrideKey)) });
+    refusedNaming(d, LAUNCH_REFUSAL.LIVE_CHECK_DECLINED, target);
+    assert.equal(declined.length, 0);
+    const failed = await launch(p, { override, ask: () => true, canary: async () => { throw new CanaryRefusal("live-canary-no-tool-call", "prose"); } });
+    refusedNaming(failed, LAUNCH_REFUSAL.LIVE_CHECK_FAILED, target);
+    assert.equal(failed.refusal.detail.canaryReason, "live-canary-no-tool-call");
+    // A runner that returns without a pass is a failure too, not a proof.
+    refusedNaming(await launch(p, { override, ask: () => true, canary: async () => ({ passed: false }) }), LAUNCH_REFUSAL.LIVE_CHECK_FAILED, target);
+
+    // ⚠️ R8: a pass about a different request is not a proof of this one.
+    for (const [label, proof, reason] of [
+      ["another resolved model", proofFor(overrideKey, { observed: { ...proofFor(overrideKey).observed, apiType: "openai-completions" } }), "canary-inputs-differ"],
+      ["a request elsewhere", proofFor(overrideKey, { requests: [{ scheme: "https", hostname: "proxy.example", port: 443, pathname: "/v1/responses" }] }), "effective-endpoint-differs"],
+      ["no observed request", proofFor(overrideKey, { requests: [] }), "effective-endpoint-unobserved"],
+      ["no key in the child", proofFor(overrideKey, { observed: { keyError: "effective-endpoint-unestablished" } }), "canary-key-unavailable"],
+    ]) {
+      const o = await launch(p, { override, ask: () => true, canary: async () => proof });
+      refusedNaming(o, LAUNCH_REFUSAL.LIVE_CHECK_FAILED, target);
+      assert.equal(o.refusal.detail.canaryReason, reason, label);
+    }
+
+    // ⚠️ D17: a stored record that matches the override model is still not the override's proof.
+    const recordPath = join(p.stateRoot, COMPATIBILITY_RECORD);
+    const projectRecord = readFileSync(recordPath);
+    writeFileSync(recordPath, JSON.stringify({ recordVersion: 1, key: overrideKey, result: { outcome: "passed", observedAt: "2026-09-22T00:00:00Z", challengeEchoed: true } }));
+    const d17 = [];
+    const withRecord = await launch(p, { override, ask: (q) => (d17.push(q), true), canary: async () => (d17.push("canary"), proofFor(overrideKey)) });
+    assert.equal(withRecord.result?.proof, "this-run", "a matching record stood in for the override's own proof");
+    assert.equal(d17.filter((q) => q === "canary").length, 1);
+    assert.ok(d17.some((q) => typeof q === "string" && q.startsWith("Live model check")));
+    writeFileSync(recordPath, projectRecord);
 
     // A removed model as the override is refused by name, like the recorded one.
-    const gone = await launch(p, { override: { provider: "openai", model: "gpt-kiln-removed-1", thinking: "off" }, ask: () => true });
+    const gone = await launch(p, { override: { provider: "openai", model: "gpt-kiln-removed-1", thinking: "off" }, ask: () => true, canary: passing });
     refusedNaming(gone, LAUNCH_REFUSAL.MODEL_NOT_FOUND, { provider: "openai", model: "gpt-kiln-removed-1" });
 
     // A thinking-only override uses the granted model, asks nothing, and is checked by Pi's rule.
@@ -302,6 +461,7 @@ test("⚠️ a one-run override is confirmed, checked exactly, and changes neith
     const after = bytes();
     assert.ok(after.settings.equals(before.settings), "an override rewrote the project's selection");
     assert.ok(after.consent.equals(before.consent), "an override changed this host's consent");
+    assert.ok(after.record.equals(before.record), "a one-run live check changed the compatibility record");
   } finally {
     cleanup(p);
   }

@@ -109,7 +109,7 @@ async function canary(answer, opts = {}) {
     } catch (e) {
       refusal = e;
     }
-    return { result, refusal, requests: p.requests, leftovers: readdirSync(parent).filter((n) => n !== "AGENTS.md") };
+    return { result, refusal, requests: p.requests, url: p.url, leftovers: readdirSync(parent).filter((n) => n !== "AGENTS.md") };
   } finally {
     await p.close();
     rmSync(parent, { recursive: true, force: true });
@@ -121,7 +121,14 @@ const exact = (seen) => ({ tool_calls: [call(PREFLIGHT_TOOL_NAME, { challenge: s
 test("⚠️ ACC-0061 an exact tool call with this run's challenge passes, observed through Pi's real provider path", async () => {
   const o = await canary(exact);
   assert.equal(o.refusal, null, o.refusal?.message);
-  assert.deepEqual(o.result, { provider: "acme", model: "acme-model", thinkingLevel: "off", passed: true, challengeEchoed: true, ceiling: CANARY_MAX_TOKENS });
+  const { observed, requests, ...rest } = o.result;
+  assert.deepEqual(rest, { provider: "acme", model: "acme-model", thinkingLevel: "off", passed: true, challengeEchoed: true, ceiling: CANARY_MAX_TOKENS });
+  // R8 and R9: what the child resolved and where its request actually went, as endpoint parts only.
+  const port = Number(new URL(o.url).port);
+  assert.deepEqual(observed.endpointIdentity, { scheme: "http", hostname: "127.0.0.1", port, pathname: "/v1" });
+  assert.equal(observed.apiType, "openai-completions");
+  assert.equal(requests.length, 1);
+  assert.deepEqual(requests[0], { scheme: "http", hostname: "127.0.0.1", port, pathname: "/v1/chat/completions" });
   assert.equal(JSON.stringify(o.result).includes(CHALLENGE), false, "the single-use challenge was returned");
   assert.deepEqual(o.leftovers, [], "the canary's temporary root survived");
 
