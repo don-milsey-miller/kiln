@@ -68,7 +68,7 @@ function tree(dir) {
 }
 
 /** Run the real command against a project, with npm and the operator replaced. */
-async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, trust = "approve" } = {}) {
+async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, trust = "approve", verifyRuntime } = {}) {
   const printed = [];
   const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
@@ -85,6 +85,7 @@ async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, t
         seen.asks.push(question);
         return answer;
       },
+      ...(verifyRuntime ? { verifyRuntime } : {}),
       install:
         install ??
         (() => {
@@ -609,8 +610,59 @@ test("⚠️ ACC-0108 trust is obtained and never assumed, and a denial leaves a
     assert.equal(o.code, EXIT.TRUST);
     assert.ok(o.seen.asks.some((q2) => /trust/i.test(q2)), `the operator was not asked: ${o.seen.asks.join(" | ")}`);
     assert.ok(o.printed.some((l) => l.includes(r.dir)), "the directory the decision applies to was not shown");
+
+    const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
+    assert.equal((await readTrust({ projectRoot: r.dir, agentDir: r.agentDir, toolRoot: ROOT })).state, TRUST.DENIED);
   } finally {
     rmSync(r.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ **ONLY A NO IS A NO.** A closed input, an empty line and an answer nobody can read are not decisions, and
+  // recording any of them as a denial would make every later run stop without asking — on a decision the
+  // operator never made.
+  const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
+  for (const [what, answer] of [
+    ["a closed input", null],
+    ["an empty line", "   "],
+    ["an answer that is neither", "maybe later"],
+  ]) {
+    const t = project({ ignored: true });
+    try {
+      const o = await setup(t, [], { trust: null, answer });
+      assert.equal(o.code, EXIT.TRUST, `${what} did not stop the run`);
+      assert.ok(o.seen.asks.some((q2) => /trust/i.test(q2)), `${what} was never asked about`);
+      assert.equal(
+        (await readTrust({ projectRoot: t.dir, agentDir: t.agentDir, toolRoot: ROOT })).state,
+        TRUST.MISSING,
+        `${what} was recorded as a decision`
+      );
+      assert.equal(existsSync(join(t.dir, ".pi", "settings.json")), false, `${what} registered the package`);
+      // The project itself is set up and can be answered later.
+      assert.equal(existsSync(join(t.dir, "planning-content", "project.yaml")), true, `${what} lost the scaffold`);
+    } finally {
+      rmSync(t.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("⚠️ the pinned runtime is verified before the transaction plan, and a mismatch writes nothing", async () => {
+  // D26 step 5: everything after the dynamic imports is Pi's — the trust store, the package the settings
+  // register, the loader that reads them — so a version this checkout was never measured against is a refusal
+  // taken while the project is still untouched, rather than four phases in.
+  const p = project({ ignored: true });
+  try {
+    const { resolvePinnedAgent } = await import("../lib/pi-runtime.mjs");
+    const before = tree(p.dir);
+    const o = await setup(p, [], {
+      // The real resolver, held to a version this checkout does not have: the refusal is Pi's own.
+      verifyRuntime: (_modules, paths) => resolvePinnedAgent(paths.toolRoot, { version: "0.0.0-not-this-one" }),
+    });
+    assert.equal(o.code, EXIT.RUNTIME, o.printed.join("\n"));
+    assert.deepEqual(tree(p.dir), before, "a version mismatch changed consumer project state");
+    assert.equal(existsSync(join(p.dir, ".pi")), false, "runtime state was written before the version was checked");
+    assert.equal(existsSync(join(p.dir, "planning-content")), false, "the scaffold was written before the version was checked");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
   }
 });
 

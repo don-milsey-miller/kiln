@@ -336,7 +336,6 @@ async function runPhases({ paths, args, ask, print, modules }) {
         "initialize",
         "state-protection",
         "project-identity",
-        "runtime-pin",
         "trust",
         "registration",
       ]);
@@ -369,17 +368,11 @@ async function runPhases({ paths, args, ask, print, modules }) {
       await tx.beginJournal();
       await tx.setRecovery(resumeCommand(paths.projectRoot), "setup was interrupted after the journal began");
 
-      // ⚠️ THE PINNED RUNTIME BEFORE ANYTHING ASKS IT QUESTIONS. The trust store and the package loader are Pi's,
-      // so a version that is not the one this checkout was measured against is a refusal rather than a surprise
-      // three phases later.
-      const pinned = await tx.phase("runtime-pin", () => modules.runtime.resolvePinnedAgent(paths.toolRoot));
-      print(`pinned runtime ${pinned.version}`);
-
       const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules }));
-      if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, pinned, trust, registered: null };
+      if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, trust, registered: null };
 
       const registered = await tx.phase("registration", () => register({ tx, paths, print, modules }));
-      return { initialized, identity, pinned, trust, registered };
+      return { initialized, identity, trust, registered };
     },
     { lock: { reuseHeld: true } }
   );
@@ -438,17 +431,33 @@ async function decideTrust({ paths, args, ask, print, modules }) {
   // ⚠️ THE CANONICAL DIRECTORY IS IN THE QUESTION, because that is what the decision applies to.
   print(`Kiln needs this project trusted before its agent can load the project's package and tools:`);
   print(`  ${paths.projectRoot}`);
-  const answer = String((await ask("Trust this project? (yes/no) ")) ?? "").trim().toLowerCase();
+  const raw = await ask("Trust this project? (yes/no) ");
+  const answer = String(raw ?? "").trim().toLowerCase();
   if (answer === "yes" || answer === "y") {
     const granted = await grantTrust(where);
     print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
     return granted;
   }
-  // ⚠️ ANYTHING THAT IS NOT A YES IS A NO, AND IT IS RECORDED AS ONE. A closed input answers `null` here, and
-  // recording that as a denial is what keeps "nobody has been asked" distinct from "somebody said no".
-  const denied = await denyTrust(where);
-  print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
-  return denied;
+  // ⚠️ **ONLY A NO IS A NO.** A denial is a decision the store remembers, and every later run reads it back as
+  // "somebody said no" — so recording one for an answer nobody gave would put words in the operator's mouth and
+  // make the next run stop without asking. A closed input, an empty line and an answer this does not understand
+  // are all the same thing: no decision, nothing written, and a rerun that asks again.
+  if (answer === "no" || answer === "n") {
+    const denied = await denyTrust(where);
+    print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
+    return denied;
+  }
+  throw new SetupCommandRefusal(
+    EXIT.TRUST,
+    `${raw === null || answer.length === 0 ? "No answer was given" : "That answer was not yes or no"}, so this ` +
+      `project's trust is still undecided and nothing was recorded.
+` +
+      `  project: ${paths.projectRoot}
+` +
+      `Rerun and answer yes or no, or pass --trust approve or --trust deny. Everything this run set up is ` +
+      `already written and valid.`,
+    { projectRoot: paths.projectRoot, answered: raw !== null }
+  );
 }
 
 /**
@@ -474,6 +483,25 @@ async function register({ tx, paths, print, modules }) {
   return { ...result, packageEntry, skillsEntry };
 }
 
+/**
+ * The installed Pi, held to this checkout's pin.
+ *
+ * ⚠️ **ITS REFUSAL IS THE RUNTIME CLASS, NOT A CRASH.** `resolvePinnedAgent` raises a supervisor refusal, which
+ * reads well and carries the expected version and the directory it looked in; what it does not carry is an exit
+ * code for this command, so it is given one here rather than falling through to "something went wrong".
+ */
+function checkPinnedRuntime(modules, paths) {
+  try {
+    return modules.runtime.resolvePinnedAgent(paths.toolRoot);
+  } catch (e) {
+    throw new SetupCommandRefusal(EXIT.RUNTIME, `${e.message}
+Nothing of the project was changed.`, {
+      toolRoot: paths.toolRoot,
+      ...(e.detail ?? {}),
+    });
+  }
+}
+
 /** The state library's own three choices, rendered as it returned them. */
 export function renderChoices(options) {
   return options
@@ -490,7 +518,13 @@ export function renderChoices(options) {
  *   operator. Neither names a program or a path; the install still runs in this checkout and nowhere else.
  */
 export async function main(argv = process.argv.slice(2), deps = {}) {
-  const { install = installDependencies, ask = askLine, print = say, nodeVersion = process.versions.node } = deps;
+  const {
+    install = installDependencies,
+    ask = askLine,
+    print = say,
+    nodeVersion = process.versions.node,
+    verifyRuntime = checkPinnedRuntime,
+  } = deps;
   const args = parseArgs(argv);
   if (args.error) {
     warn(args.error);
@@ -539,8 +573,15 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         journalValidate: await journalValidator(),
       };
 
-      // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the pinned runtime,
-      // the trust decision and the registration.
+      // ⚠️ **THE PINNED RUNTIME IS VERIFIED BEFORE THE PLAN, NOT INSIDE IT (D26 step 5).** Everything after this
+      // point is Pi's: the trust store, the package the settings register, the loader that reads them. A version
+      // this checkout was never measured against is a fact about the install, known the moment the imports
+      // resolve, and discovering it four phases later would mean refusing with the project already changed.
+      const pinned = verifyRuntime(modules, paths);
+      print(`pinned runtime ${pinned.version}`);
+
+      // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the trust decision
+      // and the registration.
       const done = await runPhases({ paths, args, ask, print, modules });
 
       // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
@@ -581,6 +622,13 @@ export function reportFailure(e, print = say) {
   if (e instanceof ContentRootError) {
     for (const line of e.message.split("\n")) warn(line);
     return EXIT.PATHS;
+  }
+  // ⚠️ THE PINNED RUNTIME IS ITS OWN CLASS WHEREVER IT IS RAISED. `resolvePinnedAgent` and the agent-directory
+  // resolver raise a supervisor refusal, and an operator whose install does not match the pin needs that told
+  // apart from "setup could not write something".
+  if (e?.name === "SupervisorRefusal") {
+    for (const line of String(e.message).split("\n")) warn(line);
+    return EXIT.RUNTIME;
   }
   if (e instanceof SetupRefusal || e?.name === "LocalStateRefusal" || e?.name === "LockError") {
     for (const line of String(e.message).split("\n")) warn(line);
