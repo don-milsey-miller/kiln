@@ -14,12 +14,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { CONSENT_READ, GRANT, STANDING, consentLocation, peekGrant, readConsent, recordGrant } from "../lib/consent-record.mjs";
+import { inspectConnections } from "../lib/connection-inspection.mjs";
 import {
   ModelSelectionRefusal,
   SELECTION_OUTCOME,
   SELECTION_REFUSAL,
   committedSelection,
   confirmationPrompt,
+  loadThinkingSupport,
   modelUseStanding,
   selectModel,
 } from "../lib/model-selection.mjs";
@@ -38,6 +40,10 @@ const INSPECTION = {
     { provider: "openai", displayName: "OpenAI", models: ["gpt-5"] },
   ],
 };
+
+/** A stand-in for Pi's registry: every listed model supports off to high. The real one is used below. */
+const REASONING = Object.freeze(["off", "minimal", "low", "medium", "high"]);
+const SUPPORT = Object.freeze({ levelsFor: () => REASONING });
 
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
@@ -70,7 +76,7 @@ function answering(...answers) {
 
 const select = (p, opts) =>
   runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
-    selectModel({ transaction, location: p.where, inspection: INSPECTION, settings: { stateMode: "project" }, ...opts })
+    selectModel({ transaction, thinkingSupport: SUPPORT, location: p.where, inspection: INSPECTION, settings: { stateMode: "project" }, ...opts })
   );
 
 const grantOf = (p) => readConsent(p.where).record?.modelUse ?? null;
@@ -80,7 +86,7 @@ test("⚠️ ACC-0055 a single available model is shown and confirmed before it 
   const single = { inspected: true, providers: [{ provider: "kiln-local", displayName: "Kiln Local", models: ["kiln-latest"] }] };
   const run = (p, a) =>
     runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
-      selectModel({ transaction, location: p.where, inspection: single, settings: { stateMode: "project" }, requested: { thinking: "high" }, ...a })
+      selectModel({ transaction, thinkingSupport: SUPPORT, location: p.where, inspection: single, settings: { stateMode: "project" }, requested: { thinking: "high" }, ...a })
     );
 
   for (const [label, answer, outcome] of [["no", false, SELECTION_OUTCOME.DECLINED], ["closed", null, SELECTION_OUTCOME.CANCELLED], ["a string", "yes", SELECTION_OUTCOME.CANCELLED]]) {
@@ -315,7 +321,7 @@ test("⚠️ the old grant is cleared before the new selection is written, so a 
     await assert.rejects(
       runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) => {
         writeFileSync(settingsPath(p.dir), readFileSync(settingsPath(p.dir), "utf8") + "\n");
-        return selectModel({ transaction, location: p.where, inspection: INSPECTION, settings: { stateMode: "project" }, ask: () => true, requested: { ...B, thinking: "high" } });
+        return selectModel({ transaction, thinkingSupport: SUPPORT, location: p.where, inspection: INSPECTION, settings: { stateMode: "project" }, ask: () => true, requested: { ...B, thinking: "high" } });
       }),
       (e) => e?.reason === "concurrent-edit"
     );
@@ -335,7 +341,7 @@ async function refusedWithoutClear(block) {
     const before = { settings: bytes(settingsPath(p.dir)), consent: bytes(p.where.path) };
     await assert.rejects(
       runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
-        selectModel({ transaction, location: where, inspection: INSPECTION, settings: { stateMode: "project" }, ask: () => true, requested: { ...B, thinking: "high" } })
+        selectModel({ transaction, thinkingSupport: SUPPORT, location: where, inspection: INSPECTION, settings: { stateMode: "project" }, ask: () => true, requested: { ...B, thinking: "high" } })
       ),
       (e) => e instanceof ModelSelectionRefusal && e.reason === SELECTION_REFUSAL.GRANT_NOT_CLEARED && /nothing was enabled/.test(e.message)
     );
@@ -360,12 +366,176 @@ test("an uninspected host has nothing to choose from", async () => {
   try {
     await assert.rejects(
       runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
-        selectModel({ transaction, location: p.where, inspection: { inspected: false }, settings: { stateMode: "project" }, ask: () => true })
+        selectModel({ transaction, thinkingSupport: SUPPORT, location: p.where, inspection: { inspected: false }, settings: { stateMode: "project" }, ask: () => true })
       ),
       (e) => e.reason === SELECTION_REFUSAL.NOT_INSPECTED
     );
     assert.equal(confirmationPrompt({ displayName: "X", provider: "x", model: "x-1", thinkingLevel: "off" }).includes("x-1"), true);
   } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * ⚠️ THE REAL REGISTRY AND PI'S OWN RULE. An isolated Pi agent directory with one custom provider holding a
+ * non-reasoning model and a reasoning one, both authenticated by an inline sentinel key. The inspection is
+ * run for real, and the supported levels come from `loadThinkingSupport`, which applies the pinned Pi's
+ * `getSupportedThinkingLevels` to the registry's model.
+ */
+async function realPi() {
+  const root = mkdtempSync(join(tmpdir(), "kiln-model-pi-"));
+  const agentDir = join(root, "agent");
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(join(agentDir, "auth.json"), "{}");
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "kiln-local": {
+          baseUrl: "http://127.0.0.1:9/v1",
+          api: "openai-completions",
+          apiKey: "kiln-model-INLINE-SENTINEL-51d0",
+          models: [
+            { id: "kiln-plain", name: "Plain", reasoning: false, contextWindow: 8192, maxTokens: 1024 },
+            { id: "kiln-reasoner", name: "Reasoner", reasoning: true, contextWindow: 8192, maxTokens: 1024 },
+          ],
+        },
+      },
+    })
+  );
+  const saved = process.env;
+  process.env = {};
+  try {
+    const inspection = await inspectConnections({ agentDir, ask: () => true });
+    const support = await loadThinkingSupport({ inspection, agentDir });
+    return { root, inspection, support };
+  } finally {
+    process.env = saved;
+  }
+}
+
+const selectReal = (p, pi, opts) =>
+  runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
+    selectModel({ transaction, location: p.where, inspection: pi.inspection, thinkingSupport: pi.support, settings: { stateMode: "project" }, ...opts })
+  );
+
+test("⚠️ the supported levels are Pi's own: a non-reasoning model supports only off", async () => {
+  const pi = await realPi();
+  try {
+    const local = pi.inspection.providers.find((x) => x.provider === "kiln-local");
+    assert.deepEqual(local?.models, ["kiln-plain", "kiln-reasoner"], "the fixture models are not both available");
+    assert.deepEqual(pi.support.levelsFor("kiln-local", "kiln-plain"), ["off"]);
+    assert.deepEqual(pi.support.levelsFor("kiln-local", "kiln-reasoner"), ["off", "minimal", "low", "medium", "high"]);
+    assert.equal(pi.support.levelsFor("kiln-local", "not-listed"), null);
+    await assert.rejects(loadThinkingSupport({ inspection: { inspected: false } }), (e) => e.reason === SELECTION_REFUSAL.NOT_INSPECTED);
+  } finally {
+    rmSync(pi.root, { recursive: true, force: true });
+  }
+});
+
+test("a model whose thinking support Pi cannot report is refused before confirmation or persistence", async () => {
+  const p = project();
+  try {
+    const unknown = { levelsFor: (provider) => (provider === "openai" ? null : REASONING) };
+    for (const opts of [{ requested: { ...B, thinking: "off" } }, { requested: {}, answers: ["3", "off", true] }]) {
+      const a = answering(...(opts.answers ?? [true]));
+      await assert.rejects(
+        runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
+          selectModel({ transaction, thinkingSupport: unknown, location: p.where, inspection: INSPECTION, settings: { stateMode: "project" }, ask: a.ask, requested: opts.requested })
+        ),
+        (e) => e instanceof ModelSelectionRefusal && e.reason === SELECTION_REFUSAL.THINKING_UNKNOWN
+      );
+      assert.equal(confirmations(a.asked).length, 0);
+      assert.equal(existsSync(settingsPath(p.dir)), false);
+      assert.equal(readConsent(p.where).state, CONSENT_READ.ABSENT);
+    }
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a non-reasoning model rejects --thinking high before confirmation or persistence, and accepts off", async () => {
+  const pi = await realPi();
+  const p = project();
+  try {
+    const a = answering(true);
+    await assert.rejects(
+      selectReal(p, pi, { ask: a.ask, requested: { provider: "kiln-local", model: "kiln-plain", thinking: "high" } }),
+      (e) =>
+        e instanceof ModelSelectionRefusal &&
+        e.reason === SELECTION_REFUSAL.THINKING_NOT_SUPPORTED &&
+        /does not support thinking level "high"/.test(e.message) &&
+        JSON.stringify(e.detail.supported) === JSON.stringify(["off"])
+    );
+    assert.equal(a.asked.length, 0, "a confirmation was shown for a level Pi would not run");
+    assert.equal(existsSync(settingsPath(p.dir)), false, "an unsupported level was persisted");
+    assert.equal(readConsent(p.where).state, CONSENT_READ.ABSENT, "model use was granted for an unsupported level");
+
+    const ok = answering(true);
+    const r = await selectReal(p, pi, { ask: ok.ask, requested: { provider: "kiln-local", model: "kiln-plain", thinking: "off" } });
+    assert.equal(r.outcome, SELECTION_OUTCOME.SELECTED);
+    assert.match(confirmations(ok.asked)[0], /Thinking: off/);
+    assert.deepEqual(committedSelection(p.dir), { provider: "kiln-local", model: "kiln-plain", thinkingLevel: "off" });
+
+    // The reasoning model accepts high, and rejects xhigh, which Pi maps for it to nothing.
+    const q = project();
+    try {
+      await assert.rejects(selectReal(q, pi, { ask: () => true, requested: { provider: "kiln-local", model: "kiln-reasoner", thinking: "xhigh" } }), (e) => e.reason === SELECTION_REFUSAL.THINKING_NOT_SUPPORTED);
+      assert.equal(existsSync(settingsPath(q.dir)), false);
+      assert.equal((await selectReal(q, pi, { ask: () => true, requested: { provider: "kiln-local", model: "kiln-reasoner", thinking: "high" } })).outcome, SELECTION_OUTCOME.SELECTED);
+    } finally {
+      rmSync(q.root, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(pi.root, { recursive: true, force: true });
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ interactively, only the levels the chosen model supports are offered, and no other is accepted", async () => {
+  const pi = await realPi();
+  const p = project();
+  try {
+    // 1 is kiln-plain: the question offers only off, and "high" is no answer.
+    const refused = answering("1", "high", true);
+    assert.equal((await selectReal(p, pi, { ask: refused.ask })).outcome, SELECTION_OUTCOME.CANCELLED);
+    assert.equal(refused.asked[1], "Thinking level? (off) ");
+    assert.equal(confirmations(refused.asked).length, 0);
+    assert.equal(existsSync(settingsPath(p.dir)), false);
+
+    const reasoner = answering("2", "high", false);
+    await selectReal(p, pi, { ask: reasoner.ask });
+    assert.equal(reasoner.asked[1], "Thinking level? (off, minimal, low, medium, high) ");
+
+    const plain = answering("1", "off", true);
+    assert.equal((await selectReal(p, pi, { ask: plain.ask })).outcome, SELECTION_OUTCOME.SELECTED);
+    assert.deepEqual(committedSelection(p.dir), { provider: "kiln-local", model: "kiln-plain", thinkingLevel: "off" });
+  } finally {
+    rmSync(pi.root, { recursive: true, force: true });
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a committed level the model does not support is not confirmed as if it would run", async () => {
+  const pi = await realPi();
+  const p = project({ selection: { provider: "kiln-local", model: "kiln-plain", thinkingLevel: "high" } });
+  try {
+    const before = bytes(settingsPath(p.dir));
+    // Even with a grant for the model, the unsupported committed level is not reused.
+    await recordGrant(p.where, { grant: GRANT.MODEL_USE, granted: true, choice: { model: { provider: "kiln-local", model: "kiln-plain" } } });
+    const lines = [];
+    const cancelled = answering("");
+    assert.equal((await selectReal(p, pi, { ask: cancelled.ask, print: (l) => lines.push(l) })).outcome, SELECTION_OUTCOME.CANCELLED);
+    assert.match(lines[0], /does not support the committed thinking level "high"/);
+    assert.equal(cancelled.asked[0], "Thinking level? (off) ");
+    assert.ok(bytes(settingsPath(p.dir)).equals(before));
+
+    const a = answering("off", true);
+    assert.equal((await selectReal(p, pi, { ask: a.ask })).outcome, SELECTION_OUTCOME.CONFIRMED);
+    assert.match(confirmations(a.asked)[0], /Thinking: off/);
+    assert.equal(committedSelection(p.dir).thinkingLevel, "off");
+  } finally {
+    rmSync(pi.root, { recursive: true, force: true });
     rmSync(p.root, { recursive: true, force: true });
   }
 });
