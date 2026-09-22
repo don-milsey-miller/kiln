@@ -368,3 +368,60 @@ test("⚠️ a runtime this checkout does not support refuses before the depende
     rmSync(p.root, { recursive: true, force: true });
   }
 });
+
+test("⚠️ the coverage fix is part of the planned transaction: a plan that refuses leaves .gitignore untouched", async () => {
+  // The write used to happen before the plan existed. It was inside the lock, but outside the transaction's
+  // lifetime and its phase ledger, so a run that then refused had already changed a file nothing recorded.
+  // A malformed project record is refused at plan time, which is strictly before any phase runs.
+  const p = project();
+  try {
+    mkdirSync(join(p.dir, ".pi"));
+    writeFileSync(join(p.dir, ".pi", "kiln.json"), "{ not json\n");
+    const o = await setup(p);
+    assert.equal(o.code, EXIT.SETUP, o.printed.join("\n"));
+    assert.equal(existsSync(join(p.dir, ".gitignore")), false, "the ignore block was written before the plan was built");
+    assert.equal(existsSync(join(p.dir, "planning-content")), false);
+    assert.equal(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8"), "{ not json\n", "the refused run rewrote the record it refused over");
+
+    // With the record repaired, the same project is covered and set up in one run.
+    rmSync(join(p.dir, ".pi"), { recursive: true, force: true });
+    const ok = await setup(p);
+    assert.equal(ok.code, EXIT.OK, ok.printed.join("\n"));
+    assert.equal(readFileSync(join(p.dir, ".gitignore"), "utf-8").includes(blockText()), true);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the bootstrap install is `npm ci --ignore-scripts`, whichever npm it reaches", async () => {
+  // `ci` refuses a lockfile that disagrees with package.json BEFORE it writes anything, which is the check the
+  // digest comparison can only make afterwards; `--ignore-scripts` keeps a dependency's install lifecycle from
+  // running in this checkout. Both are arguments, so both are asserted as arguments.
+  const { INSTALL_ARGS, defaultInstall } = await import("../bin/setup.mjs");
+  assert.deepEqual([...INSTALL_ARGS], ["ci", "--ignore-scripts"]);
+
+  const calls = [];
+  const spawn = (command, argv, opts) => {
+    calls.push({ command, argv, opts });
+    return { status: 0 };
+  };
+  const saved = process.env.npm_execpath;
+  try {
+    process.env.npm_execpath = "/npm/bin/npm-cli.js";
+    assert.deepEqual(defaultInstall({ toolRoot: "/tool", spawn }), { ok: true });
+    assert.deepEqual(calls[0].argv, ["/npm/bin/npm-cli.js", "ci", "--ignore-scripts"]);
+    assert.equal(calls[0].command, process.execPath);
+
+    delete process.env.npm_execpath;
+    defaultInstall({ toolRoot: "/tool", spawn });
+    assert.deepEqual(calls[1].argv, ["ci", "--ignore-scripts"]);
+    assert.match(calls[1].command, /^npm(\.cmd)?$/);
+    for (const c of calls) assert.equal(c.opts.cwd, "/tool", "the install ran outside this checkout");
+
+    // A failing install is a refusal naming what the runner reported, never a silent continue.
+    assert.deepEqual(defaultInstall({ toolRoot: "/tool", spawn: () => ({ status: 1 }) }), { ok: false, why: "exit 1" });
+  } finally {
+    if (saved === undefined) delete process.env.npm_execpath;
+    else process.env.npm_execpath = saved;
+  }
+});

@@ -13,11 +13,11 @@
  * journal, then the remaining phases. The install cannot come later: the transaction plan validates existing
  * Kiln records, and that validation needs Ajv, which the install is what provides.
  *
- * ⚠️ **THE INSTALL IS A BOOTSTRAP MUTATION CONFINED TO THE `.planning` CHECKOUT.** It writes `node_modules`
- * inside this checkout and nothing of the consumer's project, and it is refused if it rewrites the lockfile —
- * a locked install that changes the lock is not the install this command promised. It happens before any
- * journal exists, so an interruption during it leaves the consumer's project untouched and a rerun simply
- * repeats it.
+ * ⚠️ **THE INSTALL IS A BOOTSTRAP MUTATION CONFINED TO THE `.planning` CHECKOUT.** It is `npm ci
+ * --ignore-scripts`: it refuses a lockfile that disagrees with `package.json` before it changes anything, runs
+ * no dependency lifecycle script, writes `node_modules` inside this checkout and nothing of the consumer's
+ * project, and is refused after the fact if the lockfile moved. It happens before any journal exists, so an
+ * interruption during it leaves the consumer's project untouched and a rerun simply repeats it.
  *
  * ⚠️ **IT IS NOT A SECOND INITIALIZER.** `bin/init-project.mjs` keeps its content-only contract; this command
  * calls the same `initializeProject` under the shared transaction.
@@ -178,11 +178,17 @@ const digestOfFile = (path) => (existsSync(path) ? `sha256:${createHash("sha256"
 /**
  * The locked dependency install: a bootstrap mutation confined to this checkout.
  *
- * ⚠️ **THE LOCKFILE IS PROVED UNCHANGED.** `npm install` may rewrite `package-lock.json`, and a locked install
- * that rewrites its own lock is not locked. Its digest is taken before and after, and a change is a refusal —
- * the tree may have been altered, so the honest answer is to stop and say so rather than carry on.
+ * ⚠️ **`npm ci --ignore-scripts`, AND EACH HALF IS A GUARANTEE.** `ci` refuses BEFORE it changes anything when
+ * the lockfile is missing or disagrees with `package.json`, which is the check a digest taken afterwards can
+ * only report too late. `--ignore-scripts` keeps every dependency's install lifecycle from running: those
+ * scripts execute arbitrary code with this process's cwd and environment, and nothing in this checkout's graph
+ * needs one, so the bootstrap confines itself to writing `node_modules` rather than trusting what it installs.
  *
- * @param {{toolRoot: string, run?: Function, force?: boolean}} opts
+ * ⚠️ **THE LOCKFILE IS PROVED UNCHANGED ANYWAY.** `ci` is not supposed to write `package-lock.json` at all, so
+ * the digest either side is a defensive check rather than the primary one: if the lock moved, the install was
+ * not the one this command promised and the tree may have been altered, so it stops and says so.
+ *
+ * @param {{toolRoot: string, run?: Function}} opts
  */
 export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall } = {}) {
   const state = dependencyState(toolRoot);
@@ -195,7 +201,9 @@ export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall
     throw new SetupCommandRefusal(
       EXIT.INSTALL,
       `Installing this checkout's locked dependencies failed (${result?.why ?? "unknown"}). Nothing of the ` +
-        `project was changed: the install writes only inside ${toolRoot}.`,
+        `project was changed: the install writes only inside ${toolRoot}. A locked install also refuses when ` +
+        `package-lock.json is missing or does not match package.json, which is repaired by running the install ` +
+        `yourself and committing the lockfile it produces.`,
       { toolRoot }
     );
   const after = digestOfFile(lock);
@@ -209,16 +217,19 @@ export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall
   return { installed: true, why: state.why };
 }
 
+/** The arguments that make the install a locked one; see `installDependencies` for why each is there. */
+export const INSTALL_ARGS = Object.freeze(["ci", "--ignore-scripts"]);
+
 /**
  * ⚠️ **npm IS SPAWNED HERE AND NOWHERE ELSE**, the way `bin/start-shell.mjs` already does it: through the
  * `npm_execpath` this process was started with when there is one, and otherwise the platform's npm, which needs
  * a shell on Windows because it is a `.cmd`.
  */
-function defaultInstall({ toolRoot }) {
+export function defaultInstall({ toolRoot, spawn = spawnSync }) {
   const viaNode = process.env.npm_execpath;
   const r = viaNode
-    ? spawnSync(process.execPath, [viaNode, "install"], { cwd: toolRoot, stdio: "inherit" })
-    : spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["install"], {
+    ? spawn(process.execPath, [viaNode, ...INSTALL_ARGS], { cwd: toolRoot, stdio: "inherit" })
+    : spawn(process.platform === "win32" ? "npm.cmd" : "npm", [...INSTALL_ARGS], {
         cwd: toolRoot,
         stdio: "inherit",
         shell: process.platform === "win32",
@@ -247,8 +258,15 @@ async function runPhases({ paths, args, ask, print, modules }) {
 
   const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: paths.projectRoot });
 
-  // ⚠️ COVERAGE IS DECIDED BEFORE ANY RUNTIME DATA IS WRITTEN, and the choices are the state library's own.
+  /**
+   * ⚠️ **THE OPERATOR IS ASKED BEFORE THE TRANSACTION, AND THE ANSWER IS APPLIED INSIDE IT.** Deciding reads
+   * the project and nothing else — coverage, the state library's options, one question — so it costs nothing
+   * if the run is refused. The write it authorises is a mutation like any other and belongs to a declared
+   * phase, where the journal can say it happened. The old order did the write here, outside the plan and with
+   * no journal: the lock was held, but an interruption left a change nothing recorded.
+   */
   const covers = coverageState({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT, roots });
+  let coverageFix = null;
   if (!covers.covered) {
     const decided = modules.localState.openStateRoot({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT });
     const options = decided.options ?? [];
@@ -264,10 +282,7 @@ async function runPhases({ paths, args, ask, print, modules }) {
       });
     if (chosen.id !== "fix-ignore")
       throw new SetupCommandRefusal(EXIT.STATE, `The "${chosen.id}" choice is not part of this slice. Nothing was written.`, { chosen: chosen.id });
-    modules.gitignore.applyIgnoreBlock(chosen.plan);
-    print("added Kiln's block to .gitignore");
-    const now = coverageState({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT, roots });
-    if (!now.covered) throw new SetupCommandRefusal(EXIT.STATE, "The ignore block was applied and the runtime paths are still not ignored. Nothing was written.", {});
+    coverageFix = chosen.plan;
   }
 
   const spec = {
@@ -281,7 +296,21 @@ async function runPhases({ paths, args, ask, print, modules }) {
   return runTransaction(
     spec,
     async (tx) => {
-      tx.declarePhases(["initialize", "state-protection", "project-identity"]);
+      // ⚠️ DECLARED ONLY WHEN IT IS GOING TO RUN, so the journal's phase list is what this run set out to do
+      // rather than a fixed menu with a permanently pending entry on every already-covered project.
+      tx.declarePhases([...(coverageFix ? ["state-coverage"] : []), "initialize", "state-protection", "project-identity"]);
+
+      // ⚠️ FIRST, BECAUSE EVERY LATER PHASE WRITES INTO THE PATHS IT PROTECTS (REQ-0027). The ignore owner does
+      // its own classification against a fresh read — the plan above is a statement about the file as it was —
+      // so this passes the transaction rather than the bytes.
+      if (coverageFix)
+        await tx.phase("state-coverage", async () => {
+          await modules.gitignore.applyIgnoreBlock(coverageFix, { transaction: tx });
+          print("added Kiln's block to .gitignore");
+          const now = coverageState({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT, roots });
+          if (!now.covered)
+            throw new SetupCommandRefusal(EXIT.STATE, "The ignore block was applied and the runtime paths are still not ignored. Nothing else was written.", {});
+        });
 
       const initialized = await tx.phase("initialize", () =>
         initializeProject({ projectRoot: paths.projectRoot, name: args.name, description: args.description, transaction: tx })

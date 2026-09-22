@@ -39,6 +39,7 @@ import {
   ruleSpellings,
 } from "../lib/project-gitignore.mjs";
 import { initializeProject } from "../lib/initialize-project.mjs";
+import { runTransaction } from "../lib/setup-transaction.mjs";
 import { SETUP_FILE } from "../lib/project-scaffold.mjs";
 
 installReaper();
@@ -921,4 +922,37 @@ test("the tool's own repository is a project whose ignore file the owner reports
   // file said something else.
   const covers = coverage(readFileSync(join(ROOT, ".gitignore"), "utf-8"));
   assert.deepEqual(covers.uncovered, [], "this checkout ignores every rule the owner writes");
+});
+
+test("⚠️ a transaction supplied to the owner is authenticated, and it authorises one project's file", async () => {
+  // The setup command applies the block inside a declared phase, so the write is part of the planned run
+  // rather than beside it. What makes that more than a comment is that the lease is checked: an object that
+  // looks like a transaction holds no lock, and a real one is open over a project it names itself.
+  const dir = repo();
+  const elsewhere = repo();
+  const plan = planIgnoreBlock(dir);
+
+  await assert.rejects(() => applyIgnoreBlock(plan, { transaction: { projectRoot: dir, active: true } }), /not a setup transaction/);
+  assert.equal(existsSync(ignoreFile(dir)), false, "a forged lease wrote the file");
+
+  let captured = null;
+  await runTransaction({ projectRoot: elsewhere }, async (tx) => {
+    captured = tx;
+    // Open over `elsewhere`, asked to write in `dir`: the path comes from the transaction, not the caller.
+    await assert.rejects(() => applyIgnoreBlock(plan, { transaction: tx }), /open over/);
+    assert.equal(existsSync(ignoreFile(dir)), false, "another project's transaction wrote this project's file");
+
+    const mine = planIgnoreBlock(elsewhere);
+    const result = await applyIgnoreBlock(mine, { transaction: tx });
+    assert.equal(result.changed, true);
+    assert.deepEqual(findBlock(read(elsewhere)).interior, [...IGNORE_RULES]);
+  });
+
+  // And the lease expires with the transaction: holding the object is not holding the lock.
+  await assert.rejects(() => applyIgnoreBlock(plan, { transaction: captured }), /already finished/);
+  assert.equal(existsSync(ignoreFile(dir)), false, "a finished transaction wrote the file");
+
+  // Without a transaction it still writes: the initializer applies the block inside its own swap.
+  await applyIgnoreBlock(plan);
+  assert.deepEqual(findBlock(read(dir)).interior, [...IGNORE_RULES]);
 });
