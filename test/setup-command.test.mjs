@@ -827,15 +827,16 @@ test("⚠️ nothing of this host is read before the inspection is allowed, and 
         { fs: 0, credentials: 0 },
         `${what}: something of this host was read before the operator allowed it`
       );
-      // ⚠️ **THE ONE THING THAT DOES TOUCH THE ENVIRONMENT BEFORE THE QUESTION, NAMED RATHER THAN HIDDEN.** Loading
-      // Pi's SDK — which setup needs for the trust store, a phase the proposal puts before this one — runs its
-      // bundled `debug`, which calls `Object.keys(process.env)` to look for its own DEBUG variables. That
-      // enumerates names, and on a proxy each own key's descriptor is consulted, so a watched name appears here.
-      // No value is read: the events are enumeration and descriptors, never a `get`.
+      // ⚠️ **AND NO CREDENTIAL VARIABLE IS EVEN NAMED BEFORE THE QUESTION.** Loading Pi's SDK — which the trust
+      // phase needs, and which the proposal orders before this one — runs its bundled `debug`, and that calls
+      // `Object.keys(process.env)` for its own DEBUG settings. It reads no value, but enumerating would show which
+      // credential variables this computer has, and presence is precisely what this consent gates. Setup therefore
+      // loads the SDK through a view of the environment those names are not in: the recorder watches three of them
+      // by name, and none appears in any event — not a get, not a descriptor.
       assert.deepEqual(
-        [...new Set(access.env.map((e) => e.split(" ")[0]))].sort(),
-        ["descriptor", "enumerate"],
-        `${what}: the environment was read in some way other than enumeration: ${access.env.join(" | ")}`
+        access.env.filter((e) => /API_KEY|TOKEN/i.test(e)),
+        [],
+        `${what}: a credential variable was named before the operator allowed it: ${access.env.join(" | ")}`
       );
       assert.equal(asked.before.net, 0, `${what}: the network was reached before consent`);
 
@@ -940,4 +941,53 @@ test("⚠️ a non-interactive run neither asks nor assumes, and a host with no 
   } finally {
     rmSync(q.root, { recursive: true, force: true });
   }
+});
+
+test("⚠️ the trust child is given named variables only, so no credential variable is in it to be seen", async () => {
+  // Pi's SDK enumerates the environment when it loads, and the trust store is Pi's — so setup takes that decision
+  // in a child whose environment is built by naming variables rather than by copying this one. What proves the
+  // boundary is the builder: a host with every credential variable set hands the child none of them.
+  const { trustChildEnv } = await import("../bin/setup.mjs");
+  const { BASE_ENV, AGENT_DIR_ENV } = await import("../lib/specialists/contract.mjs");
+  const { supportedProviders, resolveProviderCredentials, declaredNames } = await import("../lib/pi-provider-credentials.mjs");
+  const { RESEARCH_CREDENTIAL } = await import("../lib/connection-inspection.mjs");
+
+  const credentials = new Set([RESEARCH_CREDENTIAL]);
+  for (const id of supportedProviders()) for (const n of declaredNames(resolveProviderCredentials(id))) credentials.add(n);
+
+  const host = { PATH: "/usr/bin", HOME: "/home/k", SystemRoot: "C:\Windows", [AGENT_DIR_ENV]: "/agent" };
+  for (const name of credentials) host[name] = "kiln-setup-MUST-NOT-CROSS";
+
+  const names = [...BASE_ENV[process.platform === "win32" ? "win32" : "posix"], AGENT_DIR_ENV];
+  const built = trustChildEnv(names, host);
+
+  assert.equal(built[AGENT_DIR_ENV], "/agent", "the child was not told which agent directory to use");
+  for (const name of credentials) assert.equal(Object.hasOwn(built, name), false, `${name} reached the trust child`);
+  // ⚠️ AND NOTHING THE LIST DOES NOT NAME: a builder that copied anything else would carry whatever the operator
+  // happened to have exported, which is the copy this exists to avoid.
+  assert.deepEqual(Object.keys(built).filter((k) => !names.includes(k)), []);
+});
+
+test("⚠️ a trust child that fails is a refusal, never a decision", async () => {
+  // The child answers with one JSON line. Anything else — a non-zero exit, silence, a half-written line — means
+  // nobody knows what this project's trust is, and continuing as though it were approved is the one outcome that
+  // must not be reachable.
+  const { trustDecision } = await import("../bin/setup.mjs");
+  const { BASE_ENV, AGENT_DIR_ENV, AGENT_SESSION_DIR_ENV } = await import("../lib/specialists/contract.mjs");
+  const modules = { contract: { BASE_ENV, AGENT_DIR_ENV, AGENT_SESSION_DIR_ENV } };
+  const paths = { toolRoot: ROOT, projectRoot: join(ROOT, "nowhere") };
+
+  await assert.rejects(
+    () => trustDecision("approve", paths, modules, () => ({ status: 3, stdout: "", stderr: "the trust store could not be written" })),
+    (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.TRUST && /could not be written/.test(e.message),
+    "a failed child must refuse, and say what it said"
+  );
+  await assert.rejects(
+    () => trustDecision("read", paths, modules, () => ({ status: 0, stdout: "half a line", stderr: "" })),
+    (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.TRUST,
+    "an unreadable report must refuse"
+  );
+  // And a well-formed report is returned as the decision it is.
+  const ok = await trustDecision("read", paths, modules, () => ({ status: 0, stdout: '{"state":"approved","agentDir":"/agent"}\n', stderr: "" }));
+  assert.deepEqual(ok, { state: "approved", agentDir: "/agent" });
 });

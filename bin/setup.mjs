@@ -41,6 +41,7 @@ import { initializeProject } from "../lib/initialize-project.mjs";
 import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
 
 const TOOL_ROOT = canonicalPath(resolve(join(dirname(fileURLToPath(import.meta.url)), "..")));
+
 const say = (msg) => console.log(`[kiln] ${msg}`);
 
 /**
@@ -387,8 +388,15 @@ async function runPhases({ paths, args, ask, print, modules }) {
       // ⚠️ THE AGENT DIRECTORY IS ASKED OF PI ONCE, AND NAMED EXPLICITLY EVERYWHERE. `pi-trust` and the
       // inspection both refuse to guess it: Pi's own default is the operator's home store, and a default here
       // would record a decision, or read an authentication file, somewhere nobody named.
-      const agentDir = await modules.runtime.resolvePinnedAgentDir(paths.toolRoot);
-      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules, agentDir }));
+      //
+      // ⚠️ **AND THE TRUST DECISION IS TAKEN IN A CHILD, BECAUSE LOADING PI'S SDK ENUMERATES THE ENVIRONMENT.**
+      // Pi's bundled `debug` calls `Object.keys(process.env)` at module load. It reads no value, but it sees which
+      // credential variables this computer has, and presence is what the inspection consent — still two phases
+      // away — exists to gate. The child is started with an environment built from a fixed list of names, so
+      // there is nothing of that kind in it to see, and this process loads no Pi until the operator has allowed
+      // it. The agent directory the child resolved comes back in its report, for the phases that follow.
+      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules }));
+      const agentDir = trust.agentDir;
       if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, trust, registered: null };
 
       const registered = await tx.phase("registration", () => register({ tx, paths, print, modules }));
@@ -440,26 +448,25 @@ async function runPhases({ paths, args, ask, print, modules }) {
  * ⚠️ **AND A DENIAL IS AN ANSWER, NOT A FAILURE.** The scaffold this run has already written stays, and it stays
  * valid; what the operator is told is that the agent is not ready and what would make it ready.
  */
-async function decideTrust({ paths, args, ask, print, modules, agentDir }) {
-  const { TRUST, readTrust, grantTrust, denyTrust } = modules.trust;
-  const where = { projectRoot: paths.projectRoot, agentDir, toolRoot: paths.toolRoot };
+async function decideTrust({ paths, args, ask, print, modules }) {
+  const ask_ = (action) => trustDecision(action, paths, modules);
 
   // ⚠️ **AN EXPLICIT ANSWER OUTRANKS A RECORDED ONE, IN BOTH DIRECTIONS.** `--trust approve` is the operator
   // answering now; treating a recorded denial as final would leave them rerunning a command that cannot change
   // anything, which is how an operator concludes the flag does not work.
   if (args.trust === "deny") {
-    const denied = await denyTrust(where);
+    const denied = await ask_("deny");
     print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
     return denied;
   }
   if (args.trust === "approve") {
-    const granted = await grantTrust(where);
+    const granted = await ask_("approve");
     print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
     return granted;
   }
 
-  const current = await readTrust(where);
-  if (current.state !== TRUST.MISSING) {
+  const current = await ask_("read");
+  if (current.state !== "missing") {
     // ⚠️ WHICH DIRECTORY ANSWERED. Pi may answer a project from a decision recorded against an ancestor, and an
     // operator told "denied" is entitled to know which directory they denied.
     print(`trust ${current.state} for ${current.recordedFor ?? current.projectRoot}`);
@@ -482,7 +489,7 @@ async function decideTrust({ paths, args, ask, print, modules, agentDir }) {
   const raw = await ask("Trust this project? (yes/no) ");
   const answer = String(raw ?? "").trim().toLowerCase();
   if (answer === "yes" || answer === "y") {
-    const granted = await grantTrust(where);
+    const granted = await ask_("approve");
     print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
     return granted;
   }
@@ -491,7 +498,7 @@ async function decideTrust({ paths, args, ask, print, modules, agentDir }) {
   // make the next run stop without asking. A closed input, an empty line and an answer this does not understand
   // are all the same thing: no decision, nothing written, and a rerun that asks again.
   if (answer === "no" || answer === "n") {
-    const denied = await denyTrust(where);
+    const denied = await ask_("deny");
     print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
     return denied;
   }
@@ -547,6 +554,60 @@ Nothing of the project was changed.`, {
       toolRoot: paths.toolRoot,
       ...(e.detail ?? {}),
     });
+  }
+}
+
+/**
+ * The environment the trust child is given: named variables, never a copy of this one.
+ *
+ * ⚠️ **BUILT BY NAME, BECAUSE ENUMERATING WOULD BE THE THING BEING AVOIDED.** Copying `process.env` and removing
+ * the credential variables means first seeing which of them this computer has, which is the presence check the
+ * inspection consent gates. Each name here is read directly, so nothing else is ever looked at. The list is the
+ * one `lib/specialists/contract.mjs` measured for a child that holds no credential, plus Pi's own locators when
+ * the operator has set them — without those a child on Windows resolves the operator's default directory, which
+ * is the right answer for setup and has to be reached deliberately rather than by inheriting everything.
+ */
+export function trustChildEnv(names, env = process.env) {
+  const out = {};
+  for (const name of names) {
+    const value = env[name];
+    if (typeof value === "string") out[name] = value;
+  }
+  return out;
+}
+
+/**
+ * Take one trust decision in the child.
+ *
+ * ⚠️ **ITS FAILURES ARE THIS COMMAND'S REFUSALS.** A child that could not resolve Pi, or could not persist the
+ * decision, is a run that must not continue as though the project were trusted; what it printed on stderr is
+ * Kiln's own refusal text, so it is passed through rather than replaced with "the child failed".
+ */
+export async function trustDecision(action, paths, modules, spawn = spawnSync) {
+  const { AGENT_DIR_ENV, AGENT_SESSION_DIR_ENV, BASE_ENV } = modules.contract;
+  const child = join(paths.toolRoot, "lib", "pi-trust-child.mjs");
+  const spec = JSON.stringify({ action, projectRoot: paths.projectRoot, toolRoot: paths.toolRoot });
+  const result = spawn(process.execPath, [child, spec], {
+    encoding: "utf-8",
+    // ⚠️ THE NAMES THE CONTRACT MEASURED FOR A CHILD THAT HOLDS NO CREDENTIAL, plus Pi's own locators when the
+    // operator set them: without those a child on Windows resolves the operator's default directory, which is the
+    // right answer for setup but has to be reached deliberately rather than by inheriting everything.
+    env: trustChildEnv([...BASE_ENV[process.platform === "win32" ? "win32" : "posix"], AGENT_DIR_ENV, AGENT_SESSION_DIR_ENV]),
+  });
+
+  if (result.status !== 0)
+    throw new SetupCommandRefusal(
+      EXIT.TRUST,
+      `The project's trust decision could not be ${action === "read" ? "read" : "recorded"}.\n` +
+        `${String(result.stderr ?? "").trim() || `The check exited ${result.status ?? "on a signal"}.`}\n` +
+        `Nothing about this project's trust was changed.`,
+      { action, status: result.status }
+    );
+
+  try {
+    return JSON.parse(String(result.stdout).trim().split("\n").pop());
+  } catch {
+    throw new SetupCommandRefusal(EXIT.TRUST, `The trust check did not report a decision this command could read.`, { action });
   }
 }
 
@@ -700,6 +761,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         research: await import("../lib/research-enablement.mjs"),
         tavily: await import("../lib/research/tavily-adapter.mjs"),
         records: await import("../lib/runtime-records.mjs"),
+        contract: await import("../lib/specialists/contract.mjs"),
         crypto: await import("node:crypto"),
         journalValidate: await journalValidator(),
       };
