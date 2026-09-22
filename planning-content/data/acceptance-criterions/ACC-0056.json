@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "An unavailable recorded selection refuses instead of falling back",
   "statement": "With the recorded model removed from the registry, or its authentication absent, launch refuses and names the recorded provider and model, offering a setup rerun or an explicit one-run override. No other model, provider, or answer from model memory is substituted.",
   "evaluates": [
@@ -13,7 +13,7 @@
   "verifies": [
     "REQ-0025"
   ],
-  "notes": "⚠️ NOT EVALUATED PENDING CI, 2026-09-22. EVD-0129 is the component proof; EVD-0132 measures the integrated launch path through the real command: a removed recorded model and absent authentication are each refused by name with both remedies and no supervisor started, a mismatched compatibility record is refused before anything starts, and nothing is substituted. Evaluated once CI passes on the wiring.",
+  "notes": "PASS 2026-09-22 on EVD-0132, measured through the real start command with its own launch checks. With the recorded model removed from Pi's catalogue, the run refuses naming openai and that exact id and says no other model was used in its place; with the authentication store empty and the credential variable empty, it refuses naming the recorded ids and says no other provider was used in its place. Both refusals carry the two remedies — rerun setup, or start once with --provider <id> --model <id> --thinking <level> — the supervisor is never reached, and the command exits 2. A compatibility record taken under other conditions is refused by the differing determinant before anything starts, and a host without model-use consent is refused with zero reads of any auth.json or models.json, zero credential-variable reads and no network. On the accepted path Pi is held to exactly the checked selection. CI run 35759728422 passed the 12 launch-path tests in all four cells. LIMITS: no billable provider was called, so the one-run override's own live check is proved at the component level (EVD-0130, EVD-0131) rather than through this command against a real provider; a custom provider cannot launch until the command can supply its credential declaration and provider configuration (D25); and the command checks project-local state only (D24).",
   "evidencedBy": [
     "EVD-0129",
     "EVD-0132"
