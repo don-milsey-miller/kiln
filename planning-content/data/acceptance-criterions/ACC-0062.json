@@ -6,12 +6,13 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "The canary cannot see or change planning content, and its record invalidates correctly",
-  "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, package capability signature or endpoint identity invalidates it and reopens approval.",
+  "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, preflight contract digest or endpoint identity invalidates it and reopens approval. The package capability signature is not part of the record's key; it remains a zero-cost check at every launch.",
   "evaluates": [
     "CMP-0030"
   ],
   "verifies": [
     "REQ-0024",
     "REQ-0025"
-  ]
+  ],
+  "notes": "⚠️ AMENDED 2026-09-22 (Q6). The statement named the package capability signature as an invalidation input. DEC-0033 and section 3.12 of the proposal replaced it with determinant 8, preflightContractDigest, which digests the canary protocol as handed to Pi: keying on the whole signature charged for a new billable canary whenever an unrelated planning tool changed, while the canary runs with only the preflight tool exposed. The signature is kept as a zero-cost launch check (lib/launch-checks.mjs step 6). Not evaluated: EVD-0130 is component proof for TSK-0041, and the record and its key are TSK-0042's."
 }

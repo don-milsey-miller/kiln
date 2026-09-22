@@ -1281,7 +1281,8 @@ canary against the explicitly selected provider/model.
 - Unchanged, valid project selections and matching local consent records are reused without prompting
   on every launch; a provider/research change or missing local record reopens the relevant prompt.
 - A matching live compatibility record is reused byte-stably; changing provider, model, thinking
-  level, endpoint identity, Pi version, or package capability signature invalidates it.
+  level, endpoint identity, Pi version, or preflight contract digest invalidates it. The package
+  capability signature is not part of the record's key; it remains a zero-cost check at every launch.
 - If setup fails before launch, it prints the last completed phase and an exact recovery command.
 - If content initialization succeeded but agent setup failed, report partial setup honestly; do not
   delete valid planning content.
