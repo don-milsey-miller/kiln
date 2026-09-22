@@ -14,6 +14,15 @@
  * checkout, passed as a command plus an argument array, and spawned with `shell: false` — an
  * override would be a supported way to run an arbitrary program with the terminal inherited, and a
  * shell would be a second interpreter of the arguments.
+ *
+ * ⚠️ **THE RECORDED SELECTION IS CHECKED BEFORE ANYTHING STARTS, AND PI IS HELD TO IT (TSK-0037).** The launch
+ * checks run first: this host's consent for the exact model, its credential contract, Pi's registry and
+ * authentication, the thinking level, the package and its tools, and a compatibility record matching the key
+ * computed for this launch. A refusal names the recorded provider and model and starts nothing. What passed is
+ * then put on Pi's own command line as `--provider`, `--model` and `--thinking`, so Pi runs exactly the
+ * selection that was checked rather than whatever default it would otherwise resolve. `--provider`,
+ * `--model` and `--thinking` on THIS command are the one-run override: confirmed, proved for that run by
+ * its own approved live check, and never written back.
  */
 
 import { randomBytes } from "node:crypto";
@@ -22,7 +31,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 
+import { existsSync } from "node:fs";
+
+import { consentLocation } from "../lib/consent-record.mjs";
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
+import { LaunchRefusal, checkLaunch as checkLaunchDefault } from "../lib/launch-checks.mjs";
+import { runLiveCanary } from "../lib/live-canary.mjs";
+import { LocalStateRefusal } from "../lib/local-state.mjs";
 import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
@@ -112,15 +127,30 @@ export function exitStatusFor(result) {
  * ⚠️ It is EXPORTED for the same reason the two decisions above are: the alternative to testing it is
  * running the whole command against the test runner's argv.
  *
+ * ⚠️ **THE OVERRIDE FLAGS TAKE A VALUE, AND EACH APPEARS AT MOST ONCE.** A flag with no value, or given twice,
+ * is a refusal: the second would silently decide which model a billable run uses.
+ *
  * @param {string[]} argv  the arguments after the script name
- * @returns {{selfHost: boolean, error?: undefined} | {error: string}}
+ * @returns {{selfHost: boolean, override: {provider?: string, model?: string, thinking?: string}} | {error: string}}
  */
+export const OVERRIDE_FLAGS = Object.freeze({ "--provider": "provider", "--model": "model", "--thinking": "thinking" });
+
 export function parseArgs(argv) {
-  const out = { selfHost: false };
-  for (const arg of argv) {
-    if (arg !== "--self-host")
-      return { error: `Unrecognised argument: ${arg}\nThe only flag this command takes is --self-host.` };
-    out.selfHost = true;
+  const out = { selfHost: false, override: {} };
+  const usage = "This command takes --self-host, and --provider <id> --model <id> --thinking <level> for a one-run override.";
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--self-host") {
+      out.selfHost = true;
+      continue;
+    }
+    const key = Object.hasOwn(OVERRIDE_FLAGS, arg) ? OVERRIDE_FLAGS[arg] : null;
+    if (!key) return { error: `Unrecognised argument: ${arg}\n${usage}` };
+    const value = argv[i + 1];
+    if (typeof value !== "string" || value.length === 0 || value.startsWith("--")) return { error: `${arg} needs a value.\n${usage}` };
+    if (key in out.override) return { error: `${arg} was given more than once.\n${usage}` };
+    out.override[key] = value;
+    i++;
   }
   return out;
 }
@@ -205,6 +235,43 @@ export async function piToolAllowlist(toolRoot = TOOL_ROOT) {
   return declaredToolNames({ packageRoot: packageRootFor(toolRoot) });
 }
 
+/** Pi's own flags for the model it runs. */
+export const SELECTION_FLAGS = Object.freeze(["--provider", "--model", "--thinking"]);
+
+/**
+ * Pi held to the selection the launch checks passed.
+ *
+ * ⚠️ **AN ARGUMENT LIST THAT ALREADY NAMES A MODEL IS A REFUSAL**, for the reason `withToolAllowlist` refuses a
+ * second tool policy: two selections leave the choice of a billable model to whichever Pi reads last.
+ */
+export function withSelection(agent, selection) {
+  const args = agent.args ?? [];
+  const conflict = args.findIndex((a) => SELECTION_FLAGS.includes(String(a)) || SELECTION_FLAGS.some((f) => String(a).startsWith(`${f}=`)));
+  if (conflict !== -1)
+    throw new SupervisorRefusal(
+      REFUSAL.MODEL_SELECTION_CONFLICT,
+      `The agent's argument list already names a model at position ${conflict}, and this command must supply the one the launch checks passed.`,
+      { args }
+    );
+  for (const [name, value] of [["provider", selection?.provider], ["model", selection?.model], ["thinkingLevel", selection?.thinkingLevel]])
+    if (typeof value !== "string" || value.length === 0 || value.startsWith("-"))
+      throw new SupervisorRefusal(REFUSAL.MODEL_SELECTION_MISSING, `The checked selection has no usable ${name}, so Pi cannot be held to it.`, { name });
+  return { ...agent, args: [...args, "--provider", selection.provider, "--model", selection.model, "--thinking", selection.thinkingLevel] };
+}
+
+/**
+ * The live canary for a one-run proof, over the Pi agent directory the launch checks resolved.
+ *
+ * ⚠️ **ONLY THE SELECTED PROVIDER'S STORED ENTRY IS COPIED**, by the canary's own isolation, and only when the
+ * store exists. The environment is this process's, scoped by the canary to the provider's contract.
+ */
+export function liveCanaryRunner() {
+  return ({ selection, agentDir, declared }) => {
+    const storedAuthPath = join(agentDir, "auth.json");
+    return runLiveCanary({ ...selection, storedAuthPath: existsSync(storedAuthPath) ? storedAuthPath : null, hostEnv: process.env, declared });
+  };
+}
+
 /**
  * @param {string[]} argv  the arguments after the script name
  * @param {{runSupervisor?: Function}} [deps]  ⚠️ **THE ONE SEAM, AND IT NAMES NO PROGRAM.** Which
@@ -213,7 +280,7 @@ export async function piToolAllowlist(toolRoot = TOOL_ROOT) {
  *   could only be checked by testing the helper that composes it, which is not the same claim as the
  *   command applying it. It is reachable from neither an argument nor an environment variable.
  */
-export async function main(argv = process.argv.slice(2), { runSupervisor: supervise = runSupervisor } = {}) {
+export async function main(argv = process.argv.slice(2), { runSupervisor: supervise = runSupervisor, checkLaunch = checkLaunchDefault } = {}) {
   const args = parseArgs(argv);
   if (args.error) {
     for (const line of args.error.split("\n")) console.error(`[kiln] ${line}`);
@@ -229,6 +296,25 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
   assertSelfHostOptIn({ toolRoot: TOOL_ROOT, selfHost: args.selfHost });
 
   const projectRoot = canonicalPath(resolveProjectRoot());
+  const interactive = Boolean(process.stdin.isTTY);
+
+  // ⚠️ **THE LAUNCH CHECKS, BEFORE ANY PROCESS STARTS, AND BEFORE PI IS EVEN LOADED.** Consent is checked before any
+  // credential is read, and a refusal leaves nothing to stop. Pi's agent directory is not resolved here: resolving
+  // it loads Pi's SDK, and loading that enumerates the environment, which is access this host has not yet allowed.
+  // The checks ask Pi for it only after consent. A run that cannot ask gets no `ask`, so anything needing an
+  // answer refuses.
+  const checked = await checkLaunch({
+    projectRoot,
+    location: consentLocation({ projectRoot }),
+    override: args.override,
+    ...(interactive ? { ask } : {}),
+    canary: liveCanaryRunner(),
+  });
+  const agentDir = await resolvePinnedAgentDir(TOOL_ROOT);
+  say(
+    `launch checks passed for ${checked.selection.provider} ${checked.selection.model} (thinking ${checked.selection.thinkingLevel})` +
+      `${checked.overridden ? ", one-run override" : ""}; compatibility proved by ${checked.proof === "record" ? "this computer's record" : "this run's live check"}`
+  );
 
   const result = await supervise({
     projectRoot,
@@ -249,12 +335,12 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     // command and an argument array because the choice of program is the security boundary; the
     // choice of what that program may do is the same boundary, so it is made in the same place and
     // not left to a default inside the supervisor.
-    agent: withToolAllowlist(resolvePinnedAgent(TOOL_ROOT), await piToolAllowlist(TOOL_ROOT)),
+    agent: withSelection(withToolAllowlist(resolvePinnedAgent(TOOL_ROOT), await piToolAllowlist(TOOL_ROOT)), checked.selection),
     // ⚠️ **ASKED OF PI, ONCE, IN THIS PROCESS.** `getAgentDir()` reads this process's environment and
     // expands a leading `~`; resolving it here and handing the answer to the supervisor means the store
     // the trust gate reads and the store the child consults are one directory, without Kiln restating
     // another tool's home-directory rules. The supervisor forces it into every child's environment.
-    agentDir: await resolvePinnedAgentDir(TOOL_ROOT),
+    agentDir,
     // ⚠️ **PI'S OWN LISTER, FOR THE SAME REASON THE COMMAND RESOLVES THE AGENT (F121).** Which sessions
     // exist, and what each one's id is, are Pi's facts: the id lives in a session file's header and is a
     // different value from the uuid in its filename. Kiln asks the pinned package rather than reading
@@ -263,7 +349,7 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     sessionLister: await resolvePinnedSessionLister(TOOL_ROOT),
     spawn,
     randomBytes,
-    interactive: Boolean(process.stdin.isTTY),
+    interactive,
     ask,
     askLine,
     log: say,
@@ -281,13 +367,18 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
  */
 const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 
-if (isEntryPoint)
-  main().catch((e) => {
+/**
+ * How a failed run ends: a refusal prints as one, anything else as the error it is.
+ *
+ * ⚠️ EXPORTED SO THE CAPTURE FIXTURE ENDS THE WAY THE COMMAND DOES. A refusal the fixture could only report as an
+ * unhandled rejection would test a different exit from the one an operator sees.
+ */
+export function exitOnFailure(e) {
   // ⚠️ **BOTH REFUSALS PRINT AS REFUSALS, NOT AS STACK TRACES.** A missing content root is the FIRST
   // thing a contributor meets running this in the Kiln repository, which is its own consumer and so
   // is not covered by the sibling rule (#70). Letting it fall through to the generic handler printed
   // an unhandled error object for a condition with a one-line fix.
-  if (e instanceof ContentRootError || e instanceof SupervisorRefusal) {
+  if (e instanceof ContentRootError || e instanceof SupervisorRefusal || e instanceof LaunchRefusal || e instanceof LocalStateRefusal) {
     for (const line of e.message.split("\n")) console.error(`[kiln] ${line}`);
     if (e instanceof ContentRootError) {
       console.error(`[kiln]`);
@@ -299,4 +390,6 @@ if (isEntryPoint)
   }
   console.error(e);
   process.exit(1);
-});
+}
+
+if (isEntryPoint) main().catch(exitOnFailure);

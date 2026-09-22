@@ -66,6 +66,7 @@ import {
   parseArgs,
   piToolAllowlist,
   stoppedSummary,
+  withSelection,
   withToolAllowlist,
 } from "../bin/start-kiln.mjs";
 import { validatePackage } from "../lib/pi-package.mjs";
@@ -950,15 +951,16 @@ test("⚠️ bin/start-kiln.mjs exposes no way to name a different program", () 
   assert.match(src, /join\(TOOL_ROOT, "bin", "start-shell\.mjs"\)/, "the launcher is resolved from this checkout");
   // ⚠️ THE SUCCESS EXIT IS ONLY REACHABLE AFTER A SUCCESSFUL RETURN, and an unobserved shutdown is a
   // refusal rather than a return — so a launcher still holding the port cannot leave here as exit 0.
-  assert.match(src, /if \(e instanceof ContentRootError \|\| e instanceof SupervisorRefusal\)[\s\S]*?process\.exit\(2\)/);
+  // Refusals, the launch checks' among them, leave with 2: not as a crash, and not as success.
+  assert.match(src, /if \(e instanceof ContentRootError \|\| e instanceof SupervisorRefusal \|\| e instanceof LaunchRefusal \|\| e instanceof LocalStateRefusal\)[\s\S]*?process\.exit\(2\)/);
   assert.ok(!/agentExit\.code \?\? 0/.test(src), "a signal kill must not be reported as success");
   // ⚠️ THE RESOLVER, AND THE ALLOWLIST AROUND IT. Both halves are the security boundary: which
   // program runs, and what that program may do. A composition that dropped either would still read
   // as a launch, and the operator would not be able to tell from the outside.
   assert.match(
     src,
-    /agent: withToolAllowlist\(resolvePinnedAgent\(TOOL_ROOT\), await piToolAllowlist\(TOOL_ROOT\)\)/,
-    "the agent comes from the pinned-package resolver, constrained to the declared tools"
+    /agent: withSelection\(withToolAllowlist\(resolvePinnedAgent\(TOOL_ROOT\), await piToolAllowlist\(TOOL_ROOT\)\), checked\.selection\)/,
+    "the agent comes from the pinned-package resolver, constrained to the declared tools and held to the checked selection"
   );
   assert.ok(!/dist[\/](bundle[\/])?cli\.js/.test(src), "and the wrapper names no entry-point path of its own");
 });
@@ -3154,9 +3156,17 @@ test("⚠️ --self-host with no override reaches the SELF-HOST refusal, through
   assert.match(said, /^\s*\[kiln\]\s+--self-host\s*$/m, "and repeat the flag beside it");
 });
 
-test("the command line takes --self-host and refuses anything else", () => {
-  assert.deepEqual(parseArgs([]), { selfHost: false });
-  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true });
+test("the command line takes --self-host and the one-run override, and refuses anything else", () => {
+  assert.deepEqual(parseArgs([]), { selfHost: false, override: {} });
+  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true, override: {} });
+  assert.deepEqual(parseArgs(["--provider", "openai", "--model", "gpt-5", "--thinking", "high"]), {
+    selfHost: false,
+    override: { provider: "openai", model: "gpt-5", thinking: "high" },
+  });
+  assert.deepEqual(parseArgs(["--thinking", "low", "--self-host"]), { selfHost: true, override: { thinking: "low" } });
+  // A flag with no value, or given twice, would leave a billable model to chance.
+  for (const bad of [["--model"], ["--provider", "--model", "x"], ["--thinking", ""], ["--model", "a", "--model", "b"]])
+    assert.match(parseArgs(bad).error ?? "", /needs a value|more than once/, `must refuse ${JSON.stringify(bad)}`);
 
   // ⚠️ **A NEAR MISS IS A REFUSAL, NOT A SILENT FALSE.** A dropped unrecognised argument would report
   // a mistyped flag as "refusing to run in the tool checkout", which reads as the flag not working.
@@ -3565,8 +3575,8 @@ test("⚠️ ACC-0065 the real command constrains the agent it hands the supervi
   assert.equal(launch.agentCommand, pinned.command, "the pinned command is what runs");
   assert.deepEqual(
     launch.agentArgs,
-    [...pinned.args, TOOLS_FLAG, declared.join(",")],
-    "the pinned entry point, then the allowlist, and nothing else"
+    [...pinned.args, TOOLS_FLAG, declared.join(","), "--provider", "fixture", "--model", "fixture-model", "--thinking", "off"],
+    "the pinned entry point, then the allowlist, then the selection the launch checks passed, and nothing else"
   );
   assert.equal(launch.agentArgs.includes(SESSION_DIR_FLAG), false, "the session directory is still the supervisor's to add");
   assert.deepEqual(launch.launcherArgs, [join(ROOT, "bin", "start-shell.mjs")], "the launcher is unchanged");
@@ -3578,4 +3588,195 @@ test("⚠️ ACC-0065 the real command constrains the agent it hands the supervi
       false,
       `${builtin} reached the real command line`
     );
+});
+
+
+/* ============================================ TSK-0037: the launch checks in the real command ===== */
+
+/** The real command, in a child, with the supervisor recorded and the launch checks recorded or real. */
+function captureLaunch(args, env = {}) {
+  const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-launch-")));
+  const contentRoot = join(base, "planning-content");
+  mkdirSync(contentRoot, { recursive: true });
+  const r = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "start-kiln", "capture-launch.mjs"), ...args], {
+    env: { ...process.env, PLANNING_CONTENT_DIR: contentRoot, KILN_CAPTURE_LAUNCH: "1", ...env },
+    encoding: "utf-8",
+    cwd: ROOT,
+  });
+  const out = `${r.stdout}`;
+  const line = (tag) => {
+    const l = out.split("\n").find((x) => x.startsWith(`${tag} `));
+    return l ? JSON.parse(l.slice(tag.length + 1)) : null;
+  };
+  return { status: r.status, check: line("KILN_CHECK"), launch: line("KILN_LAUNCH"), stdout: out, stderr: `${r.stderr}`, projectRoot: base };
+}
+
+test("⚠️ TSK-0037 the command runs the launch checks before anything, with the override, a canary runner and no ask when it cannot ask", () => {
+  const o = captureLaunch(["--provider", "openai", "--model", "gpt-5", "--thinking", "high"]);
+  assert.ok(o.check, `the launch checks were not reached: ${o.stdout}${o.stderr}`);
+  assert.deepEqual(o.check, {
+    projectRoot: "string",
+    location: "string",
+    // ⚠️ Not resolved before the checks: resolving it loads Pi, which the checks do only after consent.
+    agentDir: "undefined",
+    override: { provider: "openai", model: "gpt-5", thinking: "high" },
+    // ⚠️ spawnSync gives the child no terminal, so it has no way to ask and must not be handed one.
+    ask: "undefined",
+    canary: "function",
+  });
+  assert.ok(o.launch, "the supervisor was not reached after the checks passed");
+  assert.match(o.stdout, /launch checks passed for fixture fixture-model \(thinking off\)/);
+});
+
+test("⚠️ TSK-0037 a launch refusal starts nothing, names the model, offers both remedies and exits 2", () => {
+  const o = captureLaunch([], { KILN_CAPTURE_REFUSE: "1" });
+  assert.ok(o.check, "the launch checks were not reached");
+  assert.equal(o.launch, null, "the supervisor was reached although the launch checks refused");
+  assert.equal(o.status, 2);
+  assert.match(o.stderr, /\[kiln\] The recorded model fixture fixture-model is not in Pi's model registry/);
+  assert.match(o.stderr, /\[kiln\] Run Kiln's setup for this project again/);
+  assert.match(o.stderr, /\[kiln\] Or start once with an explicit override: --provider <id> --model <id> --thinking <level>/);
+});
+
+test("⚠️ TSK-0037 the real launch checks refuse a project with no recorded selection before anything starts", () => {
+  const o = captureLaunch([], { KILN_CAPTURE_REAL_CHECKS: "1" });
+  assert.equal(o.launch, null, `the supervisor was reached with no recorded selection: ${o.stdout}`);
+  assert.equal(o.status, 2, o.stderr);
+  assert.match(o.stderr, /\[kiln\] This project has no recorded provider and model in \.pi\/settings\.json/);
+  assert.equal(existsSync(join(o.projectRoot, ".pi")), false, "a refused launch created project state");
+});
+
+test("Pi is held to the checked selection, and an argument list that already names a model is refused", () => {
+  const agent = { command: "node", args: ["pi.js", TOOLS_FLAG, "a,b"] };
+  const selection = { provider: "openai", model: "gpt-5", thinkingLevel: "high" };
+  assert.deepEqual(withSelection(agent, selection).args, ["pi.js", TOOLS_FLAG, "a,b", "--provider", "openai", "--model", "gpt-5", "--thinking", "high"]);
+  for (const extra of [["--model", "x"], ["--provider=y"], ["--thinking", "off"]])
+    assert.throws(() => withSelection({ ...agent, args: [...agent.args, ...extra] }, selection), (e) => e.reason === REFUSAL.MODEL_SELECTION_CONFLICT);
+  for (const bad of [{ ...selection, model: "" }, { ...selection, provider: "-x" }, { ...selection, thinkingLevel: undefined }, null])
+    assert.throws(() => withSelection(agent, bad), (e) => e.reason === REFUSAL.MODEL_SELECTION_MISSING);
+});
+
+/**
+ * A project the real launch checks can pass: Kiln's ignore block, a committed selection of a real catalogue model,
+ * this host's model-use grant, a stored key in an isolated Pi agent directory, and a compatibility record under the
+ * key computed from what Pi resolves. `model` and `stored` let one input be broken at a time.
+ */
+async function launchableProject({ model: modelId = null, stored = true } = {}) {
+  const { computeCompatibilityKey, COMPATIBILITY_RECORD } = await import("../lib/compatibility-record.mjs");
+  const { GRANT, consentLocation, recordGrant } = await import("../lib/consent-record.mjs");
+  const { resolvePinnedSdk } = await import("../lib/pi-runtime.mjs");
+  const sdk = await import(resolvePinnedSdk(ROOT).url);
+  const piVersion = resolvePinnedSdk(ROOT).version;
+
+  const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-launch-real-")));
+  const contentRoot = join(base, "planning-content");
+  mkdirSync(contentRoot, { recursive: true });
+  mkdirSync(join(base, ".pi", "runtime"), { recursive: true });
+  spawnSync("git", ["init", "-q"], { cwd: base });
+  writeFileSync(join(base, ".gitignore"), IGNORE_RULES.map((r) => r).join("\n") + "\n");
+  writeFileSync(join(base, ".pi", "kiln.json"), JSON.stringify({ recordVersion: 1, projectId: "1234567890abcdef1234567890abcdef" }, null, 2) + "\n");
+
+  const agentDir = join(base, "agent");
+  mkdirSync(agentDir);
+  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(stored ? { openai: { type: "api_key", key: "sk-kiln-launch-real-STORED-0b7e" } } : {}));
+  const registry = new sdk.ModelRegistry(await sdk.ModelRuntime.create({ authPath: join(agentDir, "auth.json"), modelsPath: join(agentDir, "models.json"), allowModelNetwork: false }));
+  const plain = registry.getAll().find((m) => m.provider === "openai" && !m.reasoning);
+  const selection = { provider: "openai", model: modelId ?? plain.id, thinkingLevel: "off" };
+  writeFileSync(join(base, ".pi", "settings.json"), JSON.stringify({ defaultProvider: selection.provider, defaultModel: selection.model, defaultThinkingLevel: selection.thinkingLevel }));
+
+  const location = consentLocation({ projectRoot: base });
+  await recordGrant(location, { grant: GRANT.MODEL_USE, granted: true, choice: { model: selection } });
+  const key = computeCompatibilityKey({ selection: { ...selection, model: plain.id }, model: plain, piVersion });
+  writeFileSync(join(base, ".pi", COMPATIBILITY_RECORD), JSON.stringify({ recordVersion: 1, key, result: { outcome: "passed", observedAt: "2026-09-22T00:00:00Z", challengeEchoed: true } }));
+  return { base, contentRoot, agentDir, selection };
+}
+
+/** The real command with its real launch checks, over that project and its isolated agent directory. */
+function realLaunch(project, args = [], env = {}) {
+  const r = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "start-kiln", "capture-launch.mjs"), ...args], {
+    env: { ...process.env, PLANNING_CONTENT_DIR: project.contentRoot, PI_CODING_AGENT_DIR: project.agentDir, KILN_CAPTURE_LAUNCH: "1", KILN_CAPTURE_REAL_CHECKS: "1", KILN_CAPTURE_ACCESS: "1", OPENAI_API_KEY: "sk-kiln-launch-real-ENV-6f21", ...env },
+    encoding: "utf-8",
+    cwd: ROOT,
+  });
+  const line = `${r.stdout}`.split("\n").find((l) => l.startsWith("KILN_LAUNCH "));
+  const access = `${r.stdout}`.split("\n").find((l) => l.startsWith("KILN_ACCESS "));
+  return {
+    status: r.status,
+    launch: line ? JSON.parse(line.slice("KILN_LAUNCH ".length)) : null,
+    access: access ? JSON.parse(access.slice("KILN_ACCESS ".length)) : null,
+    stdout: `${r.stdout}`,
+    stderr: `${r.stderr}`,
+  };
+}
+
+test("⚠️ TSK-0037 the real launch checks pass a launchable project, and Pi is held to exactly that selection", async () => {
+  const project = await launchableProject();
+  const o = realLaunch(project);
+  assert.ok(o.launch, `the real checks did not pass: ${o.stdout}${o.stderr}`);
+  const args = o.launch.agentArgs;
+  assert.deepEqual(args.slice(-6), ["--provider", "openai", "--model", project.selection.model, "--thinking", "off"]);
+  assert.match(o.stdout, /compatibility proved by this computer's record/);
+  // ⚠️ THE POSITIVE CONTROL for the refusals below: on the accepted path the recorder sees the credential read.
+  assert.ok(o.access, "the access counts were not written");
+  assert.ok(o.access.fs > 0, `the recorder did not see Pi read its authentication store: ${JSON.stringify(o.access)}`);
+  assert.equal(o.access.net, 0);
+});
+
+test("⚠️ ACC-0056 through the real command: a removed recorded model is refused by name, and nothing starts", async () => {
+  const project = await launchableProject({ model: "gpt-kiln-removed-9" });
+  const o = realLaunch(project);
+  assert.equal(o.launch, null, "the supervisor was reached with a removed model");
+  assert.equal(o.status, 2, o.stderr);
+  assert.match(o.stderr, /\[kiln\] The recorded model openai gpt-kiln-removed-9 is not in Pi's model registry on this computer/);
+  assert.match(o.stderr, /no other model was used in its place/);
+  assert.match(o.stderr, /\[kiln\] Run Kiln's setup for this project again/);
+  assert.match(o.stderr, /\[kiln\] Or start once with an explicit override/);
+});
+
+test("⚠️ ACC-0056 through the real command: absent authentication is refused by name, and nothing starts", async () => {
+  const project = await launchableProject({ stored: false });
+  const o = realLaunch(project, [], { OPENAI_API_KEY: "" });
+  assert.equal(o.launch, null, "the supervisor was reached with no authentication");
+  assert.equal(o.status, 2, o.stderr);
+  assert.ok(o.stderr.includes(`No authentication is configured for openai ${project.selection.model} on this computer`), o.stderr);
+  assert.match(o.stderr, /no other\s*\n?.*provider was used in its place|no other provider was used in its place/);
+  assert.match(o.stderr, /\[kiln\] Or start once with an explicit override/);
+});
+
+
+/** Nothing of Pi's authentication store, custom-model file, credential variables or network was touched. */
+const noCredentialAccess = (o, label) =>
+  assert.deepEqual({ fs: o.access?.fs, env: o.access?.env, net: o.access?.net }, { fs: 0, env: 0, net: 0 }, `${label}: a credential was touched: ${JSON.stringify(o.access)}`);
+
+test("⚠️ ACC-0054 through the real command: a host without model-use consent is refused before any credential is touched", async () => {
+  const project = await launchableProject();
+  rmSync(join(project.base, ".pi", "runtime", "consent.json"));
+  const o = realLaunch(project);
+  assert.equal(o.launch, null, "the supervisor was reached without consent");
+  assert.equal(o.status, 2, o.stderr);
+  assert.ok(o.stderr.includes(`This project records openai ${project.selection.model}, and its use has not been confirmed on this computer`), o.stderr);
+  assert.match(o.stderr, /no credential was read/);
+  noCredentialAccess(o, "no consent");
+});
+
+test("⚠️ ACC-0056 through the real command: a compatibility record for other conditions is refused before the supervisor starts", async () => {
+  const project = await launchableProject();
+  const path = join(project.base, ".pi", "runtime", "model-compatibility.json");
+  const record = JSON.parse(readFileSync(path, "utf-8"));
+  record.key.piVersion = "0.85.0";
+  writeFileSync(path, JSON.stringify(record));
+  const o = realLaunch(project);
+  assert.equal(o.launch, null, "the supervisor was reached with a mismatched record");
+  assert.equal(o.status, 2, o.stderr);
+  assert.ok(o.stderr.includes(`The compatibility record for openai ${project.selection.model} was taken under different conditions (piVersion)`), o.stderr);
+  assert.match(o.stderr, /\[kiln\] Run Kiln's setup for this project again/);
+});
+
+test("⚠️ through the real command: a non-interactive model override is refused before any credential is touched", async () => {
+  const project = await launchableProject();
+  const o = realLaunch(project, ["--provider", "openai", "--model", "gpt-4.1-mini", "--thinking", "off"]);
+  assert.equal(o.launch, null, "the supervisor was reached with an unconfirmed override");
+  assert.equal(o.status, 2, o.stderr);
+  assert.match(o.stderr, /\[kiln\] The one-run override openai gpt-4\.1-mini has to be confirmed before Kiln uses it, and this run cannot ask/);
+  noCredentialAccess(o, "non-interactive override");
 });
