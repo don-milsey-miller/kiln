@@ -20,5 +20,6 @@
   "dependsOn": [
     "TSK-0031",
     "TSK-0033"
-  ]
+  ],
+  "notes": "⚠️ CONSENT REUSE REQUIRES A CONCLUSIVE GIT CHECK. An unchanged project is not asked again only where Git gives a definite answer that the consent record is in neither the index nor HEAD and is ignored by the repository that holds it, or that no repository holds it. Without such an answer no saved answer is trusted or written, the answer applies only to the current run, and the operator is told so (NOT_REMEMBERED.unverified in lib/consent-record.mjs). The clean-machine requirement already specifies Git. Component proof in EVD-0126."
 }

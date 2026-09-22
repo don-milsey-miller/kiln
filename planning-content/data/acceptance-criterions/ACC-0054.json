@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0023"
+  ],
+  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0126 is component proof for TSK-0034: clone controls for project-local and per-user state, negative controls for a force-added record (R1), a staged but uncommitted removal (R5) and an unignored record in a parent repository (R6), and the no-Git limit (R4). This criterion is evaluated once the research choice writer (TSK-0035), the model selection writer and their clearGrants calls, and the launch path are connected, because the choice-change clause depends on writers that do not exist yet.",
+  "evidencedBy": [
+    "EVD-0126"
   ]
 }
