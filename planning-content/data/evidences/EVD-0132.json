@@ -27,7 +27,7 @@
       "test/supervisor.test.mjs": "sha256:4d93d124f68c3420d2fb3df4e2b8117780e77a39644813f0534fa5b4fedcfcdc",
       "test/fixtures/start-kiln/capture-launch.mjs": "sha256:dccb18db013af0a8cb5a414c2a79cc83f218b21fc00f13a51bf396ad0f3fd5f0",
       "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
-      "tests": "test/supervisor.test.mjs: 11 launch-path tests through the real command, plus the existing suite",
+      "tests": "test/supervisor.test.mjs: 12 launch-path tests, 11 of which run the real command in a child; the twelfth checks withSelection directly. Plus the existing suite.",
       "observation": "the real main() in a child with the supervisor recorded and the command's own checkLaunch; the access recorder started before main(), watching auth.json and models.json by name, OPENAI_API_KEY and ANTHROPIC_API_KEY, and the network; counts written at exit",
       "accepted-path": "supervisor reached; Pi's argument list ends --provider openai --model <catalogue model> --thinking off; compatibility proved by this computer's record; the recorder saw the authentication store read and no network attempt",
       "acc-0056-removed-model": "refused naming openai gpt-kiln-removed-9, 'no other model was used in its place', both remedies, exit 2, no supervisor",
