@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0025",
     "REQ-0028"
+  ],
+  "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0130 is component proof for TSK-0041: through Pi's real openai-completions client to a loopback endpoint, only an exact call with this run's challenge passes, and prose, malformed, extra, wrong, repeated and other-tool calls each fail under their own reason. No billable provider was called and the canary does not yet run in setup.",
+  "evidencedBy": [
+    "EVD-0130"
   ]
 }

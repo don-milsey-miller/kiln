@@ -1,0 +1,70 @@
+{
+  "id": "EVD-0130",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the bounded canary accepts only the exact one-time challenge, offers only kiln_preflight, sends no project content, and cannot reach the user-facing session",
+  "kind": "experiment",
+  "summary": "TSK-0041, toward ACC-0061 and ACC-0062, as COMPONENT PROOF ONLY. The implementation is commit eb70168, and the sha256 of each file is in the facts. Canary success is returned and never written; the record, its key and the approval prompt are TSK-0042's. WHAT WAS BUILT. lib/preflight-tool.mjs defines kiln_preflight and imports nothing, so it can reach no content, mutation, research, validation, delegation or shell. Its schema is {challenge} alone, 32 lowercase hexadecimal characters, with no additional properties, and it returns one fixed acknowledgement whatever it is called with. lib/live-canary-child.mjs builds one Pi agent session through the pinned SDK: tools [kiln_preflight] with the tool as its only custom tool, which Pi applies to the registry itself; an empty working directory; extensions, skills, prompt templates, themes and context files off; settings and session in memory; the canary's own system prompt; the model copied with maxTokens lowered to 256; and the session stopped once the tool has run. lib/live-canary.mjs makes a fresh 16-byte challenge per run, never returns or stores it, and passes only on exactly one call to kiln_preflight whose arguments are exactly {challenge} with that value, and only when Pi's reported registry and active set are exactly kiln_preflight. lib/pi-provider-canary.mjs's isolation (private root, the one selected stored credential or a $NAME reference, scoped environment, confirmed removal) is extracted into runCanaryChild, which both canaries use; its 24 existing tests pass unchanged. HOW IT IS OBSERVED. Each run goes through runLiveCanary, its isolated child, the pinned SDK's session and Pi's own openai-completions client to a loopback endpoint in the test process, which records every request exactly as Pi sent it and answers as scripted. An AGENTS.md holding a sentinel is planted above the canary's working directory, where Pi looks for context files. RESULTS. (1) ACC-0061: an exact call passes with one request only; the challenge is carried in the request and not returned; the temporary root is removed. (2) ACC-0062 at the provider boundary: the only tool offered is kiln_preflight with required [challenge], additionalProperties false and the single property challenge; the ceiling Pi sent is 256, not the model's 4096; the messages are the canary's system prompt and one user request; the planted context sentinel, the project directory, planning names, other tool names and the key are absent from the request. (3) ACC-0061 FAILURES: prose claiming support, a wrong challenge, an extra argument, no argument, arguments that are not JSON, a number, another tool's name and two calls each fail under their own reason, without repeating the challenge, and leave no temporary root. A model not in the registry sends no request. (4) The judge refuses a registry or active set holding anything besides kiln_preflight, and an oversized argument; the predicate refuses an uppercase challenge, an array, and a value not of the declared shape. (5) REMOVAL BEFORE THE USER-FACING SESSION: the package neither declares nor registers kiln_preflight, the orchestrator's known tool names exclude it, the user-facing --tools allowlist excludes it, no file under lib/, pi-package/ or specialists/ other than the canary's three names it, and on the pinned SDK a session whose allowlist omits it neither registers nor activates it when asked. The acknowledgement is fixed for any arguments. (6) D14, REASONING MODEL: a reasoning model with maxTokens 32000 at thinking levels low and high passes, with reasoning_effort sent as that level and max_completion_tokens 256 in the request Pi sends. A probe at minimal, low, medium and high gave 256 at each. LIMITS. No billable provider was called, and only Pi's openai-completions request format was exercised; an API type that uses a thinking budget, such as anthropic-messages, is not measured. The acknowledgement is returned to Pi but, because the session stops after the one call, never reaches the provider (D15). The challenge reaches the child as a command-line argument: single-use and not secret, but visible in a process listing while the canary runs (D16). The approval prompt, --live-model-check and running the canary in setup are TSK-0042's and TSK-0060's, so ACC-0061 and ACC-0062 are not evaluated. MUTATIONS, RUN LOCALLY ON WINDOWS. Fourteen changes each failed the tests: no tool allowlist in the child, the project as the working directory, context files loaded, the model's own token ceiling, no stop after the call, Pi's system prompt, any tool name accepted, the tool set not checked, several calls accepted, extra argument keys accepted, the challenge value not compared, an acknowledgement echoing the challenge, the tool module importing something, and reasoning models exempted from the ceiling. Three of them survived a first pass and the controls that catch them were added before commit. Each was restored byte-identical by sha256. CI had not run on eb70168 when this was recorded, and its result is added separately.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commit eb70168a6b92a91d4f6f87467543fc53b9460e12; wording correction c88610d",
+      "lib/preflight-tool.mjs": "sha256:055259250baa7cf12ee4372a7f905b39cf83be3a1e50ec7366d418fbb23536ca",
+      "lib/live-canary.mjs": "sha256:5587474ef649d8eaa4e6ff0d70445a374fd748c5b9af2435039128fb2b03b443",
+      "lib/live-canary-child.mjs": "sha256:e2921d266f6cf40e339472fad26728f2c3bf7e54f8ed825f2dbc96582d5f9816",
+      "lib/pi-provider-canary.mjs": "sha256:0ff63304f77b75f7a62e134cf2079e955f3dd6fd41c9cd117b1202cb04bcdc7b",
+      "test/live-canary.test.mjs": "sha256:f26f4da06bd7550d9621773c5a12ed076447f77f1ef056ba327ffe3c4398d9f7",
+      "platform": "Windows 11, Node 24.18.0, Pi 0.84.4 (the pin)",
+      "tests": "test/live-canary.test.mjs 8 tests pass; test/pi-provider-canary.test.mjs 24 tests pass unchanged after the refactor",
+      "observation": "runLiveCanary through its isolated child, the pinned SDK session and Pi's openai-completions client to a loopback endpoint recording each request; an AGENTS.md sentinel planted above the working directory",
+      "exact-call": "passes; exactly one request; challenge carried and not returned; temporary root removed",
+      "provider-boundary": "tools offered: kiln_preflight only, required [challenge], additionalProperties false; max_completion_tokens 256 against a model maxTokens of 4096; messages: canary system prompt plus one user request; no context sentinel, project path, planning names, other tool names or key",
+      "failures": "prose, wrong challenge, extra argument, no argument, not JSON, a number, another tool, two calls: each its own reason, no challenge in the refusal, no temporary root left; a missing model sends no request",
+      "removal": "not declared or registered by the package; not in KNOWN_TOOL_NAMES; not in the user-facing --tools allowlist; named nowhere under lib/, pi-package/ or specialists/ outside the canary's three files; a pinned-SDK session whose allowlist omits it neither registers nor activates it",
+      "d14-reasoning-ceiling": "reasoning model, maxTokens 32000: at low and high, reasoning_effort equals the level and max_completion_tokens is 256; probe at minimal, low, medium, high gave 256 each",
+      "decisions-reviewed": "D14 closed by the reasoning control; D15 the session stops after the call; D16 the challenge travels by argv",
+      "mutations": "14 of 14 killed locally on Windows, each restored byte-identical by sha256; three first-pass survivors closed before commit",
+      "full-suite-local": "npm test on Windows: 1528 tests, 1523 pass, 0 fail, 5 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "acc-0061-and-acc-0062-evaluation",
+        "state": "not-captured",
+        "reason": "No billable provider was called and the canary does not yet run in setup. This is component proof."
+      },
+      {
+        "fact": "billable-provider",
+        "state": "not-captured",
+        "reason": "Every run used a loopback endpoint through Pi's real openai-completions client."
+      },
+      {
+        "fact": "thinking-budget-api-types",
+        "state": "not-captured",
+        "reason": "Only openai-completions was exercised. An API type that uses a thinking budget, such as anthropic-messages, is not measured."
+      },
+      {
+        "fact": "record-and-approval",
+        "state": "not-captured",
+        "reason": "Storing canary success against its key, the approval prompt and --live-model-check are TSK-0042's."
+      },
+      {
+        "fact": "ci-run",
+        "state": "not-captured",
+        "reason": "CI had not run on eb70168 when this was recorded. Only local Windows results are recorded here, and the CI result is added separately."
+      }
+    ]
+  }
+}
