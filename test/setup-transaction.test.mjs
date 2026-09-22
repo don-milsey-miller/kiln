@@ -1115,3 +1115,39 @@ test("⚠️ a write is adopted only for a planned target, only while the transa
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("⚠️ adoption cannot launder another process's edit into the plan: only .gitignore is self-written", async () => {
+  // Adoption replaces the identity `merge` compares against. Offered for any planned target it would take whatever
+  // somebody else had just written, record it as the plan's own, and let the next merge pass the concurrent-edit
+  // check that exists to refuse exactly that. So the merged targets are not adoptable, and the proof is that a
+  // concurrent edit to one of them still refuses AFTER adoption was attempted.
+  const root = project();
+  try {
+    writeFileSync(join(root, ".pi", "settings.json"), settings({ mine: true }), "utf-8");
+
+    await runTransaction({ projectRoot: root, files: [{ path: ".pi/settings.json" }, { path: ".gitignore" }] }, async (tx) => {
+      // Another process, between the plan and the merge.
+      writeFileSync(join(root, ".pi", "settings.json"), settings({ theirs: true }), "utf-8");
+
+      assert.throws(
+        () => adoptPlannedWrite(tx, join(root, ".pi", "settings.json")),
+        (e) => e instanceof SetupRefusal && e.reason === REFUSAL.NOT_SELF_WRITTEN,
+        "a merged target must not be adoptable"
+      );
+
+      // ⚠️ THE POINT OF THE TEST: the refusal that protects their edit still fires.
+      await assert.rejects(
+        () => tx.merge(".pi/settings.json", () => settings({ mine: true })),
+        (e) => e instanceof SetupRefusal && e.reason === REFUSAL.CONCURRENT_EDIT,
+        "the concurrent-edit check was laundered away"
+      );
+      assert.deepEqual(JSON.parse(read(root, ".pi/settings.json")), { theirs: true }, "their edit survives untouched");
+
+      // The ignore file, which no merge writes, remains adoptable — that is the whole exception.
+      writeFileSync(join(root, ".gitignore"), ".planning/\n", "utf-8");
+      assert.equal(adoptPlannedWrite(tx, join(root, ".gitignore")).state, "present");
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
