@@ -1,0 +1,77 @@
+{
+  "id": "EVD-0133",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the ordered setup command's first slice runs D26's order, keeps its pre-install graph to Node built-ins, installs locked dependencies without lifecycle scripts, and fixes ignore coverage inside the planned transaction",
+  "kind": "experiment",
+  "summary": "TSK-0060 SLICE 1, toward ACC-0083 and — not yet evaluated — ACC-0085, ACC-0043, ACC-0045, ACC-0106, ACC-0107, ACC-0108. The implementation is commit e808b96 with its two review fixes in 7ef9d4d; the sha256 of each file is in the facts. WHAT THE COMMAND DOES, IN D26'S ORDER. `node .planning/bin/setup.mjs` resolves and prints five paths (tool root, project root, content root, settings, runtime state) before it mutates anything, refusing a --project-root that disagrees with the resolved content owner and printing both; validates this runtime against the checkout's engines.node; takes the single setup lock in the project root and holds it for the whole run; installs this checkout's locked dependencies; dynamically imports the state library, the initializer, the ignore owner and the journal's schema validator; decides state coverage by rendering the state library's own three choices; then builds the transaction plan and runs its phases — state-coverage when a fix was chosen, initialize, state-protection, project-identity — and only then opens the journal, which lives in the directory those phases have just protected and created, and sets the resume command. On success the journal is removed, so a completed run leaves nothing to recover from. ACC-0083, THE PRE-INSTALL IMPORT GRAPH. The command's static import graph is walked from bin/setup.mjs through every relative import, transitively: node:crypto, node:readline, node:fs, node:path, node:child_process, node:url, and lib/content-root.mjs, lib/dependency-freshness.mjs, lib/lock.mjs, lib/setup-transaction.mjs, lib/initialize-project.mjs — no installed package at any depth. The check is itself checked: a file with a top-level `import Ajv from \"ajv/dist/2020.js\"` and one with `@earendil-works/pi-coding-agent` are both caught, so a scan that found nothing because it looks for nothing would fail. Everything the command needs after the install — Ajv through lib/runtime-records.mjs, the state library, the initializer, the ignore owner — is imported dynamically, after the install step. THE BOOTSTRAP INSTALL. It is `npm ci --ignore-scripts`, spawned through this process's npm_execpath when there is one and the platform's npm otherwise, with cwd set to the tool root. `ci` refuses a lockfile that is missing or disagrees with package.json BEFORE it changes anything, which is the check the lockfile digest could only make afterwards; --ignore-scripts keeps dependency install lifecycle scripts from running. The digest of package-lock.json is still taken before and after, and a change is a refusal. In the tests the install is a seam that captures the project tree at the moment it ran: the consumer project was byte-identical to its pre-run state, and the five paths had already been printed. THE COVERAGE FIX IS INSIDE THE TRANSACTION. The operator is asked before the transaction, because deciding only reads; the write that answer authorises is a declared `state-coverage` phase, placed first, because every later phase writes into the paths it protects. The ignore owner keeps the write — it appends against a read taken at the moment of writing, which a whole-file merge cannot do — and now takes the transaction as a collaborator, like createStateRoot: the lease is authenticated rather than duck-typed, and the project it may write in is the transaction's to state rather than the caller's. MEASURED: a malformed .pi/kiln.json makes the plan refuse before any phase runs, and .gitignore is not written at all; a forged lease, a transaction open over another project, and a transaction that has already finished each write nothing; with no transaction the owner still writes, which is the initializer's path. WHAT ELSE WAS MEASURED. A project id is minted once and reused on the next run, and the journal is gone when setup completes. A rerun with the same inputs changes no byte of what setup owns, including the mtime of .pi/kiln.json. A missing-coverage project is shown the state library's three options with the exact bytes of the block; answering nothing, `stop`, `user-state` or nonsense stops with nothing written; a --non-interactive run refuses on the same object and writes no content, no runtime state and no ignore file. An interrupted bootstrap leaves the consumer project untouched with no journal to resume, and the next run completes. A runtime below engines.node refuses before the install. LIMITS. This is one slice. --local-state user refuses by name: an external user-local root is keyed by the committed project id, which this command cannot print before the install, so ACC-0085 is deliberately NOT evaluated until every supported state path is implemented. The slice does not register the package, verify the Pi version, write the skill-override entry, ask for consent, discover or select a model, run the preflight canary or the live model check, read anything back, or map exit codes beyond the classes it can reach; ACC-0106, ACC-0107, ACC-0108, ACC-0043 and ACC-0045 are spanning criteria and stay not-evaluated until the later slices land and the integration record is written. `state-coverage` being a DECLARED PHASE rather than merely inside the transaction body is not observable in this slice: the journal opens after the last phase and is removed on success, so no run here can be caught mid-phase. Its mutation is the one that survives. No provider, network or npm registry was reached: the install is a seam in every test. CI. GitHub Actions run 35767341949 at 7ef9d4d, attempt 1 with no job re-run, passed in all four cells, and the 13 setup-command tests ran in every cell. The live compatibility tier ran in the ubuntu Node 24 cell and passed 6 of 6. MUTATIONS, RUN LOCALLY ON WINDOWS. Fourteen changes, each restored byte-identical by sha256. Thirteen were caught: paths printed after the install, a project-root disagreement ignored, the runtime check skipped, a rewritten lockfile tolerated, the coverage refusal skipped, a non-interactive run answering its own question, the transaction not reusing the held lock, lock reuse without opting in (caught by test/initialize-project.test.mjs), an identity minted every run, the coverage fix applied before the plan again, the install unlocked back to `npm install`, the ignore owner's lease not authenticated, and that lease not bounded to one project. The fourteenth — running the fix inside the transaction body but outside a declared phase — was not caught, for the reason stated above.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commits e808b96acf7146d98f32cc8765b68ab4846c7580 (slice 1) and 7ef9d4d (F2 and F3 fixes)",
+      "bin/setup.mjs": "sha256:29723c892f74740e73bbec82d4ccb930ddc2d4f2dcfa95e07eb8d1a4cea1c486",
+      "lib/project-gitignore.mjs": "sha256:fe938453a44058ded9d84080e5e97a554a36ad2fed2bcf085fb4bd5cab67fce7",
+      "lib/lock.mjs": "sha256:20bb15026239089e898f173c689356636eb5df487f8d42ec7b3c65d696a60b53",
+      "test/setup-command.test.mjs": "sha256:8ea055da1a09b8ef78f04c5fb77bf233510bc88788eb08904b3d60102f14b683",
+      "test/project-gitignore.test.mjs": "sha256:b972a05bd66fb608d1ea6e788e1b8e250b11b87179f6704ee389499215643d66",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1",
+      "tests": "test/setup-command.test.mjs: 13 tests, all running the real main() against a temporary Git repository with two seams (npm and the operator's answer). test/project-gitignore.test.mjs: 54 tests, one of them the transaction lease.",
+      "acc-0083-graph": "walked from bin/setup.mjs through every relative import: 6 node: built-ins and lib/content-root.mjs, lib/dependency-freshness.mjs, lib/lock.mjs, lib/setup-transaction.mjs, lib/initialize-project.mjs; zero installed packages at any depth",
+      "acc-0083-self-check": "a file importing ajv/dist/2020.js and a file importing @earendil-works/pi-coding-agent are both caught by the same scan",
+      "install-arguments": "npm ci --ignore-scripts, cwd = tool root, through npm_execpath when set and npm/npm.cmd otherwise; asserted on both paths",
+      "install-confinement": "at the moment the install ran, the consumer project tree was byte-identical to its pre-run state and the five paths had been printed",
+      "lockfile": "package-lock.json digest taken before and after; a rewrite is EXIT.INSTALL with nothing of the project changed",
+      "coverage-fix-planned": "a malformed .pi/kiln.json is refused at plan time: exit 7, no .gitignore written, no content written, and the malformed record itself unchanged",
+      "ignore-owner-lease": "a forged lease, a transaction open over another project, and a finished transaction each refuse and write nothing; with no transaction the owner still writes",
+      "identity": "minted once (32 hex characters), reused on the next run, journal absent after success",
+      "rerun": "byte-identical tree on a second run, and .pi/kiln.json keeps its mtime on a third",
+      "non-interactive": "refuses with the state library's own options and writes no .pi, no content and no .gitignore",
+      "interrupted-bootstrap": "consumer project unchanged, no .pi directory, no journal; the next run completes",
+      "mutations": "14 run locally on Windows, 13 killed, 1 survives (a declared phase is not observable in this slice); each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1571 tests, 1566 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 507 artifacts",
+      "locked-install-resolves": "npm ci --ignore-scripts --dry-run in this checkout: 'up to date', so package-lock.json and package.json agree and the real bootstrap resolves",
+      "ci-run": "GitHub Actions run 35767341949 at 7ef9d4d, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell",
+      "cell-windows-22": "job 106880098244, 1571 tests / 1570 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 106880098607, 1571 tests / 1570 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 106880098743, 1571 tests / 1561 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 106880098728, 1571 tests / 1561 pass / 0 fail / 10 skipped",
+      "live-tier": "ubuntu-latest Node 24 cell only (job 106880098728), KILN_PI_COMPAT=live: 6 of 6 pass; skipped in the other three cells"
+    },
+    "omissions": [
+      {
+        "fact": "real-npm-install",
+        "state": "not-captured",
+        "reason": "npm is a seam in every test: spawning it would install a dependency graph per case. What is asserted is the exact argument list on both npm paths, the cwd, the lockfile digest either side, and that the project tree was untouched when the install ran."
+      },
+      {
+        "fact": "user-local-state",
+        "state": "not-captured",
+        "reason": "--local-state user refuses by name in this slice, so ACC-0085 is not evaluated until every supported state path is implemented."
+      },
+      {
+        "fact": "declared-phase-observability",
+        "state": "not-captured",
+        "reason": "The journal opens after the last phase and is removed on success, so no run in this slice can be caught mid-phase. Running the coverage fix outside a declared phase is the one mutation that survives."
+      },
+      {
+        "fact": "later-slices",
+        "state": "not-captured",
+        "reason": "Package registration, the Pi version check, the skill-override entry, consent, model discovery and selection, the preflight canary, the live model check, read-back and the full exit-code mapping are slices 2 to 4. The spanning criteria stay not-evaluated until the integration record."
+      }
+    ]
+  }
+}
