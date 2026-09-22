@@ -827,22 +827,22 @@ test("⚠️ nothing of this host is read before the inspection is allowed, and 
         { fs: 0, credentials: 0 },
         `${what}: something of this host was read before the operator allowed it`
       );
-      // ⚠️ **AND NO CREDENTIAL VARIABLE IS EVEN NAMED BEFORE THE QUESTION.** Loading Pi's SDK — which the trust
-      // phase needs, and which the proposal orders before this one — runs its bundled `debug`, and that calls
-      // `Object.keys(process.env)` for its own DEBUG settings. It reads no value, but enumerating would show which
-      // credential variables this computer has, and presence is precisely what this consent gates. Setup therefore
-      // loads the SDK through a view of the environment those names are not in: the recorder watches three of them
-      // by name, and none appears in any event — not a get, not a descriptor.
+      // ⚠️ **NOT ONE ENVIRONMENT EVENT, NOT MERELY NO CREDENTIAL ONES.** Loading Pi's SDK — which the trust phase
+      // needs, and which the proposal orders before this one — runs its bundled `debug`, and that calls
+      // `Object.keys(process.env)` for its own DEBUG settings. It reads no value, but an enumeration shows which
+      // credential variables this computer has, and presence is precisely what this consent gates. So the trust
+      // decision is taken in a child with an environment built by naming variables, and this process touches the
+      // environment not at all before the question: a filter for credential names would pass an enumeration that
+      // saw every one of them.
       assert.deepEqual(
-        access.env.filter((e) => /API_KEY|TOKEN/i.test(e)),
-        [],
-        `${what}: a credential variable was named before the operator allowed it: ${access.env.join(" | ")}`
+        { events: asked.before.env, net: asked.before.net },
+        { events: 0, net: 0 },
+        `${what}: the environment or the network was touched before the operator allowed it: ${access.env.join(" | ")}`
       );
-      assert.equal(asked.before.net, 0, `${what}: the network was reached before consent`);
 
-      // And after a decline, it stays unread: nothing in the run had permission to look.
+      // And a declined run never touches them at all: nothing in it had permission to look.
       assert.deepEqual(access.fs.filter((f) => /auth\.json|models\.json/i.test(f)), [], `${what}: the store was read anyway`);
-      assert.deepEqual(access.env.filter((e) => /get OPENAI_API_KEY/.test(e)), [], `${what}: a credential variable was read anyway`);
+      assert.deepEqual(access.env, [], `${what}: the environment was read anyway: ${access.env.join(" | ")}`);
       assert.deepEqual(access.net, [], `${what}: the network was reached`);
 
       // A declined inspection records the decline; a closed input records nothing at all.
@@ -987,7 +987,33 @@ test("⚠️ a trust child that fails is a refusal, never a decision", async () 
     (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.TRUST,
     "an unreadable report must refuse"
   );
-  // And a well-formed report is returned as the decision it is.
-  const ok = await trustDecision("read", paths, modules, () => ({ status: 0, stdout: '{"state":"approved","agentDir":"/agent"}\n', stderr: "" }));
-  assert.deepEqual(ok, { state: "approved", agentDir: "/agent" });
+  // ⚠️ AND A FAILED CHILD DOES NOT PROMISE THAT NOTHING HAPPENED: it may have written the decision and failed on
+  // the read-back that proves it landed, so what the operator is told is that the result is unverified.
+  await assert.rejects(
+    () => trustDecision("approve", paths, modules, () => ({ status: 3, stdout: "", stderr: "" })),
+    (e) => /unknown/i.test(e.message) && !/nothing about this project's trust was changed/i.test(e.message),
+    "a failed recording must not claim nothing changed"
+  );
+
+  // ⚠️ **A PARSEABLE LINE IS NOT A DECISION.** Each of these parses, and each would have this run act on evidence
+  // about something else — another project, another question, or a report missing what makes it one.
+  const good = { state: "approved", projectRoot: paths.projectRoot, agentDir: "/agent", recordedFor: paths.projectRoot };
+  const line = (o) => ({ status: 0, stdout: `${JSON.stringify(o)}\n`, stderr: "" });
+  for (const [why, report, action] of [
+    ["another project", { ...good, projectRoot: join(ROOT, "somebody-elses-project") }, "approve"],
+    ["no project at all", { ...good, projectRoot: undefined }, "approve"],
+    ["no agent directory", { ...good, agentDir: "" }, "approve"],
+    ["a state Pi's store cannot give", { ...good, state: "probably" }, "read"],
+    ["an approval to a denial", { ...good }, "deny"],
+    ["not an object", "approved", "read"],
+  ])
+    await assert.rejects(
+      () => trustDecision(action, paths, modules, () => line(report)),
+      (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.TRUST,
+      `${why} was accepted as this project's trust`
+    );
+
+  // And a report that answers the question, about this project, is returned as the decision it is.
+  assert.deepEqual(await trustDecision("approve", paths, modules, () => line(good)), good);
+  assert.equal((await trustDecision("read", paths, modules, () => line({ ...good, state: "missing" }))).state, "missing");
 });

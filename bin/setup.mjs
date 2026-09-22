@@ -595,20 +595,61 @@ export async function trustDecision(action, paths, modules, spawn = spawnSync) {
     env: trustChildEnv([...BASE_ENV[process.platform === "win32" ? "win32" : "posix"], AGENT_DIR_ENV, AGENT_SESSION_DIR_ENV]),
   });
 
+  // ⚠️ **A FAILED CHILD IS AN UNKNOWN RESULT, NOT A GUARANTEED ABSENCE OF ONE.** It may have written the decision
+  // and then failed on the read-back that proves it landed, so "nothing was changed" would be a promise this
+  // process cannot keep. What is true is that the outcome is unverified, and that is what the operator is told.
   if (result.status !== 0)
     throw new SetupCommandRefusal(
       EXIT.TRUST,
-      `The project's trust decision could not be ${action === "read" ? "read" : "recorded"}.\n` +
+      `The project's trust decision could not be ${action === "read" ? "read" : "recorded and verified"}.\n` +
         `${String(result.stderr ?? "").trim() || `The check exited ${result.status ?? "on a signal"}.`}\n` +
-        `Nothing about this project's trust was changed.`,
+        `Whether anything was recorded is unknown${action === "read" ? "" : ": the check may have written the decision and failed to confirm it"}. ` +
+        `Rerun setup to see where this project's trust stands.`,
       { action, status: result.status }
     );
 
+  let report;
   try {
-    return JSON.parse(String(result.stdout).trim().split("\n").pop());
+    report = JSON.parse(String(result.stdout).trim().split("\n").pop());
   } catch {
     throw new SetupCommandRefusal(EXIT.TRUST, `The trust check did not report a decision this command could read.`, { action });
   }
+  return checkedTrustReport(report, action, paths);
+}
+
+/** The three answers Pi's store can give about a project. */
+const TRUST_STATES = new Set(["approved", "denied", "missing"]);
+
+/**
+ * The child's report, checked before it is treated as this project's trust.
+ *
+ * ⚠️ **A PARSEABLE LINE IS NOT A DECISION.** The report crosses a process boundary, and everything after this
+ * point acts on it: an "approved" for another project, for an action nobody requested, or without the directory
+ * it was recorded in would each make this run describe a trusted project on evidence about something else. Four
+ * things are checked — the state is one Pi's store can give, the action asked for is the state that came back,
+ * the project is the one this run is setting up, and the agent directory is named — because each of them is
+ * something a wrong or truncated report can get wrong while still parsing.
+ */
+function checkedTrustReport(report, action, paths) {
+  const refuse = (why) => {
+    throw new SetupCommandRefusal(
+      EXIT.TRUST,
+      `The trust check reported something this command cannot act on: ${why}.\n` +
+        `Whether anything was recorded is unknown. Rerun setup to see where this project's trust stands.`,
+      { action, why }
+    );
+  };
+
+  if (report === null || typeof report !== "object") refuse("the report is not an object");
+  if (!TRUST_STATES.has(report.state)) refuse(`${JSON.stringify(report.state)} is not a trust state`);
+  // ⚠️ THE ANSWER MUST BE TO THE QUESTION ASKED. A recorded approval reported for a denial is either a defect or
+  // a report about a different run, and acting on either is how a project nobody trusted gets described as one.
+  if (action === "approve" && report.state !== "approved") refuse(`an approval was requested and the state is ${report.state}`);
+  if (action === "deny" && report.state !== "denied") refuse(`a denial was requested and the state is ${report.state}`);
+  if (typeof report.agentDir !== "string" || report.agentDir.length === 0) refuse("it names no agent directory");
+  if (typeof report.projectRoot !== "string" || pathIdentityKey(canonicalPath(report.projectRoot)) !== pathIdentityKey(paths.projectRoot))
+    refuse(`it is about ${report.projectRoot ?? "no project"}, not ${paths.projectRoot}`);
+  return report;
 }
 
 /** The selection outcomes that mean this project has a model it may use on this computer. */
