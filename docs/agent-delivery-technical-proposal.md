@@ -705,18 +705,24 @@ The `sessionDir` field above applies to the default project-local state mode. In
 mode it is omitted from committed settings and supplied through the separately proved runtime path
 described in section 13.
 
-Invoke the pinned equivalent of:
+Setup registers the package through its own planned settings merge, and does **not** run `pi install
+-l` against the consumer project (amended 2026-09-22). The committed, portable literal is
+`../.planning/pi-package`, using `/` separators, and it is written only after it is proved to resolve
+from `.pi/settings.json` to this checkout's canonical package directory. If that proof fails — the
+checkout is not at `<project>/.planning`, or the directory is not the pinned package — setup refuses
+rather than constructing a different target. That the registered entry actually loads is proved by
+running pinned Pi against it.
 
-```sh
-pi install -l ./.planning/pi-package
-```
+The reason is the transaction. `.pi/settings.json` is a planned target: its identity is recorded
+before anything is written, and the merge refuses a file that moved, which is what protects another
+writer's edit. `pi install -l` writes that same file itself, so inside the plan it would have to be
+adopted — widening the rule that keeps a concurrent edit from being laundered into the plan — and
+outside the plan it would write a project file the transaction has not contained or probed. Neither
+is worth the registration command when the entry it produces is one line of proved, portable text.
 
-from the outer project root, then inspect the package entry Pi produced. The committed, portable
-literal must be `../.planning/pi-package`, using `/` separators and resolving from `.pi/settings.json`
-to the exact canonical package directory. If Pi writes an equivalent absolute or Windows-separator
-path, the settings merger may normalize only that proven-equivalent package entry. If equivalence
-cannot be proven, refuse rather than constructing a different target. Merge the remaining owned
-settings only after this validation.
+EVD-0079 and ACC-0105 remain the component proof of Pi's literal entry and its canonical equivalent:
+what `pi install -l` writes, and that the portable spelling is the same directory, are measured facts
+that do not depend on setup running the command.
 
 Project settings override global defaults. CLI `--provider`, `--model`, and `--thinking` flags may
 override them for one run but must not silently rewrite the project selection. **There is no
@@ -1259,8 +1265,10 @@ canary against the explicitly selected provider/model.
    or transaction record.
 9. Create/resume the non-secret transaction journal in the selected runtime directory.
 10. Obtain or verify the explicit project trust decision.
-11. Install/register `.planning/pi-package` project-locally.
-12. Register `planning-content/skills-overrides/`.
+11. Register `.planning/pi-package` project-locally through the planned settings merge, after proving
+   the portable entry resolves to this checkout's package directory, and prove pinned Pi loads it.
+12. Register the selected content root's `skills-overrides/`, as the entry that resolves to it from
+   `.pi/settings.json` rather than a fixed spelling.
 13. Obtain or verify explicit permission to inspect existing user/host connections. Before approval,
    do not read Pi's user auth/custom-model registry or check credential-variable presence.
 14. Discover available authenticated models and the presence-only Tavily state without exposing
