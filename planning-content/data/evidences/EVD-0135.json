@@ -1,0 +1,76 @@
+{
+  "id": "EVD-0135",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: setup asks before it looks, binds a model only on an explicit confirmation, and settles the research decision separately",
+  "kind": "experiment",
+  "summary": "TSK-0060 SLICE 3, toward ACC-0054 and — not yet evaluated — ACC-0106, ACC-0107, ACC-0043, ACC-0045, ACC-0085 and ACC-0108. The implementation is commit 4313e6e with its fixture correction in 5aaa2da; the sha256 of each file is in the facts. THE ORDER, AND WHAT IT PROTECTS. After the package is registered, setup obtains permission to inspect this computer's connections, and only then discovers models, binds one, proves its credential contract and settles the separate web-research decision. Pi's authentication store, its custom-model registry and the presence of any credential variable are all behind that one answer. Each phase is declared, and each is the existing writer's work rather than a second copy of it: `inspectWithConsent` for the grant and the discovery, `selectModel` for the choice, the confirmation, the grant and the settings write, `resolveProviderCredentials` for the contract, and `setUpResearch` for the Tavily decision. WHAT THE COMMAND ADDS. `--provider` and `--model` are given together or not at all; `--thinking` and `--research tavily|disabled` are their own. One typed line is turned into what these modules expect: an explicit yes or no becomes a boolean, a list choice stays a line, and a closed input is null — so an answer the command cannot read is never recorded as a decision, in any phase. A run with nobody to ask does not ask: it answers null without prompting, which records nothing, and hands the selection no `ask` at all, so a model nobody confirmed cannot be committed. A partial run — an inspection nobody allowed, a model nobody confirmed, a cancelled choice — exits 9 with the project, its identity, its protected runtime directory and its registered package all valid and the reason printed. NOTHING OF THIS HOST IS READ BEFORE THE ANSWER, AND IT IS OBSERVED RATHER THAN ASSERTED. A child runs the real command with Node's own fs, environment and network boundaries recorded from before it starts, and every question is recorded with the counts as they stood when it was asked. At the inspection question: zero reads of any auth.json or models.json, zero credential-variable reads — with OPENAI_API_KEY set in that environment — and no network. After a decline they stay at zero for the rest of the run. THE ONE THING THAT DOES TOUCH THE ENVIRONMENT IS NAMED: loading Pi's SDK, which the trust phase needs and which the proposal orders before this one, runs its bundled `debug`, and that calls Object.keys(process.env) to find its own DEBUG variables. The recorder sees an enumeration and, because Object.keys consults each own key's descriptor on a proxy, one descriptor event per watched name. No value is read: the control asserts the only event kinds before consent are `enumerate` and `descriptor`, never a `get`. The source was traced to debug/src/node.js inside the Pi bundle rather than inferred. RESULTS, THROUGH THE REAL COMMAND. (1) A complete run commits provider, model and thinking level to .pi/settings.json and records this host's model-use grant in the ignored runtime directory; neither file contains the stored key's sentinel. (2) A declined inspection stops the phases that depend on it, records the decline, and still settles the research choice, which \"not-inspected\" is a state that writer records without looking at anything. (3) A closed input records nothing at all — no consent file is written. (4) A changed selection moves both the committed model and the grant; a declined change leaves both exactly as they were. (5) A rerun that names nothing asks nothing and rewrites nothing: the committed selection and its approval are read back and reused, byte-identically. (6) With no Tavily credential the operator is not asked and no grant is recorded; with one present the question is asked and a no records the project's choice with the connection never checked. (7) A non-interactive run asks nothing, records nothing and commits no model. (8) A provider with no credential contract — the fixture's loopback custom provider — is refused by name. THE FIXTURES ARE THE REAL LAYOUT, AND NOTHING BILLABLE IS REACHABLE. Each project is a Git repository whose `.planning` is this checkout, with its own Pi agent directory holding a stored sentinel key for OpenAI and a custom provider pointed at a closed loopback port. Discovery is Pi's own registry, built with its network disabled; no inference is performed anywhere in these slices, and no case answers yes to the research question, because a yes is what makes the probe contact Tavily. A TEST THAT MEASURED THE MACHINE, FOUND BY CI. The first push passed locally and failed in all four cells: this computer has a real TAVILY_API_KEY in its environment, so setup found a connection and asked, while CI has none and did not. The presence of that variable decides whether the question is asked at all, so the harness now owns it — absent unless a case asks for it, and then an obvious fake — and the two paths are separate cases. Recorded here because the defect was in the measurement, not in the command. LIMITS. R9 is still half closed and the registration refusals still print as stack traces; both are owed by the remaining TSK-0060 work. Setup supplies no custom credential declaration, so a custom provider cannot be bound (D25, D13). `--local-state user` refuses by name. The preflight canary, the live model check, the read-back and the full exit-code mapping are slice 4, and the spanning criteria stay not-evaluated until the integration record. No model request is made by any phase in this slice, so nothing here proves the selected model works — that is what slice 4's live check is for. MUTATIONS, RUN LOCALLY ON WINDOWS. Eight changes, each restored byte-identical by sha256. Seven were caught: the inspection run without consent, a declined inspection still choosing a model, an unreadable answer counted as a yes, a run with nobody to ask asking anyway, a partial setup reported as complete, the credential contract not proved, and the research decision skipped. THE ONE THAT SURVIVES is dropping the derived skill-override entry from the selection's settings write, which no supported layout can distinguish while every non-default content root is refused — the same blind spot R9 leaves in slice 2.",
+  "outcome": "success",
+  "observedAt": "2026-09-22",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commits 4313e6e (slice 3) and 5aaa2da (the fixture correction)",
+      "bin/setup.mjs": "sha256:55590f173cf18d5bdf7d8695c0725a5cf34e06f0b785fe035852a0fc9ba471cb",
+      "lib/pi-settings.mjs": "sha256:e2deafdb88743f38947ed988af2f2f966678d56a489bbddad44ac0cc6a0ebc4c",
+      "test/setup-command.test.mjs": "sha256:df6ad4b647d360a1c54b76f7a90e369a580b42668e7472f4d75c59e3c0c873c1",
+      "test/fixtures/setup/capture-setup.mjs": "sha256:d78a1b418159ebed63a7941340a223efa596bdc5859332d4e207682ed19fb94b",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 24 tests, 20 of which run the real main(); one of those runs it in a child with every access recorded. The other four hold exported functions directly, the import graph being a static scan.",
+      "phases": "inspection, model, credential-contract and research, each declared, after trust and registration",
+      "order-observed": "at the inspection question: 0 reads of any auth.json or models.json, 0 credential-variable reads with OPENAI_API_KEY set, 0 network; unchanged after a decline",
+      "environment-before-consent": "enumeration and descriptor events only, from Pi's bundled debug calling Object.keys(process.env) at SDK load (debug/src/node.js), never a value read",
+      "complete-run": "provider, model and thinking level committed to .pi/settings.json; the model-use grant recorded in the ignored runtime directory; neither file contains the fixture's stored-key sentinel",
+      "declined-inspection": "exit 9, the decline recorded, the research choice still settled as not-inspected, the project valid",
+      "closed-input": "exit 9 with no consent file written at all",
+      "changed-selection": "the committed model and the grant both move; a declined change leaves both as they were",
+      "rerun": "a rerun that names nothing asks nothing and changes no bytes",
+      "research": "with no credential the operator is not asked and no grant is recorded; with one present the question is asked and a no records the project's choice with the connection never checked",
+      "non-interactive": "asks nothing, records nothing, commits no model, exit 9",
+      "custom-provider": "refused by name for want of a credential contract (D25)",
+      "no-billable-provider": "Pi's registry is built with its network disabled, the fixture's custom provider points at a closed loopback port, no inference is performed, and no case answers yes to the research question",
+      "mutations": "8 run locally on Windows, 7 killed, 1 survives (the derived skill entry, unobservable while every non-default content root is refused); each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1585 tests, 1580 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 509 artifacts",
+      "ci-run": "GitHub Actions run 35781602432 at 5aaa2da, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell. The previous push (4313e6e, run 35780113706) failed in all four cells on one test that measured the operator's environment rather than the command; 5aaa2da is that correction.",
+      "cell-windows-22": "job 106928178643, 1585 tests / 1584 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 106928179380, 1585 tests / 1584 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 106928179173, 1585 tests / 1575 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 106928179281, 1585 tests / 1575 pass / 0 fail / 10 skipped",
+      "live-tier": "ubuntu-latest Node 24 cell only (job 106928179281), KILN_PI_COMPAT=live: 6 of 6 pass; skipped in the other three cells"
+    },
+    "omissions": [
+      {
+        "fact": "live-model-request",
+        "state": "not-captured",
+        "reason": "No phase in this slice makes a model request, so nothing here shows the selected model works. That is slice 4's preflight canary and live check."
+      },
+      {
+        "fact": "tavily-probe",
+        "state": "not-captured",
+        "reason": "No case answers yes to the research question, because the probe is what contacts Tavily. What a probe does is measured in the research component's own tests against an injected fetch."
+      },
+      {
+        "fact": "custom-provider-binding",
+        "state": "not-captured",
+        "reason": "Setup supplies no custom credential declaration, so a custom provider is refused rather than bound (D25, D13)."
+      },
+      {
+        "fact": "content-root-elsewhere",
+        "state": "not-captured",
+        "reason": "R9 remains half closed: the skill entry is derived and proved, but every content root other than <project>/planning-content is refused, which is also why the surviving mutation is unobservable."
+      }
+    ]
+  }
+}
