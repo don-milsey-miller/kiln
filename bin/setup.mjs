@@ -82,6 +82,8 @@ export const EXIT = Object.freeze({
   SETUP: 7,
   /** A project nobody has trusted, or one somebody denied: the scaffold is fine, the agent is not ready. */
   TRUST: 8,
+  /** An answer left setup partial: nothing billable is enabled, and the project is still valid. */
+  CONSENT: 9,
 });
 
 export class SetupCommandRefusal extends Error {
@@ -94,7 +96,7 @@ export class SetupCommandRefusal extends Error {
 }
 
 /** The options this slice reads. The whole argument surface, and its `--help`, belong to TSK-0061. */
-const VALUED = new Set(["--project-root", "--name", "--description", "--local-state", "--trust"]);
+const VALUED = new Set(["--project-root", "--name", "--description", "--local-state", "--trust", "--provider", "--model", "--thinking", "--research"]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
 export function parseArgs(argv) {
@@ -117,6 +119,10 @@ export function parseArgs(argv) {
     if (flag === "--description") out.description = value;
     if (flag === "--local-state") out.localState = value;
     if (flag === "--trust") out.trust = value;
+    if (flag === "--provider") out.provider = value;
+    if (flag === "--model") out.model = value;
+    if (flag === "--thinking") out.thinking = value;
+    if (flag === "--research") out.research = value;
   }
   if (out.localState !== "project" && out.localState !== "user") return { error: `--local-state is "project" or "user", got ${JSON.stringify(out.localState)}.` };
   // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
@@ -124,6 +130,12 @@ export function parseArgs(argv) {
   // approval.
   if (out.trust !== undefined && out.trust !== "approve" && out.trust !== "deny")
     return { error: `--trust is "approve" or "deny", got ${JSON.stringify(out.trust)}.` };
+  // ⚠️ A CHANGED SELECTION NEEDS BOTH HALVES. `--provider` alone cannot name a model and `--model` alone cannot say
+  // whose it is, and guessing either from the other is how a run binds to something nobody asked for.
+  if ((out.provider === undefined) !== (out.model === undefined))
+    return { error: `--provider and --model are given together, or neither.` };
+  if (out.research !== undefined && out.research !== "tavily" && out.research !== "disabled")
+    return { error: `--research is "tavily" or "disabled", got ${JSON.stringify(out.research)}.` };
   return out;
 }
 
@@ -338,6 +350,10 @@ async function runPhases({ paths, args, ask, print, modules }) {
         "project-identity",
         "trust",
         "registration",
+        "inspection",
+        "model",
+        "credential-contract",
+        "research",
       ]);
 
       // ⚠️ FIRST, BECAUSE EVERY LATER PHASE WRITES INTO THE PATHS IT PROTECTS (REQ-0027). The ignore owner does
@@ -368,11 +384,47 @@ async function runPhases({ paths, args, ask, print, modules }) {
       await tx.beginJournal();
       await tx.setRecovery(resumeCommand(paths.projectRoot), "setup was interrupted after the journal began");
 
-      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules }));
+      // ⚠️ THE AGENT DIRECTORY IS ASKED OF PI ONCE, AND NAMED EXPLICITLY EVERYWHERE. `pi-trust` and the
+      // inspection both refuse to guess it: Pi's own default is the operator's home store, and a default here
+      // would record a decision, or read an authentication file, somewhere nobody named.
+      const agentDir = await modules.runtime.resolvePinnedAgentDir(paths.toolRoot);
+      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules, agentDir }));
       if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, trust, registered: null };
 
       const registered = await tx.phase("registration", () => register({ tx, paths, print, modules }));
-      return { initialized, identity, trust, registered };
+
+      // ⚠️ **CONSENT FIRST, AND NOTHING OF THE HOST'S IS READ BEFORE IT.** Pi's authentication store, its
+      // custom-model registry and the presence of any credential variable are all behind this one answer; the
+      // phases below exist in this order because each needs what the one before it was allowed to look at.
+      const location = modules.consent.consentLocation({ projectRoot: paths.projectRoot });
+      const validators = modules.records.createRuntimeValidators();
+      const asking = interactively(args, ask);
+
+      const inspection = await tx.phase("inspection", () =>
+        modules.inspection.inspectWithConsent({ location, ask: asking.grant, agentDir })
+      );
+      print(inspection.summary);
+      if (!inspection.inspected) {
+        // ⚠️ A DECLINED INSPECTION IS AN ANSWER, AND IT STOPS THE PHASES THAT DEPEND ON IT. The research choice
+        // still runs, because "not-inspected" is a state it knows how to record without looking at anything.
+        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+        return { initialized, identity, trust, registered, inspection, research, selection: null };
+      }
+
+      const selection = await tx.phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators }));
+      if (selection.selection) print(`model ${selection.selection.provider} ${selection.selection.model} (${selection.selection.thinkingLevel})`);
+      if (!READY_SELECTIONS.has(selection.outcome)) {
+        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+        return { initialized, identity, trust, registered, inspection, selection, research };
+      }
+
+      const contract = await tx.phase("credential-contract", () =>
+        modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom: null })
+      );
+      print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
+
+      const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+      return { initialized, identity, trust, registered, inspection, selection, contract, research };
     },
     { lock: { reuseHeld: true } }
   );
@@ -388,12 +440,8 @@ async function runPhases({ paths, args, ask, print, modules }) {
  * ⚠️ **AND A DENIAL IS AN ANSWER, NOT A FAILURE.** The scaffold this run has already written stays, and it stays
  * valid; what the operator is told is that the agent is not ready and what would make it ready.
  */
-async function decideTrust({ paths, args, ask, print, modules }) {
+async function decideTrust({ paths, args, ask, print, modules, agentDir }) {
   const { TRUST, readTrust, grantTrust, denyTrust } = modules.trust;
-  // ⚠️ THE AGENT DIRECTORY IS ASKED OF PI, AND NAMED EXPLICITLY. `pi-trust` has no default for it on purpose:
-  // Pi's own default is the operator's home store, and defaulting to it would record a decision in the wrong
-  // place. Resolving it here rather than at import keeps Pi's SDK out of a run that refuses earlier.
-  const agentDir = await modules.runtime.resolvePinnedAgentDir(paths.toolRoot);
   const where = { projectRoot: paths.projectRoot, agentDir, toolRoot: paths.toolRoot };
 
   // ⚠️ **AN EXPLICIT ANSWER OUTRANKS A RECORDED ONE, IN BOTH DIRECTIONS.** `--trust approve` is the operator
@@ -502,6 +550,81 @@ Nothing of the project was changed.`, {
   }
 }
 
+/** The selection outcomes that mean this project has a model it may use on this computer. */
+const READY_SELECTIONS = new Set(["selected", "confirmed", "reused"]);
+
+/**
+ * One typed line, turned into what each of these modules expects.
+ *
+ * ⚠️ **A YES OR NO IS A BOOLEAN, AND NOTHING ELSE IS.** Consent, model confirmation and the research choice all
+ * record only an explicit boolean, so an answer this cannot read must arrive as something that is not one:
+ * anything else would turn "the operator typed something odd" into a decision remembered on their behalf. A
+ * choice from a list is a line, and a closed input is `null` everywhere.
+ *
+ * ⚠️ **AND A RUN WITH NOBODY TO ASK DOES NOT ASK.** `grant` answers `null` without prompting, so a consent
+ * record is never written for a question nobody saw; `choice` is undefined, which is how the selection and the
+ * research choice know they cannot ask and refuse instead of defaulting.
+ */
+function interactively(args, ask) {
+  const typed = async (prompt) => {
+    const line = await ask(prompt);
+    if (line === null || line === undefined) return null;
+    const said = String(line).trim();
+    if (/^(y|yes)$/i.test(said)) return true;
+    if (/^(n|no)$/i.test(said)) return false;
+    return said;
+  };
+  return args.nonInteractive ? { grant: async () => null, choice: undefined } : { grant: typed, choice: typed };
+}
+
+/**
+ * The project's model: discovered from what this host is authenticated for, chosen, confirmed and granted.
+ *
+ * ⚠️ **THE EXISTING WRITERS DO THE WORK, INCLUDING CLEARING THE OLD GRANT.** A changed selection has to clear
+ * this host's approval for the previous model BEFORE the new one is written, or a run could inherit an approval
+ * for a model nobody approved; `selectModel` owns that rule, and setup's job here is to hand it the inspection,
+ * the thinking support and the rest of the settings state.
+ */
+async function chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators }) {
+  const thinkingSupport = await modules.selection.loadThinkingSupport({ inspection, agentDir });
+  // ⚠️ THE SELECTION'S WRITE CARRIES THE SAME SKILL ENTRY REGISTRATION WROTE, derived from the content root
+  // rather than spelled again here: two writers of one key that disagree would leave the file with both.
+  const { skillsEntry } = modules.settings.skillOverrideEntry({ projectRoot: paths.projectRoot, contentRoot: paths.contentRoot });
+  return modules.selection.selectModel({
+    transaction: tx,
+    location,
+    inspection,
+    thinkingSupport,
+    ask: asking.choice,
+    print,
+    requested: { provider: args.provider, model: args.model, thinking: args.thinking },
+    settings: { stateMode: modules.localState.STATE_MODE.PROJECT, skillsEntry },
+    validators,
+  });
+}
+
+/**
+ * The web-research decision, which is separate from the model's and asked on its own.
+ *
+ * ⚠️ **THE PRESENCE COMES FROM THE INSPECTION, NOT FROM A SECOND LOOK.** `researchCredential` is what the one
+ * granted inspection saw — present, absent, or not-inspected — and passing it through is what keeps this
+ * phase from reading the environment on its own.
+ */
+async function decideResearch({ tx, location, inspection, args, asking, modules, validators, print }) {
+  const result = await modules.research.setUpResearch({
+    transaction: tx,
+    location,
+    presence: inspection.researchCredential,
+    ask: asking.choice,
+    request: args.research,
+    adapter: modules.tavily.createTavilyAdapter({}),
+    validators,
+  });
+  print(result.message);
+  if (result.hint) print(result.hint);
+  return result;
+}
+
 /** The state library's own three choices, rendered as it returned them. */
 export function renderChoices(options) {
   return options
@@ -530,7 +653,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     warn(args.error);
     warn(
       "This slice takes --project-root <path>, --name <text>, --description <text>, --local-state project, " +
-        "--trust approve|deny, --non-interactive, --resume."
+        "--trust approve|deny, --provider <id> --model <id>, --thinking <level>, --research tavily|disabled, " +
+        "--non-interactive, --resume."
     );
     return EXIT.ARGUMENTS;
   }
@@ -569,6 +693,13 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         settings: await import("../lib/pi-settings.mjs"),
         package: await import("../lib/pi-package.mjs"),
         packageEntry: await import("../lib/pi-package-entry.mjs"),
+        consent: await import("../lib/consent-record.mjs"),
+        inspection: await import("../lib/connection-inspection.mjs"),
+        selection: await import("../lib/model-selection.mjs"),
+        credentials: await import("../lib/pi-provider-credentials.mjs"),
+        research: await import("../lib/research-enablement.mjs"),
+        tavily: await import("../lib/research/tavily-adapter.mjs"),
+        records: await import("../lib/runtime-records.mjs"),
         crypto: await import("node:crypto"),
         journalValidate: await journalValidator(),
       };
@@ -595,7 +726,22 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         return EXIT.TRUST;
       }
 
-      print("setup complete for this slice: paths, runtime, dependencies, initialization, state protection, identity, journal, trust, registration");
+      // ⚠️ **A PARTIAL SETUP IS REPORTED AS ONE, WITH THE PROJECT LEFT VALID.** An inspection nobody allowed, a
+      // model nobody confirmed and a cancelled choice are all answers; none of them is a failure of the command,
+      // and none of them may be described as a ready agent. The project, its identity, its protected runtime
+      // directory and its registered package all stand, and the operator can answer later.
+      if (!done.inspection?.inspected || !READY_SELECTIONS.has(done.selection?.outcome)) {
+        warn(`Setup is partial: this project has no model it may use on this computer yet.`);
+        warn(
+          done.inspection?.inspected
+            ? `  the model was ${done.selection?.outcome === "declined" ? "declined" : "not confirmed"}; rerun setup to choose one`
+            : `  this computer's connections were not inspected, so no model could be offered; rerun setup to allow it`
+        );
+        warn(`Everything else this run set up is written and valid.`);
+        return EXIT.CONSENT;
+      }
+
+      print("setup complete for this slice: paths, runtime, dependencies, initialization, state protection, identity, journal, trust, registration, inspection, model, credential contract, research");
       return EXIT.OK;
     });
   } catch (e) {
@@ -629,6 +775,14 @@ export function reportFailure(e, print = say) {
   if (e?.name === "SupervisorRefusal") {
     for (const line of String(e.message).split("\n")) warn(line);
     return EXIT.RUNTIME;
+  }
+  // ⚠️ **KILN'S REFUSALS REACH THE OPERATOR AS REFUSALS, NOT AS STACK TRACES.** Each of these classes carries a
+  // written message and a `reason`; printing the object instead would bury what was refused under a trace of
+  // where. Which exit code each class deserves is the mapping TSK-0061 publishes — until then they share the
+  // setup class, which is at least honest about "this run refused and wrote nothing further".
+  if (typeof e?.reason === "string" && typeof e?.name === "string" && e.name.endsWith("Refusal")) {
+    for (const line of String(e.message).split("\n")) warn(line);
+    return EXIT.SETUP;
   }
   if (e instanceof SetupRefusal || e?.name === "LocalStateRefusal" || e?.name === "LockError") {
     for (const line of String(e.message).split("\n")) warn(line);

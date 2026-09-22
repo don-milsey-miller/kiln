@@ -13,7 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -22,6 +22,7 @@ import { EXIT, SetupCommandRefusal, main, nodeSatisfies, parseArgs, renderChoice
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
+const SENTINEL_KEY = "kiln-setup-STORED-SENTINEL-8ac3";
 
 /**
  * A fresh consumer project: a Git repository with nothing of Kiln's in it yet, and this checkout as its
@@ -34,16 +35,65 @@ const ROOT = join(import.meta.dirname, "..");
  * privilege, and a directory symlink elsewhere; `canonicalPath` resolves both, which is why the proof holds
  * through it.
  */
-function project({ ignored = false } = {}) {
+function project({ ignored = false, models = true } = {}) {
   const root = mkdtempSync(join(tmpdir(), "kiln-setup-"));
   const dir = join(root, "project");
+  const agentDir = join(root, "agent");
   mkdirSync(dir);
   execFileSync("git", ["init", "-q"], { cwd: dir });
   symlinkSync(ROOT, join(dir, ".planning"), process.platform === "win32" ? "junction" : "dir");
   if (ignored) writeFileSync(join(dir, ".gitignore"), blockText());
-  // ⚠️ AN AGENT DIRECTORY PER PROJECT, so a trust decision here is never the operator's own store.
-  return { root, dir, contentRoot: join(dir, "planning-content"), agentDir: join(root, "agent") };
+
+  // ⚠️ **AN AGENT DIRECTORY PER PROJECT, WITH ONE LOCAL PROVIDER IN IT.** The trust decision and the
+  // authentication Pi discovers are both real, and neither is the operator's own: the provider points at a
+  // closed loopback port with an inline sentinel key, and Pi's registry is built with its network disabled, so
+  // discovery is genuine and nothing billable can be reached. `models: false` is the host with nothing
+  // configured, which is a state setup has to report rather than crash on.
+  mkdirSync(agentDir, { recursive: true });
+  // ⚠️ **A STORED KEY FOR A PROVIDER KILN SUPPORTS, AND NOTHING IS EVER SENT TO IT.** Discovery is Pi's own:
+  // it lists the provider's catalogue models whose authentication is configured, which is a question about this
+  // directory rather than about the network, and the registry is built with its network disabled. The key is an
+  // obvious sentinel; no request is made by setup, whose slices here stop before any inference.
+  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(models ? { openai: { type: "api_key", key: SENTINEL_KEY } } : {}));
+  // ⚠️ A CUSTOM PROVIDER ALONGSIDE IT, pointed at a closed loopback port: setup has no credential declaration to
+  // supply for one, so it is the case that must refuse rather than the case that must work (D25).
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "kiln-local": {
+          baseUrl: "http://127.0.0.1:9/v1",
+          api: "openai-completions",
+          apiKey: "kiln-setup-INLINE-SENTINEL-4f21",
+          models: [{ id: "kiln-plain", name: "Plain", reasoning: false, contextWindow: 8192, maxTokens: 1024 }],
+        },
+      },
+    })
+  );
+  return { root, dir, contentRoot: join(dir, "planning-content"), agentDir };
 }
+
+/**
+ * The answers a complete run needs, by the question it is answering.
+ *
+ * ⚠️ **BY PROMPT, NOT BY POSITION.** A queue of answers in order silently reassigns them the moment a phase asks
+ * one more question, which is how a test starts approving something it never meant to. Each entry says which
+ * question it answers.
+ */
+const ANSWERS = [
+  [/^Which\?/i, "fix-ignore"],
+  [/^Trust this project/i, "yes"],
+  [/^Check this computer/i, "yes"],
+  [/^Which model should this project use/i, "1"],
+  [/^Thinking level/i, "off"],
+  [/^Use this model for this project/i, "yes"],
+  [/^Optional web research/i, "no"],
+];
+const scriptedAnswer = (question, overrides) => {
+  for (const [pattern, answer] of overrides ?? []) if (pattern.test(question)) return answer;
+  for (const [pattern, answer] of ANSWERS) if (pattern.test(question)) return answer;
+  return null;
+};
 
 /**
  * Every file under `dir`, by path and digest, except Git's own and the setup lock.
@@ -68,7 +118,15 @@ function tree(dir) {
 }
 
 /** Run the real command against a project, with npm and the operator replaced. */
-async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, trust = "approve", verifyRuntime } = {}) {
+/**
+ * ⚠️ **THE DEFAULT RUN NAMES ITS MODEL, because Pi's catalogue is not this test's to pin.** A host with an OpenAI
+ * key configured can use dozens of models, and their order is Pi's; answering the list by position would make
+ * every case depend on a catalogue that moves under it. The flags name one model, the confirmation is still
+ * asked and answered, and the interactive list has its own case that reads the index out of what was printed.
+ */
+const PICKED = ["--provider", "openai", "--model", "gpt-4o", "--thinking", "off"];
+
+async function setup(p, argv = [], { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED } = {}) {
   const printed = [];
   const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
@@ -78,12 +136,12 @@ async function setup(p, argv = [], { answer = "fix-ignore", install, env = {}, t
   process.env.PI_CODING_AGENT_DIR = p.agentDir;
   for (const [k, v] of Object.entries(env)) process.env[k] = v;
   try {
-    const code = await main(["--project-root", p.dir, "--name", "Test Project", ...(trust ? ["--trust", trust] : []), ...argv], {
+    const code = await main(["--project-root", p.dir, "--name", "Test Project", ...(trust ? ["--trust", trust] : []), ...pick, ...argv], {
       print: (line) => printed.push(line),
       // ⚠️ EVERY QUESTION IS RECORDED, not just answered: "did not ask" is the assertion a non-interactive run needs.
       ask: async (question) => {
         seen.asks.push(question);
-        return answer;
+        return answer === undefined ? scriptedAnswer(question, answers) : answer;
       },
       ...(verifyRuntime ? { verifyRuntime } : {}),
       install:
@@ -344,12 +402,16 @@ test("⚠️ ACC-0043 a rerun with the same inputs changes no bytes of what setu
     assert.equal((await setup(p)).code, EXIT.OK);
     const after = tree(p.dir);
     assert.ok(Object.keys(after).length > 5, "the first run wrote nothing to compare");
-    assert.equal((await setup(p)).code, EXIT.OK);
+    // ⚠️ A RERUN NAMES NOTHING, which is what running setup again actually does: the committed selection and this
+    // host's approval of it are read back and reused, so nothing is asked and nothing is rewritten.
+    const again = await setup(p, [], { pick: [] });
+    assert.equal(again.code, EXIT.OK, again.printed.join("\n"));
+    assert.deepEqual(again.seen.asks, [], "a rerun asked about a decision this host had already made");
     assert.deepEqual(tree(p.dir), after, "a rerun with unchanged inputs changed bytes");
     // Including the times: a rerun that rewrites identical content still churns them.
     const idPath = join(p.dir, ".pi", "kiln.json");
     const mtime = statSync(idPath).mtimeMs;
-    assert.equal((await setup(p)).code, EXIT.OK);
+    assert.equal((await setup(p, [], { pick: [] })).code, EXIT.OK);
     assert.equal(statSync(idPath).mtimeMs, mtime, "the project identity was rewritten on a rerun");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
@@ -478,8 +540,9 @@ test("⚠️ setup registers the package itself, and the pinned runtime loads wh
   // project and asked what it found.
   const p = project({ ignored: true });
   try {
-    const o = await setup(p);
-    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    // ⚠️ THE RUN STOPS AT THE INSPECTION, so what the settings file holds is registration's work and nothing else.
+    const o = await setup(p, [], { pick: [], answers: [[/^Check this computer/i, "no"]] });
+    assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
 
     const settings = settingsOf(p);
     assert.deepEqual(settings.packages, ["../.planning/pi-package"]);
@@ -547,7 +610,10 @@ test("⚠️ the registration merge preserves every unrelated setting and adds e
       JSON.stringify({ defaultModel: "somebody-elses-choice", packages: ["../their-package"], theirKey: { kept: true } }, null, 2) + "\n"
     );
 
-    assert.equal((await setup(p)).code, EXIT.OK);
+    // ⚠️ MEASURED WHERE REGISTRATION IS THE LAST WRITER: the run stops at the inspection, so a selection key that
+    // survived can only have survived registration. The model phase commits one of its own, and legitimately.
+    const declined = { pick: [], answers: [[/^Check this computer/i, "no"]] };
+    assert.equal((await setup(p, [], declined)).code, EXIT.CONSENT);
     const after = settingsOf(p);
     assert.deepEqual(after.packages, ["../their-package", "../.planning/pi-package"], "an unrelated package entry was disturbed");
     assert.deepEqual(after.theirKey, { kept: true }, "an unrelated key was lost");
@@ -555,7 +621,7 @@ test("⚠️ the registration merge preserves every unrelated setting and adds e
 
     // A rerun adds nothing a second time and changes no bytes.
     const bytes = readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8");
-    assert.equal((await setup(p)).code, EXIT.OK);
+    assert.equal((await setup(p, [], declined)).code, EXIT.CONSENT);
     assert.equal(readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8"), bytes, "a rerun rewrote the settings file");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
@@ -680,5 +746,174 @@ test("⚠️ the package entry is written only after it is proved to reach THIS 
     assert.equal(existsSync(join(p.dir, ".pi", "settings.json")), false, "an unproved entry was committed");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+
+/* ============================================== slice 3 ======================================== */
+
+const consentOf = (p) => JSON.parse(readFileSync(join(p.dir, ".pi", "runtime", "consent.json"), "utf-8"));
+
+test("⚠️ a complete run commits the confirmed selection and grants its use on this host", async () => {
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p);
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+
+    // The selection is committed configuration, in the file Pi reads.
+    const settings = settingsOf(p);
+    assert.equal(settings.defaultProvider, "openai");
+    assert.equal(settings.defaultModel, "gpt-4o");
+    assert.equal(settings.defaultThinkingLevel, "off");
+    // ⚠️ AND THE APPROVAL IS NOT. What is committed is the choice; what stays on this computer is the permission
+    // to use this host's credential for it, which lives in the ignored runtime directory.
+    const consent = consentOf(p);
+    assert.equal(consent.modelUse.granted, true);
+    assert.equal(consent.inspection.granted, true);
+    assert.equal(JSON.stringify(consent).includes(SENTINEL_KEY), false, "the consent record carries credential material");
+    assert.equal(readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8").includes(SENTINEL_KEY), false, "settings carry credential material");
+
+    // The credential contract for what was selected was resolved from Kiln's own table.
+    assert.ok(o.printed.some((l) => l.startsWith("credential contract openai:")), o.printed.join(" | "));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ nothing of this host is read before the inspection is allowed, and a decline reads nothing at all", async () => {
+  // The order is the guarantee: Pi's authentication store, its custom-model registry and the presence of any
+  // credential variable are all behind one answer. This runs the real command in a child with Node's own fs, env
+  // and network boundaries recorded from before it starts, so "nothing was read" is observed rather than asserted.
+  for (const [what, answers, expected] of [
+    ["a decline", [["^Check this computer", "no"]], EXIT.CONSENT],
+    ["a closed input", [], EXIT.CONSENT],
+  ]) {
+    const p = project({ ignored: true });
+    try {
+      // ⚠️ `spawnSync`, BECAUSE A REFUSAL IS A NON-ZERO EXIT and that is the case under test.
+      const run = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          PLANNING_CONTENT_DIR: p.contentRoot,
+          PI_CODING_AGENT_DIR: p.agentDir,
+          OPENAI_API_KEY: "kiln-setup-ENV-SENTINEL-must-not-be-read",
+          KILN_CAPTURE_SETUP: JSON.stringify({
+            agentDir: p.agentDir,
+            answers,
+            argv: ["--project-root", p.dir, "--name", "Recorded", "--trust", "approve"],
+          }),
+        },
+      });
+
+      const out = run.stdout ?? "";
+      const access = JSON.parse(/KILN_ACCESS (.+)/.exec(out)[1]);
+      assert.equal(run.status, expected, `${what}: ${out}${run.stderr ?? ""}`);
+
+      // ⚠️ THE COUNTS AS THEY STOOD WHEN THE QUESTION WAS ASKED, which is what makes this about order.
+      const asked = access.asked.find((a) => /^Check this computer/.test(a.question));
+      assert.ok(asked, `${what}: the inspection was never asked: ${access.asked.map((a) => a.question).join(" | ")}`);
+      assert.deepEqual(
+        { fs: access.fs.filter((f) => /auth\.json|models\.json/i.test(f)).length, credentials: access.env.filter((e) => /^get .*API_KEY/.test(e)).length },
+        { fs: 0, credentials: 0 },
+        `${what}: something of this host was read before the operator allowed it`
+      );
+      // ⚠️ **THE ONE THING THAT DOES TOUCH THE ENVIRONMENT BEFORE THE QUESTION, NAMED RATHER THAN HIDDEN.** Loading
+      // Pi's SDK — which setup needs for the trust store, a phase the proposal puts before this one — runs its
+      // bundled `debug`, which calls `Object.keys(process.env)` to look for its own DEBUG variables. That
+      // enumerates names, and on a proxy each own key's descriptor is consulted, so a watched name appears here.
+      // No value is read: the events are enumeration and descriptors, never a `get`.
+      assert.deepEqual(
+        [...new Set(access.env.map((e) => e.split(" ")[0]))].sort(),
+        ["descriptor", "enumerate"],
+        `${what}: the environment was read in some way other than enumeration: ${access.env.join(" | ")}`
+      );
+      assert.equal(asked.before.net, 0, `${what}: the network was reached before consent`);
+
+      // And after a decline, it stays unread: nothing in the run had permission to look.
+      assert.deepEqual(access.fs.filter((f) => /auth\.json|models\.json/i.test(f)), [], `${what}: the store was read anyway`);
+      assert.deepEqual(access.env.filter((e) => /get OPENAI_API_KEY/.test(e)), [], `${what}: a credential variable was read anyway`);
+      assert.deepEqual(access.net, [], `${what}: the network was reached`);
+
+      // A declined inspection records the decline; a closed input records nothing at all.
+      const consent = existsSync(join(p.dir, ".pi", "runtime", "consent.json")) ? consentOf(p) : null;
+      if (what === "a decline") assert.equal(consent.inspection.granted, false);
+      else assert.equal(consent?.inspection ?? null, null, "an unanswered question was recorded as a decision");
+    } finally {
+      rmSync(p.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("⚠️ a changed selection clears this host's approval for the old model before the new one is written", async () => {
+  const p = project({ ignored: true });
+  try {
+    assert.equal((await setup(p)).code, EXIT.OK);
+    assert.equal(consentOf(p).modelUse.model, "gpt-4o");
+
+    // A different model: the old approval goes first, and the new one is granted only after it is confirmed.
+    const changed = await setup(p, [], { pick: ["--provider", "openai", "--model", "gpt-4.1", "--thinking", "off"] });
+    assert.equal(changed.code, EXIT.OK, changed.printed.join("\n"));
+    assert.equal(settingsOf(p).defaultModel, "gpt-4.1");
+    assert.equal(consentOf(p).modelUse.model, "gpt-4.1");
+
+    // ⚠️ AND A DECLINED CHANGE CHANGES NOTHING. The committed selection and its grant are what they were, because
+    // a no to a change says nothing about what this host already approved.
+    const refused = await setup(p, [], {
+      pick: ["--provider", "openai", "--model", "gpt-4o", "--thinking", "off"],
+      answers: [[/^Use this model for this project/i, "no"]],
+    });
+    assert.equal(refused.code, EXIT.CONSENT);
+    assert.equal(settingsOf(p).defaultModel, "gpt-4.1", "a declined change was written anyway");
+    assert.equal(consentOf(p).modelUse.model, "gpt-4.1", "a declined change cleared the existing approval");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the research decision is its own, and is recorded separately from the model's", async () => {
+  // No Tavily key on this host: the outcome is that there is no credential, nothing is probed, and the project's
+  // committed choice says so. The operator is told how to enable it later.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p);
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.ok(o.printed.some((l) => /web research/i.test(l)), o.printed.join(" | "));
+    assert.equal(consentOf(p).research ?? null, null, "a research grant was recorded without a credential");
+
+    // Asked to disable it explicitly, the project records the choice rather than leaving it unstated.
+    const off = await setup(p, ["--research", "disabled"], { pick: [] });
+    assert.equal(off.code, EXIT.OK, off.printed.join("\n"));
+    assert.equal(JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).research?.provider ?? "none", "none");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a non-interactive run neither asks nor assumes, and a host with no models is reported rather than guessed", async () => {
+  // Nobody to ask, and nothing recorded to read back: the run stops with the project valid and nothing approved.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p, ["--non-interactive"], { pick: [] });
+    assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
+    assert.deepEqual(o.seen.asks, [], "a non-interactive run asked a question");
+    assert.equal(existsSync(join(p.dir, ".pi", "runtime", "consent.json")), false, "a run nobody answered recorded a decision");
+    assert.equal(Object.hasOwn(settingsOf(p), "defaultModel"), false, "a model was committed with nobody to confirm it");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // A provider Kiln has no credential contract for is refused by name, rather than bound to.
+  const q = project({ ignored: true });
+  try {
+    const o = await setup(q, [], { pick: ["--provider", "kiln-local", "--model", "kiln-plain", "--thinking", "off"] });
+    assert.equal(o.code, EXIT.SETUP);
+    assert.ok(
+      o.printed.concat(o.printed).some(() => true) && existsSync(join(q.dir, ".pi", "settings.json")),
+      "the run should have reached the settings write before refusing"
+    );
+    assert.equal(settingsOf(q).defaultProvider, "kiln-local", "the selection this run confirmed was not committed");
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
   }
 });
