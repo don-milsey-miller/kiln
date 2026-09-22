@@ -6,12 +6,13 @@
   "lifecycle": "active",
   "outcome": "not-evaluated",
   "title": "An interrupted setup resumes from its journal and never deletes valid content",
-  "statement": "Killing setup partway through leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
+  "statement": "Killing setup after its journal has begun leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. Killing it during the dependency bootstrap, which runs before any journal exists, leaves consumer project state unchanged, and rerunning setup repeats the locked install safely. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
   "evaluates": [
     "CMP-0022"
   ],
   "verifies": [
     "REQ-0022",
     "REQ-0027"
-  ]
+  ],
+  "notes": "⚠️ AMENDED 2026-09-22 (D26). The dependency install now runs before the transaction plan, because the plan validates existing Kiln records and that validation needs Ajv. So there are two interruption windows, not one: before the journal exists, where the only mutation is the install inside the .planning checkout, and after it, where the journal names the last completed phase. The criterion asks for the right behaviour in each."
 }

@@ -359,11 +359,13 @@ The setup command performs all deterministic setup and then starts the combined 
 It may provide `--no-launch` for provisioning or automation, but a normal interactive first run must
 not require the user to discover another command.
 
-Expected visible milestones, with trust resolved before project package installation:
+Expected visible milestones, with dependencies installed before the project is initialized — the
+transaction plan cannot validate existing records until Ajv exists — and trust resolved before project
+package installation:
 
 ```text
-project initialized
 dependencies installed
+project initialized
 Pi runtime 0.84.4
 project trust approved
 Kiln Pi package registered for this project
@@ -1239,40 +1241,46 @@ canary against the explicitly selected provider/model.
 1. Resolve and print tool root, outer project root, content root, project settings, and runtime state
    paths before mutation.
 2. Validate Node compatibility before attempting to install a dependency graph that cannot run.
-3. Acquire the single project setup lock, validate existing schemas/paths/write capabilities, record
-   existing-file identities, and build the complete transaction plan.
-4. Call the existing initializer under that transaction and preserve its current
+3. Acquire the single project setup lock.
+4. Install the locked `.planning` dependencies if needed, using only the built-ins-only bootstrap
+   graph through completion of this step. ⚠️ **THIS IS WHY THE INSTALL COMES BEFORE THE PLAN.** The
+   transaction plan validates existing Kiln records, and that validation needs Ajv — which this step is
+   what provides. The install is a **bootstrap mutation confined to the `.planning` checkout**: it
+   changes no consumer project state and does not rewrite the lockfile, and an interruption during it
+   leaves nothing to resume from, so a rerun simply repeats the locked install.
+5. Dynamically import Ajv, the local-state library, the pinned Pi integration and the remaining setup
+   modules, and verify Pi's exact version.
+6. Validate existing schemas/paths/write capabilities, record existing-file identities, and build the
+   complete transaction plan.
+7. Call the existing initializer under that transaction and preserve its current
    idempotency/refusal semantics.
-5. Create or verify the stable non-secret project ID, then establish the approved project-local ignore
+8. Create or verify the stable non-secret project ID, then establish the approved project-local ignore
    block or validated external user-local state before writing any session, consent, compatibility,
    or transaction record.
-6. Create/resume the non-secret transaction journal in the selected runtime directory.
-7. Install the locked `.planning` dependencies if needed, using only the built-ins-only bootstrap
-   graph through completion of this step.
-8. Dynamically import the pinned Pi integration and verify its exact version.
-9. Obtain or verify the explicit project trust decision.
-10. Install/register `.planning/pi-package` project-locally.
-11. Register `planning-content/skills-overrides/`.
-12. Obtain or verify explicit permission to inspect existing user/host connections. Before approval,
+9. Create/resume the non-secret transaction journal in the selected runtime directory.
+10. Obtain or verify the explicit project trust decision.
+11. Install/register `.planning/pi-package` project-locally.
+12. Register `planning-content/skills-overrides/`.
+13. Obtain or verify explicit permission to inspect existing user/host connections. Before approval,
    do not read Pi's user auth/custom-model registry or check credential-variable presence.
-13. Discover available authenticated models and the presence-only Tavily state without exposing
+14. Discover available authenticated models and the presence-only Tavily state without exposing
     credentials or contacting external services.
-14. Perform authentication/local-provider setup if required, then rediscover under the same approved
+15. Perform authentication/local-provider setup if required, then rediscover under the same approved
     scope.
-15. Present sanitized results and obtain explicit selection or confirmation of the exact provider,
+16. Present sanitized results and obtain explicit selection or confirmation of the exact provider,
     model, and thinking level before persisting them.
-16. Resolve the selected provider credential contract and prove it through a disposable restricted
+17. Resolve the selected provider credential contract and prove it through a disposable restricted
     child; refuse an unknown/unsafe environment-only mapping.
-17. Obtain a separate Tavily validation/enablement choice. If approved, run `GET /usage`, report the
+18. Obtain a separate Tavily validation/enablement choice. If approved, run `GET /usage`, report the
     plain-English outcome, and persist only non-secret project choice and local consent state. If it is
     absent or declined, continue with web research unavailable.
-18. Run the zero-cost model/package/tool preflight.
-19. Obtain explicit consent for and run the bounded live model/tool canary unless an exact matching
+19. Run the zero-cost model/package/tool preflight.
+20. Obtain explicit consent for and run the bounded live model/tool canary unless an exact matching
     local success record exists. Decline or failure leaves the agent not ready and does not begin
     intake.
-20. Read back and validate all generated/merged state, mark the transaction complete, and remove the
+21. Read back and validate all generated/merged state, mark the transaction complete, and remove the
     completed journal.
-21. If launch is enabled, exec or spawn the combined runtime, prove browser identity/readiness, and
+22. If launch is enabled, exec or spawn the combined runtime, prove browser identity/readiness, and
     begin/resume intake.
 
 ### Idempotency and failure
