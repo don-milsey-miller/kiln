@@ -20,5 +20,5 @@
   "dependsOn": [
     "TSK-0060"
   ],
-  "notes": "⚠️ NON-INTERACTIVE MODEL-USE CONFIRMATION IS UNRESOLVED (EVD-0128). selectModel refuses when it cannot ask, because --provider and --model alone do not grant model use. This task must decide how a fresh non-interactive setup supplies that confirmation. ⚠️ THE HELP MUST NAME --research tavily AS THE WAY TO ENABLE RESEARCH LATER (EVD-0127), matching the hint every user-disabled research outcome carries."
+  "notes": "⚠️ NON-INTERACTIVE MODEL-USE CONFIRMATION IS UNRESOLVED (EVD-0128). selectModel refuses when it cannot ask, because --provider and --model alone do not grant model use. This task must decide how a fresh non-interactive setup supplies that confirmation. ⚠️ THE HELP MUST NAME --research tavily AS THE WAY TO ENABLE RESEARCH LATER (EVD-0127), matching the hint every user-disabled research outcome carries. ⚠️ DECLARED NON-SECRET IDENTITIES NEED AN INPUT (D22, EVD-0131). A model whose endpoint cannot be canonicalised or whose request profile holds unbounded inputs has no compatibility key without a declared identity, and setup and launch refuse it. This task's argument surface must provide a way to declare the endpoint and request identities, validated as non-secret labels, or such configurations cannot complete setup."
 }

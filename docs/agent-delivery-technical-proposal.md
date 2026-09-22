@@ -325,7 +325,11 @@ sanitised: stripping a query would let two differently routed endpoints share on
 identity that is merely "non-secret after normalisation" is not a property a persisted file may rely
 on. Such an endpoint needs an explicitly **declared** non-secret identity — recorded as
 `endpointIdentitySource`, because a measured identity and an asserted one are different claims about
-the same string — or the canary simply re-runs.
+the same string. Without one there is no key, and without a key there is no check: Kiln cannot show that
+any canary proved the request launch will make, so setup sends no live check and reports the agent not
+ready, and launch refuses. The same holds when the effective endpoint, which authentication may
+supply at request time, cannot be established without contacting anything. Until the setup argument
+surface lets an operator declare an identity, such a configuration cannot complete setup.
 
 Never store a credential value, a credential-derived fingerprint, or a URL containing user
 information. Timestamps, paths, session ids and consent state are deliberately **outside** the key:
