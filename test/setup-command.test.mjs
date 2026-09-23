@@ -16,7 +16,7 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { EXIT, SetupCommandRefusal, main, nodeSatisfies, parseArgs, renderChoices, resolvePaths, resumeCommand } from "../bin/setup.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
@@ -175,6 +175,9 @@ async function setup(
   process.env.PLANNING_CONTENT_DIR = p.contentRoot;
   // ⚠️ PI'S OWN STATE GOES IN THE FIXTURE, not in the operator's home: the trust decision is recorded for real.
   process.env.PI_CODING_AGENT_DIR = p.agentDir;
+  // ⚠️ RESTORED, NOT DELETED. A case that points LOCALAPPDATA at a fixture must not leave the runner without the
+  // real one, and deleting a variable this machine had is not the same as putting it back.
+  const savedEnv = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
   for (const [k, v] of Object.entries(env)) process.env[k] = v;
   try {
     const code = await main(
@@ -215,7 +218,10 @@ async function setup(
     else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
     if (savedTavily === undefined) delete process.env.TAVILY_API_KEY;
     else process.env.TAVILY_API_KEY = savedTavily;
-    for (const k of Object.keys(env)) delete process.env[k];
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
   }
 }
 
@@ -616,7 +622,7 @@ test("⚠️ setup registers the package itself, and the pinned runtime loads wh
   }
 });
 
-test("⚠️ R9 the skill-override entry is derived from the content root, and a root setup cannot own is refused", async () => {
+test("⚠️ R9 the skill-override entry is derived from the selected content root, and setup initializes there", async () => {
   // The entry used to be fixed at `../planning-content/skills-overrides`, while the content root can be selected
   // elsewhere. Two halves: the entry setup writes is derived from the resolved content root and proved to resolve
   // back to it, and a selection this command cannot create is refused instead of quietly making a second root.
@@ -641,14 +647,28 @@ test("⚠️ R9 the skill-override entry is derived from the content root, and a
       (e) => e.reason === SETTINGS_REFUSAL.SKILL_OVERRIDE_OUTSIDE
     );
 
-    // The command refuses a selection it cannot create, before anything is read or written.
-    const q = project();
+    // ⚠️ **AND THE COMMAND SETS UP THE CONTENT WHERE IT WAS SELECTED, rather than creating a second root beside
+    // it.** This is the half R9 was missing: the entry was derived and proved, but every non-default selection was
+    // refused, so nothing exercised the derivation through the command.
+    const q = project({ ignored: true });
     try {
       q.contentRoot = join(q.dir, "kiln-content");
       const o = await setup(q);
-      assert.equal(o.code, EXIT.PATHS);
-      assert.equal(existsSync(join(q.dir, "planning-content")), false, "a second content root was created");
-      assert.equal(existsSync(join(q.dir, ".pi")), false, "runtime state was written for a refused selection");
+      assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+      assert.equal(existsSync(join(q.dir, "kiln-content", "project.yaml")), true, "the selected content root was not initialized");
+      assert.equal(existsSync(join(q.dir, "planning-content")), false, "a second content root was created beside it");
+      assert.deepEqual(settingsOf(q).skills, ["../kiln-content/skills-overrides"]);
+      // ⚠️ AND THE OPERATOR IS TOLD what later runs need, since only the same selection finds this content again.
+      assert.ok(o.printed.some((l) => /later runs need the same selection/.test(l)), o.printed.join(" | "));
+
+      // ⚠️ THE ENTRY IS WHAT PI FOLLOWS, so the proof is Pi following it: an override in that directory wins.
+      writeFileSync(
+        join(q.dir, "kiln-content", "skills-overrides", "SKILL.md"),
+        ["---", "name: kiln-planning", "description: An override only the selected content root can supply.", "---", "", "override", ""].join("\n")
+      );
+      const found = await discover(q);
+      assert.deepEqual(found.errors, []);
+      assert.ok(found.skills.includes("kiln-planning"), found.skills.join(", "));
     } finally {
       rmSync(q.root, { recursive: true, force: true });
     }
@@ -1486,4 +1506,40 @@ test("⚠️ a host authenticated by an environment variable is not handed a sto
     () => runLiveCanary({ ...selection, storedAuthPath: join(tmpdir(), "kiln-no-such-auth-file.json") }),
     (e) => e.name === "CanaryRefusal" && e.reason === "canary-stored-auth-missing"
   );
+});
+
+test("⚠️ --local-state user keeps every runtime record outside the project, keyed by the committed id", async () => {
+  // The external root is keyed by the project's committed id and never by its path: a path-derived root moves the
+  // moment somebody renames the project, taking every transcript and consent record with it. So the id is
+  // committed first, in a transaction that plans that record and nothing else, and the root is named from it.
+  const p = project({ ignored: true });
+  const stateHome = join(p.root, "state-home");
+  try {
+    const o = await setup(p, ["--local-state", "user"], { env: { LOCALAPPDATA: stateHome, XDG_STATE_HOME: stateHome } });
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+
+    // ⚠️ THE RULE IS PRINTED BEFORE ANYTHING IS MUTATED, and the path as soon as the id makes it knowable.
+    const paths = o.printed.filter((l) => l.startsWith("runtime state"));
+    assert.match(paths[0], /keyed by this project's committed id/);
+    assert.equal(paths.length, 2, o.printed.join(" | "));
+
+    // ⚠️ THE ROOT IS TAKEN FROM WHAT THE COMMAND PRINTED, not rebuilt here: the layout under the per-user home is
+    // the state library's, and a test that spelled it again would be asserting its own copy of that rule.
+    const id = JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).projectId;
+    const runtime = paths[1].replace(/^runtime state /, "").trim();
+    const external = dirname(runtime);
+    assert.ok(runtime.startsWith(stateHome), `${runtime} is not under the fixture's state home`);
+    assert.equal(basename(external), id, `${external} is not keyed by the committed id`);
+
+    // Every runtime record is out there, and none of it is in the project.
+    for (const name of ["consent.json", "model-compatibility.json"])
+      assert.equal(existsSync(join(external, "runtime", name)), true, `${name} is not in the external root`);
+    assert.equal(existsSync(join(p.dir, ".pi", "runtime")), false, "runtime state was written into the project");
+
+    // ⚠️ AND NO SESSION PATH IS COMMITTED: the external root is this machine's, and the launcher supplies it.
+    assert.equal(Object.hasOwn(settingsOf(p), "sessionDir"), false, "an external run committed a machine-specific session path");
+    assert.equal(settingsOf(p).defaultModel, "gpt-4o");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
 });

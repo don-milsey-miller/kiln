@@ -30,6 +30,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -997,4 +998,46 @@ test("⚠️ an initializer the body never awaited still finishes under the lock
     [],
     "and what it built is whole, not caught halfway"
   );
+});
+
+test("⚠️ R9 a named content root is created where it was named, staged beside it, and never outside the project", async () => {
+  // The default is still one rule; a caller may name the directory instead, because a project whose content lives
+  // at `<project>/kiln-content` is one Kiln can run and setup owns making what it writes agree with that choice.
+  const dir = asGitRepository(project());
+  const staged = [];
+  // ⚠️ NESTED, DELIBERATELY: with a content root directly under the project, "beside the destination" and "in the
+  // project root" are the same directory, and the difference this asserts would be invisible.
+  const contentRoot = join(dir, "docs", "kiln-content");
+  const created = await init(dir, {
+    contentRoot,
+    // ⚠️ THE SWAP IS WATCHED, because where the scaffold is staged is not visible afterwards: the temp directory
+    // becomes the content root. A rename is only atomic within one filesystem, so it is staged beside its
+    // destination rather than in the project root.
+    rename: (from, to) => {
+      staged.push({ from, to });
+      renameSync(from, to);
+    },
+  });
+
+  assert.equal(created.status, STATUS.CREATED, JSON.stringify(created));
+  assert.equal(created.contentRoot, contentRoot);
+  assert.equal(existsSync(join(contentRoot, "project.yaml")), true);
+  assert.equal(existsSync(join(dir, "planning-content")), false, "the default root was created as well");
+  assert.equal(staged.length, 1);
+  assert.equal(dirname(staged[0].from), dirname(contentRoot), "the scaffold was staged away from its destination");
+  assert.notEqual(dirname(contentRoot), dir, "this case cannot tell the two staging places apart");
+
+  // ⚠️ AND NOT OUTSIDE THE PROJECT: the swap is a rename beside the destination and the committed settings hold a
+  // path relative to `.pi`, so a content root elsewhere is neither swappable nor spellable in a file every clone
+  // reads.
+  const elsewhere = project("kiln-init-outside-");
+  for (const [label, contentRoot] of [
+    ["outside the project", join(elsewhere, "content")],
+    ["the project itself", dir],
+  ]) {
+    const refused = await init(asGitRepository(project()), { contentRoot });
+    assert.equal(refused.status, STATUS.REFUSED, `${label}: ${JSON.stringify(refused)}`);
+    assert.equal(refused.reason, "invalid-content-root", label);
+    assert.equal(existsSync(join(elsewhere, "content")), false, `${label}: it was created anyway`);
+  }
 });

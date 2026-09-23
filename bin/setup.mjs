@@ -211,30 +211,18 @@ export function resolvePaths({ projectRoot: explicit = null, env = process.env }
         { named, owner, contentRoot }
       );
   }
-  // ⚠️ **SETUP CAN ONLY SET UP THE CONTENT ROOT THE INITIALIZER OWNS, AND SAYS SO RATHER THAN MAKING A SECOND.**
-  // `PLANNING_CONTENT_DIR` selects which content a run READS; the initializer creates `<project>/planning-content`
-  // by its own single rule. A run that accepted another selection would print one content root, create a second,
-  // and commit a skill-override entry for whichever of the two it happened to be holding.
-  const owned = join(owner, CONTENT_DIR_NAME);
-  if (pathIdentityKey(contentRoot) !== pathIdentityKey(canonicalPath(owned)))
-    throw new SetupCommandRefusal(
-      EXIT.PATHS,
-      `The selected content root is not the one this command can create.
-` +
-        `  selected: ${contentRoot}  (${candidate.how})
-  owned:    ${owned}
-` +
-        `Setting up a project whose content lives elsewhere is not supported yet: the initializer creates ` +
-        `${CONTENT_DIR_NAME}/ beside the project, and a run that accepted another selection would create a second ` +
-        `content root and register a skill-override path for whichever one it was holding. Nothing was read or ` +
-        `written. Unset the override, or run setup against the project that owns that content.`,
-      { selected: contentRoot, owned: canonicalPath(owned), how: candidate.how }
-    );
+  // ⚠️ **A SELECTED CONTENT ROOT IS SET UP WHERE IT WAS SELECTED (R9).** `PLANNING_CONTENT_DIR` chooses which
+  // content a run reads, and setup initializes into that directory rather than creating a second one beside it.
+  // What follows from the choice is the skill-override entry, which is derived from this path and proved to reach
+  // it, and the fact that later runs need the same selection — which is printed rather than assumed.
+  const selected = pathIdentityKey(contentRoot) !== pathIdentityKey(canonicalPath(join(owner, CONTENT_DIR_NAME)));
 
   return {
     toolRoot: TOOL_ROOT,
     projectRoot: owner,
     contentRoot,
+    contentRootSelected: selected,
+    contentRootHow: candidate.how,
     settingsPath: join(owner, ".pi", "settings.json"),
     // ⚠️ THE PROJECT-LOCAL RUNTIME PATH IS DERIVED FROM BUILT-INS so it can be printed before the install.
     // An external user-local root is keyed by the committed project id and derived by `lib/local-state.mjs`,
@@ -363,15 +351,9 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
   const { STATE_MODE, coverageState, createStateRoot, ensureProjectId, projectRecordTarget, stateRootFor } = modules.localState;
   const { randomBytes } = modules.crypto;
 
-  if (args.localState === "user")
-    throw new SetupCommandRefusal(
-      EXIT.STATE,
-      `--local-state user is not part of this slice: an external user-local root is keyed by the committed ` +
-        `project id, and this command cannot print its path before the install. Run with project-local state.`,
-      { localState: args.localState }
-    );
-
-  const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: paths.projectRoot });
+  const stateMode = args.localState === "user" ? STATE_MODE.USER : STATE_MODE.PROJECT;
+  const validators = modules.records.createRuntimeValidators();
+  const { roots, projectId } = await resolveStateRoot({ paths, stateMode, modules, validators, print });
 
   // ⚠️ **AN INTERRUPTED RUN IS CONTINUED DELIBERATELY, NEVER SILENTLY.** The journal's presence is the
   // interruption signal: a previous run got far enough to open it and did not finish. Every phase here is
@@ -410,10 +392,10 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
    * phase, where the journal can say it happened. The old order did the write here, outside the plan and with
    * no journal: the lock was held, but an interruption left a change nothing recorded.
    */
-  const covers = coverageState({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT, roots });
+  const covers = coverageState({ projectRoot: paths.projectRoot, mode: stateMode, roots });
   let coverageFix = null;
   if (!covers.covered) {
-    const decided = modules.localState.openStateRoot({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT });
+    const decided = modules.localState.openStateRoot({ projectRoot: paths.projectRoot, mode: stateMode, projectId });
     const options = decided.options ?? [];
     if (args.nonInteractive)
       throw new SetupCommandRefusal(EXIT.STATE, `${decided.refusal.message}\n${renderChoices(options)}`, { options: options.map((o) => o.id) });
@@ -433,7 +415,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
   const spec = {
     projectRoot: paths.projectRoot,
     stateRoot: roots.root,
-    stateMode: STATE_MODE.PROJECT,
+    stateMode,
     // ⚠️ THE IGNORE FILE IS A PLANNED TARGET WHEN THIS RUN INTENDS TO CHANGE IT, and only then. Planning it is
     // what gives the owner's append the containment check, the identity recorded before anything is written and
     // the writeability probe; the owner refuses a transaction that did not plan it. A run that needs no fix
@@ -470,13 +452,19 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         await tx.phase("state-coverage", async () => {
           await modules.gitignore.applyIgnoreBlock(coverageFix, { transaction: tx });
           print("added Kiln's block to .gitignore");
-          const now = coverageState({ projectRoot: paths.projectRoot, mode: STATE_MODE.PROJECT, roots });
+          const now = coverageState({ projectRoot: paths.projectRoot, mode: stateMode, roots });
           if (!now.covered)
             throw new SetupCommandRefusal(EXIT.STATE, "The ignore block was applied and the runtime paths are still not ignored. Nothing else was written.", {});
         });
 
       const initialized = await tx.phase("initialize", () =>
-        initializeProject({ projectRoot: paths.projectRoot, name: args.name, description: args.description, transaction: tx })
+        initializeProject({
+          projectRoot: paths.projectRoot,
+          contentRoot: paths.contentRoot,
+          name: args.name,
+          description: args.description,
+          transaction: tx,
+        })
       );
       // ⚠️ THE INITIALIZER REPORTS REFUSALS AND DAMAGE AS DATA, and its statuses are its own vocabulary.
       if (initialized.status === modules.init.STATUS.REFUSED || initialized.status === modules.init.STATUS.DAMAGED)
@@ -510,8 +498,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // ⚠️ **CONSENT FIRST, AND NOTHING OF THE HOST'S IS READ BEFORE IT.** Pi's authentication store, its
       // custom-model registry and the presence of any credential variable are all behind this one answer; the
       // phases below exist in this order because each needs what the one before it was allowed to look at.
-      const location = modules.consent.consentLocation({ projectRoot: paths.projectRoot });
-      const validators = modules.records.createRuntimeValidators();
+      const location = modules.consent.consentLocation({ projectRoot: paths.projectRoot, stateMode, projectId });
       const asking = interactively(args, ask);
 
       const inspection = await tx.phase("inspection", () =>
@@ -525,7 +512,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         return { initialized, identity, trust, registered, inspection, research, selection: null };
       }
 
-      const selection = await tx.phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators }));
+      const selection = await tx.phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators, selectionStateMode: stateMode }));
       if (selection.selection) print(`model ${selection.selection.provider} ${selection.selection.model} (${selection.selection.thinkingLevel})`);
       if (!READY_SELECTIONS.has(selection.outcome)) {
         const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
@@ -834,7 +821,7 @@ function interactively(args, ask) {
  * for a model nobody approved; `selectModel` owns that rule, and setup's job here is to hand it the inspection,
  * the thinking support and the rest of the settings state.
  */
-async function chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators }) {
+async function chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators, selectionStateMode }) {
   const thinkingSupport = await modules.selection.loadThinkingSupport({ inspection, agentDir });
   // ⚠️ THE SELECTION'S WRITE CARRIES THE SAME SKILL ENTRY REGISTRATION WROTE, derived from the content root
   // rather than spelled again here: two writers of one key that disagree would leave the file with both.
@@ -847,7 +834,7 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
     ask: asking.choice,
     print,
     requested: { provider: args.provider, model: args.model, thinking: args.thinking },
-    settings: { stateMode: modules.localState.STATE_MODE.PROJECT, skillsEntry },
+    settings: { stateMode: selectionStateMode, skillsEntry },
     validators,
   });
 }
@@ -1015,6 +1002,42 @@ export function canaryRequest(ctx, preflight) {
   return { ...ctx.selection, declared: ctx.declared, storedAuthPath: stored };
 }
 
+/**
+ * Where this project's runtime state lives, and the id an external root is keyed by.
+ *
+ * ⚠️ **AN EXTERNAL ROOT CANNOT BE NAMED UNTIL THE PROJECT HAS AN ID, AND THE ID IS COMMITTED CONFIGURATION.** It
+ * is not derived from the project's path on purpose: a path-derived root moves the moment somebody renames or
+ * moves the project, taking every transcript and consent record with it. So for a project that has one, the root
+ * is resolved from the record; for one that does not, the id is committed first, in a transaction that plans that
+ * record and nothing else and opens no journal — because the journal lives in the root this is resolving.
+ *
+ * ⚠️ **AND THE PATH IS PRINTED THE MOMENT IT IS KNOWN**, which for a fresh external project is after that one
+ * write and before any runtime data exists. Project-local state has no such step: its root is the project's own
+ * `.pi`, printed with the other paths before anything is mutated at all.
+ */
+async function resolveStateRoot({ paths, stateMode, modules, validators, print }) {
+  const { STATE_MODE, readProjectId, stateRootFor, projectRecordTarget, ensureProjectId } = modules.localState;
+  if (stateMode === STATE_MODE.PROJECT) return { roots: stateRootFor({ mode: stateMode, projectRoot: paths.projectRoot }), projectId: null };
+
+  let projectId = readProjectId(paths.projectRoot, { validators })?.projectId ?? null;
+  if (projectId === null) {
+    print("committing this project's id, which the external state root is keyed by");
+    const minted = await runTransaction(
+      { projectRoot: paths.projectRoot, files: [projectRecordTarget({ validators })] },
+      async (tx) => {
+        tx.declarePhases(["project-identity"]);
+        return tx.phase("project-identity", () => ensureProjectId({ transaction: tx, randomBytes: modules.crypto.randomBytes, validators }));
+      },
+      { lock: { reuseHeld: true } }
+    );
+    projectId = minted.projectId;
+  }
+
+  const roots = stateRootFor({ mode: stateMode, projectRoot: paths.projectRoot, projectId });
+  print(`runtime state ${roots.runtime}`);
+  return { roots, projectId };
+}
+
 /** The state library's own three choices, rendered as it returned them. */
 export function renderChoices(options) {
   return options
@@ -1058,8 +1081,20 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     print(`tool root     ${paths.toolRoot}`);
     print(`project root  ${paths.projectRoot}`);
     print(`content root  ${paths.contentRoot}`);
+    // ⚠️ SAID ONCE, WHERE THE PATHS ARE. A project whose content is not at the default place is found by later
+    // runs only through the same selection, and an operator who set it for this command may not know that.
+    if (paths.contentRootSelected)
+      print(`              selected by ${paths.contentRootHow}; later runs need the same selection to find it`);
     print(`settings      ${paths.settingsPath}`);
-    print(`runtime state ${paths.runtimeStatePath}`);
+    // ⚠️ **PROJECT-LOCAL STATE HAS ITS PATH NOW; EXTERNAL STATE HAS A RULE NOW AND A PATH SHORTLY.** An external
+    // root is keyed by the project's committed id, and a fresh project has none until this run commits one — so
+    // what can honestly be printed before anything is mutated is where it will be, and the exact path follows the
+    // moment the id exists and before any runtime data is written.
+    print(
+      args.localState === "user"
+        ? `runtime state a per-user root keyed by this project's committed id (printed once the id is known)`
+        : `runtime state ${paths.runtimeStatePath}`
+    );
 
     // 2. The runtime, before installing a dependency graph that cannot run on it.
     const manifest = JSON.parse(readFileSync(join(paths.toolRoot, "package.json"), "utf-8"));
