@@ -54,14 +54,23 @@ const asked = [];
 process.on("exit", () =>
   writeSync(
     1,
-    `\nKILN_ACCESS ${JSON.stringify({ fs: rec.fs, env: rec.env, net: rec.net, asked })}\n`
+    `\nKILN_ACCESS ${JSON.stringify({ fs: rec.fs, env: rec.env, net: rec.net, asked, printed })}\n`
   )
 );
 
 const { main } = await import("../../../bin/setup.mjs");
 
+/** What was printed, with the access counts as they stood — so "printed before anything was written" is a fact. */
+const printed = [];
+
 const code = await main(spec.argv, {
-  print: (line) => writeSync(1, `${line}\n`),
+  print: (line) => {
+    // ⚠️ WRITES, NOT READS. Setup reads a great deal before it changes anything; what a path printed "before
+    // anything is mutated" has to beat is the first write, so this counts only calls that can change a project.
+    const writes = rec.fs.filter((event) => /^fs\.(write|append|mkdir|rename|rm|unlink|copy|truncate|chmod)/.test(event)).length;
+    printed.push({ line, writes });
+    writeSync(1, `${line}\n`);
+  },
   ask: async (question) => {
     // ⚠️ THE QUESTION IS RECORDED WITH THE ACCESS COUNTS AS THEY STOOD WHEN IT WAS ASKED, which is what makes
     // "nothing was read before consent" an assertion about order rather than about totals.

@@ -285,9 +285,10 @@ export function resolvePaths({ projectRoot: explicit = null, env = process.env }
     contentRootSelected: selected,
     contentRootHow: candidate.how,
     settingsPath: join(owner, ".pi", "settings.json"),
-    // ⚠️ THE PROJECT-LOCAL RUNTIME PATH IS DERIVED FROM BUILT-INS so it can be printed before the install.
-    // An external user-local root is keyed by the committed project id and derived by `lib/local-state.mjs`,
-    // which needs Ajv; `--local-state user` is therefore not part of this slice.
+    // ⚠️ THE PROJECT-LOCAL RUNTIME PATH IS DERIVED FROM BUILT-INS so it can be printed before the install. An
+    // external user-local root is keyed by the committed project id and derived by `lib/local-state.mjs`, which
+    // needs Ajv — so for `--local-state user` this field is the project-local path that is NOT used, and the
+    // external one is resolved and printed after the imports, still before anything of the project is written.
     runtimeStatePath: join(owner, ".pi", "runtime"),
   };
 }
@@ -414,7 +415,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
 
   const stateMode = args.localState === "user" ? STATE_MODE.USER : STATE_MODE.PROJECT;
   const validators = modules.records.createRuntimeValidators();
-  const { roots, projectId } = await resolveStateRoot({ paths, stateMode, modules, validators, print });
+  const { roots, projectId, proposedId } = await resolveStateRoot({ paths, stateMode, modules, validators, print });
 
   // ⚠️ **AN INTERRUPTED RUN IS CONTINUED DELIBERATELY, NEVER SILENTLY.** The journal's presence is the
   // interruption signal: a previous run got far enough to open it and did not finish. Every phase here is
@@ -473,6 +474,13 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
     coverageFix = chosen.plan;
   }
 
+  // ⚠️ **FOUND BEFORE THE PLAN, SO THE PLAN CAN CONTAIN THEM.** A stage document written before the `## Intake`
+  // section existed cannot record an answer at all — the writer refuses it rather than restructuring somebody's
+  // document mid-write — so setup adds the section. Which documents need it is a read; the writes are planned
+  // targets like every other file this command touches.
+  const migrations = migrationsFor({ paths, modules });
+  if (migrations.length > 0) print(`${migrations.length} stage document(s) need Kiln's intake section`);
+
   const spec = {
     projectRoot: paths.projectRoot,
     stateRoot: roots.root,
@@ -481,7 +489,12 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
     // what gives the owner's append the containment check, the identity recorded before anything is written and
     // the writeability probe; the owner refuses a transaction that did not plan it. A run that needs no fix
     // plans no write to it, so an already-covered project keeps the file entirely out of the transaction.
-    files: [projectRecordTarget(), modules.settings.settingsTarget(), ...(coverageFix ? [{ path: ".gitignore" }] : [])],
+    files: [
+      projectRecordTarget(),
+      modules.settings.settingsTarget(),
+      ...(coverageFix ? [{ path: ".gitignore" }] : []),
+      ...migrations.map((m) => ({ path: m.target })),
+    ],
     journal: { path: "state:runtime/setup-transaction.json", validate: modules.journalValidate },
   };
 
@@ -493,6 +506,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       tx.declarePhases([
         ...(coverageFix ? ["state-coverage"] : []),
         "initialize",
+        ...(migrations.length > 0 ? ["stage-documents"] : []),
         "state-protection",
         "project-identity",
         "trust",
@@ -532,9 +546,35 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         throw new SetupCommandRefusal(EXIT.SETUP, initialized.message ?? `The initializer reported ${initialized.status}.`, { status: initialized.status });
       print(`project initialized (${initialized.status})`);
 
+      // ⚠️ AFTER THE INITIALIZER, which may have just created these documents in their current form, and before
+      // anything reads them. A run that needed no migration declares no phase at all.
+      if (migrations.length > 0)
+        await tx.phase("stage-documents", async () => {
+          for (const m of migrations) {
+            // ⚠️ THE MERGE RE-READS AND COMPARES: a document edited between the scan and this write is refused
+            // rather than overwritten with bytes computed from what it used to say.
+            const written = await tx.merge(m.target, (current) => (current === null ? null : modules.migration.migrateIntakeSection(current).text ?? null));
+            if (written.changed) print(`added Kiln's intake section to ${m.target}`);
+          }
+        });
+
       await tx.phase("state-protection", () => createStateRoot(roots, { transaction: tx }));
-      const identity = await tx.phase("project-identity", () => ensureProjectId({ transaction: tx, randomBytes }));
+      // ⚠️ **THE ID THE RUN PRINTED IS THE ID IT COMMITS.** For an external state root the path was named from a
+      // proposed id before anything was written; handing the identity phase its own generator would commit a
+      // different one and leave the printed path describing a directory nothing uses.
+      const identity = await tx.phase("project-identity", () =>
+        ensureProjectId({ transaction: tx, randomBytes: proposedId === null ? randomBytes : () => Buffer.from(proposedId, "hex") })
+      );
       print(`project id ${identity.created ? "created" : "reused"}`);
+      // ⚠️ AND IF SOMETHING ELSE COMMITTED ONE FIRST, the printed path is not this project's: say so rather than
+      // carrying on against a root nothing will read.
+      if (proposedId !== null && identity.projectId !== proposedId)
+        throw new SetupCommandRefusal(
+          EXIT.STATE,
+          `This project was given an id by something else while setup was running, so the external state root ` +
+            `this run printed is not the one that would be used. Nothing further was written. Run setup again.`,
+          { expected: proposedId, found: identity.projectId }
+        );
 
       // ⚠️ THE JOURNAL ONLY NOW: it lives in the runtime directory, which has just been protected and created.
       await tx.beginJournal();
@@ -941,7 +981,7 @@ export function usage() {
     "  --project-root <path>            the project to set up; must own the resolved content root",
     "  --name <text>                    the project's name, on a first run",
     "  --description <text>             the project's one-line description, on a first run",
-    "  --local-state project            where runtime state lives (user is not supported yet)",
+    "  --local-state project|user       where runtime state lives: the project's ignored .pi, or a per-user root",
     "  --trust approve|deny             answer the project trust question without a prompt",
     "  --provider <id> --model <id>     choose the model without the interactive list",
     "  --thinking <level>               the thinking level for that model",
@@ -1106,26 +1146,39 @@ function providerConfigFor(preflight) {
  * `.pi`, printed with the other paths before anything is mutated at all.
  */
 async function resolveStateRoot({ paths, stateMode, modules, validators, print }) {
-  const { STATE_MODE, readProjectId, stateRootFor, projectRecordTarget, ensureProjectId } = modules.localState;
-  if (stateMode === STATE_MODE.PROJECT) return { roots: stateRootFor({ mode: stateMode, projectRoot: paths.projectRoot }), projectId: null };
+  const { STATE_MODE, readProjectId, stateRootFor } = modules.localState;
+  // ⚠️ `proposedId` IS ALWAYS PRESENT, null included: an absent field reads as "no proposal" in one place and as
+  // `undefined` in another, and the identity phase has to be able to tell them apart.
+  if (stateMode === STATE_MODE.PROJECT)
+    return { roots: stateRootFor({ mode: stateMode, projectRoot: paths.projectRoot }), projectId: null, proposedId: null };
 
-  let projectId = readProjectId(paths.projectRoot, { validators })?.projectId ?? null;
-  if (projectId === null) {
-    print("committing this project's id, which the external state root is keyed by");
-    const minted = await runTransaction(
-      { projectRoot: paths.projectRoot, files: [projectRecordTarget({ validators })] },
-      async (tx) => {
-        tx.declarePhases(["project-identity"]);
-        return tx.phase("project-identity", () => ensureProjectId({ transaction: tx, randomBytes: modules.crypto.randomBytes, validators }));
-      },
-      { lock: { reuseHeld: true } }
-    );
-    projectId = minted.projectId;
-  }
-
+  // ⚠️ **THE ID IS DERIVED IN MEMORY, THE PATH IS PRINTED, AND THEN THAT SAME ID IS COMMITTED (ACC-0085).** An
+  // external root is keyed by the project's committed id, so a fresh project has to produce one before its
+  // runtime path can be named — and printing a path only after committing the id would print it after the first
+  // lasting write, which is precisely what the criterion forbids. Minting into a variable costs nothing and
+  // changes nothing: the project is altered only when the identity phase writes this id, and the phase is handed
+  // this id rather than left to invent a second one.
+  const recorded = readProjectId(paths.projectRoot, { validators })?.projectId ?? null;
+  const projectId = recorded ?? modules.crypto.randomBytes(16).toString("hex");
   const roots = stateRootFor({ mode: stateMode, projectRoot: paths.projectRoot, projectId });
   print(`runtime state ${roots.runtime}`);
-  return { roots, projectId };
+  if (recorded === null) print(`              keyed by the id this run is about to commit`);
+  return { roots, projectId, proposedId: recorded === null ? projectId : null };
+}
+
+/**
+ * The stage documents in this project that have no `## Intake` section, as transaction targets.
+ *
+ * ⚠️ **THE STAGE SET IS THE TOOL'S, AND THE DOCUMENTS ARE THE PROJECT'S.** Which stages exist is the definition
+ * set this checkout ships; which of their documents lack the section is a question about this project's content
+ * root. Both are read here, before anything is planned, and a project with no content root yet has nothing to
+ * migrate — the initializer is about to generate documents that already have the section.
+ */
+function migrationsFor({ paths, modules }) {
+  if (!existsSync(paths.contentRoot)) return [];
+  const ids = Object.keys(modules.stages.loadStageDefinitions() ?? {});
+  const relative = paths.contentRoot.slice(paths.projectRoot.length + 1).split("\\").join("/");
+  return modules.migration.pendingMigrations(paths.contentRoot, ids).map((m) => ({ ...m, target: `${relative}/${modules.migration.STAGE_DIR}/${m.id}.md` }));
 }
 
 /** The state library's own three choices, rendered as it returned them. */
@@ -1215,6 +1268,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         tavily: await import("../lib/research/tavily-adapter.mjs"),
         records: await import("../lib/runtime-records.mjs"),
         contract: await import("../lib/specialists/contract.mjs"),
+        migration: await import("../lib/stage-document-migration.mjs"),
+        stages: await import("../lib/stages.mjs"),
         launch: await import("../lib/launch-checks.mjs"),
         liveCheck: await import("../lib/live-model-check.mjs"),
         compatibility: await import("../lib/compatibility-record.mjs"),

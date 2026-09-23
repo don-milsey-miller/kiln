@@ -1162,7 +1162,13 @@ test("⚠️ every exit code this command can return is published by --help", as
     assert.ok(printed.some((l) => new RegExp(`^\\s*${code}\\s`).test(l)), `${name} (${code}) is not in --help`);
   }
   // ⚠️ AND THE OPTIONS THAT DECIDE SOMETHING BILLABLE OR IRREVERSIBLE ARE NAMED THERE TOO.
-  for (const flag of ["--trust", "--live-model-check", "--non-interactive", "--resume"]) assert.ok(text.includes(flag), `${flag} is undocumented`);
+  for (const flag of ["--trust", "--live-model-check", "--non-interactive", "--resume", "--credential-var", "--local-state"])
+    assert.ok(text.includes(flag), `${flag} is undocumented`);
+  // ⚠️ AND WHAT IT SAYS ABOUT THEM IS TRUE. Help that still calls a supported mode unsupported is worse than no
+  // help: an operator reads it and does not try the thing that works.
+  const localState = printed.find((l) => l.includes("--local-state"));
+  assert.match(localState, /project\|user/, localState);
+  assert.equal(/not supported|unsupported/.test(localState), false, localState);
   assert.deepEqual(usage(), printed, "--help printed something other than the command's own usage");
 });
 
@@ -1686,4 +1692,102 @@ test("⚠️ every refusal class this command can raise has its own published ex
   // cannot, held here so the table is not a list of aspirations.
   const unreachable = ["ResearchChoiceRefusal", "IgnoreRefusal", "SettingsRefusal"];
   for (const name of unreachable) assert.ok(classes.some(([c]) => c === name), `${name} left the table`);
+});
+
+test("⚠️ a stage document written before the intake section gets one, and a document somebody edited is left alone", async () => {
+  // `kiln_write_stage_document` refuses a document without the `## Intake` section rather than restructuring one
+  // mid-write, so a project initialized before that section existed cannot record an answer at all. Setup adds it,
+  // as a planned write like any other, and adds it only where it is absent.
+  const { INTAKE_HEADING, ANSWERS_HEADING, READING_HEADING, parseIntakeSection } = await import("../lib/stage-documents.mjs");
+  const p = project({ ignored: true });
+  try {
+    assert.equal((await setup(p)).code, EXIT.OK);
+
+    // An older document: everything of the operator's, and no intake section.
+    const stage = join(p.dir, "planning-content", "stages", "01-intake.md");
+    const older = ["# Stage 1 — Intake", "", "## Purpose", "", "What this project is for.", "", "## Working notes", "", "Ours, not Kiln's.", ""].join("\n");
+    writeFileSync(stage, older);
+
+    const migrated = await setup(p, [], { pick: [] });
+    assert.equal(migrated.code, EXIT.OK, migrated.printed.join("\n"));
+    const text = readFileSync(stage, "utf-8");
+
+    // ⚠️ EVERY LINE THE OPERATOR WROTE IS STILL THERE, IN ORDER, and the section is now readable by the writer.
+    for (const line of ["# Stage 1 — Intake", "## Purpose", "What this project is for.", "## Working notes", "Ours, not Kiln's."])
+      assert.ok(text.includes(line), `${line} was lost`);
+    assert.ok(text.indexOf("Ours, not Kiln's.") < text.indexOf(INTAKE_HEADING), "the section was inserted into the operator's material");
+    for (const heading of [INTAKE_HEADING, ANSWERS_HEADING, READING_HEADING]) assert.ok(text.includes(heading), `${heading} is missing`);
+    assert.ok(parseIntakeSection(text), "the writer cannot read the section this migration added");
+    assert.ok(migrated.printed.some((l) => /intake section/.test(l)), migrated.printed.join(" | "));
+
+    // ⚠️ AND IT IS DONE ONCE: a rerun changes no bytes, and adds no second section.
+    const bytes = readFileSync(stage, "utf-8");
+    assert.equal((await setup(p, [], { pick: [] })).code, EXIT.OK);
+    assert.equal(readFileSync(stage, "utf-8"), bytes, "a rerun rewrote a migrated document");
+    assert.equal(text.split(INTAKE_HEADING).length - 1, 1, "the document has more than one intake section");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the migration adds a section, never repairs one, and keeps the document's own line endings", async () => {
+  const { migrateIntakeSection } = await import("../lib/stage-document-migration.mjs");
+  const { INTAKE_HEADING, ANSWERS_HEADING } = await import("../lib/stage-documents.mjs");
+
+  // ⚠️ **A HEADING THAT IS THERE IS LEFT ALONE, whatever state its anchors are in.** A renamed or reordered anchor
+  // is the operator's own edit, and the writer's refusal already tells them what it cannot follow; repairing one
+  // here would mean deciding which of their lines were meant to be Kiln's.
+  assert.deepEqual(migrateIntakeSection(`# S\n\n${INTAKE_HEADING}\n\n${ANSWERS_HEADING}\n\nwhatever\n`), { needed: false });
+  assert.deepEqual(migrateIntakeSection(`# S\n\n${INTAKE_HEADING}\n\nthe anchors are gone\n`), { needed: false });
+  // A heading that merely mentions it is not that heading.
+  assert.equal(migrateIntakeSection(`# S\n\n## Intake notes\n\ntext\n`).needed, true);
+  assert.equal(migrateIntakeSection(`# S\n\nprose about ${INTAKE_HEADING} in a sentence\n`).needed, true);
+
+  // ⚠️ AND THE DOCUMENT'S OWN LINE ENDINGS ARE KEPT: appending LF to a CRLF document leaves one file with two
+  // conventions, and shows every added line as changed in an editor that normalises.
+  const crlf = migrateIntakeSection("# S\r\n\r\n## Purpose\r\n\r\nwhy\r\n");
+  assert.equal(crlf.needed, true);
+  assert.equal(/(^|[^\r])\n/.test(crlf.text), false, "a CRLF document gained bare LF lines");
+  const lf = migrateIntakeSection("# S\n\n## Purpose\n\nwhy\n");
+  assert.equal(lf.text.includes("\r"), false, "an LF document gained CRLF lines");
+});
+
+test("⚠️ ACC-0085 the external runtime path is printed before anything of the project is written", async () => {
+  // An external root is keyed by the project's committed id, so a fresh project has to produce one before its
+  // runtime path can be named. Deriving it in memory costs nothing and changes nothing; committing it first would
+  // print the path after the first lasting write, which is what this criterion forbids. Measured in a child with
+  // every filesystem call recorded from before the command starts, so "before" is a count and not a reading of
+  // the source.
+  const p = project({ ignored: true });
+  const stateHome = join(p.root, "state-home");
+  try {
+    const run = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PLANNING_CONTENT_DIR: p.contentRoot,
+        PI_CODING_AGENT_DIR: p.agentDir,
+        LOCALAPPDATA: stateHome,
+        XDG_STATE_HOME: stateHome,
+        KILN_CAPTURE_SETUP: JSON.stringify({
+          agentDir: p.agentDir,
+          answers: [["^Check this computer", "no"]],
+          argv: ["--project-root", p.dir, "--name", "External", "--trust", "approve", "--local-state", "user"],
+        }),
+      },
+    });
+
+    const access = JSON.parse(/KILN_ACCESS (.+)/.exec(run.stdout)[1]);
+    // ⚠️ THE LINE THAT NAMES THE PATH, not the earlier one that states the rule. Both come before any write — the
+    // rule is printed with the other paths, before the install — and what this asserts is the exact one.
+    const line = access.printed.find((entry) => entry.line.includes(stateHome));
+    assert.ok(line, access.printed.map((entry) => entry.line).join(" | "));
+    assert.equal(line.writes, 0, `the path was printed after ${line.writes} write(s) to the project`);
+
+    // ⚠️ AND THE ID IN THAT PATH IS THE ONE THE RUN THEN COMMITTED, or the path described a directory nothing uses.
+    const id = JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).projectId;
+    assert.ok(line.line.includes(id), `${line.line} does not name the committed id ${id}`);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
 });
