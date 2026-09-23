@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Setup mints the project ID, renders the coverage choices, and refuses before writing runtime data",
   "statement": "A complete setup creates the stable non-secret project ID once and reuses an existing one rather than minting a second identity. Where coverage is missing, interactive setup renders exactly the three choices the state library returns - the exact ignore block with its bytes, external state, and stopping - and non-interactive setup refuses on the same object, with the refusal occurring before setup has written any session, consent, compatibility or journal file, asserted by those paths not existing. External state is offered only once relocation support for the pinned runtime has been established.",
   "evaluates": [
@@ -14,5 +14,8 @@
     "REQ-0027",
     "REQ-0022"
   ],
-  "notes": "⚠️ SPLIT FROM ACC-0049 AND ACC-0050, WHICH ASKED TSK-0031 FOR BEHAVIOUR ONLY A SETUP COMMAND CAN HAVE. ACC-0049 now covers the refusal and the three choices as data; ACC-0050 covers the derivation and the committed record; this criterion covers the command that uses them. ⚠️ LIBRARY-ONLY TESTS CANNOT SATISFY THIS. The review of TSK-0031 recorded four gaps, and each is a thing no test of `lib/local-state.mjs` can close: G1 no production caller selects external mode - `runSupervisor` defaults `stateMode` to project and `bin/start-kiln.mjs` never passes it, so the mode is reachable only from a library caller; G2 `ensureProjectId` has no production caller, so the committed ID external mode derives from is minted only by tests; G3 there is no setup command, so nothing renders the choices and nothing is non-interactive; G4 consent and compatibility records have schemas but no writer, so 'writes no consent or compatibility file' is vacuous until setup writes them. Evidence for this criterion must exercise the command, not the primitives underneath it."
+  "notes": "PASS 2026-09-23 on EVD-0138. The project id is minted once and reused on later runs, and a completed run leaves no journal. A project with no coverage is shown exactly the three choices the state library returns, with the ignore block's own bytes; answering nothing, `stop`, `user-state` or anything unrecognised stops with nothing written; a non-interactive run refuses on the same object with no `.pi`, no content root and no ignore file — asserted by those paths not existing. External state is offered, which this criterion permits now that AST-0047 (on EVD-0081) establishes relocation for the pinned runtime: `--session-dir` and `PI_CODING_AGENT_SESSION_DIR` reach a per-user root without committing an absolute path, and a run in that mode commits no `sessionDir` at all.",
+  "evidencedBy": [
+    "EVD-0138"
+  ]
 }

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A rerun with unchanged choices changes no bytes",
   "statement": "Running setup twice with the same inputs against the same project leaves every file it owns byte-identical, including the settings file, the ignore block, the project identity file and the generated skills. The comparison is over file bytes, not over a reported status.",
   "evaluates": [
@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0022"
+  ],
+  "notes": "PASS 2026-09-23 on EVD-0138. A second run naming nothing reads back the committed selection and this host's approval of it, asks no question, and leaves every file byte-identical — the whole tree by digest rather than a reported status — including the settings file, the ignore block, the identity file and the generated content; the compatibility record too, and the live check is not run again. A third run leaves the identity file's mtime untouched, so nothing is rewritten with identical bytes.",
+  "evidencedBy": [
+    "EVD-0138"
   ]
 }

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Setup prints every path before it mutates anything",
   "statement": "Before the first lasting write, the command has printed the canonicalised tool root, project root, content root, settings path and runtime state path. A disagreement between the explicit project root and the resolved content owner refuses and prints both.",
   "evaluates": [
@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0022",
     "REQ-0027"
+  ],
+  "notes": "PASS 2026-09-23 on EVD-0138. A project-local run prints the canonical tool root, project root, content root, settings path and runtime state path in its first five lines, and the install seam captures the project tree at that moment: byte-identical to its pre-run state. The external case is measured in a child with every filesystem call recorded from before the command starts — the line naming the per-user runtime path is printed after ZERO writes to the project, and the id in that path is the id the run then commits, because the id is derived in memory and the identity phase is handed it rather than left to invent a second one. A `--project-root` disagreeing with the resolved content owner refuses with both printed, having written nothing.",
+  "evidencedBy": [
+    "EVD-0138"
   ]
 }

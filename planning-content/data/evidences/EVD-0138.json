@@ -1,0 +1,61 @@
+{
+  "id": "EVD-0138",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Integrated measurement: the ordered setup command, end to end, for the six criteria that span it",
+  "kind": "experiment",
+  "summary": "TSK-0060, INTEGRATED. The ordered setup command, measured end to end through `main()` against real projects, for the six criteria that span the whole command. The implementation is everything from e808b96 to 00776db; the sha256 of each file is in the facts. ACC-0085, THE PATHS BEFORE THE FIRST LASTING WRITE. A project-local run prints the canonical tool root, project root, content root, settings path and runtime state path in its first five lines, and the install seam captures the project tree at the moment the bootstrap ran: byte-identical to its pre-run state. An EXTERNAL run is the harder case, because a per-user root is keyed by the project's committed id — so the id is derived in memory, the exact path is printed, and the identity phase is handed THAT id to commit. Measured in a child with every filesystem call recorded from before the command starts: the line naming the external path is printed after ZERO writes to the project, and the id in it is the id the run then committed. A `--project-root` that disagrees with the resolved content owner refuses with both printed, having written nothing. ACC-0106, NO SECRET AND NO ABSOLUTE PATH IN WHAT IS COMMITTED. A complete run against an environment-authenticated provider — asserted from the preflight's own line, since a stored credential would be a different arrangement — with research enabled and its connection checked. The file set is git's answer: every path it would commit, with the ignore rules applied, rather than a list written in the test that would pass forever while the command grew a file nobody added to it. Each file is read and asserted to carry no credential, nothing derived from one (sha256 in hex and base64, base64 of the key, a prefix of it), no authorisation header, no path belonging to this machine, and not even the NAMES of the credential variables. `.pi/settings.json` and `.pi/kiln.json` are asserted by name to be in that set; the ignored consent and compatibility records are asserted not to be. The entry that is not a regular file — this fixture's `.planning` link — is named rather than skipped, because passing over what a scan cannot read is how a scan stops being one. ACC-0107, ONE IDENTITY AND THE STATE LIBRARY'S OWN CHOICES. The id is minted once and reused, with the journal gone when the run completes. A project with no coverage is shown exactly the three choices the state library returns, with the ignore block's own bytes; answering nothing, `stop`, `user-state` or anything unrecognised stops with nothing written; and a non-interactive run refuses on the same object with no `.pi`, no content root and no ignore file. External state is offered, which AST-0047 (on EVD-0081) permits: pi 0.84.4 relocates session transcripts through `--session-dir` and `PI_CODING_AGENT_SESSION_DIR`, so the per-user root is reachable without committing an absolute path — and a run in that mode commits no `sessionDir` at all. ACC-0043, BYTE-IDENTICAL ON A RERUN. A second run naming nothing reads back the committed selection and this host's approval of it, asks no question, and leaves every file byte-identical — the whole tree by digest, not a reported status — including the settings file, the ignore block, the identity file and the generated content. A third run leaves `.pi/kiln.json`'s mtime untouched, so nothing is rewritten with identical bytes. The compatibility record is byte-identical too, and the check is not run again. ACC-0045, BOTH INTERRUPTION WINDOWS, BY KILLING A RUN. Inside the bootstrap, which runs before any journal exists: a real child is killed mid-install, the project is byte-identical afterwards, no `.pi` survives, and an ordinary rerun — no `--resume`, because there is nothing to resume — completes. After the journal opens: a real child is killed during the trust phase, and what it left records the phase IN FLIGHT as running, which is only true because that status is written before the work; the journal carries an exact resume command naming this project, and the argument list from that command completes the remaining phases and leaves no journal. A failure in an agent phase leaves the scaffold: a declined inspection, an unconfirmed model, a denied or failed live check each report partial setup with the project valid. THAT MEASUREMENT FOUND A DEFECT, IN BOTH WINDOWS. A killed run leaves its lockfile, and the stale window that protects waiters from a slow holder is two minutes — so every rerun after a kill refused for two minutes on a lock held by a process that no longer exists. Setup now clears such a lock before any run waits on it, and the safety is in what it still refuses: another machine's lock, an unreadable one, and one whose pid is alive are each left where they are, so two live setups exclude each other exactly as before. ACC-0108, TRUST OBTAINED AND NEVER ASSUMED. An interactive run prints the canonical project directory the decision applies to and asks; `--trust approve` records an approval with no prompt and answers over a recorded decision; a run with nobody to ask refuses WITHOUT REACHING THE QUESTION, measured as zero questions asked. Only an explicit yes approves and only an explicit no denies — a closed input, an empty line and an unreadable answer each leave the store with no decision. A denial is reported as not ready, the agent is never described as usable, nothing is registered, the journal is removed, and the scaffold that survives is put through Kiln's own plan linter rather than declared valid because its files exist. An unapproved project loads none of the package's tools, which is the same fact from Pi's side. WHAT THE WHOLE COMMAND DOES, IN ONE SENTENCE PER PHASE, IS IN THE SLICE RECORDS: EVD-0133 (the order, the built-ins-only graph, the locked install), EVD-0134 (the pinned runtime, trust, registration), EVD-0135 (consent before any read, discovery, selection, the credential contract, research), EVD-0136 (the zero-cost preflight, the separately approved live check, the read-back) and EVD-0137 (the selected content root, the per-user root, the declared custom provider, the exit codes). LIMITS. Nothing billable is contacted anywhere: the one real canary in the suite answers to a loopback server the test runs, every other case injects its runner, the research probe answers through an injected adapter, and npm is a seam in every case — what the bootstrap does is asserted by its arguments, its confinement and the lockfile digest either side. `ACC-0108`'s \"the browser-only start remains available\" is evidenced by the scaffold validating under Kiln's linter, not by starting the browser application. The canary's real request against a real provider, and a real `npm ci` against a registry, remain outside this suite by design.",
+  "outcome": "success",
+  "observedAt": "2026-09-23",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "the whole of TSK-0060, e808b96 through 00776db",
+      "bin/setup.mjs": "sha256:ff9c0cba62d0ef889a16c8e6816fcc499d060260815ed725dbbe63284a426354",
+      "lib/lock.mjs": "sha256:cc003c221336625b5f2248823a477ca044f31ca6560cd5e181ee09f47aa7d759",
+      "lib/stage-document-migration.mjs": "sha256:e9ad936c66d75e8ffa8ffe8096508cb13c454965a1bef5c9bf84f3ca23b89c74",
+      "test/setup-command.test.mjs": "sha256:6275e7bdf73ae839a00074e4b22eebe2f6a0b388627a18a2efdc94bbf2b36516",
+      "test/fixtures/setup/capture-setup.mjs": "sha256:e3a45a0d4367e74fbd0ab0697deb34a9eb92676cd238ca02bbbcbacd5c870579",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 46 tests against real projects, two of which kill a real child, one of which runs the real canary against a loopback server, and one of which runs the command through PowerShell",
+      "acc-0085": "the five paths in the first five lines with the project tree unchanged at the install; the external path printed after zero writes, naming the id the run then committed; a project-root disagreement refused with both printed",
+      "acc-0106": "the committed set from git with ignore rules applied; no credential, derived value, authorisation header, machine path or credential-variable name in any of it; .pi/settings.json and .pi/kiln.json in the set by name; consent and compatibility records not in it",
+      "acc-0107": "the id minted once and reused, the journal gone on completion, the state library's three choices with the block's bytes, a non-interactive refusal before any runtime file, and external state offered on AST-0047's relocation support",
+      "acc-0043": "a rerun asks nothing and leaves the whole tree byte-identical, including the compatibility record; a third run leaves the identity file's mtime untouched",
+      "acc-0045": "both windows by killing a real child: byte-identical project and an ordinary rerun after a bootstrap kill; the in-flight phase and an exact resume command after a post-journal kill, with that command's arguments completing the run",
+      "acc-0108": "the canonical directory shown and asked about; --trust approve without a prompt; a run with nobody to ask refusing with zero questions; only an explicit yes or no recorded; a denial leaving a scaffold that passes Kiln's plan linter and a project Pi loads no tools for",
+      "defect-found-by-this-measurement": "a killed run's lockfile made every rerun wait out the two-minute stale window; setup now clears a lock whose owner is provably gone, and still refuses another host's, an unreadable one, and a live one",
+      "no-billable-request": "the one real canary answers to a loopback server; every other canary is injected; the research probe is an injected adapter; npm is a seam",
+      "full-suite-local": "npm test on Windows: 1608 tests, 1603 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 512 artifacts",
+      "ci-run": "GitHub Actions run 35900930619 at 00776db, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell",
+      "cell-windows-22": "job 107316650201, 1608 tests / 1607 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 107316649878, 1608 tests / 1607 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 107316650406, 1608 tests / 1598 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 107316650297, 1608 tests / 1598 pass / 0 fail / 10 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "browser-only-start",
+        "state": "not-captured",
+        "reason": "ACC-0108's clause is evidenced by the scaffold validating under Kiln's own plan linter after a denial, not by starting the browser application, which this suite does not run."
+      },
+      {
+        "fact": "real-provider-and-registry",
+        "state": "not-captured",
+        "reason": "No billable request and no registry install: the one real canary answers to a loopback server, other canaries and the research probe are injected, and npm is a seam whose arguments, confinement and lockfile digest are what is asserted."
+      }
+    ]
+  }
+}
