@@ -329,8 +329,24 @@ export function defaultInstall({ toolRoot, spawn = spawnSync }) {
  * under `C:\Users\some one\work` produces a command that runs against a different directory unquoted, and what
  * the operator then sees is a refusal about a project they did not name.
  */
-export const resumeCommand = (projectRoot) =>
-  `node .planning/bin/setup.mjs --project-root ${/[\s"]/.test(projectRoot) ? JSON.stringify(projectRoot) : projectRoot} --resume`;
+export const resumeCommand = (projectRoot, platform = process.platform) =>
+  `node .planning/bin/setup.mjs --project-root ${shellArgument(projectRoot, platform)} --resume`;
+
+/**
+ * One argument, quoted for the shell this command will be pasted into.
+ *
+ * ⚠️ **ALWAYS QUOTED, BECAUSE "LOOKS ORDINARY" IS NOT A PROPERTY OF A PATH.** A space is the obvious case, but
+ * `C:/a&b/project` splits a cmd line in two, and `$HOME`, backticks, semicolons and pipes each mean something to
+ * a POSIX shell. Deciding per character is a list that will be wrong once; quoting every time is right always.
+ *
+ * ⚠️ **AND IT IS THE TARGET SHELL'S OWN QUOTING.** Windows paths cannot contain a double quote, so wrapping is
+ * enough there. A POSIX path can contain a single quote, so the one sequence that closes, escapes and reopens is
+ * used — the standard `'''` — rather than a backslash, which single quotes do not honour.
+ */
+export function shellArgument(value, platform = process.platform) {
+  if (platform === "win32") return `"${value}"`;
+  return `'${String(value).split("'").join(`'\\''`)}'`;
+}
 
 /**
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
@@ -893,7 +909,13 @@ export function readJournal(roots, validate) {
   // directory in the consumer's project: a junction at `.pi/runtime`, or a link where the journal should be, makes
   // "read the file at this path" a read of somewhere else entirely. The rule the transaction applies to every
   // target it plans is applied here too, before the first byte, because this read happens before the plan exists.
+  // ⚠️ **THE STATE ROOT IS CHECKED AGAINST THE PROJECT FIRST, OR THE CONTAINMENT CHECKS NOTHING.** Canonicalising
+  // `.pi` and then asking whether the journal is inside it answers yes for a `.pi` that is itself a link out of
+  // the project: both sides resolve to the same somewhere-else. The question that matters is whether the state
+  // root is in the project this run resolved, and it has to be asked before the one about the file.
+  const project = canonicalPath(roots.within);
   const root = canonicalPath(roots.root);
+  if (!isAtOrInside(root, project)) return { contained: false };
   const path = canonicalPath(join(roots.runtime, "setup-transaction.json"));
   if (!isAtOrInside(path, root)) return { contained: false };
   if (!existsSync(path)) return null;
@@ -978,7 +1000,12 @@ export async function verifyRecorded({ compatibility, preflight, modules, valida
  * @param {object} preflight  the zero-cost preflight's result, including the agent directory it resolved
  */
 export function canaryRequest(ctx, preflight) {
-  return { ...ctx.selection, declared: ctx.declared, storedAuthPath: join(preflight.agentDir, "auth.json") };
+  // ⚠️ **ONLY WHEN THE PREFLIGHT SAID THE STORED FILE IS WHAT AUTHENTICATES THIS SELECTION.** The canary refuses a
+  // stored path that is not there, so a host authenticated by an environment variable — which commonly has no
+  // auth.json at all — would fail a check its credential never reached. The environment route needs nothing here:
+  // the canary builds its child's environment from the provider's declared names, which is its own boundary.
+  const stored = preflight.authSource === "stored" ? join(preflight.agentDir, "auth.json") : null;
+  return { ...ctx.selection, declared: ctx.declared, storedAuthPath: stored };
 }
 
 /** The state library's own three choices, rendered as it returned them. */

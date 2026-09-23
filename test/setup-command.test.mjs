@@ -1334,7 +1334,7 @@ test("⚠️ the live check is given this host's saved credential, and a recover
   // copies only the selected provider's entry out of it (test/pi-provider-canary.test.mjs).
   const request = canaryRequest(
     { selection: { provider: "openai", model: "gpt-4o", thinkingLevel: "off" }, declared: { endpointIdentity: "x" } },
-    { agentDir: join("/some", "agent") }
+    { agentDir: join("/some", "agent"), authSource: "stored" }
   );
   assert.deepEqual(request, {
     provider: "openai",
@@ -1349,7 +1349,7 @@ test("⚠️ the live check is given this host's saved credential, and a recover
   // somebody else's text in this command's own refusal.
   const p = project({ ignored: true });
   try {
-    const roots = { root: join(p.dir, ".pi"), runtime: join(p.dir, ".pi", "runtime") };
+    const roots = { within: p.dir, root: join(p.dir, ".pi"), runtime: join(p.dir, ".pi", "runtime") };
     const validate = (record) => {
       if (!Array.isArray(record?.phases)) throw new Error("not a journal");
     };
@@ -1373,6 +1373,17 @@ test("⚠️ the live check is given this host's saved credential, and a recover
     assert.deepEqual(readJournal(roots, validate), { contained: false }, "a directory at the journal path was read as one");
     rmSync(journal, { recursive: true });
 
+    // ⚠️ **A STATE ROOT THAT IS ITSELF A LINK OUT OF THE PROJECT.** Canonicalising `.pi` and then asking whether
+    // the journal is inside it answers yes here — both sides resolve to the same somewhere-else — so the question
+    // has to be asked of the state root against the project first.
+    mkdirSync(join(p.root, "outside-pi", "runtime"), { recursive: true });
+    writeFileSync(join(p.root, "outside-pi", "runtime", "setup-transaction.json"), JSON.stringify({ phases: [] }));
+    rmSync(roots.root, { recursive: true, force: true });
+    symlinkSync(join(p.root, "outside-pi"), roots.root, process.platform === "win32" ? "junction" : "dir");
+    assert.deepEqual(readJournal({ ...roots, within: p.dir }, validate), { contained: false }, "a linked .pi was read");
+    rmSync(roots.root, { recursive: true, force: true });
+    mkdirSync(roots.runtime, { recursive: true });
+
     // A runtime directory that resolves outside the state root is refused rather than read.
     rmSync(roots.runtime, { recursive: true, force: true });
     symlinkSync(join(p.root, "elsewhere"), roots.runtime, process.platform === "win32" ? "junction" : "dir");
@@ -1383,7 +1394,51 @@ test("⚠️ the live check is given this host's saved credential, and a recover
     rmSync(p.root, { recursive: true, force: true });
   }
 
-  // The command an operator is told to run quotes a path that needs it.
-  assert.equal(resume("C:/a b/proj"), 'node .planning/bin/setup.mjs --project-root "C:/a b/proj" --resume');
-  assert.equal(resume("C:/plain/proj"), "node .planning/bin/setup.mjs --project-root C:/plain/proj --resume");
+  // ⚠️ THE COMMAND AN OPERATOR IS TOLD TO RUN IS QUOTED, ALWAYS AND FOR THE RIGHT SHELL — the metacharacter cases
+  // are held on their own below; this is the shape of the line they appear in.
+  assert.equal(resume("C:/a b/proj", "win32"), 'node .planning/bin/setup.mjs --project-root "C:/a b/proj" --resume');
+  assert.equal(resume("/home/plain/proj", "linux"), "node .planning/bin/setup.mjs --project-root '/home/plain/proj' --resume");
+});
+
+test("⚠️ the command an operator is told to run is safe for the shell it targets", async () => {
+  const { shellArgument, resumeCommand: resume } = await import("../bin/setup.mjs");
+
+  // ⚠️ A SPACE IS THE OBVIOUS CASE AND NOT THE ONLY ONE. `&` splits a cmd line in two; `$`, a backtick, `;` and
+  // `|` each mean something to a POSIX shell. Deciding per character is a list that is wrong once, so every path
+  // is quoted, in the quoting the target shell actually honours.
+  for (const awkward of ["C:/a&b/project", "C:/a b/project", "C:/a;b/project", "C:/a|b/project", "C:/a$b/project", "C:/a`b/project"]) {
+    assert.equal(shellArgument(awkward, "win32"), `"${awkward}"`, awkward);
+    assert.equal(shellArgument(awkward, "linux"), `'${awkward}'`, awkward);
+  }
+  // A POSIX path may contain the quote itself, and a backslash does not escape inside single quotes.
+  assert.equal(shellArgument("/it's/here", "linux"), "'/it'" + String.fromCharCode(92) + "''s/here'");
+  assert.match(resume("C:/a&b/project", "win32"), /--project-root "C:\/a&b\/project" --resume$/);
+  assert.match(resume("/home/a b/project", "linux"), /--project-root '\/home\/a b\/project' --resume$/);
+});
+
+test("⚠️ a host authenticated by an environment variable is not handed a stored file that does not exist", async () => {
+  // The canary refuses a stored path that is not there, and a host authenticated by a variable commonly has no
+  // auth.json at all — so always supplying one would fail a check whose credential never needed that file. What
+  // decides is what the preflight found: the source that actually authenticates this selection.
+  const { canaryRequest } = await import("../bin/setup.mjs");
+  const selection = { provider: "openai", model: "gpt-4o", thinkingLevel: "off" };
+
+  assert.equal(
+    canaryRequest({ selection, declared: {} }, { agentDir: join("/some", "agent"), authSource: "stored" }).storedAuthPath,
+    join("/some", "agent", "auth.json")
+  );
+  for (const source of ["environment-key", "custom-environment-key"])
+    assert.equal(
+      canaryRequest({ selection, declared: {} }, { agentDir: join("/some", "agent"), authSource: source }).storedAuthPath,
+      null,
+      `${source} was handed a stored file`
+    );
+
+  // ⚠️ AND THE CANARY IS THE ONE THAT SAYS SO: a supplied path that is not there is its refusal, which is why the
+  // decision above is not a matter of taste.
+  const { runLiveCanary } = await import("../lib/live-canary.mjs");
+  await assert.rejects(
+    () => runLiveCanary({ ...selection, storedAuthPath: join(tmpdir(), "kiln-no-such-auth-file.json") }),
+    (e) => e.name === "CanaryRefusal" && e.reason === "canary-stored-auth-missing"
+  );
 });
