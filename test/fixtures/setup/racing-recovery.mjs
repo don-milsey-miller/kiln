@@ -12,7 +12,7 @@
  * file and stays inside the lock briefly; two arrivals with no departure between them is two writers, whatever
  * the exit codes say.
  *
- * argv: `<lockPath> <logPath> <holdMs>`.
+ * argv: `<lockPath> <logPath> <holdMs> [wait]`.
  */
 
 import { appendFileSync } from "node:fs";
@@ -24,13 +24,19 @@ import { breakDeadLock, withLock } from "../../../lib/lock.mjs";
  * under `test/`, and this one is a real program: run with no lock to compete for, it has nothing to do and says
  * so by exiting cleanly rather than failing a suite it is not part of.
  */
-const [lockPath, logPath, holdMs] = process.argv.slice(2);
+const [lockPath, logPath, holdMs, mode] = process.argv.slice(2);
 if (!lockPath || !logPath) process.exit(0);
 
 const note = (what) => appendFileSync(logPath, `${what} ${process.pid}\n`);
 
-const broke = breakDeadLock(lockPath);
-note(`broke:${broke.broken ? "yes" : broke.reason}`);
+if (mode === "wait") {
+  // ⚠️ **A PLAIN WAITER IS HALF THE HAZARD.** A recovery that wrongly clears somebody else's lock only matters
+  // because another process then creates its own over the free name. This child is that process.
+  note("waits");
+} else {
+  const broke = breakDeadLock(lockPath);
+  note(`broke:${broke.broken ? "yes" : broke.reason}`);
+}
 
 try {
   await withLock(

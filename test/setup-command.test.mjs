@@ -2259,7 +2259,7 @@ test("⚠️ one process at a time may clear a lock, and a gate nobody holds doe
   const { breakDeadLock, withLock, LockError } = await import("../lib/lock.mjs");
   const p = project();
   const lock = join(p.dir, ".planning-init.lock");
-  const gate = `${lock}.breaking`;
+  const { gate, token } = { gate: `${lock}.breaking`, token: `${lock}.breaking.reclaim` };
   const exited = () =>
     Number(spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" }).stdout);
   try {
@@ -2288,6 +2288,41 @@ test("⚠️ one process at a time may clear a lock, and a gate nobody holds doe
     );
     assert.equal(readFileSync(lock, "utf-8"), dead, "a waiter cleared a lock somebody else was clearing");
 
+    // ⚠️ **AND RECLAIMING AN ABANDONED GATE IS ITSELF SERIALISED.** Two reclaimers can reach the same
+    // judgement about one old gate; the first clears it and takes a new one, and the second would then clear THAT
+    // gate, a live one. Only the process holding the token may reclaim, so the other one breaks nothing.
+    const abandon = () => {
+      writeFileSync(lock, dead);
+      writeFileSync(gate, JSON.stringify({ pid: exited(), hostname: hostname() }));
+      const stale = Date.now() / 1000 - 60;
+      utimesSync(gate, stale, stale);
+    };
+    abandon();
+    writeFileSync(token, JSON.stringify({ pid: process.pid, hostname: hostname(), takenAt: new Date().toISOString() }));
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "claimed-elsewhere" });
+    assert.equal(existsSync(gate), true, "a second reclaimer cleared a gate somebody else was reclaiming");
+
+    // ⚠️ AND AGE ALONE DOES NOT MAKE A GATE ABANDONED: a breaker whose machine is loaded is still a breaker, so
+    // the holder has to be gone as well. This one is old and alive, and it is left exactly where it is.
+    rmSync(token);
+    writeFileSync(gate, JSON.stringify({ pid: process.pid, hostname: hostname() }));
+    const longSince = Date.now() / 1000 - 600;
+    utimesSync(gate, longSince, longSince);
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "claimed-elsewhere" });
+    assert.equal(existsSync(gate), true, "a live breaker's gate was reclaimed because it was old");
+    writeFileSync(token, JSON.stringify({ pid: process.pid, hostname: hostname(), takenAt: new Date().toISOString() }));
+    abandon();
+
+    // ⚠️ **AND THE TOKEN IS NEVER RECLAIMED IN TURN, WHICH IS WHERE THIS STOPS.** Judging a file and then
+    // removing it is the defect at every level, so the last file is not judged at all: one left behind by a killed
+    // process fails closed and names itself, because removing it is a decision only the operator can make.
+    const longAgo = Date.now() / 1000 - 600;
+    utimesSync(token, longAgo, longAgo);
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "break-blocked", blockedBy: { gate, token } });
+    assert.equal(existsSync(gate), true, "a blocked recovery cleared the gate anyway");
+    assert.equal(readFileSync(lock, "utf-8"), dead, "a blocked recovery cleared the lock anyway");
+    rmSync(token);
+
     // ⚠️ A GATE ITS HOLDER DIED INSIDE MUST NOT OUTLIVE THEM. It is held for microseconds with nothing
     // awaited inside it, so one this old belongs to nobody — and a single killed recovery would otherwise stop
     // every later one for good.
@@ -2308,6 +2343,89 @@ test("⚠️ one process at a time may clear a lock, and a gate nobody holds doe
       [],
       "a recovery left a file of its own behind"
     );
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ two reclaimers and a waiter, starting from a gate nobody holds, do not both get the lock", async () => {
+  // ⚠️ **THE STATE THE FOUR-RACER CONTROL NEVER STARTS IN.** A recovery killed inside the gate leaves it
+  // behind, and the next two runs both find it abandoned. If they could both act on that judgement, the second
+  // would clear a gate the first is already holding, and the waiter beside them would take the lock over the top.
+  const p = project();
+  const lock = join(p.dir, ".planning-init.lock");
+  const gate = `${lock}.breaking`;
+  const log = join(p.root, "holders.log");
+  try {
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    const dead = JSON.stringify({ pid: Number(gone.stdout), hostname: hostname(), acquiredAt: new Date().toISOString() });
+    writeFileSync(lock, dead);
+    // What a run killed inside the gate leaves: old enough to be nobody's, owned by a process that is gone.
+    writeFileSync(gate, JSON.stringify({ pid: Number(gone.stdout), hostname: hostname() }));
+    const stale = Date.now() / 1000 - 60;
+    utimesSync(gate, stale, stale);
+    writeFileSync(log, "");
+
+    const racers = ["break", "break", "wait"].map(
+      (mode) =>
+        new Promise((resolve) => {
+          const argv = [join(ROOT, "test", "fixtures", "setup", "racing-recovery.mjs"), lock, log, "250", mode];
+          spawn(process.execPath, argv, { stdio: "ignore" }).on("exit", (code) => resolve(code));
+        })
+    );
+    const codes = await Promise.all(racers);
+    assert.ok(codes.some((c) => c === 0), `nobody acquired the lock: ${codes.join(", ")}`);
+
+    const events = readFileSync(log, "utf-8").split("\n").filter(Boolean);
+    let held = 0;
+    for (const event of events) {
+      if (event.startsWith("enter")) held += 1;
+      if (event.startsWith("exit")) held -= 1;
+      assert.ok(held <= 1, `two processes held the lock at once:\n${events.join("\n")}`);
+    }
+    assert.equal(held, 0, `a holder never left:\n${events.join("\n")}`);
+    assert.equal(events.filter((e) => e.startsWith("enter")).length >= 1, true, events.join(" | "));
+
+    // The abandoned gate was cleared by whoever reclaimed it, and nothing of the recovery is left behind.
+    assert.deepEqual(
+      readdirSync(p.dir).filter((name) => name.startsWith(".planning-init.lock.")),
+      [],
+      "a recovery left a file of its own behind"
+    );
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a recovery that cannot be proved safe stops the command and names the files to remove", async () => {
+  // ⚠️ **FAIL CLOSED, WITH A ROUTE OUT.** The last file in the chain is never cleared on a guess, so a run
+  // killed inside that window blocks automatic recovery. What the operator gets is the two paths and a published
+  // exit code — not a timeout whose message names a pid they cannot do anything with.
+  const p = project({ ignored: true });
+  const lock = join(p.dir, ".planning-init.lock");
+  const gate = `${lock}.breaking`;
+  const token = `${lock}.breaking.reclaim`;
+  try {
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    writeFileSync(lock, JSON.stringify({ pid: Number(gone.stdout), hostname: hostname(), acquiredAt: new Date().toISOString() }));
+    const stale = Date.now() / 1000 - 600;
+    for (const path of [gate, token]) {
+      writeFileSync(path, JSON.stringify({ pid: Number(gone.stdout), hostname: hostname() }));
+      utimesSync(path, stale, stale);
+    }
+    const before = tree(p.dir);
+
+    const refused = await setup(p);
+    assert.equal(refused.code, EXIT.LOCK_RECOVERY, refused.printed.concat(refused.warned).join("\n"));
+    const said = refused.warned.join("\n");
+    assert.ok(said.includes(gate) && said.includes(token), `the refusal does not name what to remove: ${said}`);
+    assert.deepEqual(tree(p.dir), before, "a blocked run changed the project");
+
+    // And the route works: with those files gone, the same command clears the dead run's lock and completes.
+    rmSync(gate);
+    rmSync(token);
+    const again = await setup(p);
+    assert.equal(again.code, EXIT.OK, again.printed.concat(again.warned).join("\n"));
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

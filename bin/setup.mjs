@@ -101,6 +101,8 @@ export const EXIT = Object.freeze({
   RESEARCH: 15,
   /** The committed selection cannot be used on this computer as it stands. */
   UNUSABLE: 16,
+  /** A previous recovery left its files beside the setup lock, and only the operator may remove them. */
+  LOCK_RECOVERY: 17,
 });
 
 /**
@@ -127,6 +129,7 @@ export const EXIT_MEANING = Object.freeze({
   [EXIT.REGISTRATION]: "the package or the skill overrides could not be registered",
   [EXIT.RESEARCH]: "the web-research choice could not be settled",
   [EXIT.UNUSABLE]: "the committed selection cannot be used on this computer as it stands",
+  [EXIT.LOCK_RECOVERY]: "a previous recovery left files beside the setup lock; the message names what to remove",
 });
 
 /**
@@ -1258,6 +1261,21 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     // still exclude each other exactly as before.
     const broke = breakDeadLock(join(paths.projectRoot, SETUP_LOCK_FILE));
     if (broke.broken) print(`cleared the setup lock left by process ${broke.owner.pid}, which is no longer running`);
+    /**
+     * ⚠️ **AND WHEN CLEARING IT CANNOT BE PROVED SAFE, THIS RUN STOPS AND SAYS WHICH FILES ARE IN THE WAY.**
+     * Clearing a lock is serialised by files beside it, and the last of those is never cleared automatically —
+     * removing it on a guess is how two runs end up holding one project. A run killed inside that narrow window
+     * leaves it behind, so the operator gets the two paths and decides; waiting out a timeout with a message
+     * about a pid would tell them nothing they could act on.
+     */
+    if (broke.reason === "break-blocked")
+      throw new SetupCommandRefusal(
+        EXIT.LOCK_RECOVERY,
+        `Nothing was changed: a previous recovery left its files beside the setup lock, and this run will not ` +
+          `remove them on a guess.${NEWLINE}If no other setup is running on this project, delete these and run ` +
+          `this command again:${NEWLINE}  ${broke.blockedBy.gate}${NEWLINE}  ${broke.blockedBy.token}`,
+        { blockedBy: [broke.blockedBy.gate, broke.blockedBy.token] }
+      );
 
     return await withLock(join(paths.projectRoot, SETUP_LOCK_FILE), async () => {
       // 4. The locked dependencies, inside this checkout only.
