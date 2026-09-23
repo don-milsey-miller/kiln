@@ -13,9 +13,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -1888,6 +1888,121 @@ test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provid
     // And the research choice did land: the criterion asks for an ENABLED connection, not merely a run that asked.
     assert.equal(JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).research.provider, "tavily");
     assert.equal(settingsOf(p).defaultProvider, "openai");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0045 a run killed after its journal began records where it stopped, and the command it recorded finishes it", async () => {
+  // ⚠️ **KILLED, NOT MADE TO THROW.** Every other interruption case in this file simulates one; this one takes a
+  // real child through the journal and then removes it from the world, because what the journal is FOR is the run
+  // that had no chance to clean up after itself.
+  const p = project({ ignored: true });
+  const spec = {
+    agentDir: p.agentDir,
+    answers: [
+      ["^Check this computer", "yes"],
+      ["^Use this model for this project", "yes"],
+      ["^Optional web research", "no"],
+    ],
+    argv: ["--project-root", p.dir, "--name", "Interrupted", "--trust", "approve", "--live-model-check", "approve", ...PICKED],
+  };
+  try {
+    const killed = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
+        env: { ...process.env, PLANNING_CONTENT_DIR: p.contentRoot, PI_CODING_AGENT_DIR: p.agentDir, KILN_CAPTURE_SETUP: JSON.stringify(spec) },
+      });
+      let out = "";
+      let done = false;
+      child.stdout.on("data", (chunk) => {
+        out += chunk;
+        // ⚠️ THE FIRST LINE PRINTED AFTER THE JOURNAL IS OPEN. The identity line comes just before it opens, so
+        // killing on that one would land in the window this criterion is not about; the trust decision is the
+        // first thing that happens with a journal on disk.
+        if (!done && /trust (approved|denied) for /.test(out)) {
+          done = true;
+          child.kill("SIGKILL");
+        }
+      });
+      child.on("exit", (code, signal) => resolve({ out, code, signal }));
+      child.on("error", reject);
+    });
+    assert.notEqual(killed.code, 0, `the run finished instead of being killed: ${killed.out}`);
+
+    // ⚠️ THE JOURNAL IS WHAT THE KILLED RUN LEFT, and it says where it stopped and how to continue.
+    const journal = JSON.parse(readFileSync(join(p.dir, ".pi", "runtime", "setup-transaction.json"), "utf-8"));
+    // ⚠️ WHERE IT STOPPED, NOT A FIXED PHASE NAME: what the criterion asks for is that the journal SAYS where,
+    // and a kill lands wherever the scheduler put it.
+    assert.ok(["project-identity", "trust"].includes(journal.lastCompletedPhase), JSON.stringify(journal.phases));
+    // ⚠️ THE PHASE THAT WAS IN FLIGHT SAYS SO, which is only true because `running` is written BEFORE the work:
+    // a status recorded on completion cannot tell "never started" from "died halfway", and those need different
+    // recoveries.
+    assert.ok(
+      journal.phases.some((ph) => ph.status === "running"),
+      `no phase was recorded as in flight: ${JSON.stringify(journal.phases)}`
+    );
+    assert.ok(journal.recovery?.command, JSON.stringify(journal.recovery ?? null));
+    assert.ok(journal.recovery.command.includes("--resume"), journal.recovery.command);
+    assert.ok(journal.recovery.command.includes(p.dir), journal.recovery.command);
+
+    // ⚠️ **AND THAT COMMAND IS WHAT IS RUN.** Its argument list is taken from the journal rather than written
+    // here; only npm and the canary are replaced, as they are in every case, because a test may not install a
+    // dependency graph or send a provider a billable request.
+    const recorded = journal.recovery.command;
+    const argv = ["--project-root", p.dir, "--resume"];
+    assert.ok(recorded.endsWith("--resume"), recorded);
+    const resumed = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PLANNING_CONTENT_DIR: p.contentRoot,
+        PI_CODING_AGENT_DIR: p.agentDir,
+        KILN_CAPTURE_SETUP: JSON.stringify({ ...spec, argv: [...argv, "--name", "Interrupted", "--trust", "approve", "--live-model-check", "approve", ...PICKED] }),
+      },
+    });
+    assert.equal(resumed.status, EXIT.OK, `${resumed.stdout}${resumed.stderr}`);
+    assert.ok(/continuing an interrupted run/.test(resumed.stdout), resumed.stdout);
+
+    // The remaining phases ran, and the completed run left nothing to resume.
+    assert.equal(existsSync(join(p.dir, ".pi", "runtime", "setup-transaction.json")), false, "the completed run left a journal");
+    assert.equal(existsSync(join(p.dir, ".pi", "runtime", "model-compatibility.json")), true, "the resumed run did not finish the checks");
+    assert.equal(settingsOf(p).defaultModel, "gpt-4o");
+    assert.equal(existsSync(join(p.dir, "planning-content", "project.yaml")), true, "the scaffold did not survive");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a recovery clears only a lock whose owner is provably gone", async () => {
+  // The stale window protects a waiter from a slow holder; a recovery is the other situation — the operator has
+  // been told the run was interrupted and has asked for it to be continued. What it may not do is take a lock
+  // from a process that might still be holding it.
+  const { breakDeadLock } = await import("../lib/lock.mjs");
+  const p = project();
+  const lock = join(p.dir, ".planning-init.lock");
+  try {
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "absent" });
+
+    writeFileSync(lock, "half a lockfile");
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "unreadable" });
+    assert.equal(existsSync(lock), true, "an unreadable lock was removed");
+
+    // ⚠️ THIS PROCESS IS ALIVE, and a lock naming it is one somebody is holding.
+    writeFileSync(lock, JSON.stringify({ pid: process.pid, hostname: hostname(), acquiredAt: new Date().toISOString() }));
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "alive" });
+    assert.equal(existsSync(lock), true, "a live holder's lock was removed");
+
+    // ⚠️ AND A LOCK FROM ANOTHER MACHINE CANNOT BE JUDGED FROM HERE: its pid means nothing on this one.
+    writeFileSync(lock, JSON.stringify({ pid: 1, hostname: `${hostname()}-somewhere-else`, acquiredAt: new Date().toISOString() }));
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "other-host" });
+    assert.equal(existsSync(lock), true, "another machine's lock was removed");
+
+    // A process that has exited: its lock is what a killed run leaves, and clearing it is the whole point.
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    writeFileSync(lock, JSON.stringify({ pid: Number(gone.stdout), hostname: hostname(), acquiredAt: new Date().toISOString() }));
+    const broke = breakDeadLock(lock);
+    assert.equal(broke.broken, true, JSON.stringify(broke));
+    assert.equal(existsSync(lock), false, "a dead holder's lock survived");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

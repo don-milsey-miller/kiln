@@ -79,6 +79,25 @@ const code = await main(spec.argv, {
     return null;
   },
   install: () => ({ installed: false, why: "the fixture's bootstrap" }),
+  // ⚠️ **THE ONE STEP THAT WOULD COST MONEY, ANSWERED HERE.** The canary sends a request to the selected provider;
+  // this returns what a passing check would have observed, derived from what the command itself resolved, so a
+  // recorded run can complete without anything leaving this machine.
+  canary: async ({ selection, declared = {}, preflight }) => {
+    const { computeCompatibilityKey, OBSERVED_KEY_FIELDS } = await import("../../../lib/compatibility-record.mjs");
+    const key = computeCompatibilityKey({
+      selection,
+      model: preflight.model,
+      piVersion: preflight.piVersion,
+      declared,
+      effectiveBaseUrl: preflight.effectiveBaseUrl,
+    });
+    return {
+      passed: true,
+      challengeEchoed: true,
+      observed: Object.fromEntries(OBSERVED_KEY_FIELDS.map((f) => [f, key[f]])),
+      requests: [{ ...key.endpointIdentity, pathname: `${key.endpointIdentity.pathname}/responses` }],
+    };
+  },
 });
 
 writeSync(1, `\nKILN_EXIT ${code}\n`);

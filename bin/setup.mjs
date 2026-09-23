@@ -35,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ContentRootError, canonicalPath, contentRootCandidate, isAtOrInside, pathIdentityKey } from "../lib/content-root.mjs";
 import { dependencyState } from "../lib/dependency-freshness.mjs";
-import { withLock } from "../lib/lock.mjs";
+import { breakDeadLock, withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
 import { initializeProject } from "../lib/initialize-project.mjs";
 import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
@@ -1249,6 +1249,16 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     if (!node.ok) throw new SetupCommandRefusal(EXIT.RUNTIME, `Nothing was changed: ${node.why}.`, { required: manifest.engines?.node ?? null });
 
     // 3. The single setup lock, held across everything that follows, including the bootstrap install.
+    //
+    // ⚠️ **A RECOVERY FIRST CLEARS A LOCK ITS OWNER CANNOT STILL BE HOLDING.** A run that was killed leaves its
+    // lockfile behind, and the stale window that protects waiters from a slow holder is two minutes long — so the
+    // command an interrupted run records would refuse for two minutes, on a lock belonging to a process that no
+    // longer exists. `--resume` is the operator saying that run is over; this checks whether it really is.
+    if (args.resume) {
+      const broke = breakDeadLock(join(paths.projectRoot, SETUP_LOCK_FILE));
+      if (broke.broken) print(`removed the setup lock left by process ${broke.owner.pid}, which is no longer running`);
+    }
+
     return await withLock(join(paths.projectRoot, SETUP_LOCK_FILE), async () => {
       // 4. The locked dependencies, inside this checkout only.
       const installed = install({ toolRoot: paths.toolRoot });
