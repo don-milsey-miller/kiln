@@ -43,6 +43,8 @@ import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
 const TOOL_ROOT = canonicalPath(resolve(join(dirname(fileURLToPath(import.meta.url)), "..")));
 
 const say = (msg) => console.log(`[kiln] ${msg}`);
+/** Written once so a multi-line message can be split without an escape in every call site. */
+const NEWLINE = "\n";
 
 /**
  * One line from the operator, or `null` when there is not going to be one.
@@ -85,6 +87,31 @@ export const EXIT = Object.freeze({
   TRUST: 8,
   /** An answer left setup partial: nothing billable is enabled, and the project is still valid. */
   CONSENT: 9,
+  /** A previous run was interrupted and its journal is still there: the operator decides whether to continue. */
+  INTERRUPTED: 10,
+  /** The selected model could not be shown to work, so nothing is described as ready. */
+  NOT_PROVED: 11,
+});
+
+/**
+ * What each code means, printed by `--help` so a script can be written against it.
+ *
+ * ⚠️ **PUBLISHED, BECAUSE AN UNDOCUMENTED CODE IS A NUMBER NOBODY CAN BRANCH ON.** CMP-0039 asks for a distinct
+ * code per refusal class AND for the mapping to be published; a mapping that lives only in this file is the half
+ * that cannot be used. Each line is what an operator or a script needs to tell one outcome from another.
+ */
+export const EXIT_MEANING = Object.freeze({
+  [EXIT.OK]: "setup completed and the project is ready",
+  [EXIT.ARGUMENTS]: "the command line could not be read",
+  [EXIT.PATHS]: "the paths disagree, and nothing was read or written",
+  [EXIT.RUNTIME]: "this runtime or the installed Pi is not the one this checkout pins",
+  [EXIT.INSTALL]: "the locked dependency install failed or was not locked",
+  [EXIT.STATE]: "the runtime state could not be protected, so nothing was written",
+  [EXIT.SETUP]: "setup refused; the message says what it refused and what it left",
+  [EXIT.TRUST]: "this project is not trusted, or its trust could not be verified",
+  [EXIT.CONSENT]: "an answer left setup partial: the project is valid, the agent is not ready",
+  [EXIT.INTERRUPTED]: "a previous run was interrupted; rerun with --resume to continue it",
+  [EXIT.NOT_PROVED]: "the selected model was not shown to work, so the agent is not ready",
 });
 
 export class SetupCommandRefusal extends Error {
@@ -97,7 +124,18 @@ export class SetupCommandRefusal extends Error {
 }
 
 /** The options this slice reads. The whole argument surface, and its `--help`, belong to TSK-0061. */
-const VALUED = new Set(["--project-root", "--name", "--description", "--local-state", "--trust", "--provider", "--model", "--thinking", "--research"]);
+const VALUED = new Set([
+  "--project-root",
+  "--name",
+  "--description",
+  "--local-state",
+  "--trust",
+  "--provider",
+  "--model",
+  "--thinking",
+  "--research",
+  "--live-model-check",
+]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
 export function parseArgs(argv) {
@@ -124,6 +162,7 @@ export function parseArgs(argv) {
     if (flag === "--model") out.model = value;
     if (flag === "--thinking") out.thinking = value;
     if (flag === "--research") out.research = value;
+    if (flag === "--live-model-check") out.liveModelCheck = value;
   }
   if (out.localState !== "project" && out.localState !== "user") return { error: `--local-state is "project" or "user", got ${JSON.stringify(out.localState)}.` };
   // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
@@ -137,6 +176,10 @@ export function parseArgs(argv) {
     return { error: `--provider and --model are given together, or neither.` };
   if (out.research !== undefined && out.research !== "tavily" && out.research !== "disabled")
     return { error: `--research is "tavily" or "disabled", got ${JSON.stringify(out.research)}.` };
+  // ⚠️ THE ONE CHECK THAT COSTS MONEY IS SPELLED OUT, BOTH WAYS. It sends a request to the selected provider, so
+  // an unreadable value is a mistake about a billable action and is refused rather than read as approval.
+  if (out.liveModelCheck !== undefined && out.liveModelCheck !== "approve" && out.liveModelCheck !== "deny")
+    return { error: `--live-model-check is "approve" or "deny", got ${JSON.stringify(out.liveModelCheck)}.` };
   return out;
 }
 
@@ -286,7 +329,7 @@ export const resumeCommand = (projectRoot) => `node .planning/bin/setup.mjs --pr
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
  * needs is imported dynamically.
  */
-async function runPhases({ paths, args, ask, print, modules }) {
+async function runPhases({ paths, args, ask, print, modules, canary: injected = null }) {
   const { STATE_MODE, coverageState, createStateRoot, ensureProjectId, projectRecordTarget, stateRootFor } = modules.localState;
   const { randomBytes } = modules.crypto;
 
@@ -299,6 +342,30 @@ async function runPhases({ paths, args, ask, print, modules }) {
     );
 
   const roots = stateRootFor({ mode: STATE_MODE.PROJECT, projectRoot: paths.projectRoot });
+
+  // ⚠️ **AN INTERRUPTED RUN IS CONTINUED DELIBERATELY, NEVER SILENTLY.** The journal's presence is the
+  // interruption signal: a previous run got far enough to open it and did not finish. Every phase here is
+  // idempotent, so continuing is safe — but it is still the operator's decision, because the thing they most
+  // need to know is that a run did not finish. Without `--resume` this says so, names the last phase that
+  // completed, and prints the command the interrupted run itself recorded.
+  const interrupted = readJournal(join(roots.runtime, "setup-transaction.json"));
+  if (interrupted && !args.resume)
+    throw new SetupCommandRefusal(
+      EXIT.INTERRUPTED,
+      `A previous setup of this project was interrupted and has not been continued.
+` +
+        `  last completed phase: ${interrupted.lastCompletedPhase ?? "none"}
+` +
+        `  interrupted at:       ${interrupted.phases?.find((ph) => ph.status === "running")?.name ?? "an unrecorded point"}
+` +
+        `Continue it with:
+  ${interrupted.recovery?.command ?? resumeCommand(paths.projectRoot)}
+` +
+        `Nothing was changed by this run. Everything the interrupted run completed is still there.`,
+      { lastCompletedPhase: interrupted.lastCompletedPhase ?? null }
+    );
+  if (interrupted) print(`continuing an interrupted run (last completed phase: ${interrupted.lastCompletedPhase ?? "none"})`);
+  else if (args.resume) print("nothing to resume: no interrupted run is recorded, so this is an ordinary run");
 
   /**
    * ⚠️ **THE OPERATOR IS ASKED BEFORE THE TRANSACTION, AND THE ANSWER IS APPLIED INSIDE IT.** Deciding reads
@@ -355,6 +422,9 @@ async function runPhases({ paths, args, ask, print, modules }) {
         "model",
         "credential-contract",
         "research",
+        "preflight",
+        "live-check",
+        "read-back",
       ]);
 
       // ⚠️ FIRST, BECAUSE EVERY LATER PHASE WRITES INTO THE PATHS IT PROTECTS (REQ-0027). The ignore owner does
@@ -432,7 +502,51 @@ async function runPhases({ paths, args, ask, print, modules }) {
       print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
 
       const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
-      return { initialized, identity, trust, registered, inspection, selection, contract, research };
+
+      // ⚠️ **THE ZERO-COST CHECKS FIRST, AND THEY SEND NOTHING.** Everything a run can be refused for without
+      // spending anything — the committed selection, this host's grant for it, the credential contract, Pi's
+      // catalogue, the thinking level that model supports, the package — is settled before the one check that
+      // costs money is even offered. A run that fails here has asked the provider for nothing.
+      const preflight = await tx.phase("preflight", () =>
+        modules.launch.zeroCostPreflight({ projectRoot: paths.projectRoot, location, agentDir, validators })
+      );
+      print(`preflight passed: ${preflight.displayName} ${preflight.selection.model}, authentication ${preflight.authSource}, ${preflight.tools.length} package tools`);
+
+      // ⚠️ THE DEFAULT CANARY IS THE REAL ONE, and it runs only after an explicit approval inside the live check.
+      // ⚠️ **AND WHAT IT IS GIVEN INCLUDES THE PREFLIGHT**, because the request it makes is the one the preflight
+      // resolved: the same model object, the same endpoint, the same version. A runner handed only the selection
+      // would have to resolve those again and could resolve them differently, which is the disagreement the
+      // compatibility key exists to catch.
+      const canary = (ctx) =>
+        injected
+          ? injected({ ...ctx, preflight })
+          : modules.canary.runLiveCanary({ ...ctx.selection, declared: ctx.declared });
+      const compatibility = modules.compatibility.compatibilityLocationFrom(location);
+      const live = await tx.phase("live-check", () =>
+        modules.liveCheck.runLiveModelCheck({
+          preflight,
+          location: compatibility,
+          ask: asking.choice,
+          request: args.liveModelCheck,
+          canary,
+          validators,
+        })
+      );
+      if (live.message) for (const line of live.message.split("\n")) print(line);
+      if (!live.ready) return { initialized, identity, trust, registered, inspection, selection, contract, research, preflight, live };
+
+      // ⚠️ **READ BACK BEFORE REPORTING READY.** A write that reported success is not a record a later run can
+      // use: the gate that refuses a tracked or unprotected record applies on read as well, and a record that
+      // cannot be read back is one the next start will refuse. So readiness is what the file says now, checked
+      // against the key this run computed, rather than what the writer said a moment ago.
+      const readBack = await tx.phase("read-back", () => verifyRecorded({ compatibility, preflight, modules, validators }));
+      // ⚠️ WHAT IS PRINTED COMES FROM THE RECORD THAT WAS READ, not from the fact that a write returned: a line
+      // that could be printed without reading the file would report a readiness nobody checked.
+      print(
+        `compatibility recorded and read back for ${preflight.selection.provider} ${preflight.selection.model} ` +
+          `(checked ${readBack.record.result.observedAt})`
+      );
+      return { initialized, identity, trust, registered, inspection, selection, contract, research, preflight, live, readBack };
     },
     { lock: { reuseHeld: true } }
   );
@@ -727,6 +841,88 @@ async function decideResearch({ tx, location, inspection, args, asking, modules,
   return result;
 }
 
+/**
+ * The command's own description of itself, options and exit codes together.
+ *
+ * ⚠️ **THE CODES ARE PART OF THE INTERFACE, SO THEY ARE PRINTED WITH THE OPTIONS.** A caller scripting setup
+ * branches on the code, not on the prose; TSK-0061 owns what else this text should grow, but a published mapping
+ * is what makes each class worth having.
+ */
+export function usage() {
+  return [
+    "node .planning/bin/setup.mjs [options]",
+    "",
+    "  --project-root <path>            the project to set up; must own the resolved content root",
+    "  --name <text>                    the project's name, on a first run",
+    "  --description <text>             the project's one-line description, on a first run",
+    "  --local-state project            where runtime state lives (user is not supported yet)",
+    "  --trust approve|deny             answer the project trust question without a prompt",
+    "  --provider <id> --model <id>     choose the model without the interactive list",
+    "  --thinking <level>               the thinking level for that model",
+    "  --research tavily|disabled       settle web research without a prompt",
+    "  --live-model-check approve|deny  allow, or refuse, the one check that sends a billable request",
+    "  --non-interactive                never ask; refuse rather than assume",
+    "  --resume                         continue a run that was interrupted",
+    "  --help                           this text",
+    "",
+    "Exit codes:",
+    ...Object.entries(EXIT_MEANING).map(([code, meaning]) => `  ${String(code).padStart(2, " ")}  ${meaning}`),
+  ];
+}
+
+/**
+ * The journal an interrupted run left behind, or null.
+ *
+ * ⚠️ **A JOURNAL THIS CANNOT PARSE IS STILL AN INTERRUPTION.** It is written by a process that may have been
+ * killed mid-write, so half a record is exactly the evidence it exists to provide; treating an unreadable one as
+ * "no interruption" would hide the case it was invented for. What a damaged record cannot do is say which phase
+ * completed, so it says so instead of guessing.
+ */
+function readJournal(path) {
+  if (!existsSync(path)) return null;
+  try {
+    const record = JSON.parse(readFileSync(path, "utf-8"));
+    return record !== null && typeof record === "object" ? record : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The compatibility record, read back from the file and checked against this run's own key.
+ *
+ * ⚠️ **THE KEY IS RECOMPUTED, NOT TAKEN FROM THE RECORD.** Comparing a record with itself proves nothing; what
+ * has to match is what this run resolved from Pi and the selection it confirmed. The live check computed the
+ * same key to decide what to write, and this asks the question again of what is actually on disk.
+ */
+export async function verifyRecorded({ compatibility, preflight, modules, validators }) {
+  const key = modules.compatibility.computeCompatibilityKey({
+    selection: preflight.selection,
+    model: preflight.model,
+    piVersion: preflight.piVersion,
+    effectiveBaseUrl: preflight.effectiveBaseUrl,
+  });
+  const found = modules.compatibility.readCompatibility(compatibility, { validators });
+  if (found.state !== "valid")
+    throw new SetupCommandRefusal(
+      EXIT.NOT_PROVED,
+      `The live model check passed and its record cannot be read back (${found.state}${found.why ? `: ${found.why}` : ""}).\n` +
+        `A record this computer cannot read is one the next start will refuse, so this run does not describe the ` +
+        `agent as ready. The rest of the project is set up and valid.`,
+      { state: found.state, why: found.why ?? null }
+    );
+
+  const differing = modules.compatibility.differingFields(found.record.key, key);
+  if (differing.length > 0)
+    throw new SetupCommandRefusal(
+      EXIT.NOT_PROVED,
+      `The compatibility record that was just written does not describe what this run checked: ` +
+        `${differing.join(", ")} differ.\nNothing is described as ready.`,
+      { fields: differing }
+    );
+  return { key, record: found.record };
+}
+
 /** The state library's own three choices, rendered as it returned them. */
 export function renderChoices(options) {
   return options
@@ -749,19 +945,18 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     print = say,
     nodeVersion = process.versions.node,
     verifyRuntime = checkPinnedRuntime,
+    // ⚠️ **THE ONE SEAM THAT SENDS A REQUEST TO A PROVIDER.** A real run performs the canary; a test supplies its
+    // own, because a suite that reached a provider would bill somebody for running it.
+    canary = null,
   } = deps;
   const args = parseArgs(argv);
   if (args.error) {
     warn(args.error);
-    warn(
-      "This slice takes --project-root <path>, --name <text>, --description <text>, --local-state project, " +
-        "--trust approve|deny, --provider <id> --model <id>, --thinking <level>, --research tavily|disabled, " +
-        "--non-interactive, --resume."
-    );
+    for (const line of usage()) warn(line);
     return EXIT.ARGUMENTS;
   }
   if (args.help) {
-    print("node .planning/bin/setup.mjs --project-root <path> [--name <text>] [--description <text>] [--non-interactive]");
+    for (const line of usage()) print(line);
     return EXIT.OK;
   }
 
@@ -803,6 +998,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         tavily: await import("../lib/research/tavily-adapter.mjs"),
         records: await import("../lib/runtime-records.mjs"),
         contract: await import("../lib/specialists/contract.mjs"),
+        launch: await import("../lib/launch-checks.mjs"),
+        liveCheck: await import("../lib/live-model-check.mjs"),
+        compatibility: await import("../lib/compatibility-record.mjs"),
+        canary: await import("../lib/live-canary.mjs"),
         crypto: await import("node:crypto"),
         journalValidate: await journalValidator(),
       };
@@ -816,7 +1015,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
 
       // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the trust decision
       // and the registration.
-      const done = await runPhases({ paths, args, ask, print, modules });
+      const done = await runPhases({ paths, args, ask, print, modules, canary });
 
       // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
       // before this point is valid and stays: the content scaffold, the ignore block, the project identity and
@@ -844,7 +1043,21 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         return EXIT.CONSENT;
       }
 
-      print("setup complete for this slice: paths, runtime, dependencies, initialization, state protection, identity, journal, trust, registration, inspection, model, credential contract, research");
+      // ⚠️ **THE LIVE CHECK'S OUTCOME DECIDES WHETHER THIS RUN MAY SAY "READY", AND IT IS NOT ONE CLASS.** A
+      // decline is an answer, like the others; a check that ran and did not pass, or passed and could not be
+      // recorded, is a different fact about the same project and a script has to be able to tell them apart.
+      if (!done.live?.ready) {
+        const declined = done.live?.outcome === "declined";
+        warn(
+          declined
+            ? `Setup is partial: the live model check was not run.`
+            : `Setup is partial: ${done.live?.message?.split(NEWLINE)[0] ?? "the model was not shown to work"}`
+        );
+        warn(`Everything else this run set up is written and valid.`);
+        return declined ? EXIT.CONSENT : EXIT.NOT_PROVED;
+      }
+
+      print("setup complete: the project is initialized, its state protected, its package registered, its model chosen and proved, and the agent is ready");
       return EXIT.OK;
     });
   } catch (e) {
@@ -883,6 +1096,12 @@ export function reportFailure(e, print = say) {
   // written message and a `reason`; printing the object instead would bury what was refused under a trace of
   // where. Which exit code each class deserves is the mapping TSK-0061 publishes — until then they share the
   // setup class, which is at least honest about "this run refused and wrote nothing further".
+  // ⚠️ THE ONE REFUSAL THAT IS AN ANSWER RATHER THAN A FAULT: a run with nobody to ask reached the billable
+  // check and refused to assume approval, which leaves setup partial exactly as a decline does.
+  if (e?.name === "LiveCheckRefusal") {
+    for (const line of String(e.message).split(NEWLINE)) warn(line);
+    return EXIT.CONSENT;
+  }
   if (typeof e?.reason === "string" && typeof e?.name === "string" && e.name.endsWith("Refusal")) {
     for (const line of String(e.message).split("\n")) warn(line);
     return EXIT.SETUP;

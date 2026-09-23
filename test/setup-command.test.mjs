@@ -126,7 +126,36 @@ function tree(dir) {
  */
 const PICKED = ["--provider", "openai", "--model", "gpt-4o", "--thinking", "off"];
 
-async function setup(p, argv = [], { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED, tavily = null } = {}) {
+/**
+ * A canary that proves the key this run computed, without sending anything.
+ *
+ * ⚠️ **NO TEST MAY RUN THE REAL ONE.** The canary is the single step that sends a request to the selected
+ * provider, and the fixture's model is a real OpenAI catalogue entry — so a suite that let the default through
+ * would bill somebody for running the tests. Every case injects a runner; this one returns what a passing check
+ * would have observed, derived from the preflight the command itself resolved.
+ */
+async function passingCanary({ selection, declared = {}, preflight }) {
+  const { computeCompatibilityKey, OBSERVED_KEY_FIELDS } = await import("../lib/compatibility-record.mjs");
+  const key = computeCompatibilityKey({
+    selection,
+    model: preflight.model,
+    piVersion: preflight.piVersion,
+    declared,
+    effectiveBaseUrl: preflight.effectiveBaseUrl,
+  });
+  return {
+    passed: true,
+    challengeEchoed: true,
+    observed: Object.fromEntries(OBSERVED_KEY_FIELDS.map((f) => [f, key[f]])),
+    requests: [{ ...key.endpointIdentity, pathname: `${key.endpointIdentity.pathname}/responses` }],
+  };
+}
+
+async function setup(
+  p,
+  argv = [],
+  { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED, tavily = null, canary = passingCanary, liveCheck = "approve" } = {}
+) {
   const printed = [];
   const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
@@ -143,7 +172,18 @@ async function setup(p, argv = [], { answer, answers, install, env = {}, trust =
   process.env.PI_CODING_AGENT_DIR = p.agentDir;
   for (const [k, v] of Object.entries(env)) process.env[k] = v;
   try {
-    const code = await main(["--project-root", p.dir, "--name", "Test Project", ...(trust ? ["--trust", trust] : []), ...pick, ...argv], {
+    const code = await main(
+      [
+        "--project-root",
+        p.dir,
+        "--name",
+        "Test Project",
+        ...(trust ? ["--trust", trust] : []),
+        ...(liveCheck ? ["--live-model-check", liveCheck] : []),
+        ...pick,
+        ...argv,
+      ],
+      {
       print: (line) => printed.push(line),
       // ⚠️ EVERY QUESTION IS RECORDED, not just answered: "did not ask" is the assertion a non-interactive run needs.
       ask: async (question) => {
@@ -151,6 +191,7 @@ async function setup(p, argv = [], { answer, answers, install, env = {}, trust =
         return answer === undefined ? scriptedAnswer(question, answers) : answer;
       },
       ...(verifyRuntime ? { verifyRuntime } : {}),
+      ...(canary ? { canary } : {}),
       install:
         install ??
         (() => {
@@ -1016,4 +1057,257 @@ test("⚠️ a trust child that fails is a refusal, never a decision", async () 
   // And a report that answers the question, about this project, is returned as the decision it is.
   assert.deepEqual(await trustDecision("approve", paths, modules, () => line(good)), good);
   assert.equal((await trustDecision("read", paths, modules, () => line({ ...good, state: "missing" }))).state, "missing");
+});
+
+/* ============================================== slice 4 ======================================== */
+
+test("⚠️ ACC-0045 an interrupted run is continued deliberately, and the published mapping says what each code means", async () => {
+  // The journal's presence is the interruption signal. Every phase is idempotent, so continuing is safe — but the
+  // operator has to learn that a run did not finish, so an ordinary rerun says so and prints the command the
+  // interrupted run itself recorded, rather than quietly carrying on.
+  const p = project({ ignored: true });
+  try {
+    assert.equal((await setup(p)).code, EXIT.OK);
+
+    const journal = join(p.dir, ".pi", "runtime", "setup-transaction.json");
+    writeFileSync(
+      journal,
+      JSON.stringify({
+        recordVersion: 1,
+        operation: "setup",
+        startedAt: new Date().toISOString(),
+        phases: [
+          { name: "initialize", status: "complete" },
+          { name: "registration", status: "running" },
+        ],
+        lastCompletedPhase: "initialize",
+        fileIdentities: [],
+        recovery: { command: resumeCommand(p.dir), reason: "setup was interrupted after the journal began" },
+      }) + "\n"
+    );
+
+    const stopped = await setup(p, [], { pick: [] });
+    assert.equal(stopped.code, EXIT.INTERRUPTED, stopped.printed.join("\n"));
+    assert.equal(existsSync(journal), true, "the refusal removed the evidence of the interruption");
+
+    // With --resume it continues, and the completed run leaves no journal behind.
+    const resumed = await setup(p, ["--resume"], { pick: [] });
+    assert.equal(resumed.code, EXIT.OK, resumed.printed.join("\n"));
+    assert.ok(resumed.printed.some((l) => /continuing an interrupted run/.test(l)), resumed.printed.join(" | "));
+    assert.equal(existsSync(journal), false, "a completed run left a journal to resume");
+
+    // ⚠️ AND `--resume` WITH NOTHING TO RESUME IS AN ORDINARY RUN, said out loud rather than implied.
+    const ordinary = await setup(p, ["--resume"], { pick: [] });
+    assert.equal(ordinary.code, EXIT.OK);
+    assert.ok(ordinary.printed.some((l) => /nothing to resume/.test(l)), ordinary.printed.join(" | "));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ every exit code this command can return is published by --help", async () => {
+  const { usage, EXIT_MEANING } = await import("../bin/setup.mjs");
+  const printed = [];
+  assert.equal(await main(["--help"], { print: (l) => printed.push(l), install: () => ({ installed: false, why: "unused" }) }), EXIT.OK);
+
+  const text = printed.join("\n");
+  for (const [name, code] of Object.entries(EXIT)) {
+    assert.ok(Object.hasOwn(EXIT_MEANING, String(code)), `${name} (${code}) has no published meaning`);
+    assert.ok(printed.some((l) => new RegExp(`^\\s*${code}\\s`).test(l)), `${name} (${code}) is not in --help`);
+  }
+  // ⚠️ AND THE OPTIONS THAT DECIDE SOMETHING BILLABLE OR IRREVERSIBLE ARE NAMED THERE TOO.
+  for (const flag of ["--trust", "--live-model-check", "--non-interactive", "--resume"]) assert.ok(text.includes(flag), `${flag} is undocumented`);
+  assert.deepEqual(usage(), printed, "--help printed something other than the command's own usage");
+});
+
+/** A canary that counts its runs, so "it never ran" is an observation rather than an inference. */
+function countingCanary(result = passingCanary) {
+  const runs = [];
+  const seen = { runs, preflight: null };
+  seen.canary = async (ctx) => {
+    runs.push(ctx.selection);
+    // ⚠️ KEPT, BECAUSE THE READ-BACK IS ASKED THE SAME QUESTION LATER: what the command resolved is what the
+    // record has to match, and rebuilding it here would be a second answer rather than the one under test.
+    seen.preflight = ctx.preflight;
+    return typeof result === "function" ? result(ctx) : result;
+  };
+  return seen;
+}
+
+const recordPath = (p) => join(p.dir, ".pi", "runtime", "model-compatibility.json");
+
+test("⚠️ the zero-cost checks run first, and a run they refuse sends nothing", async () => {
+  // Everything a run can be refused for without spending anything — the selection, this host's grant, the
+  // credential contract, Pi's catalogue, the thinking level, the package — is settled before the one check that
+  // costs money is offered. So a project whose authentication has gone never reaches the canary at all.
+  const p = project({ ignored: true });
+  try {
+    assert.equal((await setup(p)).code, EXIT.OK);
+    writeFileSync(join(p.agentDir, "auth.json"), "{}");
+
+    const c = countingCanary();
+    const o = await setup(p, [], { pick: [], canary: c.canary });
+    assert.equal(o.code, EXIT.SETUP, o.printed.join("\n"));
+    assert.deepEqual(c.runs, [], "the billable check ran for a project the zero-cost checks refused");
+    assert.ok(o.printed.every((l) => !/^preflight passed/.test(l)), o.printed.join(" | "));
+
+    // ⚠️ **THE JOURNAL THE FAILED RUN LEFT SAYS WHERE IT STOPPED, AND THAT THE BILLABLE PHASE NEVER STARTED.**
+    // An exit code alone cannot show that; the ledger can. Which zero-cost phase refuses depends on what the host
+    // lost — here the host's only remaining provider is the loopback one, which has no credential contract — and
+    // the guarantee is about the two phases after them, not about which of them fires.
+    const journal = JSON.parse(readFileSync(join(p.dir, ".pi", "runtime", "setup-transaction.json"), "utf-8"));
+    const status = Object.fromEntries(journal.phases.map((ph) => [ph.name, ph.status]));
+    const zeroCost = ["inspection", "model", "credential-contract", "preflight"];
+    assert.ok(zeroCost.some((name) => status[name] === "failed"), `no zero-cost phase failed: ${JSON.stringify(status)}`);
+    assert.equal(status["live-check"], "pending", JSON.stringify(status));
+    assert.equal(status["read-back"], "pending", JSON.stringify(status));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ the billable check needs its own approval, which is separate from every other answer", async () => {
+  // Denied outright: nothing is sent, nothing is recorded, and the project is left valid and partial.
+  const p = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    const o = await setup(p, [], { liveCheck: "deny", canary: c.canary });
+    assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
+    assert.deepEqual(c.runs, [], "a denied check still sent a request");
+    assert.equal(existsSync(recordPath(p)), false, "a denied check recorded compatibility");
+    assert.ok(o.printed.some((l) => /not run, by your choice/.test(l)), o.printed.join(" | "));
+    // The project itself is set up: the model is committed, the package registered, the scaffold valid.
+    assert.equal(settingsOf(p).defaultModel, "gpt-4o");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // Asked interactively and answered no: the same outcome, from the operator rather than the flag.
+  const q = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    const o = await setup(q, [], { liveCheck: null, canary: c.canary, answers: [[/^Live model check/i, "no"]] });
+    assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
+    assert.ok(o.seen.asks.some((a) => /^Live model check/i.test(a)), o.seen.asks.join(" | "));
+    assert.deepEqual(c.runs, []);
+    assert.equal(existsSync(recordPath(q)), false);
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ NOBODY TO ASK, AND NO FLAG: it refuses rather than assuming approval for something billable. The project is
+  // taken all the way to the check first — inspection allowed, model confirmed, only the check outstanding — so
+  // what this measures is the billable step, and not an earlier refusal standing in for it.
+  const r = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    assert.equal((await setup(r, [], { liveCheck: "deny", canary: c.canary })).code, EXIT.CONSENT);
+    assert.equal(existsSync(recordPath(r)), false);
+
+    const o = await setup(r, ["--non-interactive"], { liveCheck: null, canary: c.canary, pick: [] });
+    assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
+    assert.deepEqual(o.seen.asks, [], "a run with nobody to ask asked anyway");
+    assert.deepEqual(c.runs, [], "a run with nobody to ask sent a billable request");
+    assert.equal(existsSync(recordPath(r)), false);
+  } finally {
+    rmSync(r.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a passing check is recorded, read back, and reused by the next run without asking again", async () => {
+  const p = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    const first = await setup(p, [], { canary: c.canary });
+    assert.equal(first.code, EXIT.OK, first.printed.join("\n"));
+    assert.equal(c.runs.length, 1, "the check ran more than once, or not at all");
+    assert.ok(first.printed.some((l) => /^compatibility recorded and read back/.test(l)), first.printed.join(" | "));
+
+    // ⚠️ THE RECORD IS WHAT THE NEXT START WILL READ, so the test reads it the same way and recomputes the key.
+    const { readCompatibility, compatibilityLocation, computeCompatibilityKey, differingFields } = await import("../lib/compatibility-record.mjs");
+    const found = readCompatibility(compatibilityLocation({ projectRoot: p.dir }));
+    assert.equal(found.state, "valid", JSON.stringify(found));
+    assert.equal(found.record.result.outcome, "passed");
+    assert.equal(JSON.stringify(found.record).includes(SENTINEL_KEY), false, "the compatibility record carries credential material");
+
+    // A second run reuses it: no question, no request, and the same bytes.
+    const bytes = readFileSync(recordPath(p), "utf-8");
+    const second = await setup(p, [], { pick: [], canary: c.canary, liveCheck: null });
+    assert.equal(second.code, EXIT.OK, second.printed.join("\n"));
+    assert.equal(c.runs.length, 1, "a recorded check was run again");
+    assert.deepEqual(second.seen.asks, [], "a recorded check asked again");
+    assert.equal(readFileSync(recordPath(p), "utf-8"), bytes, "a rerun rewrote the compatibility record");
+    void computeCompatibilityKey;
+    void differingFields;
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a check that does not pass, or does not prove what it checked, records nothing and reports not ready", async () => {
+  // The canary said no.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p, [], { canary: async () => ({ passed: false }) });
+    assert.equal(o.code, EXIT.NOT_PROVED, o.printed.join("\n"));
+    assert.equal(existsSync(recordPath(p)), false, "a failed check was recorded");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ THE CANARY PASSED, BUT NOT ON WHAT THIS RUN CHECKED. A child that resolved a different endpoint proves
+  // something about another configuration, and a record made from it would let a later start skip the check on
+  // evidence that never applied to it.
+  const q = project({ ignored: true });
+  try {
+    const o = await setup(q, [], {
+      canary: async (ctx) => {
+        const proof = await passingCanary(ctx);
+        return { ...proof, requests: [{ ...proof.requests[0], hostname: "somewhere-else.example" }] };
+      },
+    });
+    assert.equal(o.code, EXIT.NOT_PROVED, o.printed.join("\n"));
+    assert.equal(existsSync(recordPath(q)), false, "a check that proved something else was recorded");
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ readiness is what the record says on disk, not what the writer reported", async () => {
+  // The read-back is its own step, and it answers with the file. Held directly, because the case it exists for —
+  // a record that cannot be read back — is one the filesystem has to produce.
+  const { verifyRecorded } = await import("../bin/setup.mjs");
+  const { compatibilityLocation, computeCompatibilityKey, readCompatibility, differingFields, recordCompatibility } = await import(
+    "../lib/compatibility-record.mjs"
+  );
+  const modules = { compatibility: { compatibilityLocation, computeCompatibilityKey, readCompatibility, differingFields } };
+
+  const p = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    assert.equal((await setup(p, [], { canary: c.canary })).code, EXIT.OK);
+    const compatibility = compatibilityLocation({ projectRoot: p.dir });
+    const preflight = c.preflight;
+
+    // The record this run wrote reads back and matches.
+    const ok = await verifyRecorded({ compatibility, preflight, modules, validators: undefined });
+    assert.equal(ok.record.result.outcome, "passed");
+
+    // A record that is gone is not readiness.
+    rmSync(recordPath(p));
+    await assert.rejects(
+      () => verifyRecorded({ compatibility, preflight, modules, validators: undefined }),
+      (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.NOT_PROVED && /cannot be read back/.test(e.message)
+    );
+
+    // And a record about another model is not this project's proof.
+    const otherKey = { ...ok.key, model: "gpt-4.1" };
+    await recordCompatibility(compatibility, { key: otherKey, result: { outcome: "passed", observedAt: new Date().toISOString(), challengeEchoed: true } });
+    await assert.rejects(
+      () => verifyRecorded({ compatibility, preflight, modules, validators: undefined }),
+      (e) => e instanceof SetupCommandRefusal && e.exit === EXIT.NOT_PROVED && /model/.test(e.message)
+    );
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
 });
