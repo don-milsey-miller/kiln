@@ -756,6 +756,16 @@ test("⚠️ ACC-0108 trust is obtained and never assumed, and a denial leaves a
     assert.equal(existsSync(join(q.dir, "planning-content", "project.yaml")), true, "the scaffold did not survive a denial");
     assert.equal(existsSync(join(q.dir, ".pi", "runtime", "setup-transaction.json")), false, "a denial left a journal to resume");
 
+    // ⚠️ **"INTACT AND VALID" IS MEASURED, NOT ASSERTED.** The scaffold surviving a denial is worth nothing if what
+    // survived does not validate, so the project's own content is put through Kiln's plan linter — the same check
+    // this repository runs over its own planning content.
+    const linted = spawnSync(process.execPath, [join(ROOT, "bin", "lint-plan.mjs")], {
+      encoding: "utf-8",
+      env: { ...process.env, PLANNING_CONTENT_DIR: q.contentRoot },
+    });
+    assert.equal(linted.status, 0, `the scaffold a denial left does not validate:
+${linted.stdout}${linted.stderr}`);
+
     // ⚠️ AND THE DENIAL IS RECORDED, so the next run knows somebody said no rather than asking again.
     const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
     const recorded = await readTrust({ projectRoot: q.dir, agentDir: q.agentDir, toolRoot: ROOT });
@@ -2003,6 +2013,50 @@ test("⚠️ a recovery clears only a lock whose owner is provably gone", async 
     const broke = breakDeadLock(lock);
     assert.equal(broke.broken, true, JSON.stringify(broke));
     assert.equal(existsSync(lock), false, "a dead holder's lock survived");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0045 a run killed inside the bootstrap leaves the project untouched and nothing to resume", async () => {
+  // The second interruption window: the bootstrap runs before any journal exists, so what a kill there must leave
+  // is a project that looks exactly as it did — and a rerun that simply does the install again.
+  const p = project({ ignored: true });
+  try {
+    const before = tree(p.dir);
+    const spec = {
+      agentDir: p.agentDir,
+      installMs: 4000,
+      answers: [["^Check this computer", "no"]],
+      argv: ["--project-root", p.dir, "--name", "Killed", "--trust", "approve"],
+    };
+    const killed = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
+        env: { ...process.env, PLANNING_CONTENT_DIR: p.contentRoot, PI_CODING_AGENT_DIR: p.agentDir, KILN_CAPTURE_SETUP: JSON.stringify(spec) },
+      });
+      let out = "";
+      let done = false;
+      child.stdout.on("data", (chunk) => {
+        out += chunk;
+        if (!done && /KILN_INSTALLING/.test(out)) {
+          done = true;
+          child.kill("SIGKILL");
+        }
+      });
+      child.on("exit", (code, signal) => resolve({ out, code, signal }));
+      child.on("error", reject);
+    });
+    assert.notEqual(killed.code, 0, `the run finished instead of being killed: ${killed.out}`);
+    assert.ok(/KILN_INSTALLING/.test(killed.out), killed.out);
+
+    // ⚠️ NOT ONE BYTE OF THE PROJECT, and nothing that would make the next run think it was recovering.
+    assert.deepEqual(tree(p.dir), before, "a run killed in the bootstrap changed the project");
+    assert.equal(existsSync(join(p.dir, ".pi")), false, "runtime state survived a killed bootstrap");
+
+    // And an ordinary rerun — no --resume, because there is nothing to resume — completes.
+    const again = await setup(p);
+    assert.equal(again.code, EXIT.OK, again.printed.join("\n"));
+    assert.ok(again.printed.every((l) => !/continuing an interrupted run/.test(l)), again.printed.join(" | "));
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

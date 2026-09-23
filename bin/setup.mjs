@@ -1250,14 +1250,14 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
 
     // 3. The single setup lock, held across everything that follows, including the bootstrap install.
     //
-    // ⚠️ **A RECOVERY FIRST CLEARS A LOCK ITS OWNER CANNOT STILL BE HOLDING.** A run that was killed leaves its
-    // lockfile behind, and the stale window that protects waiters from a slow holder is two minutes long — so the
-    // command an interrupted run records would refuse for two minutes, on a lock belonging to a process that no
-    // longer exists. `--resume` is the operator saying that run is over; this checks whether it really is.
-    if (args.resume) {
-      const broke = breakDeadLock(join(paths.projectRoot, SETUP_LOCK_FILE));
-      if (broke.broken) print(`removed the setup lock left by process ${broke.owner.pid}, which is no longer running`);
-    }
+    // ⚠️ **A LOCK WHOSE OWNER IS PROVABLY GONE IS CLEARED BEFORE THIS RUN WAITS ON IT.** A killed setup leaves its
+    // lockfile behind, and the stale window that protects waiters from a slow holder is two minutes long — so
+    // every rerun after a kill, whether it resumes or starts afresh, would refuse for two minutes on a lock held
+    // by a process that no longer exists. What makes this safe is what it refuses to do: another machine's lock,
+    // an unreadable one, and one whose pid is still alive are each left exactly where they are, so two live setups
+    // still exclude each other exactly as before.
+    const broke = breakDeadLock(join(paths.projectRoot, SETUP_LOCK_FILE));
+    if (broke.broken) print(`cleared the setup lock left by process ${broke.owner.pid}, which is no longer running`);
 
     return await withLock(join(paths.projectRoot, SETUP_LOCK_FILE), async () => {
       // 4. The locked dependencies, inside this checkout only.

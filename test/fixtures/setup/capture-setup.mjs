@@ -78,7 +78,19 @@ const code = await main(spec.argv, {
     for (const [pattern, answer] of answers) if (pattern.test(question)) return answer;
     return null;
   },
-  install: () => ({ installed: false, why: "the fixture's bootstrap" }),
+  install: () => {
+    // ⚠️ **A WINDOW TO BE KILLED IN.** The bootstrap is the one phase that runs before any journal exists, and the
+    // criterion is about a run that dies inside it. `installMs` holds this process there long enough for a test to
+    // do exactly that, by blocking rather than awaiting — a killed process does not get to finish a timer.
+    if (spec.installMs) {
+      writeSync(1, `
+KILN_INSTALLING
+`);
+      const until = Date.now() + spec.installMs;
+      while (Date.now() < until) {}
+    }
+    return { installed: false, why: "the fixture's bootstrap" };
+  },
   // ⚠️ **THE ONE STEP THAT WOULD COST MONEY, ANSWERED HERE.** The canary sends a request to the selected provider;
   // this returns what a passing check would have observed, derived from what the command itself resolved, so a
   // recorded run can complete without anything leaving this machine.
