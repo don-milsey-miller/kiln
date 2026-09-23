@@ -829,7 +829,7 @@ test("⚠️ the package entry is written only after it is proved to reach THIS 
     symlinkSync(join(p.root, "other"), join(p.dir, ".planning"), process.platform === "win32" ? "junction" : "dir");
 
     const o = await setup(p);
-    assert.equal(o.code, EXIT.SETUP);
+    assert.equal(o.code, EXIT.REGISTRATION, o.printed.join("\n"));
     assert.equal(existsSync(join(p.dir, ".pi", "settings.json")), false, "an unproved entry was committed");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
@@ -1010,7 +1010,7 @@ test("⚠️ a non-interactive run neither asks nor assumes, and a host with no 
   const q = project({ ignored: true });
   try {
     const o = await setup(q, [], { pick: ["--provider", "kiln-local", "--model", "kiln-plain", "--thinking", "off"] });
-    assert.equal(o.code, EXIT.SETUP);
+    assert.equal(o.code, EXIT.CREDENTIALS, o.printed.join("\n"));
     assert.ok(
       o.printed.concat(o.printed).some(() => true) && existsSync(join(q.dir, ".pi", "settings.json")),
       "the run should have reached the settings write before refusing"
@@ -1193,7 +1193,7 @@ test("⚠️ the zero-cost checks run first, and a run they refuse sends nothing
 
     const c = countingCanary();
     const o = await setup(p, [], { pick: [], canary: c.canary });
-    assert.equal(o.code, EXIT.SETUP, o.printed.join("\n"));
+    assert.equal(o.code, EXIT.CREDENTIALS, o.printed.join("\n"));
     assert.deepEqual(c.runs, [], "the billable check ran for a project the zero-cost checks refused");
     assert.ok(o.printed.every((l) => !/^preflight passed/.test(l)), o.printed.join(" | "));
 
@@ -1614,7 +1614,7 @@ test("⚠️ D25 a custom provider is declared, not guessed, and the real canary
       canary: null,
       liveCheck: "approve",
     });
-    assert.equal(undeclared.code, EXIT.SETUP, undeclared.printed.join("\n"));
+    assert.equal(undeclared.code, EXIT.CREDENTIALS, undeclared.printed.join("\n"));
     assert.deepEqual(requests, [], "a provider with no contract was contacted");
 
     // ⚠️ AND THE NEXT RUN RESUMES, because the refused one left a journal — which is the operator's real path
@@ -1650,4 +1650,40 @@ test("⚠️ D25 a custom provider is declared, not guessed, and the real canary
     server.close();
     rmSync(p.root, { recursive: true, force: true });
   }
+});
+
+test("⚠️ every refusal class this command can raise has its own published exit code", async () => {
+  // ⚠️ **A CODE PER CLASS IS WHAT A CALLER CAN ACT ON.** "Choose a model", "this provider needs a credential
+  // declaration" and "the package entry could not be written" are three different instructions; one code for all
+  // of them is none. Each class is checked against the table, and the table against what --help publishes.
+  const { exitFor, EXIT_MEANING, usage } = await import("../bin/setup.mjs");
+  const classes = [
+    ["ModelSelectionRefusal", EXIT.SELECTION],
+    ["CredentialContractRefusal", EXIT.CREDENTIALS],
+    ["PackageEntryRefusal", EXIT.REGISTRATION],
+    ["SettingsRefusal", EXIT.REGISTRATION],
+    ["ResearchChoiceRefusal", EXIT.RESEARCH],
+    ["LaunchRefusal", EXIT.UNUSABLE],
+    ["IgnoreRefusal", EXIT.STATE],
+    ["LiveCheckRefusal", EXIT.CONSENT],
+    ["TrustRefusal", EXIT.TRUST],
+  ];
+  const text = usage().join("\n");
+  for (const [name, code] of classes) {
+    const error = Object.assign(new Error("refused"), { name, reason: "whatever" });
+    assert.equal(exitFor(error), code, `${name} maps to the wrong code`);
+    assert.ok(Object.hasOwn(EXIT_MEANING, String(code)), `${code} has no published meaning`);
+    assert.ok(usage().some((line) => new RegExp(`^\\s*${code}\\s`).test(line)), `${code} is not in --help`);
+  }
+
+  // ⚠️ AND A CLASS THIS TABLE DOES NOT NAME IS NOT GUESSED AT: it keeps the generic setup code, which is at least
+  // honest about "this run refused".
+  assert.equal(exitFor(Object.assign(new Error("x"), { name: "SomethingElseRefusal", reason: "r" })), null);
+  assert.equal(exitFor(new Error("x")), null);
+  assert.equal(exitFor(null), null);
+
+  // The classes the command can reach are each proved through it elsewhere in this file; these are the ones it
+  // cannot, held here so the table is not a list of aspirations.
+  const unreachable = ["ResearchChoiceRefusal", "IgnoreRefusal", "SettingsRefusal"];
+  for (const name of unreachable) assert.ok(classes.some(([c]) => c === name), `${name} left the table`);
 });

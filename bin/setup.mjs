@@ -91,6 +91,16 @@ export const EXIT = Object.freeze({
   INTERRUPTED: 10,
   /** The selected model could not be shown to work, so nothing is described as ready. */
   NOT_PROVED: 11,
+  /** No model could be chosen or confirmed for this project on this computer. */
+  SELECTION: 12,
+  /** The selected provider's credential contract is not one Kiln can satisfy or was told about. */
+  CREDENTIALS: 13,
+  /** Kiln's package or its skill overrides could not be registered in the project's settings. */
+  REGISTRATION: 14,
+  /** The web-research choice could not be settled, so it was left as it was. */
+  RESEARCH: 15,
+  /** The committed selection cannot be used on this computer as it stands. */
+  UNUSABLE: 16,
 });
 
 /**
@@ -112,7 +122,43 @@ export const EXIT_MEANING = Object.freeze({
   [EXIT.CONSENT]: "an answer left setup partial: the project is valid, the agent is not ready",
   [EXIT.INTERRUPTED]: "a previous run was interrupted; rerun with --resume to continue it",
   [EXIT.NOT_PROVED]: "the selected model was not shown to work, so the agent is not ready",
+  [EXIT.SELECTION]: "no model could be chosen or confirmed on this computer",
+  [EXIT.CREDENTIALS]: "the selected provider's credential contract is not one Kiln can satisfy",
+  [EXIT.REGISTRATION]: "the package or the skill overrides could not be registered",
+  [EXIT.RESEARCH]: "the web-research choice could not be settled",
+  [EXIT.UNUSABLE]: "the committed selection cannot be used on this computer as it stands",
 });
+
+/**
+ * Which code each of Kiln's refusal classes exits with.
+ *
+ * ⚠️ **BY CLASS, BECAUSE THAT IS WHAT A CALLER CAN ACT ON.** A script rerunning setup needs to tell "choose a
+ * model" from "this provider needs a credential declaration" from "the package entry could not be written";
+ * lumping them together as one setup failure makes every one of those the same instruction, which is no
+ * instruction. The classes are Kiln's own — each carries a written message and a `reason` — and anything this
+ * table does not name keeps the generic setup code rather than being guessed at.
+ */
+const EXIT_BY_REFUSAL = Object.freeze({
+  ModelSelectionRefusal: EXIT.SELECTION,
+  CredentialContractRefusal: EXIT.CREDENTIALS,
+  PackageEntryRefusal: EXIT.REGISTRATION,
+  SettingsRefusal: EXIT.REGISTRATION,
+  ResearchChoiceRefusal: EXIT.RESEARCH,
+  LaunchRefusal: EXIT.UNUSABLE,
+  // ⚠️ THE IGNORE OWNER IS A STATE-PROTECTION REFUSAL, not a registration one: what it could not do is make the
+  // runtime paths ignored, which is the same failure the coverage step reports.
+  IgnoreRefusal: EXIT.STATE,
+  // ⚠️ AND THE ONE REFUSAL THAT IS AN ANSWER RATHER THAN A FAULT: a run with nobody to ask reached the billable
+  // check and refused to assume approval, which leaves setup partial exactly as a decline does.
+  LiveCheckRefusal: EXIT.CONSENT,
+  TrustRefusal: EXIT.TRUST,
+});
+
+/** The exit code for one thrown thing, or null when this table does not name its class. */
+export function exitFor(error) {
+  if (typeof error?.name !== "string") return null;
+  return Object.hasOwn(EXIT_BY_REFUSAL, error.name) ? EXIT_BY_REFUSAL[error.name] : null;
+}
 
 export class SetupCommandRefusal extends Error {
   constructor(exit, message, detail = {}) {
@@ -1263,18 +1309,18 @@ export function reportFailure(e, print = say) {
     for (const line of String(e.message).split("\n")) warn(line);
     return EXIT.RUNTIME;
   }
-  // ⚠️ **KILN'S REFUSALS REACH THE OPERATOR AS REFUSALS, NOT AS STACK TRACES.** Each of these classes carries a
-  // written message and a `reason`; printing the object instead would bury what was refused under a trace of
-  // where. Which exit code each class deserves is the mapping TSK-0061 publishes — until then they share the
-  // setup class, which is at least honest about "this run refused and wrote nothing further".
-  // ⚠️ THE ONE REFUSAL THAT IS AN ANSWER RATHER THAN A FAULT: a run with nobody to ask reached the billable
-  // check and refused to assume approval, which leaves setup partial exactly as a decline does.
-  if (e?.name === "LiveCheckRefusal") {
+  // ⚠️ **KILN'S REFUSALS REACH THE OPERATOR AS REFUSALS, NOT AS STACK TRACES, AND EACH CLASS HAS ITS OWN CODE.**
+  // Every one of them carries a written message and a `reason`; printing the object instead would bury what was
+  // refused under a trace of where, and returning one code for all of them would tell a script that "choose a
+  // model" and "this provider needs a credential declaration" are the same situation. A class this table does
+  // not name keeps the generic setup code, which is at least honest about "this run refused".
+  const mapped = exitFor(e);
+  if (mapped !== null) {
     for (const line of String(e.message).split(NEWLINE)) warn(line);
-    return EXIT.CONSENT;
+    return mapped;
   }
   if (typeof e?.reason === "string" && typeof e?.name === "string" && e.name.endsWith("Refusal")) {
-    for (const line of String(e.message).split("\n")) warn(line);
+    for (const line of String(e.message).split(NEWLINE)) warn(line);
     return EXIT.SETUP;
   }
   if (e instanceof SetupRefusal || e?.name === "LocalStateRefusal" || e?.name === "LockError") {
