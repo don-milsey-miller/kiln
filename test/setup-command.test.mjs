@@ -118,6 +118,82 @@ function tree(dir) {
   return out;
 }
 
+
+/**
+ * The arguments inside a command line Kiln printed, read back the way the shell it targets would.
+ *
+ * ⚠️ **SO THE RECORDED COMMAND IS THE SOURCE, NOT A COPY OF IT.** A recovery test that types the arguments it
+ * expects passes whatever the journal says, including nothing and including the wrong project. Parsing the line
+ * makes the recorded command the thing under test: a command naming another directory sends the run there, and
+ * the assertions about this project fail.
+ */
+function parseShellArgv(command, platform = process.platform) {
+  const out = [];
+  let current = "";
+  let quoted = false;
+  let started = false;
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (!quoted && /\s/.test(c)) {
+      if (started) out.push(current);
+      current = "";
+      started = false;
+      continue;
+    }
+    started = true;
+    if (c === "'") {
+      if (!quoted) {
+        quoted = true;
+        continue;
+      }
+      // Inside a quoted run: PowerShell writes an apostrophe twice, a POSIX shell closes, escapes and reopens.
+      if (platform === "win32" && command[i + 1] === "'") {
+        current += "'";
+        i += 1;
+        continue;
+      }
+      if (platform !== "win32" && command.slice(i, i + 4) === `'${String.fromCharCode(92)}''`) {
+        current += "'";
+        i += 3;
+        continue;
+      }
+      quoted = false;
+      continue;
+    }
+    current += c;
+  }
+  if (started) out.push(current);
+  return out;
+}
+
+
+/**
+ * What git would commit, as paths, read the way git offers them rather than parsed out of a display format.
+ *
+ * ⚠️ **NUL-DELIMITED, BECAUSE A NEWLINE IS A LEGAL CHARACTER IN A PATH.** `--porcelain` quotes and escapes such a
+ * path for display, and a test that split its output on newlines would silently read one entry as two — and would
+ * never see the file whose name did it. `-z` gives the paths themselves, unquoted and unescaped, which is what a
+ * scan of every committed file has to enumerate.
+ *
+ * ⚠️ **AND THE RENAME FORM IS HANDLED**, since `XY` records for a rename carry two NUL-separated paths; both are
+ * returned, because both are things the working tree now has an opinion about.
+ */
+function committedPaths(dir) {
+  const raw = execFileSync("git", ["status", "-z", "--porcelain", "--untracked-files=all"], { cwd: dir, encoding: "utf-8" });
+  const fields = raw.split("\0").filter((f) => f.length > 0);
+  const out = [];
+  for (let i = 0; i < fields.length; i++) {
+    const status = fields[i].slice(0, 2);
+    out.push({ status, path: fields[i].slice(3) });
+    // A rename or copy is followed by its source path in the next field.
+    if (/R|C/.test(status)) {
+      i += 1;
+      if (fields[i] !== undefined) out.push({ status, path: fields[i] });
+    }
+  }
+  return out;
+}
+
 /** Run the real command against a project, with npm and the operator replaced. */
 /**
  * ⚠️ **THE DEFAULT RUN NAMES ITS MODEL, because Pi's catalogue is not this test's to pin.** A host with an OpenAI
@@ -763,8 +839,40 @@ test("⚠️ ACC-0108 trust is obtained and never assumed, and a denial leaves a
       encoding: "utf-8",
       env: { ...process.env, PLANNING_CONTENT_DIR: q.contentRoot },
     });
-    assert.equal(linted.status, 0, `the scaffold a denial left does not validate:
-${linted.stdout}${linted.stderr}`);
+    assert.equal(linted.status, 0, `the scaffold a denial left does not validate:\n${linted.stdout}${linted.stderr}`);
+
+    // ⚠️ **AND THE BROWSER-ONLY ROUTE IS SERVED, NOT INFERRED FROM THE FILES VALIDATING.** A denial means the agent
+    // is not ready; what the operator keeps is the project in the browser, so that route is started against THIS
+    // project and asked for a page. Content that validates does not establish that a server can read it.
+    const served = await new Promise((resolve, reject) => {
+      const app = spawn(process.execPath, [join(ROOT, "app", "server.mjs")], {
+        env: { ...process.env, PLANNING_CONTENT_DIR: q.contentRoot, PORT: "0" },
+      });
+      let out = "";
+      const finish = (value) => {
+        app.kill("SIGKILL");
+        resolve(value);
+      };
+      app.stdout.on("data", async (chunk) => {
+        out += chunk;
+        const url = /Walking skeleton on (\S+)/.exec(out)?.[1];
+        if (!url) return;
+        try {
+          const response = await fetch(url);
+          finish({ status: response.status, body: await response.text() });
+        } catch (e) {
+          finish({ status: 0, body: String(e?.message ?? e) });
+        }
+      });
+      app.on("exit", (code) => {
+        if (!/Walking skeleton on/.test(out)) resolve({ status: 0, body: `the server exited ${code}: ${out}` });
+      });
+      app.on("error", reject);
+    });
+    assert.equal(served.status, 200, `the browser-only route did not serve this project: ${served.body.slice(0, 400)}`);
+    // A rendered page, not an error body: the skeleton's own document, and no sign of a failed read behind it.
+    assert.match(served.body, /^<!doctype html>/i, served.body.slice(0, 200));
+    assert.equal(/error|cannot|failed/i.test(served.body.slice(0, 600)), false, served.body.slice(0, 600));
 
     // ⚠️ AND THE DENIAL IS RECORDED, so the next run knows somebody said no rather than asking again.
     const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
@@ -1824,6 +1932,16 @@ test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provid
   const PROVIDER_KEY = "sk-kiln-acc0106-PROVIDER-9c41f7";
   const RESEARCH_KEY = "tvly-kiln-acc0106-RESEARCH-3b08de";
   try {
+    // ⚠️ THE BOUNDARY IS TAKEN BEFORE THE RUN, so what is scanned is what this run did and not what the fixture
+    // arrived with. The operator's own file is written first and carries a path and a secret-shaped string of its
+    // own: it must not be in the scanned set, and a scan that took the whole after-set would fail on it — which is
+    // how this boundary is observable rather than merely intended.
+    writeFileSync(join(p.dir, "OPERATOR-NOTES.md"), `# Notes
+
+My key is ${PROVIDER_KEY} and my project is ${p.dir}.
+`);
+    const before = committedPaths(p.dir);
+
     // An environment-authenticated provider: Pi finds openai through the variable, with nothing in auth.json.
     const probes = [];
     const o = await setup(p, ["--research", "tavily"], {
@@ -1849,12 +1967,18 @@ test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provid
       o.printed.filter((l) => l.startsWith("preflight")).join(" | ")
     );
 
-    // Every path git would commit, which is the set the criterion asks for.
-    const committed = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: p.dir, encoding: "utf-8" })
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.slice(3).trim().replace(/^"|"$/g, ""));
+    // ⚠️ **WHAT THE RUN ADDED OR CHANGED, WHICH IS A BEFORE AND AN AFTER.** The set that matters is the run's own
+    // effect on what git would commit, so it is the difference between the two: a fixture artefact that was
+    // already there — this project's `.planning` link, which the ignore block's `.planning/` does not match — is
+    // in both, and therefore in neither the set nor an exemption list somebody has to maintain.
+    const after = committedPaths(p.dir);
+    const wasThere = new Set(before.map((entry) => `${entry.status} ${entry.path}`));
+    const committed = after.filter((entry) => !wasThere.has(`${entry.status} ${entry.path}`)).map((entry) => entry.path);
     assert.ok(committed.length > 5, `the run committed almost nothing: ${committed.join(", ")}`);
+    assert.equal(committed.includes("OPERATOR-NOTES.md"), false, "the scan claimed a file the operator wrote before the run");
+    // ⚠️ EVERY ENTRY IS ACCOUNTED FOR: each one is read below, and anything not readable as a file fails rather
+    // than being passed over, because a scan that skips what it cannot read is not a scan.
+    for (const entry of committed) assert.ok(typeof entry === "string" && entry.length > 0, JSON.stringify(after));
     // ⚠️ AND THE TWO FILES THE CRITERION NAMES ARE IN IT, by name, rather than assumed to be.
     for (const named of [".pi/settings.json", ".pi/kiln.json"])
       assert.ok(committed.includes(named), `${named} is not among what the run committed: ${committed.join(", ")}`);
@@ -1872,25 +1996,26 @@ test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provid
       PROVIDER_KEY.slice(0, 12),
       RESEARCH_KEY.slice(0, 12),
     ];
-    const absolute = [p.root, p.dir, p.agentDir, stateHome, tmpdir(), homedir()];
+    // ⚠️ **ANY ABSOLUTE PATH, NOT ONLY THIS FIXTURE'S.** The tool root is the likeliest one to leak in practice —
+    // a generator that interpolated where it was running would commit the developer's checkout into every
+    // project — so the fixture's own paths are checked by value and absolute paths in general by shape.
+    const absolute = [p.root, p.dir, p.agentDir, stateHome, tmpdir(), homedir(), ROOT];
+    const absoluteShapes = [/[A-Za-z]:[\/]/, /\/home\//, /\/Users\//, /\/tmp\//, /\/var\/folders\//];
     const headers = [/authorization:/i, /bearer\s/i, /x-api-key/i];
 
     for (const rel of committed) {
-      // ⚠️ **THE ONE ENTRY THAT IS NOT A FILE IS NAMED, NOT SKIPPED.** This fixture's `.planning` is a link to the
-      // checkout, and `.planning/` in the ignore block does not match a link, so git lists it — on Linux, where a
-      // symlink is what it is; on Windows the junction reads as a directory and git says nothing. In a real
-      // project `.planning` is a directory the block does ignore. Anything else that is not a regular file would
-      // be something this scan has never looked inside, so it fails rather than being passed over.
-      if (!statSync(join(p.dir, rel)).isFile()) {
-        assert.equal(rel, ".planning", `${rel} is in the committed set and is not a file this scan can read`);
-        continue;
-      }
+      // ⚠️ **EVERYTHING THIS RUN ADDED IS A FILE THIS SCAN READS.** There is no exemption list: an entry that is
+      // not a regular file is one nobody has looked inside, and a leak scan that passes over what it cannot read
+      // is not one. The fixture's `.planning` link is not here because it was in the before set too.
+      assert.ok(statSync(join(p.dir, rel)).isFile(), `${rel} was added by this run and is not a file this scan can read`);
       const text = readFileSync(join(p.dir, rel), "utf-8");
       for (const secret of [PROVIDER_KEY, RESEARCH_KEY, ...derived])
         assert.equal(text.includes(secret), false, `${rel} carries a credential or something derived from one`);
       for (const header of headers) assert.equal(header.test(text), false, `${rel} carries an authorisation header`);
       for (const path of absolute)
         assert.equal(text.includes(path), false, `${rel} carries this machine's own path (${path})`);
+      for (const shape of absoluteShapes)
+        assert.equal(shape.test(text), false, `${rel} carries an absolute path (${shape})`);
       // The variables' NAMES are configuration, not credentials — but this project never needed to commit one.
       for (const name of ["OPENAI_API_KEY", "TAVILY_API_KEY"]) assert.equal(text.includes(name), false, `${rel} names a credential variable`);
     }
@@ -1955,12 +2080,15 @@ test("⚠️ ACC-0045 a run killed after its journal began records where it stop
     assert.ok(journal.recovery.command.includes("--resume"), journal.recovery.command);
     assert.ok(journal.recovery.command.includes(p.dir), journal.recovery.command);
 
-    // ⚠️ **AND THAT COMMAND IS WHAT IS RUN.** Its argument list is taken from the journal rather than written
-    // here; only npm and the canary are replaced, as they are in every case, because a test may not install a
-    // dependency graph or send a provider a billable request.
-    const recorded = journal.recovery.command;
-    const argv = ["--project-root", p.dir, "--resume"];
-    assert.ok(recorded.endsWith("--resume"), recorded);
+    // ⚠️ **AND THAT COMMAND IS THE SOURCE OF WHAT IS RUN.** Its arguments are parsed out of the recorded line —
+    // not typed here — so a command naming another project, or omitting `--resume`, sends this run somewhere else
+    // and the assertions below fail. Only npm and the canary are replaced, as everywhere, because a test may not
+    // install a dependency graph or send a provider a billable request; the operator's own answers are added.
+    const parsed = parseShellArgv(journal.recovery.command);
+    assert.equal(parsed[0], "node", journal.recovery.command);
+    assert.match(parsed[1], /bin[\/]setup\.mjs$/, journal.recovery.command);
+    const argv = parsed.slice(2);
+    assert.deepEqual(argv, ["--project-root", p.dir, "--resume"], journal.recovery.command);
     const resumed = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "setup", "capture-setup.mjs")], {
       encoding: "utf-8",
       env: {
@@ -2057,6 +2185,55 @@ test("⚠️ ACC-0045 a run killed inside the bootstrap leaves the project untou
     const again = await setup(p);
     assert.equal(again.code, EXIT.OK, again.printed.join("\n"));
     assert.ok(again.printed.every((l) => !/continuing an interrupted run/.test(l)), again.printed.join(" | "));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ two recoveries racing for one dead run's lock do not both get it", async () => {
+  // ⚠️ **THE DEFECT THIS EXISTS FOR:** a recovery that reads a dead owner and then unlinks the lock can unlink a
+  // lock another recovery has just legitimately acquired, and both then believe they hold the project. Setup
+  // clears such a lock on every rerun, so two reruns started together is not a contrived case.
+  const p = project();
+  const lock = join(p.dir, ".planning-init.lock");
+  const log = join(p.root, "holders.log");
+  try {
+    // A lockfile owned by a process that has exited: what a killed run leaves behind.
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    writeFileSync(lock, JSON.stringify({ pid: Number(gone.stdout), hostname: hostname(), acquiredAt: new Date().toISOString() }));
+    writeFileSync(log, "");
+
+    const racers = [0, 1, 2, 3].map(
+      () =>
+        new Promise((resolve) => {
+          const child = spawn(process.execPath, [join(ROOT, "test", "fixtures", "setup", "racing-recovery.mjs"), lock, log, "250"], {
+            stdio: "ignore",
+          });
+          child.on("exit", (code) => resolve(code));
+        })
+    );
+    const codes = await Promise.all(racers);
+    assert.ok(codes.some((c) => c === 0), `nobody acquired the lock: ${codes.join(", ")}`);
+
+    // ⚠️ **OVERLAP IS READ OUT OF WHAT THE HOLDERS WROTE.** Every `enter` must be followed by its own `exit`
+    // before another `enter`; two arrivals in a row is two writers inside one lock.
+    const events = readFileSync(log, "utf-8").split("\n").filter(Boolean);
+    let held = 0;
+    for (const event of events) {
+      if (event.startsWith("enter")) held += 1;
+      if (event.startsWith("exit")) held -= 1;
+      assert.ok(held <= 1, `two processes held the lock at once:\n${events.join("\n")}`);
+    }
+    assert.equal(held, 0, `a holder never left:\n${events.join("\n")}`);
+    assert.equal(events.filter((e) => e.startsWith("enter")).length >= 1, true, events.join(" | "));
+
+    // And the lock is gone when they are all finished, with no claim file left behind.
+    assert.equal(existsSync(lock), false, "the lock outlived its holders");
+    assert.deepEqual(
+      readdirSync(p.dir).filter((name) => name.includes(".recovering.")),
+      [],
+      "a recovery left its claim file behind"
+    );
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

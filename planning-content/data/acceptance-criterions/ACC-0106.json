@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "pass",
+  "outcome": "not-evaluated",
   "title": "A complete setup commits no secret and no absolute home path",
   "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, every committed file the setup produced or modified is asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path - the set taken from what the setup actually wrote, not from a list fixed in advance - and `.pi/settings.json` and `.pi/kiln.json` are each asserted explicitly by name.",
   "evaluates": [
@@ -13,7 +13,7 @@
   "verifies": [
     "REQ-0024"
   ],
-  "notes": "PASS 2026-09-23 on EVD-0138. A complete run against an environment-authenticated provider — asserted from the preflight's own line — with research enabled and its connection checked. The file set is git's own answer, every path it would commit with the ignore rules applied, so it cannot go stale as the command grows. Every file in it carries no credential, nothing derived from one (sha256 hex and base64, base64 of the key, a prefix), no authorisation header, no path belonging to this machine, and not even the names of the credential variables. `.pi/settings.json` and `.pi/kiln.json` are asserted in that set by name; the ignored consent and compatibility records are asserted not to be. Three mutations that make a committed file carry a variable name, an absolute session path or the research key are each caught.",
+  "notes": "⚠️ WITHDRAWN 2026-09-23, PENDING REPAIRED CONTROLS. This was recorded as passing on EVD-0138; review found the measurement weaker than the claim, so the outcome is withdrawn rather than left standing while it is fixed. A complete run against an environment-authenticated provider — asserted from the preflight's own line — with research enabled and its connection checked. The file set is git's own answer, every path it would commit with the ignore rules applied, so it cannot go stale as the command grows. Every file in it carries no credential, nothing derived from one (sha256 hex and base64, base64 of the key, a prefix), no authorisation header, no path belonging to this machine, and not even the names of the credential variables. `.pi/settings.json` and `.pi/kiln.json` are asserted in that set by name; the ignored consent and compatibility records are asserted not to be. Three mutations that make a committed file carry a variable name, an absolute session path or the research key are each caught.",
   "evidencedBy": [
     "EVD-0138"
   ]

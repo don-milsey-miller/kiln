@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "pass",
+  "outcome": "not-evaluated",
   "title": "An interrupted setup resumes from its journal and never deletes valid content",
   "statement": "Killing setup after its journal has begun leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. Killing it during the dependency bootstrap, which runs before any journal exists, leaves consumer project state unchanged, and rerunning setup repeats the locked install safely. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
   "evaluates": [
@@ -14,7 +14,7 @@
     "REQ-0022",
     "REQ-0027"
   ],
-  "notes": "PASS 2026-09-23 on EVD-0138, measured by killing real children rather than by making one throw. Inside the bootstrap, which runs before any journal exists: the project is byte-identical afterwards, no `.pi` survives, and an ordinary rerun completes. After the journal opens: what the killed run left records the phase in flight as running — true only because that status is written before the work — and carries an exact resume command naming the project, whose argument list then completes the remaining phases and leaves no journal. A failure in an agent phase leaves the scaffold and reports partial setup. THE MEASUREMENT FOUND A DEFECT, NOW FIXED: a killed run's lockfile made every rerun wait out the two-minute stale window, so setup clears a lock whose owner is provably gone while still refusing another machine's, an unreadable one, and a live one.",
+  "notes": "⚠️ WITHDRAWN 2026-09-23, PENDING REPAIRED CONTROLS. This was recorded as passing on EVD-0138; review found the measurement weaker than the claim, so the outcome is withdrawn rather than left standing while it is fixed. PASS 2026-09-23 on EVD-0138, measured by killing real children rather than by making one throw. Inside the bootstrap, which runs before any journal exists: the project is byte-identical afterwards, no `.pi` survives, and an ordinary rerun completes. After the journal opens: what the killed run left records the phase in flight as running — true only because that status is written before the work — and carries an exact resume command naming the project, whose argument list then completes the remaining phases and leaves no journal. A failure in an agent phase leaves the scaffold and reports partial setup. THE MEASUREMENT FOUND A DEFECT, NOW FIXED: a killed run's lockfile made every rerun wait out the two-minute stale window, so setup clears a lock whose owner is provably gone while still refusing another machine's, an unreadable one, and a live one.",
   "evidencedBy": [
     "EVD-0138"
   ]
