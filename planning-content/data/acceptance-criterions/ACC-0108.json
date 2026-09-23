@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Setup obtains the trust decision for the path it names, and never defaults one",
   "statement": "Interactive setup displays the canonical project directory the decision applies to and obtains an approval or a denial for it. `--trust approve` records an approval without a prompt. Non-interactive setup neither prompts nor assumes: with no pre-existing decision and no explicit approval it refuses. A denial is reported as not ready - setup does not describe the agent as usable - while the planning scaffold is left intact and valid and the browser-only start remains available.",
   "evaluates": [
@@ -14,7 +14,7 @@
     "REQ-0023",
     "REQ-0026"
   ],
-  "notes": "⚠️ WITHDRAWN 2026-09-23, PENDING REPAIRED CONTROLS. This was recorded as passing on EVD-0138; review found the measurement weaker than the claim, so the outcome is withdrawn rather than left standing while it is fixed. An interactive run prints the canonical project directory the decision applies to and asks about it; `--trust approve` records an approval with no prompt, and answers over a recorded decision because it is the operator answering now; a run with nobody to ask refuses WITHOUT REACHING THE QUESTION, measured as zero questions asked. Only an explicit yes approves and only an explicit no denies: a closed input, an empty line and an unreadable answer each leave the trust store with no decision. A denial is reported as not ready, nothing is registered, the journal is removed, and the scaffold that survives passes Kiln's own plan linter; Pi loads none of the package's tools for that project, which is the same fact from the runtime's side. LIMIT: \"the browser-only start remains available\" is evidenced by that scaffold validating, not by starting the browser application.",
+  "notes": "PASS 2026-09-23 on EVD-0138. An interactive run prints the canonical project directory the decision applies to and asks about it; `--trust approve` records an approval with no prompt, and answers over a recorded decision because it is the operator answering now; a run with nobody to ask refuses WITHOUT REACHING THE QUESTION, measured as zero questions asked. Only an explicit yes approves and only an explicit no denies: a closed input, an empty line and an unreadable answer each leave the trust store with no decision. A denial is reported as not ready, nothing is registered, the journal is removed, and the scaffold that survives passes Kiln's own plan linter; Pi loads none of the package's tools for that project, which is the same fact from the runtime's side. THE BROWSER-ONLY ROUTE IS SERVED, NOT INFERRED: the application is started against that denied project and asked for a page, which returns a rendered document — content that validates does not establish that a server can read it. LIMIT: what is not exercised is `npm start`'s production path, which installs and builds before serving, because a test may not run an install.",
   "evidencedBy": [
     "EVD-0138"
   ]
