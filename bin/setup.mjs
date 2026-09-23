@@ -409,7 +409,7 @@ export const shellName = (platform = process.platform) => (platform === "win32" 
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
  * needs is imported dynamically.
  */
-async function runPhases({ paths, args, ask, print, modules, canary: injected = null }) {
+async function runPhases({ paths, args, ask, print, modules, canary: injected = null, researchAdapter = null }) {
   const { STATE_MODE, coverageState, createStateRoot, ensureProjectId, projectRecordTarget, stateRootFor } = modules.localState;
   const { randomBytes } = modules.crypto;
 
@@ -609,14 +609,14 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       if (!inspection.inspected) {
         // ⚠️ A DECLINED INSPECTION IS AN ANSWER, AND IT STOPS THE PHASES THAT DEPEND ON IT. The research choice
         // still runs, because "not-inspected" is a state it knows how to record without looking at anything.
-        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
         return { initialized, identity, trust, registered, inspection, research, selection: null };
       }
 
       const selection = await tx.phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators, selectionStateMode: stateMode }));
       if (selection.selection) print(`model ${selection.selection.provider} ${selection.selection.model} (${selection.selection.thinkingLevel})`);
       if (!READY_SELECTIONS.has(selection.outcome)) {
-        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
         return { initialized, identity, trust, registered, inspection, selection, research };
       }
 
@@ -630,7 +630,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       );
       print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
 
-      const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print }));
+      const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
 
       // ⚠️ **THE ZERO-COST CHECKS FIRST, AND THEY SEND NOTHING.** Everything a run can be refused for without
       // spending anything — the committed selection, this host's grant for it, the credential contract, Pi's
@@ -952,14 +952,14 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
  * granted inspection saw — present, absent, or not-inspected — and passing it through is what keeps this
  * phase from reading the environment on its own.
  */
-async function decideResearch({ tx, location, inspection, args, asking, modules, validators, print }) {
+async function decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter = null }) {
   const result = await modules.research.setUpResearch({
     transaction: tx,
     location,
     presence: inspection.researchCredential,
     ask: asking.choice,
     request: args.research,
-    adapter: modules.tavily.createTavilyAdapter({}),
+    adapter: researchAdapter ?? modules.tavily.createTavilyAdapter({}),
     validators,
   });
   print(result.message);
@@ -1206,6 +1206,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     // ⚠️ **THE ONE SEAM THAT SENDS A REQUEST TO A PROVIDER.** A real run performs the canary; a test supplies its
     // own, because a suite that reached a provider would bill somebody for running it.
     canary = null,
+    // ⚠️ **AND THE OTHER THING THAT LEAVES THIS MACHINE.** Checking a research connection contacts Tavily; the
+    // real adapter is what a real run uses, and a test that wanted an enabled connection would otherwise have to
+    // reach the service to get one.
+    researchAdapter = null,
   } = deps;
   const args = parseArgs(argv);
   if (args.error) {
@@ -1287,7 +1291,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
 
       // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the trust decision
       // and the registration.
-      const done = await runPhases({ paths, args, ask, print, modules, canary });
+      const done = await runPhases({ paths, args, ask, print, modules, canary, researchAdapter });
 
       // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
       // before this point is valid and stays: the content scaffold, the ignore block, the project identity and

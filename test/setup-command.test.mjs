@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -155,7 +155,19 @@ async function passingCanary({ selection, declared = {}, preflight }) {
 async function setup(
   p,
   argv = [],
-  { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED, tavily = null, canary = passingCanary, liveCheck = "approve" } = {}
+  {
+    answer,
+    answers,
+    install,
+    env = {},
+    trust = "approve",
+    verifyRuntime,
+    pick = PICKED,
+    tavily = null,
+    canary = passingCanary,
+    liveCheck = "approve",
+    researchAdapter = null,
+  } = {}
 ) {
   const printed = [];
   // ⚠️ REFUSALS GO TO STDERR, and what they say is part of the contract: the operator reads the refusal, not the
@@ -201,6 +213,7 @@ async function setup(
       },
       ...(verifyRuntime ? { verifyRuntime } : {}),
       ...(canary ? { canary } : {}),
+      ...(researchAdapter ? { researchAdapter } : {}),
       install:
         install ??
         (() => {
@@ -1787,6 +1800,85 @@ test("⚠️ ACC-0085 the external runtime path is printed before anything of th
     // ⚠️ AND THE ID IN THAT PATH IS THE ONE THE RUN THEN COMMITTED, or the path described a directory nothing uses.
     const id = JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).projectId;
     assert.ok(line.line.includes(id), `${line.line} does not name the committed id ${id}`);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provider and research enabled, commits no secret and no absolute path", async () => {
+  // ⚠️ **THE FILE SET COMES FROM WHAT THE RUN ACTUALLY COMMITTED, NOT FROM A LIST WRITTEN HERE.** A fixed list
+  // passes forever while the command grows a file nobody added to it; git's own answer — every untracked or
+  // modified path it would commit, with the ignore rules applied — is the set that cannot go stale.
+  const p = project({ ignored: true, models: false });
+  const stateHome = join(p.root, "state-home");
+  const PROVIDER_KEY = "sk-kiln-acc0106-PROVIDER-9c41f7";
+  const RESEARCH_KEY = "tvly-kiln-acc0106-RESEARCH-3b08de";
+  try {
+    // An environment-authenticated provider: Pi finds openai through the variable, with nothing in auth.json.
+    const probes = [];
+    const o = await setup(p, ["--research", "tavily"], {
+      env: { OPENAI_API_KEY: PROVIDER_KEY, LOCALAPPDATA: stateHome, XDG_STATE_HOME: stateHome },
+      tavily: RESEARCH_KEY,
+      answers: [[/^Optional web research/i, "yes"]],
+      // ⚠️ NEITHER CHECK LEAVES THIS MACHINE: the canary's proof is derived from what the command resolved, and
+      // the research probe answers as a healthy connection would. What is under test is the bytes that land.
+      researchAdapter: {
+        probe: async () => {
+          probes.push("probe");
+          return { ok: true, backend: "tavily", quota: { used: 1, limit: 1000, remaining: 999 }, checkedWithoutSearching: true };
+        },
+      },
+    });
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.deepEqual(probes, ["probe"], "the research connection was not checked");
+    // ⚠️ AND IT REALLY WAS THE ENVIRONMENT THAT AUTHENTICATED IT: this project's agent directory holds no stored
+    // credential, so a run that reported "stored" here would be testing a different arrangement than the one the
+    // criterion names.
+    assert.ok(
+      o.printed.some((l) => /^preflight passed:.*authentication environment-key/.test(l)),
+      o.printed.filter((l) => l.startsWith("preflight")).join(" | ")
+    );
+
+    // Every path git would commit, which is the set the criterion asks for.
+    const committed = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: p.dir, encoding: "utf-8" })
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.slice(3).trim().replace(/^"|"$/g, ""));
+    assert.ok(committed.length > 5, `the run committed almost nothing: ${committed.join(", ")}`);
+    // ⚠️ AND THE TWO FILES THE CRITERION NAMES ARE IN IT, by name, rather than assumed to be.
+    for (const named of [".pi/settings.json", ".pi/kiln.json"])
+      assert.ok(committed.includes(named), `${named} is not among what the run committed: ${committed.join(", ")}`);
+    // The ignored runtime state is NOT in it: consent and compatibility records are not committed at all.
+    for (const ignored of [".pi/runtime/consent.json", ".pi/runtime/model-compatibility.json"])
+      assert.equal(committed.includes(ignored), false, `${ignored} would be committed`);
+
+    // ⚠️ WHAT IS LOOKED FOR IS THE CREDENTIAL, THINGS DERIVED FROM IT, AND THIS MACHINE'S PATHS. A fingerprint is
+    // still a credential-derived value: a project that committed one would leak which key a host holds.
+    const derived = [
+      createHash("sha256").update(PROVIDER_KEY).digest("hex"),
+      createHash("sha256").update(PROVIDER_KEY).digest("base64"),
+      createHash("sha256").update(RESEARCH_KEY).digest("hex"),
+      Buffer.from(PROVIDER_KEY).toString("base64"),
+      PROVIDER_KEY.slice(0, 12),
+      RESEARCH_KEY.slice(0, 12),
+    ];
+    const absolute = [p.root, p.dir, p.agentDir, stateHome, tmpdir(), homedir()];
+    const headers = [/authorization:/i, /bearer\s/i, /x-api-key/i];
+
+    for (const rel of committed) {
+      const text = readFileSync(join(p.dir, rel), "utf-8");
+      for (const secret of [PROVIDER_KEY, RESEARCH_KEY, ...derived])
+        assert.equal(text.includes(secret), false, `${rel} carries a credential or something derived from one`);
+      for (const header of headers) assert.equal(header.test(text), false, `${rel} carries an authorisation header`);
+      for (const path of absolute)
+        assert.equal(text.includes(path), false, `${rel} carries this machine's own path (${path})`);
+      // The variables' NAMES are configuration, not credentials — but this project never needed to commit one.
+      for (const name of ["OPENAI_API_KEY", "TAVILY_API_KEY"]) assert.equal(text.includes(name), false, `${rel} names a credential variable`);
+    }
+
+    // And the research choice did land: the criterion asks for an ENABLED connection, not merely a run that asked.
+    assert.equal(JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8")).research.provider, "tavily");
+    assert.equal(settingsOf(p).defaultProvider, "openai");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
