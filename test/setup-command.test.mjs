@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -1100,6 +1100,9 @@ test("⚠️ ACC-0045 an interrupted run is continued deliberately, and the publ
     // ⚠️ WHAT IT TELLS THE OPERATOR TO RUN IS THIS RUN'S OWN COMMAND, never the one in the file it just read.
     const refusal = stopped.warned.join("\n");
     assert.ok(refusal.includes(resumeCommand(p.dir)), refusal);
+    // ⚠️ AND IT SAYS WHICH SHELL THAT LINE IS QUOTED FOR: `cmd.exe` does not treat single quotes as quoting at all,
+    // so an operator in one has to know to adjust rather than to paste.
+    assert.match(refusal, process.platform === "win32" ? /Continue it with, in PowerShell:/ : /Continue it with, in a POSIX shell:/);
     assert.equal(refusal.includes("this-came-out-of-the-journal"), false, "the refusal printed a command out of the journal");
 
     // With --resume it continues, and the completed run leaves no journal behind.
@@ -1396,24 +1399,66 @@ test("⚠️ the live check is given this host's saved credential, and a recover
 
   // ⚠️ THE COMMAND AN OPERATOR IS TOLD TO RUN IS QUOTED, ALWAYS AND FOR THE RIGHT SHELL — the metacharacter cases
   // are held on their own below; this is the shape of the line they appear in.
-  assert.equal(resume("C:/a b/proj", "win32"), 'node .planning/bin/setup.mjs --project-root "C:/a b/proj" --resume');
+  assert.equal(resume("C:/a b/proj", "win32"), "node .planning/bin/setup.mjs --project-root 'C:/a b/proj' --resume");
   assert.equal(resume("/home/plain/proj", "linux"), "node .planning/bin/setup.mjs --project-root '/home/plain/proj' --resume");
 });
 
-test("⚠️ the command an operator is told to run is safe for the shell it targets", async () => {
-  const { shellArgument, resumeCommand: resume } = await import("../bin/setup.mjs");
+test("⚠️ the command an operator is told to run names the same project after the shell has read it", async () => {
+  const { shellArgument, shellName, resumeCommand: resume } = await import("../bin/setup.mjs");
 
-  // ⚠️ A SPACE IS THE OBVIOUS CASE AND NOT THE ONLY ONE. `&` splits a cmd line in two; `$`, a backtick, `;` and
-  // `|` each mean something to a POSIX shell. Deciding per character is a list that is wrong once, so every path
-  // is quoted, in the quoting the target shell actually honours.
-  for (const awkward of ["C:/a&b/project", "C:/a b/project", "C:/a;b/project", "C:/a|b/project", "C:/a$b/project", "C:/a`b/project"]) {
-    assert.equal(shellArgument(awkward, "win32"), `"${awkward}"`, awkward);
+  // ⚠️ **QUOTED FOR POWERSHELL ON WINDOWS, AND THAT IS A MEASUREMENT, NOT A PREFERENCE.** Inside double quotes
+  // PowerShell expands `$` and backticks, so `"C:/a$null/project"` pasted back names `C:/a/project` — a different
+  // directory, silently, with no error for the operator to notice. Single quotes suppress every expansion, and an
+  // apostrophe inside them is written twice. POSIX shells need the other sequence, since a backslash does not
+  // escape inside single quotes there.
+  for (const awkward of ["C:/a&b/project", "C:/a b/project", "C:/a;b/project", "C:/a|b/project", "C:/a$b/project"]) {
+    assert.equal(shellArgument(awkward, "win32"), `'${awkward}'`, awkward);
     assert.equal(shellArgument(awkward, "linux"), `'${awkward}'`, awkward);
   }
-  // A POSIX path may contain the quote itself, and a backslash does not escape inside single quotes.
+  assert.equal(shellArgument("C:/it's/here", "win32"), "'C:/it''s/here'");
   assert.equal(shellArgument("/it's/here", "linux"), "'/it'" + String.fromCharCode(92) + "''s/here'");
-  assert.match(resume("C:/a&b/project", "win32"), /--project-root "C:\/a&b\/project" --resume$/);
-  assert.match(resume("/home/a b/project", "linux"), /--project-root '\/home\/a b\/project' --resume$/);
+  // ⚠️ AND THE LINE SAYS WHICH SHELL IT IS FOR, because `cmd.exe` does not treat single quotes as quoting at all.
+  assert.equal(shellName("win32"), "PowerShell");
+  assert.equal(shellName("linux"), "a POSIX shell");
+
+  // ⚠️ **THE PROOF IS THE ROUND TRIP, NOT THE STRING.** A test that checks the path is wrapped in quotes cannot
+  // tell quoting that works from quoting that silently renames a directory. So the generated command is run by
+  // the shell it names, against a project whose path holds each metacharacter, and what is read back is the
+  // project the command actually reached — the command refuses, and its refusal prints the root it was given.
+  const p = project({ ignored: true });
+  try {
+    for (const awkward of ["a$null-x", "a`b-x", "a&b-x", "it's-x"]) {
+      const named = join(p.root, awkward, "project");
+      mkdirSync(named, { recursive: true });
+
+      // ⚠️ **ONLY THE SCRIPT'S LOCATION IS SUBSTITUTED; THE QUOTED ARGUMENT IS THE COMMAND'S OWN.** The printed
+      // line names `.planning/bin/setup.mjs`, and this fixture's `.planning` is a link to the checkout — Node
+      // resolves a script through its real path, so invoked that way the file would not recognise itself as the
+      // program being run and would do nothing. What is under test is the quoting of the project path, so that
+      // part travels verbatim.
+      const printed = resume(named);
+      const command = printed.replace(".planning/bin/setup.mjs", shellArgument(join(ROOT, "bin", "setup.mjs")));
+      assert.ok(command.endsWith(printed.slice(printed.indexOf("--project-root"))), printed);
+
+      const env = { ...process.env, PLANNING_CONTENT_DIR: p.contentRoot };
+      const run =
+        process.platform === "win32"
+          ? // ⚠️ POWERSHELL RETURNS ITS OWN STATUS, not the program's, unless it is told to pass it on.
+            spawnSync("powershell", ["-NoProfile", "-Command", `${command}; exit $LASTEXITCODE`], { cwd: p.dir, encoding: "utf-8", env })
+          : spawnSync("sh", ["-c", command], { cwd: p.dir, encoding: "utf-8", env });
+
+      // The run refuses, because the named project does not own the selected content root — and the refusal is
+      // where it prints the project root it was handed, which is exactly what the shell delivered.
+      const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+      assert.equal(run.status, EXIT.PATHS, `${awkward}: ${output}`);
+      assert.ok(
+        output.includes(realpathSync(named)),
+        `${awkward}: the shell did not deliver the path this command named${String.fromCharCode(10)}  command: ${command}${String.fromCharCode(10)}  output:  ${output}`
+      );
+    }
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
 });
 
 test("⚠️ a host authenticated by an environment variable is not handed a stored file that does not exist", async () => {

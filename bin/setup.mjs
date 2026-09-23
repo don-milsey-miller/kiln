@@ -336,17 +336,24 @@ export const resumeCommand = (projectRoot, platform = process.platform) =>
  * One argument, quoted for the shell this command will be pasted into.
  *
  * ⚠️ **ALWAYS QUOTED, BECAUSE "LOOKS ORDINARY" IS NOT A PROPERTY OF A PATH.** A space is the obvious case, but
- * `C:/a&b/project` splits a cmd line in two, and `$HOME`, backticks, semicolons and pipes each mean something to
- * a POSIX shell. Deciding per character is a list that will be wrong once; quoting every time is right always.
+ * `C:/a&b/project` splits a command line in two, and `$`, a backtick, `;` and `|` each mean something to a shell.
+ * Deciding per character is a list that will be wrong once; quoting every time is right always.
  *
- * ⚠️ **AND IT IS THE TARGET SHELL'S OWN QUOTING.** Windows paths cannot contain a double quote, so wrapping is
- * enough there. A POSIX path can contain a single quote, so the one sequence that closes, escapes and reopens is
- * used — the standard `'''` — rather than a backslash, which single quotes do not honour.
+ * ⚠️ **AND SINGLE QUOTES ON WINDOWS, BECAUSE THE SHELL THIS TARGETS IS POWERSHELL.** Measured: inside double
+ * quotes PowerShell expands `$` and backticks, so a path under `C:$null\project` pasted back in double quotes
+ * names `C:\project` — a different directory, silently. Single quotes suppress every expansion, and an
+ * apostrophe inside them is written twice. That is PowerShell's rule and not the POSIX one, which is why the two
+ * platforms escape differently: `cmd.exe` does not treat single quotes as quoting at all, so the printed line
+ * names the shell it is for.
  */
 export function shellArgument(value, platform = process.platform) {
-  if (platform === "win32") return `"${value}"`;
-  return `'${String(value).split("'").join(`'\\''`)}'`;
+  const text = String(value);
+  if (platform === "win32") return `'${text.split("'").join("''")}'`;
+  return `'${text.split("'").join(`'\\''`)}'`;
 }
+
+/** The shell the printed command is quoted for, named so an operator in another one knows to adjust. */
+export const shellName = (platform = process.platform) => (platform === "win32" ? "PowerShell" : "a POSIX shell");
 
 /**
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
@@ -389,7 +396,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         // ⚠️ **THE COMMAND IS THIS RUN'S, NOT THE FILE'S.** The interrupted run wrote a recovery command into its
         // own journal; printing that back would print a path out of a document this process just read from a
         // project directory. What is safe to print is what this run resolved and checked.
-        `${NEWLINE}Continue it with:${NEWLINE}  ${resumeCommand(paths.projectRoot)}` +
+        `${NEWLINE}Continue it with, in ${shellName()}:${NEWLINE}  ${resumeCommand(paths.projectRoot)}` +
         `${NEWLINE}Nothing was changed by this run. Everything the interrupted run completed is still there.`,
       { lastCompletedPhase: interrupted.lastCompletedPhase ?? null }
     );
