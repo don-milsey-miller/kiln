@@ -157,6 +157,11 @@ async function setup(
   { answer, answers, install, env = {}, trust = "approve", verifyRuntime, pick = PICKED, tavily = null, canary = passingCanary, liveCheck = "approve" } = {}
 ) {
   const printed = [];
+  // ⚠️ REFUSALS GO TO STDERR, and what they say is part of the contract: the operator reads the refusal, not the
+  // exit code. Captured here so a test can hold the words as well as the number.
+  const warned = [];
+  const realError = console.error;
+  console.error = (...args) => warned.push(args.join(" "));
   const seen = { atInstall: null, installs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
   const savedAgentDir = process.env.PI_CODING_AGENT_DIR;
@@ -201,8 +206,9 @@ async function setup(
           return { installed: true, why: "the test's bootstrap" };
         }),
     });
-    return { code, printed, seen };
+    return { code, printed, warned, seen };
   } finally {
+    console.error = realError;
     if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
     else process.env.PLANNING_CONTENT_DIR = saved;
     if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -1082,13 +1088,19 @@ test("⚠️ ACC-0045 an interrupted run is continued deliberately, and the publ
         ],
         lastCompletedPhase: "initialize",
         fileIdentities: [],
-        recovery: { command: resumeCommand(p.dir), reason: "setup was interrupted after the journal began" },
+        // ⚠️ A COMMAND NOBODY SHOULD PRINT BACK. The journal is a file in a project directory, so a refusal that
+        // echoed its `recovery.command` would put whatever is in that file in front of the operator to copy.
+        recovery: { command: "echo this-came-out-of-the-journal", reason: "setup was interrupted after the journal began" },
       }) + "\n"
     );
 
     const stopped = await setup(p, [], { pick: [] });
     assert.equal(stopped.code, EXIT.INTERRUPTED, stopped.printed.join("\n"));
     assert.equal(existsSync(journal), true, "the refusal removed the evidence of the interruption");
+    // ⚠️ WHAT IT TELLS THE OPERATOR TO RUN IS THIS RUN'S OWN COMMAND, never the one in the file it just read.
+    const refusal = stopped.warned.join("\n");
+    assert.ok(refusal.includes(resumeCommand(p.dir)), refusal);
+    assert.equal(refusal.includes("this-came-out-of-the-journal"), false, "the refusal printed a command out of the journal");
 
     // With --resume it continues, and the completed run leaves no journal behind.
     const resumed = await setup(p, ["--resume"], { pick: [] });
@@ -1310,4 +1322,68 @@ test("⚠️ readiness is what the record says on disk, not what the writer repo
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
+});
+
+test("⚠️ the live check is given this host's saved credential, and a recovery file is never trusted for what it prints", async () => {
+  // Two production paths that no earlier control reached.
+  const { canaryRequest, readJournal, resumeCommand: resume } = await import("../bin/setup.mjs");
+
+  // ⚠️ **THE SAVED CREDENTIAL REACHES THE CHECK.** Pi authenticates a provider from its stored auth.json as
+  // readily as from the environment; a canary run against an empty store would fail a model that works on this
+  // computer. The path handed over is the agent directory the preflight resolved, and the canary's own boundary
+  // copies only the selected provider's entry out of it (test/pi-provider-canary.test.mjs).
+  const request = canaryRequest(
+    { selection: { provider: "openai", model: "gpt-4o", thinkingLevel: "off" }, declared: { endpointIdentity: "x" } },
+    { agentDir: join("/some", "agent") }
+  );
+  assert.deepEqual(request, {
+    provider: "openai",
+    model: "gpt-4o",
+    thinkingLevel: "off",
+    declared: { endpointIdentity: "x" },
+    storedAuthPath: join("/some", "agent", "auth.json"),
+  });
+
+  // ⚠️ **AND THE RECOVERY READ IS CONTAINED, VALIDATED, AND NOT A SOURCE OF WHAT IS PRINTED.** The journal is a
+  // file in a project directory: read through a link it is somebody else's file, and read unvalidated it is
+  // somebody else's text in this command's own refusal.
+  const p = project({ ignored: true });
+  try {
+    const roots = { root: join(p.dir, ".pi"), runtime: join(p.dir, ".pi", "runtime") };
+    const validate = (record) => {
+      if (!Array.isArray(record?.phases)) throw new Error("not a journal");
+    };
+    mkdirSync(roots.runtime, { recursive: true });
+    const journal = join(roots.runtime, "setup-transaction.json");
+
+    assert.equal(readJournal(roots, validate), null, "an absent journal is not an interruption");
+
+    writeFileSync(journal, "{ half a record");
+    assert.deepEqual(readJournal(roots, validate), { unreadable: true }, "a truncated journal is still an interruption");
+
+    writeFileSync(journal, JSON.stringify({ phases: "not an array", recovery: { command: "rm -rf /" } }));
+    assert.deepEqual(readJournal(roots, validate), { unreadable: true }, "an invalid journal was read as a decision");
+
+    writeFileSync(journal, JSON.stringify({ phases: [{ name: "initialize", status: "complete" }], lastCompletedPhase: "initialize" }));
+    assert.equal(readJournal(roots, validate).lastCompletedPhase, "initialize");
+
+    // Something that is not a regular file where the journal should be is refused rather than read.
+    rmSync(journal, { force: true });
+    mkdirSync(journal);
+    assert.deepEqual(readJournal(roots, validate), { contained: false }, "a directory at the journal path was read as one");
+    rmSync(journal, { recursive: true });
+
+    // A runtime directory that resolves outside the state root is refused rather than read.
+    rmSync(roots.runtime, { recursive: true, force: true });
+    symlinkSync(join(p.root, "elsewhere"), roots.runtime, process.platform === "win32" ? "junction" : "dir");
+    mkdirSync(join(p.root, "elsewhere"), { recursive: true });
+    writeFileSync(join(p.root, "elsewhere", "setup-transaction.json"), JSON.stringify({ phases: [] }));
+    assert.deepEqual(readJournal(roots, validate), { contained: false }, "a journal outside the state root was read");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // The command an operator is told to run quotes a path that needs it.
+  assert.equal(resume("C:/a b/proj"), 'node .planning/bin/setup.mjs --project-root "C:/a b/proj" --resume');
+  assert.equal(resume("C:/plain/proj"), "node .planning/bin/setup.mjs --project-root C:/plain/proj --resume");
 });

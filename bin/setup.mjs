@@ -28,12 +28,12 @@
 
 import { createHash } from "node:crypto";
 import { createInterface } from "node:readline";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { ContentRootError, canonicalPath, contentRootCandidate, pathIdentityKey } from "../lib/content-root.mjs";
+import { ContentRootError, canonicalPath, contentRootCandidate, isAtOrInside, pathIdentityKey } from "../lib/content-root.mjs";
 import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
@@ -322,8 +322,15 @@ export function defaultInstall({ toolRoot, spawn = spawnSync }) {
   return r.status === 0 ? { ok: true } : { ok: false, why: r.status === null ? `signal ${r.signal}` : `exit ${r.status}` };
 }
 
-/** The exact command that continues an interrupted run, printed into the journal and on refusal. */
-export const resumeCommand = (projectRoot) => `node .planning/bin/setup.mjs --project-root ${projectRoot} --resume`;
+/**
+ * The exact command that continues an interrupted run, printed into the journal and on refusal.
+ *
+ * ⚠️ **THE PATH IS QUOTED WHEN IT NEEDS TO BE, because an operator copies this line into a shell.** A project
+ * under `C:\Users\some one\work` produces a command that runs against a different directory unquoted, and what
+ * the operator then sees is a refusal about a project they did not name.
+ */
+export const resumeCommand = (projectRoot) =>
+  `node .planning/bin/setup.mjs --project-root ${/[\s"]/.test(projectRoot) ? JSON.stringify(projectRoot) : projectRoot} --resume`;
 
 /**
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
@@ -347,24 +354,30 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
   // interruption signal: a previous run got far enough to open it and did not finish. Every phase here is
   // idempotent, so continuing is safe — but it is still the operator's decision, because the thing they most
   // need to know is that a run did not finish. Without `--resume` this says so, names the last phase that
-  // completed, and prints the command the interrupted run itself recorded.
-  const interrupted = readJournal(join(roots.runtime, "setup-transaction.json"));
+  // completed, and prints the command to continue it — which this run builds, never the file.
+  const interrupted = readJournal(roots, modules.journalValidate);
+  if (interrupted?.contained === false)
+    throw new SetupCommandRefusal(
+      EXIT.STATE,
+      `${join(roots.runtime, "setup-transaction.json")} does not resolve to a regular file inside this project's ` +
+        `runtime directory, so setup will not read it. Something replaced a directory on that path with a link, or ` +
+        `put something other than a file there. Nothing was read or written.`,
+      { runtime: roots.runtime }
+    );
   if (interrupted && !args.resume)
     throw new SetupCommandRefusal(
       EXIT.INTERRUPTED,
-      `A previous setup of this project was interrupted and has not been continued.
-` +
-        `  last completed phase: ${interrupted.lastCompletedPhase ?? "none"}
-` +
-        `  interrupted at:       ${interrupted.phases?.find((ph) => ph.status === "running")?.name ?? "an unrecorded point"}
-` +
-        `Continue it with:
-  ${interrupted.recovery?.command ?? resumeCommand(paths.projectRoot)}
-` +
-        `Nothing was changed by this run. Everything the interrupted run completed is still there.`,
+      `A previous setup of this project was interrupted and has not been continued.` +
+        `${NEWLINE}  last completed phase: ${interrupted.lastCompletedPhase ?? "not recorded"}` +
+        `${NEWLINE}  interrupted at:       ${interrupted.phases?.find((ph) => ph.status === "running")?.name ?? "an unrecorded point"}` +
+        // ⚠️ **THE COMMAND IS THIS RUN'S, NOT THE FILE'S.** The interrupted run wrote a recovery command into its
+        // own journal; printing that back would print a path out of a document this process just read from a
+        // project directory. What is safe to print is what this run resolved and checked.
+        `${NEWLINE}Continue it with:${NEWLINE}  ${resumeCommand(paths.projectRoot)}` +
+        `${NEWLINE}Nothing was changed by this run. Everything the interrupted run completed is still there.`,
       { lastCompletedPhase: interrupted.lastCompletedPhase ?? null }
     );
-  if (interrupted) print(`continuing an interrupted run (last completed phase: ${interrupted.lastCompletedPhase ?? "none"})`);
+  if (interrupted) print(`continuing an interrupted run (last completed phase: ${interrupted.lastCompletedPhase ?? "not recorded"})`);
   else if (args.resume) print("nothing to resume: no interrupted run is recorded, so this is an ordinary run");
 
   /**
@@ -517,10 +530,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // resolved: the same model object, the same endpoint, the same version. A runner handed only the selection
       // would have to resolve those again and could resolve them differently, which is the disagreement the
       // compatibility key exists to catch.
-      const canary = (ctx) =>
-        injected
-          ? injected({ ...ctx, preflight })
-          : modules.canary.runLiveCanary({ ...ctx.selection, declared: ctx.declared });
+      const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(canaryRequest(ctx, preflight)));
       const compatibility = modules.compatibility.compatibilityLocationFrom(location);
       const live = await tx.phase("live-check", () =>
         modules.liveCheck.runLiveModelCheck({
@@ -878,14 +888,42 @@ export function usage() {
  * "no interruption" would hide the case it was invented for. What a damaged record cannot do is say which phase
  * completed, so it says so instead of guessing.
  */
-function readJournal(path) {
+export function readJournal(roots, validate) {
+  // ⚠️ **CONTAINED BEFORE IT IS READ.** The journal is named relative to the state root, and that root is a
+  // directory in the consumer's project: a junction at `.pi/runtime`, or a link where the journal should be, makes
+  // "read the file at this path" a read of somewhere else entirely. The rule the transaction applies to every
+  // target it plans is applied here too, before the first byte, because this read happens before the plan exists.
+  const root = canonicalPath(roots.root);
+  const path = canonicalPath(join(roots.runtime, "setup-transaction.json"));
+  if (!isAtOrInside(path, root)) return { contained: false };
   if (!existsSync(path)) return null;
+
+  let stats = null;
   try {
-    const record = JSON.parse(readFileSync(path, "utf-8"));
-    return record !== null && typeof record === "object" ? record : {};
+    stats = statSync(path);
   } catch {
-    return {};
+    return { unreadable: true };
   }
+  if (!stats.isFile()) return { contained: false };
+
+  let record;
+  try {
+    record = JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    // ⚠️ **HALF A RECORD IS STILL AN INTERRUPTION**, and the likeliest one: a process killed mid-write. What it
+    // cannot do is say which phase completed, so nothing is taken from it.
+    return { unreadable: true };
+  }
+
+  // ⚠️ **VALIDATED BEFORE ANY FIELD IS USED.** This is Kiln's own file, but it is a file in a project directory,
+  // and taking a path, a phase name or a command out of an unvalidated document is how a refusal ends up printing
+  // whatever somebody put there. A record that does not match its schema is an interruption with no detail.
+  try {
+    validate(record);
+  } catch {
+    return { unreadable: true };
+  }
+  return record;
 }
 
 /**
@@ -921,6 +959,26 @@ export async function verifyRecorded({ compatibility, preflight, modules, valida
       { fields: differing }
     );
   return { key, record: found.record };
+}
+
+/**
+ * What the live canary is asked to do: this run's selection, and where its credential lives.
+ *
+ * ⚠️ **THE SAVED CREDENTIAL HAS TO REACH THE CHECK, OR THE CHECK ANSWERS A DIFFERENT QUESTION.** Pi authenticates
+ * a provider from its stored `auth.json` as readily as from the environment, and the preflight has just
+ * established which source authenticates this selection. A canary given no auth path runs against an empty store,
+ * so a model that works perfectly well on this computer fails a check that was never handed what makes it work.
+ *
+ * ⚠️ **AND PASSING THE PATH NARROWS RATHER THAN WIDENS.** The canary copies the SELECTED provider's entry alone
+ * into its own isolated root; the child never sees the operator's file, and never sees another provider's
+ * credential. That boundary is the canary's, measured in test/pi-provider-canary.test.mjs; this hands it the
+ * file it narrows.
+ *
+ * @param {{selection: object, declared?: object}} ctx  what the live check passes its runner
+ * @param {object} preflight  the zero-cost preflight's result, including the agent directory it resolved
+ */
+export function canaryRequest(ctx, preflight) {
+  return { ...ctx.selection, declared: ctx.declared, storedAuthPath: join(preflight.agentDir, "auth.json") };
 }
 
 /** The state library's own three choices, rendered as it returned them. */
