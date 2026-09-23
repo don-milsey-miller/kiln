@@ -2323,19 +2323,29 @@ test("⚠️ one process at a time may clear a lock, and a gate nobody holds doe
     assert.equal(readFileSync(lock, "utf-8"), dead, "a blocked recovery cleared the lock anyway");
     rmSync(token);
 
-    // ⚠️ A GATE ITS HOLDER DIED INSIDE MUST NOT OUTLIVE THEM. It is held for microseconds with nothing
-    // awaited inside it, so one this old belongs to nobody — and a single killed recovery would otherwise stop
-    // every later one for good.
-    for (const abandoned of [JSON.stringify({ pid: exited(), hostname: hostname() }), ""]) {
-      writeFileSync(lock, dead);
-      writeFileSync(gate, abandoned);
+    // ⚠️ **AND AN OLD GATE NOBODY CAN READ IS NOT AN ABANDONED ONE EITHER.** Creating the gate and writing
+    // the owner into it are two calls, and a process can be stopped between them for as long as the operating
+    // system likes, so an empty gate says only that somebody created it. It fails closed, with both paths named.
+    rmSync(token, { force: true });
+    writeFileSync(lock, dead);
+    for (const unprovable of ["", JSON.stringify({ pid: exited(), hostname: `${hostname()}-somewhere-else` })]) {
+      writeFileSync(gate, unprovable);
       const stale = Date.now() / 1000 - 60;
       utimesSync(gate, stale, stale);
-      const broke = breakDeadLock(lock);
-      assert.equal(broke.broken, true, `an abandoned gate blocked a recovery: ${JSON.stringify(broke)}`);
-      assert.equal(existsSync(lock), false, "the dead run's lock survived");
-      assert.equal(existsSync(gate), false, "the abandoned gate survived");
+      assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "break-blocked", blockedBy: { gate, token } });
+      assert.equal(existsSync(gate), true, "a gate nobody can judge was reclaimed anyway");
+      assert.equal(readFileSync(lock, "utf-8"), dead, "a lock was cleared behind a gate nobody can judge");
     }
+
+    // ⚠️ WHAT IS RECLAIMED IS A GATE WHOSE RECORD NAMES A PROCESS ON THIS HOST THAT IS GONE, and nothing
+    // else — otherwise one killed recovery would stop every later one for good.
+    writeFileSync(gate, JSON.stringify({ pid: exited(), hostname: hostname() }));
+    const stale = Date.now() / 1000 - 60;
+    utimesSync(gate, stale, stale);
+    const broke = breakDeadLock(lock);
+    assert.equal(broke.broken, true, `an abandoned gate blocked a recovery: ${JSON.stringify(broke)}`);
+    assert.equal(existsSync(lock), false, "the dead run's lock survived");
+    assert.equal(existsSync(gate), false, "the abandoned gate survived");
 
     // A recovery that runs to the end leaves nothing of its own beside the lock.
     assert.deepEqual(
@@ -2343,6 +2353,48 @@ test("⚠️ one process at a time may clear a lock, and a gate nobody holds doe
       [],
       "a recovery left a file of its own behind"
     );
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("\u26a0\ufe0f a breaker stopped before it names itself keeps its gate, and the run says so", async () => {
+  // \u26a0\ufe0f **THE CASE AGE CANNOT DECIDE, MEASURED AGAINST A REAL PROCESS.** A breaker that is stopped
+  // between taking its gate and writing its name into it leaves exactly what a killed one leaves: an old, empty
+  // gate. Clearing it would take the gate from a process that is still running, so nothing clears it \u2014 the
+  // run fails closed and names it, and the stopped process carries on and releases it itself.
+  const { breakDeadLock } = await import("../lib/lock.mjs");
+  const p = project();
+  const lock = join(p.dir, ".planning-init.lock");
+  const gate = `${lock}.breaking`;
+  const ready = join(p.root, "gate-taken");
+  const go = join(p.root, "carry-on");
+  try {
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    const dead = JSON.stringify({ pid: Number(gone.stdout), hostname: hostname(), acquiredAt: new Date().toISOString() });
+    writeFileSync(lock, dead);
+
+    const argv = [join(ROOT, "test", "fixtures", "setup", "paused-breaker.mjs"), gate, ready, go];
+    const paused = spawn(process.execPath, argv, { stdio: "ignore" });
+    const finished = new Promise((resolve) => paused.on("exit", resolve));
+    while (!existsSync(ready)) await new Promise((r) => setTimeout(r, 10));
+
+    // The gate is old, empty, and its holder is very much alive. Whatever this finds, the paused process is let
+    // go afterwards: a fixture left waiting for a signal a failed assertion never sends is a hung run.
+    try {
+      assert.deepEqual(breakDeadLock(lock), {
+        broken: false,
+        reason: "break-blocked",
+        blockedBy: { gate, token: `${lock}.breaking.reclaim` },
+      });
+      assert.equal(existsSync(gate), true, "a running breaker's gate was taken from it");
+      assert.equal(readFileSync(lock, "utf-8"), dead, "the lock was cleared while a breaker still held the gate");
+    } finally {
+      // And the process that was stopped carries on and releases its own gate, as it would have all along.
+      writeFileSync(go, "");
+    }
+    assert.equal(await finished, 0, "the paused breaker did not finish");
+    assert.equal(existsSync(gate), false, "the breaker did not release its gate");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
