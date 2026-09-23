@@ -2,10 +2,11 @@
 /**
  * One competitor in the two-recoveries race — spawned only by `test/setup-command.test.mjs`.
  *
- * ⚠️ **THE POINT IS THE WINDOW BETWEEN BREAKING AND ACQUIRING.** A recovery that reads a dead owner and then
- * unlinks the lock can unlink a lock somebody else has just legitimately acquired; both then believe they hold
- * the project. Two processes doing exactly that, started together against one dead lockfile, is the only way to
- * observe it — a single process cannot race itself.
+ * ⚠️ **THE POINT IS THE WINDOW BETWEEN JUDGING A LOCK AND REMOVING IT.** A recovery that reads a dead owner and
+ * then clears the lock can clear a lock somebody else has just legitimately acquired; both then believe they hold
+ * the project. Four processes doing exactly that, started together against one dead lockfile, is the only way to
+ * observe it — a single process cannot race itself, and the later arrivals are the ones that judged a lock which
+ * went live underneath them.
  *
  * ⚠️ **AND OVERLAP IS OBSERVED, NOT INFERRED.** Each holder appends its own arrival and departure to a shared
  * file and stays inside the lock briefly; two arrivals with no departure between them is two writers, whatever

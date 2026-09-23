@@ -14,7 +14,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, hostname, tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -2227,12 +2239,74 @@ test("⚠️ two recoveries racing for one dead run's lock do not both get it", 
     assert.equal(held, 0, `a holder never left:\n${events.join("\n")}`);
     assert.equal(events.filter((e) => e.startsWith("enter")).length >= 1, true, events.join(" | "));
 
-    // And the lock is gone when they are all finished, with no claim file left behind.
+    // And the lock is gone when they are all finished, with nothing a recovery used left beside it.
     assert.equal(existsSync(lock), false, "the lock outlived its holders");
     assert.deepEqual(
-      readdirSync(p.dir).filter((name) => name.includes(".recovering.")),
+      readdirSync(p.dir).filter((name) => name.startsWith(".planning-init.lock.")),
       [],
-      "a recovery left its claim file behind"
+      "a recovery left a file of its own behind"
+    );
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ one process at a time may clear a lock, and a gate nobody holds does not block recovery", async () => {
+  // ⚠️ **WHAT THE RACE CONTROL CAUGHT IN CI ON 2026-09-23.** Judging a lock and then removing it are two
+  // moments, and in between the lock can become a live holder's — so the removal is serialised, and the
+  // judgement that acts is made where no other process can be removing anything. This is that gate from the
+  // outside: while somebody is breaking, nobody else breaks, by either path.
+  const { breakDeadLock, withLock, LockError } = await import("../lib/lock.mjs");
+  const p = project();
+  const lock = join(p.dir, ".planning-init.lock");
+  const gate = `${lock}.breaking`;
+  const exited = () =>
+    Number(spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" }).stdout);
+  try {
+    const dead = JSON.stringify({ pid: exited(), hostname: hostname(), acquiredAt: new Date().toISOString() });
+    writeFileSync(lock, dead);
+    // Somebody is breaking this lock right now, and that somebody is alive.
+    writeFileSync(gate, JSON.stringify({ pid: process.pid, hostname: hostname(), takenAt: new Date().toISOString() }));
+
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "claimed-elsewhere" });
+    assert.equal(readFileSync(lock, "utf-8"), dead, "a second recovery cleared a lock somebody else was clearing");
+
+    // ⚠️ AND A GATE JUST TAKEN IS SOMEBODY'S EVEN BEFORE THEY HAVE WRITTEN THEIR NAME IN IT: a fresh gate that
+    // cannot be read is the microsecond between the create and the write, not an abandoned one.
+    writeFileSync(gate, "");
+    assert.deepEqual(breakDeadLock(lock), { broken: false, reason: "claimed-elsewhere" });
+    assert.equal(readFileSync(lock, "utf-8"), dead, "a recovery took a gate another process had just created");
+
+    // ⚠️ AND THE WAITER'S PATH IS THE SAME PATH. An old lock with a dead owner is exactly what a waiter
+    // may break — unless a recovery is already acting on it, in which case waiting and giving up is correct.
+    const old = Date.now() / 1000 - 600;
+    utimesSync(lock, old, old);
+    await assert.rejects(
+      () => withLock(lock, async () => "acquired", { maxWaitMs: 200, retryMs: 5 }),
+      (e) => e instanceof LockError && /Timed out/.test(e.message),
+      "a waiter broke a lock another process was already breaking"
+    );
+    assert.equal(readFileSync(lock, "utf-8"), dead, "a waiter cleared a lock somebody else was clearing");
+
+    // ⚠️ A GATE ITS HOLDER DIED INSIDE MUST NOT OUTLIVE THEM. It is held for microseconds with nothing
+    // awaited inside it, so one this old belongs to nobody — and a single killed recovery would otherwise stop
+    // every later one for good.
+    for (const abandoned of [JSON.stringify({ pid: exited(), hostname: hostname() }), ""]) {
+      writeFileSync(lock, dead);
+      writeFileSync(gate, abandoned);
+      const stale = Date.now() / 1000 - 60;
+      utimesSync(gate, stale, stale);
+      const broke = breakDeadLock(lock);
+      assert.equal(broke.broken, true, `an abandoned gate blocked a recovery: ${JSON.stringify(broke)}`);
+      assert.equal(existsSync(lock), false, "the dead run's lock survived");
+      assert.equal(existsSync(gate), false, "the abandoned gate survived");
+    }
+
+    // A recovery that runs to the end leaves nothing of its own beside the lock.
+    assert.deepEqual(
+      readdirSync(p.dir).filter((name) => name.startsWith(".planning-init.lock")),
+      [],
+      "a recovery left a file of its own behind"
     );
   } finally {
     rmSync(p.root, { recursive: true, force: true });
