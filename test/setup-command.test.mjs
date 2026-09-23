@@ -1866,6 +1866,15 @@ test("⚠️ ACC-0106 a complete setup, with an environment-authenticated provid
     const headers = [/authorization:/i, /bearer\s/i, /x-api-key/i];
 
     for (const rel of committed) {
+      // ⚠️ **THE ONE ENTRY THAT IS NOT A FILE IS NAMED, NOT SKIPPED.** This fixture's `.planning` is a link to the
+      // checkout, and `.planning/` in the ignore block does not match a link, so git lists it — on Linux, where a
+      // symlink is what it is; on Windows the junction reads as a directory and git says nothing. In a real
+      // project `.planning` is a directory the block does ignore. Anything else that is not a regular file would
+      // be something this scan has never looked inside, so it fails rather than being passed over.
+      if (!statSync(join(p.dir, rel)).isFile()) {
+        assert.equal(rel, ".planning", `${rel} is in the committed set and is not a file this scan can read`);
+        continue;
+      }
       const text = readFileSync(join(p.dir, rel), "utf-8");
       for (const secret of [PROVIDER_KEY, RESEARCH_KEY, ...derived])
         assert.equal(text.includes(secret), false, `${rel} carries a credential or something derived from one`);
