@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createServer } from "node:http";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { EXIT, SetupCommandRefusal, main, nodeSatisfies, parseArgs, renderChoices, resolvePaths, resumeCommand } from "../bin/setup.mjs";
@@ -485,6 +486,16 @@ test("the command line refuses what it does not take, and renders the choices it
   assert.deepEqual(parseArgs(["--non-interactive", "--resume"]), { localState: "project", nonInteractive: true, resume: true });
   for (const bad of [["--project"], ["--name"], ["--local-state", "elsewhere"], ["extra"], ["--project-root", "--name"]])
     assert.ok(parseArgs(bad).error, `must refuse ${JSON.stringify(bad)}`);
+
+  // ⚠️ **`--credential-var` TAKES A NAME, AND A KEY LOOKS NOTHING LIKE ONE.** An operator who pastes the secret
+  // itself has put it in their shell history and in every process listing on the machine; the refusal is what
+  // tells them, and it names neither the value nor any part of it.
+  assert.deepEqual(parseArgs(["--credential-var", "ACME_KEY"]), { localState: "project", credentialVar: "ACME_KEY" });
+  for (const bad of ["sk-live-2f8a0b", "$ACME_KEY", "acme_key", "ACME KEY", "ACME-KEY", "1ACME"]) {
+    const refused = parseArgs(["--credential-var", bad]);
+    assert.ok(refused.error, `--credential-var ${bad} was accepted`);
+    assert.equal(refused.error.includes("2f8a0b"), false, "the refusal repeated part of the value");
+  }
   assert.match(renderChoices([{ id: "stop", summary: "change nothing and stop", available: true }]), /stop: change nothing and stop/);
   assert.match(renderChoices([{ id: "fix-ignore", summary: "add", available: false, block: "x\n" }]), /\(not available\)/);
 });
@@ -1540,6 +1551,103 @@ test("⚠️ --local-state user keeps every runtime record outside the project, 
     assert.equal(Object.hasOwn(settingsOf(p), "sessionDir"), false, "an external run committed a machine-specific session path");
     assert.equal(settingsOf(p).defaultModel, "gpt-4o");
   } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ D25 a custom provider is declared, not guessed, and the real canary checks it against its own endpoint", async () => {
+  // ⚠️ **THE ONLY CASE IN THIS FILE THAT RUNS THE REAL CANARY**, which is possible here and nowhere else: the
+  // provider is one this fixture defines, pointed at a loopback server, so the request that proves the model can
+  // call a tool is answered by this test rather than by anybody's paid service.
+  const requests = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const parsed = JSON.parse(body);
+      requests.push({ path: req.url, authorization: req.headers.authorization ?? null, model: parsed.model });
+      // The challenge comes back through the one tool the canary exposes, which is what a pass means.
+      const seen = /[0-9a-f]{32}/.exec(JSON.stringify(parsed.messages))?.[0];
+      const base = { id: "x", object: "chat.completion.chunk", created: 0, model: parsed.model };
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(
+        `data: ${JSON.stringify({
+          ...base,
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", tool_calls: [{ index: 0, id: "c0", type: "function", function: { name: "kiln_preflight", arguments: JSON.stringify({ challenge: seen }) } }] },
+              finish_reason: null,
+            },
+          ],
+        })}\n\n`
+      );
+      res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] })}\n\ndata: [DONE]\n\n`);
+      res.end();
+    });
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+
+  const p = project({ ignored: true, models: false });
+  try {
+    const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+    writeFileSync(
+      join(p.agentDir, "models.json"),
+      JSON.stringify({
+        providers: {
+          acme: {
+            baseUrl,
+            api: "openai-completions",
+            // ⚠️ A NAME, NOT A KEY: this is how Pi is told where the credential is, and it is also what setup
+            // declares to Kiln's credential table.
+            apiKey: "$ACME_SETUP_KEY",
+            models: [{ id: "acme-model", name: "Acme Model", contextWindow: 128000, maxTokens: 4096, reasoning: false }],
+          },
+        },
+      })
+    );
+
+    // Without the declaration, the provider has no contract Kiln knows, and setup refuses rather than inventing one.
+    const undeclared = await setup(p, [], {
+      pick: ["--provider", "acme", "--model", "acme-model", "--thinking", "off"],
+      env: { ACME_SETUP_KEY: "acme-setup-KEY-7b2f" },
+      canary: null,
+      liveCheck: "approve",
+    });
+    assert.equal(undeclared.code, EXIT.SETUP, undeclared.printed.join("\n"));
+    assert.deepEqual(requests, [], "a provider with no contract was contacted");
+
+    // ⚠️ AND THE NEXT RUN RESUMES, because the refused one left a journal — which is the operator's real path
+    // here: the run stopped, they supply what it asked for, and continue.
+    const o = await setup(p, ["--credential-var", "ACME_SETUP_KEY", "--resume"], {
+      pick: ["--provider", "acme", "--model", "acme-model", "--thinking", "off"],
+      env: { ACME_SETUP_KEY: "acme-setup-KEY-7b2f" },
+      canary: null,
+      liveCheck: "approve",
+    });
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.equal(requests.length, 1, `the canary made ${requests.length} requests`);
+    assert.equal(requests[0].model, "acme-model");
+
+    // ⚠️ THE RECORD DESCRIBES THIS ENDPOINT, AND CARRIES NO CREDENTIAL.
+    const record = JSON.parse(readFileSync(recordPath(p), "utf-8"));
+    assert.equal(record.result.outcome, "passed");
+    assert.equal(record.key.endpointIdentity.hostname, "127.0.0.1");
+    const written = `${readFileSync(recordPath(p), "utf-8")}${readFileSync(join(p.dir, ".pi", "settings.json"), "utf-8")}`;
+    assert.equal(written.includes("acme-setup-KEY-7b2f"), false, "a written file carries the key");
+    assert.equal(written.includes("ACME_SETUP_KEY"), false, "a written file carries the credential variable's name");
+
+    // And the next run reuses it: no second request to the provider.
+    const again = await setup(p, ["--credential-var", "ACME_SETUP_KEY"], {
+      pick: [],
+      env: { ACME_SETUP_KEY: "acme-setup-KEY-7b2f" },
+      canary: null,
+      liveCheck: null,
+    });
+    assert.equal(again.code, EXIT.OK, again.printed.join("\n"));
+    assert.equal(requests.length, 1, "a recorded check was run again");
+  } finally {
+    server.close();
     rmSync(p.root, { recursive: true, force: true });
   }
 });

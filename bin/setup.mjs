@@ -135,6 +135,7 @@ const VALUED = new Set([
   "--thinking",
   "--research",
   "--live-model-check",
+  "--credential-var",
 ]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
@@ -163,6 +164,7 @@ export function parseArgs(argv) {
     if (flag === "--thinking") out.thinking = value;
     if (flag === "--research") out.research = value;
     if (flag === "--live-model-check") out.liveModelCheck = value;
+    if (flag === "--credential-var") out.credentialVar = value;
   }
   if (out.localState !== "project" && out.localState !== "user") return { error: `--local-state is "project" or "user", got ${JSON.stringify(out.localState)}.` };
   // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
@@ -180,6 +182,19 @@ export function parseArgs(argv) {
   // an unreadable value is a mistake about a billable action and is refused rather than read as approval.
   if (out.liveModelCheck !== undefined && out.liveModelCheck !== "approve" && out.liveModelCheck !== "deny")
     return { error: `--live-model-check is "approve" or "deny", got ${JSON.stringify(out.liveModelCheck)}.` };
+  // ⚠️ **A NAME, NOT A KEY.** This says which environment variable holds the provider's credential; a value here
+  // would put a credential on the command line, in the shell history and in every process listing.
+  if (out.credentialVar !== undefined && !/^[A-Z][A-Z0-9_]*$/.test(out.credentialVar))
+    return {
+      // ⚠️ **WHAT WAS GIVEN IS NOT REPEATED, BECAUSE IT MAY BE THE CREDENTIAL.** An operator who pasted the key
+      // instead of the variable's name has already put it in their shell history; echoing it into a refusal that
+      // reaches a terminal, a log and a CI transcript would spread it further. The shape that IS accepted is what
+      // they need in order to fix it.
+      error:
+        `--credential-var takes the NAME of an environment variable — uppercase letters, digits and underscores — ` +
+        `not a key and not a value. What was given is not a name of that shape, and is not repeated here in case ` +
+        `it is the credential itself.`,
+    };
   return out;
 }
 
@@ -519,8 +534,13 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         return { initialized, identity, trust, registered, inspection, selection, research };
       }
 
+      // ⚠️ **A PROVIDER PI KNOWS AND KILN DOES NOT IS DECLARED, NOT GUESSED.** Kiln's table holds the built-in
+      // contracts; anything else needs the operator to say which variable carries its key, by name. Without that
+      // this refuses, which is the honest answer: a contract Kiln invented would be a guess about somebody's
+      // credential.
+      const custom = args.credentialVar ? { id: selection.selection.provider, apiKey: `$${args.credentialVar}` } : null;
       const contract = await tx.phase("credential-contract", () =>
-        modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom: null })
+        modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom })
       );
       print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
 
@@ -531,7 +551,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // catalogue, the thinking level that model supports, the package — is settled before the one check that
       // costs money is even offered. A run that fails here has asked the provider for nothing.
       const preflight = await tx.phase("preflight", () =>
-        modules.launch.zeroCostPreflight({ projectRoot: paths.projectRoot, location, agentDir, validators })
+        modules.launch.zeroCostPreflight({ projectRoot: paths.projectRoot, location, agentDir, custom, validators })
       );
       print(`preflight passed: ${preflight.displayName} ${preflight.selection.model}, authentication ${preflight.authSource}, ${preflight.tools.length} package tools`);
 
@@ -540,7 +560,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // resolved: the same model object, the same endpoint, the same version. A runner handed only the selection
       // would have to resolve those again and could resolve them differently, which is the disagreement the
       // compatibility key exists to catch.
-      const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(canaryRequest(ctx, preflight)));
+      const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(canaryRequest(ctx, preflight, custom)));
       const compatibility = modules.compatibility.compatibilityLocationFrom(location);
       const live = await tx.phase("live-check", () =>
         modules.liveCheck.runLiveModelCheck({
@@ -881,6 +901,7 @@ export function usage() {
     "  --thinking <level>               the thinking level for that model",
     "  --research tavily|disabled       settle web research without a prompt",
     "  --live-model-check approve|deny  allow, or refuse, the one check that sends a billable request",
+    "  --credential-var <NAME>          the variable holding the key for a provider Kiln has no built-in contract for",
     "  --non-interactive                never ask; refuse rather than assume",
     "  --resume                         continue a run that was interrupted",
     "  --help                           this text",
@@ -993,13 +1014,36 @@ export async function verifyRecorded({ compatibility, preflight, modules, valida
  * @param {{selection: object, declared?: object}} ctx  what the live check passes its runner
  * @param {object} preflight  the zero-cost preflight's result, including the agent directory it resolved
  */
-export function canaryRequest(ctx, preflight) {
+export function canaryRequest(ctx, preflight, custom = null) {
   // ⚠️ **ONLY WHEN THE PREFLIGHT SAID THE STORED FILE IS WHAT AUTHENTICATES THIS SELECTION.** The canary refuses a
   // stored path that is not there, so a host authenticated by an environment variable — which commonly has no
   // auth.json at all — would fail a check its credential never reached. The environment route needs nothing here:
   // the canary builds its child's environment from the provider's declared names, which is its own boundary.
   const stored = preflight.authSource === "stored" ? join(preflight.agentDir, "auth.json") : null;
-  return { ...ctx.selection, declared: ctx.declared, storedAuthPath: stored };
+
+  // ⚠️ **A CUSTOM PROVIDER'S CHILD NEEDS TO KNOW WHERE THE PROVIDER IS, AND THAT IS NOT A CREDENTIAL.** The child
+  // runs against its own isolated agent directory, so nothing of the operator's `models.json` reaches it: without
+  // the endpoint and the model's shape it would resolve the id against Pi's built-in catalogue and check a
+  // different service. What crosses is exactly the non-credential half — the base URL, the API kind and the one
+  // model — taken from what the preflight resolved rather than re-derived here, so the check and the record
+  // describe the same request. The key itself never crosses: the canary writes the DECLARED NAME.
+  const config = custom === null ? null : providerConfigFor(preflight);
+  return {
+    ...ctx.selection,
+    declared: ctx.declared,
+    storedAuthPath: stored,
+    ...(custom === null ? {} : { custom, customProviderConfig: config }),
+  };
+}
+
+/** The non-credential half of the selected custom provider, as the canary's child needs it. */
+function providerConfigFor(preflight) {
+  const model = preflight.model ?? {};
+  const entry = { id: model.id };
+  // ⚠️ ONLY THE FIELDS THE CANARY ACCEPTS, and only when Pi resolved them: an undefined bound is not a bound, and
+  // the canary refuses a configuration carrying anything it does not know.
+  for (const key of ["name", "contextWindow", "maxTokens", "reasoning"]) if (model[key] !== undefined) entry[key] = model[key];
+  return { baseUrl: preflight.effectiveBaseUrl, api: model.api, models: [entry] };
 }
 
 /**
