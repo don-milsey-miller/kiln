@@ -1,0 +1,71 @@
+{
+  "id": "EVD-0136",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: setup spends nothing before it has to, asks separately for the one check that costs money, and reports readiness from the record it read back",
+  "kind": "experiment",
+  "summary": "TSK-0060 SLICE 4, toward ACC-0045 and — not yet evaluated — ACC-0043, ACC-0085, ACC-0106, ACC-0107, ACC-0108. The implementation is commit 7d0d48a; the sha256 of each file is in the facts. THE ORDER IS WHAT THIS SLICE IS ABOUT. After the research decision, three declared phases run: `preflight`, `live-check` and `read-back`. The preflight is `zeroCostPreflight`, which settles everything a run can be refused for without spending anything — the committed selection, this host's grant for it, the credential contract, Pi's catalogue, the thinking level that model supports, and the package — and sends nothing. Only then is the one check that costs money offered. THE BILLABLE CHECK HAS ITS OWN ANSWER, SEPARATE FROM EVERY OTHER ONE. `--live-model-check approve|deny` settles it without a prompt; interactively the operator is asked, with the prompt naming the provider, the exact model and that the provider may charge; and a run with nobody to ask refuses rather than assuming, which reaches the operator as a partial setup rather than as a fault. A decline leaves the project valid, the model committed and nothing recorded. READINESS IS WHAT THE RECORD SAYS ON DISK. The live check writes the compatibility record; a separate phase reads it back and compares it against the key recomputed from what Pi resolved in this run. That is not ceremony: the gate that refuses a tracked or unprotected record applies on READ as well as on write, so a record that cannot be read back is one the next start will refuse, and reporting readiness from the writer's return value would be a promise about somebody else's next run. What the command prints comes from the record that was read. AN INTERRUPTED RUN IS CONTINUED DELIBERATELY. The journal's presence is the interruption signal. An ordinary rerun names the last completed phase, prints the recovery command the interrupted run itself recorded, and exits 10 having changed nothing; `--resume` continues, and a completed run leaves no journal. `--resume` with nothing to resume says so and proceeds as an ordinary run. THE EXIT CODES ARE PUBLISHED. `--help` prints every code with what it means, and a test holds each member of the command's own EXIT table to having both a published meaning and a line in that output. This slice adds two: 10 for an interrupted run, and 11 for a model that was not shown to work — which is deliberately distinct from 9, the code for an answer that left setup partial, because a script has to tell a decline from a failure. MEASURED THROUGH THE REAL COMMAND. (1) A zero-cost refusal leaves `live-check` and `read-back` PENDING in the journal the failed run left, with the canary never called. (2) A denied check, a declined one and one nobody could approve each send nothing and record nothing, with the model still committed and the scaffold valid. (3) A passing check is recorded, read back, and reused by the next run: no question, no request, and the record's bytes unchanged. (4) A check that returns not-passed, and one that passes while proving a different endpoint, are both refused with nothing recorded. (5) The read-back itself refuses a record that is gone and one about another model. (6) The interruption, the resume and the no-op resume are all exercised on a real journal. NOTHING BILLABLE IS REACHED, AND THAT IS ENFORCED BY THE FIXTURE. The canary is the single step that sends a request to the selected provider, and the fixture's model is a real OpenAI catalogue entry, so every case injects its own runner; the default — the real canary — is never reached in a test. The injected runner returns what a passing check would have observed, derived from the preflight the command itself resolved, which is also what makes the key comparison meaningful rather than circular. LIMITS. One mutation survives: swallowing a preflight refusal. In this fixture an earlier zero-cost phase refuses first — when the host's stored key goes, its only remaining provider is the loopback one, which has no credential contract — so setup's own tests cannot distinguish a preflight that refuses from one that is ignored. The preflight's individual refusals are held by test/launch-checks.test.mjs. Also unchanged from the earlier slices: R9's alternate content root, custom-provider credential inputs (D25, D13) and `--local-state user` are all still owed, and the spanning criteria stay not-evaluated until they land and the integration record is written. The per-class exit codes are published, but several refusal classes still share the generic setup code; narrowing those is the rest of that mapping. MUTATIONS, RUN LOCALLY ON WINDOWS. Nine changes, each restored byte-identical by sha256. Eight were caught: the read-back skipped, a not-ready check reported as ready, a declined check and a failed one sharing a code, an unapproved check assumed approved, the canary given no preflight, an interrupted run continued without being asked, the read-back accepting a record about another model, and the read-back accepting an unreadable record.",
+  "outcome": "success",
+  "observedAt": "2026-09-23",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commit 7d0d48a",
+      "bin/setup.mjs": "sha256:c8ae28a1228b74017fcd061d52c4fa4a66130a6c2572329cc6b9f24a522f86b9",
+      "test/setup-command.test.mjs": "sha256:a74bf7f1576a7a64892f2600e4fdfa162fffde6ea7adce2ff1107538c76efb04",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 33 tests, 25 of which run the real main(); one runs it in a child with every access recorded, and the rest hold exported functions directly.",
+      "phases": "preflight, live-check and read-back, declared and run in that order after the research decision",
+      "zero-cost-first": "a zero-cost refusal leaves live-check and read-back pending in the journal, with the canary never called",
+      "separate-approval": "--live-model-check approve|deny, an interactive question naming the provider, the model and that it may be charged, or a refusal when there is nobody to ask; a decline records nothing and sends nothing",
+      "read-back": "the record is re-read and compared against the key recomputed from what Pi resolved; a missing record and one about another model are both refused as not-proved",
+      "reuse": "a second run reuses the recorded check without asking, without sending, and without rewriting the record's bytes",
+      "failed-check": "a not-passed canary and one that proves a different endpoint are both refused with nothing recorded",
+      "resume": "an ordinary rerun after an interruption exits 10 naming the last completed phase and the recorded recovery command; --resume continues and the completed run leaves no journal; --resume with nothing to resume says so",
+      "exit-codes": "--help publishes all eleven codes with their meanings, and every member of the command's EXIT table is held to having one",
+      "no-billable-provider": "the canary is a seam and every case injects one; the real runner is never reached in a test, and the injected proof is derived from the preflight the command resolved",
+      "mutations": "9 run locally on Windows, 8 killed, 1 survives (swallowing a preflight refusal, which this fixture cannot distinguish); each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1594 tests, 1589 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 510 artifacts",
+      "ci-run": "GitHub Actions run 35803035422 at 7d0d48a, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell",
+      "cell-windows-22": "job 106997495878, 1594 tests / 1593 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 106997495906, 1594 tests / 1593 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 106997495606, 1594 tests / 1584 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 106997495820, 1594 tests / 1584 pass / 0 fail / 10 skipped",
+      "live-tier": "ubuntu-latest Node 24 cell only (job 106997495820), KILN_PI_COMPAT=live: 6 of 6 pass; skipped in the other three cells"
+    },
+    "omissions": [
+      {
+        "fact": "real-canary-request",
+        "state": "not-captured",
+        "reason": "The canary is the one step that sends a request to the selected provider, and the fixture's model is a real catalogue entry, so every case injects a runner. What a real canary does against a loopback provider is measured in test/live-canary.test.mjs and test/live-model-check.test.mjs."
+      },
+      {
+        "fact": "preflight-only-refusal",
+        "state": "not-captured",
+        "reason": "An earlier zero-cost phase refuses first in this fixture, so a preflight that refuses cannot be told from one that is ignored through setup's own tests; the preflight's refusals are held by test/launch-checks.test.mjs."
+      },
+      {
+        "fact": "content-root-elsewhere",
+        "state": "not-captured",
+        "reason": "R9 remains open: every content root other than <project>/planning-content is refused."
+      },
+      {
+        "fact": "custom-provider-and-user-state",
+        "state": "not-captured",
+        "reason": "Setup supplies no custom credential declaration (D25, D13), and --local-state user refuses by name, so ACC-0085 stays not evaluated."
+      }
+    ]
+  }
+}
