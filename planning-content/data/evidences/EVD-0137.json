@@ -1,0 +1,65 @@
+{
+  "id": "EVD-0137",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: setup owns a selected content root and a per-user state root, binds a declared custom provider through the real canary, and exits with one code per refusal class",
+  "kind": "experiment",
+  "summary": "TSK-0060 SLICE 5, which closes the four things the earlier slices owed: R9's alternate content root, `--local-state user`, the custom-provider credential inputs (D25, D13) and the per-class exit codes. The implementation is commits 0a325c7, 2c61a1b and 804dd43; the sha256 of each file is in the facts. R9. The initializer now takes an explicit content root, contained inside the project, and stages its scaffold BESIDE the destination rather than in the project root — a rename is only atomic within one filesystem, and the destination is where the filesystem in question is. Setup passes the resolved content root instead of refusing every non-default selection, and prints that later runs need the same selection, since only that selection finds the content again. The skill-override entry was already derived and proved; what was missing was a command that could reach a project where the derivation differs from the default. MEASURED: content selected at `kiln-content` is initialized there, no second root appears beside it, `../kiln-content/skills-overrides` is committed, and Pi's own loader finds an override placed in that directory. A content root outside the project, or the project itself, is refused; the staging location is asserted through the initializer's rename seam, with a NESTED content root, because for a root directly under the project \"beside the destination\" and \"in the project root\" are the same directory and the difference would be invisible. `--local-state user`. The external root is keyed by the project's committed id and never by its path: a path-derived root moves the moment somebody renames the project, taking every transcript and consent record with it. A project that has an id resolves from its record; a fresh one commits the id first, in a transaction planning that record alone and opening no journal — because the journal lives in the root being resolved. What can honestly be printed before any mutation is the rule; the exact path follows the moment the id makes it knowable, and before any runtime data exists. MEASURED: consent and compatibility records land under the per-user root keyed by the committed id, `.pi/runtime` is never created in the project, and no machine-specific session path is committed to settings. D25, THE CUSTOM PROVIDER. Kiln's table holds the built-in credential contracts; a provider Pi knows and Kiln does not needs the operator to say which environment variable carries its key. `--credential-var NAME` is that input, and without it such a provider is refused rather than bound to, because a contract Kiln invented would be a guess about somebody's credential. A NAME, NEVER A VALUE: a key on the command line is a key in the shell history and in every process listing, so the flag takes the variable's name — and the refusal for anything else does not repeat what was given, in case it is the credential itself. That refusal WAS leaking it, and a control caught it before this landed. The canary's child also needs to know where a custom provider is, which is not a credential: the base URL, the API kind and the one model, taken from what the preflight resolved so the check and the record describe the same request. Without it the child resolves the id against Pi's built-in catalogue and checks a different service. THE REAL CANARY, THROUGH THE WHOLE COMMAND, AGAINST AN ENDPOINT THIS TEST SERVES. One case runs setup with no injected canary at all, against a provider defined in the fixture's `models.json` and pointed at a loopback server: undeclared, the run refuses and the endpoint is never contacted; declared, it resumes from the journal the refusal left, the canary makes exactly ONE request, the recorded key names 127.0.0.1, neither the key nor its variable's name appears in anything written, and the next run reuses the record without a second request. THE EXIT CODES. Every Kiln refusal class shared the generic setup code, which tells a script that \"choose a model\", \"this provider needs a credential declaration\" and \"the package entry could not be written\" are one situation. Five codes join the table: selection, credentials, registration, research and unusable. The ignore owner's refusals map to state protection, which is the failure they are, and the live check's approval refusal stays with the partial-setup code, because it is an answer rather than a fault. A class the table does not name keeps the generic code rather than being guessed at. `--help` publishes all sixteen, and the control holds each class to its code, each code to a published meaning AND a line in that output, and the unnamed case to falling through. Four classes are also proved through the real command; the three it cannot currently reach are named in the test so the table is not a list of aspirations. LIMITS. The spanning criteria stay not-evaluated until the integrated record. A non-default content root is supported by setup, and every later run must carry the same `PLANNING_CONTENT_DIR` selection to find it — which is printed, not assumed. Nothing here proves a real provider: the one real canary in this slice answers to a loopback server this test runs, and every other case injects its runner. MUTATIONS, RUN LOCALLY ON WINDOWS. Eighteen changes across four sets, each restored byte-identical by sha256, and ALL eighteen were caught: the selected content root ignored, a content root outside the project accepted, the scaffold staged in the project root again, external state written into the project, the external root keyed by something other than the id, the path rule not printed before the id exists, a custom provider needing no declaration, the declaration never reaching the preflight, the canary told nothing about the provider, the canary pointed at a different endpoint, a value accepted where a name belongs, every refusal sharing the generic code again, the selection class mapped to the wrong code, a credential refusal reading as a registration one, an unnamed class guessed at, a code published with no meaning, and the two staging and containment cases above. TWO OF THESE SURVIVED THEIR FIRST RUN and were killed only after the controls were sharpened: the containment refusal had no test at all, and the staging assertion could not tell the two places apart until the fixture used a nested content root.",
+  "outcome": "success",
+  "observedAt": "2026-09-23",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "commits 0a325c7 (R9 and user state), 2c61a1b (custom provider) and 804dd43 (exit codes)",
+      "bin/setup.mjs": "sha256:aab49c9bcafa43ec60e7ea3592ac445022f48ee230a3b7c5f81e29759caff573",
+      "lib/initialize-project.mjs": "sha256:f2904359efe7a79f2401fab7b534e83154f549546ec706bf20b7cb690c472726",
+      "test/setup-command.test.mjs": "sha256:2f84743df51b23358f26fd4d794387c8b76d7076a39f1f0beb65418a3470b1db",
+      "test/initialize-project.test.mjs": "sha256:1c8c65372a577014b3c73269e3da8b4db5206b3264fc9c9b787aaef9afa8a5f6",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 39 tests; test/initialize-project.test.mjs: 53. One case runs the real canary against a loopback server; every other case injects its runner.",
+      "content-root": "a content root selected at <project>/kiln-content is initialized there, no second root is created, ../kiln-content/skills-overrides is committed, and Pi's loader finds an override placed in it",
+      "content-root-refusals": "outside the project, and the project itself, are both refused; the scaffold is staged beside the destination, asserted through the rename seam with a nested root",
+      "user-state": "consent and compatibility land under the per-user root keyed by the committed id; no .pi/runtime in the project; no sessionDir committed",
+      "user-state-order": "the rule is printed before any mutation and the exact path once the id makes it knowable, which for a fresh project is after the id is committed and before any runtime data",
+      "custom-provider": "--credential-var NAME declares which variable holds the key; without it the provider is refused; the refusal repeats nothing of what was given",
+      "custom-provider-canary": "the real canary, through the command, against a loopback provider: exactly one request, the key named 127.0.0.1, no key or variable name in anything written, and the next run reuses the record",
+      "exit-codes": "16 published codes, one per refusal class, with a class the table does not name keeping the generic setup code",
+      "mutations": "18 run locally on Windows across four sets, 18 killed; two needed sharper controls before they died; each restored byte-identical by sha256",
+      "full-suite-local": "npm test on Windows: 1601 tests, 1596 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 511 artifacts",
+      "ci-run": "GitHub Actions run 35884413057 at 804dd43, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell. The slice's earlier commits also passed all four cells: 35875837268 at 0a325c7 and the run at 2c61a1b.",
+      "cell-windows-22": "job 107260774826, 1601 tests / 1600 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 107260775097, 1601 tests / 1600 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 107260774834, 1601 tests / 1591 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 107260774617, 1601 tests / 1591 pass / 0 fail / 10 skipped"
+    },
+    "omissions": [
+      {
+        "fact": "real-provider",
+        "state": "not-captured",
+        "reason": "The one real canary answers to a loopback server this test runs; no billable provider is contacted anywhere in the suite."
+      },
+      {
+        "fact": "content-root-outside-the-project",
+        "state": "not-captured",
+        "reason": "Refused by construction: the scaffold is staged beside its destination and the committed settings hold a path relative to .pi, so a content root elsewhere is neither swappable nor spellable in a committed file."
+      },
+      {
+        "fact": "spanning-criteria",
+        "state": "not-captured",
+        "reason": "ACC-0043, ACC-0045, ACC-0085, ACC-0106, ACC-0107 and ACC-0108 are evaluated from the integrated record, which follows this one."
+      }
+    ]
+  }
+}
