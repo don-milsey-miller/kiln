@@ -230,6 +230,11 @@ test(
           assert.match(r.stdout, new RegExp(`\\[kiln\\] run \\S+ · project \\S+ · http://127\\.0\\.0\\.1:${port}`), `${label} did not print the workspace address: ${r.out}`);
           assert.match(r.stdout, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, `${label}: ${r.out}`);
           assert.equal(r.stdout.includes("run file(s) from earlier runs"), false, `${label} found an earlier run's files left behind: ${r.out}`);
+          // ⚠️ THE LAUNCHER'S OWN RUN DIRECTORY IS GONE TOO. It is removed only by the launcher's graceful stop, so one
+          // left behind means the launcher was killed rather than stopped.
+          const runDir = /run directory: (\S+)/.exec(r.out)?.[1];
+          assert.ok(runDir, `${label}: the launcher did not report its run directory: ${r.out}`);
+          assert.equal(existsSync(runDir), false, `${label} left its launcher's run directory behind: ${runDir}\n${r.out}`);
           assert.equal(await answers(port), false, `${label}: something still answers on port ${port}`);
           return /\[kiln\] session (\S+) \(([^)]*)\)/.exec(r.stdout)?.slice(1) ?? [null, null];
         };
