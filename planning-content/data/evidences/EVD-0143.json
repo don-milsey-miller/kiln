@@ -31,23 +31,18 @@
       "real-control-posix": "at 5ba5a2a: 1 test, 1 pass, 20.5 s (at eb734bc: 65.0 s)",
       "suites-windows": "supervisor, shutdown-and-session, custom-provider-start and kiln-start-entry: 167 tests, 166 pass, 0 fail, 1 skipped (kiln-start-entry, no pseudo-terminal on Windows); ACC-0116's piped start passed unchanged",
       "mutations": "plan-keyed send (race unit case failed); at eb734bc, send on every run and never send each failed the real control; at 5ba5a2a, never send failed in 36.6 s; files restored and compared",
-      "no-billable-request": "every request went to the loopback fixture"
+      "no-billable-request": "every request went to the loopback fixture",
+      "ci-run": "GitHub Actions run 36038639205 at 009a16e, attempt 1, no job re-run, all four cells succeeded",
+      "cell-windows-22": "job 107764939292, 1637 tests / 1635 pass / 0 fail / 2 skipped; the real-command control skipped (no pseudo-terminal), the unit cases passed",
+      "cell-windows-24": "job 107764939632, 1637 tests / 1635 pass / 0 fail / 2 skipped; the real-command control skipped (no pseudo-terminal), the unit cases passed",
+      "cell-ubuntu-22": "job 107764939467, 1637 tests / 1627 pass / 0 fail / 10 skipped; the real-command control passed in 32.8 s",
+      "cell-ubuntu-24": "job 107764939808, 1637 tests / 1627 pass / 0 fail / 10 skipped; the real-command control passed in 36.1 s"
     },
     "omissions": [
       {
         "fact": "windows-terminal",
         "state": "not-captured",
         "reason": "Node cannot allocate a pseudo-terminal and Windows has no script equivalent here, so the real-command control is POSIX only. On Windows the argument list is covered by the unit cases, and ACC-0088's manual terminal run is where a Windows interactive session is observed."
-      },
-      {
-        "fact": "ci-run",
-        "state": "not-captured",
-        "reason": "Recorded once the four-cell CI run for these commits completes."
-      },
-      {
-        "fact": "full-suite",
-        "state": "not-captured",
-        "reason": "Only the four related test files were run on Windows and the one control on POSIX."
       }
     ]
   }
