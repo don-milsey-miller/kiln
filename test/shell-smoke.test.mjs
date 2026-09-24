@@ -151,6 +151,38 @@ async function runSmokeCheck(t) {
           `build output was:\n${buildOut.slice(-800)}`
       );
     }
+    /* ------------------------------------ a change under stages/ reaches the change stream (TSK-0063) */
+
+    // ⚠️ ONLY A STAGE DOCUMENT IS TOUCHED, NOTHING UNDER data/. The route used to watch data/ alone, so the Stage 1
+    // answer an agent writes to stages/ never reached an open page. The watcher starts on the first subscriber and
+    // is not awaited, so the file is touched every 2 s until a change arrives, within a bound.
+    {
+      const controller = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${PORT}/events`, { signal: controller.signal });
+      assert.equal(res.status, 200);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      const stageFile = join(contentCopy, "planning-content", "stages", `${STAGE}.md`);
+      const original = readFileSync(stageFile, "utf-8");
+      let received = "";
+      let changed = false;
+      const reading = (async () => {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) return;
+          received += decoder.decode(value, { stream: true });
+          if (/^event: change$/m.test(received)) return (changed = true);
+        }
+      })().catch(() => {});
+      const deadline = Date.now() + 30_000;
+      for (let n = 1; !changed && Date.now() < deadline; n++) {
+        writeFileSync(stageFile, `${original}\n<!-- touched ${n} -->\n`);
+        await Promise.race([reading, sleep(2000)]);
+      }
+      controller.abort();
+      assert.ok(changed, `a write under stages/ never reached /events within 30 s; received:\n${received.slice(-400)}`);
+    }
+
     /* ---------------------------------------------------- the health endpoint, over real HTTP */
 
     // ⚠️ THIS SERVER WAS STARTED WITHOUT A RUN IDENTITY, so it is the unidentified case, transported

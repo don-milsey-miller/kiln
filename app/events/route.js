@@ -15,6 +15,11 @@ import { resolveContentRoot } from "../server/paths.js";
  * answers to "where is the content" is #70's failure, and a watcher is the worst place for it because
  * watching the wrong directory reports nothing rather than reporting an error.
  *
+ * ⚠️ THE WHOLE CONTENT ROOT, NOT ITS `data/` (TSK-0063). The pages render `stages/` and
+ * `state/stage-attestations/` as well as `data/`, and the Stage 1 answer an agent records is written to
+ * `stages/01-intake.md`. Watching `data/` alone left an open stage page showing the answer only when
+ * something else reloaded it. Lock and temporary files are ignored by the stream itself.
+ *
  * ⚠️ EVERY FRAME IS A NAMED EVENT. A comment keepalive is ignored by the client parser (AST-0036), so
  * it would keep the socket warm and fire nothing — leaving a page that cannot tell a healthy stream
  * from a dead one, which is exactly REQ-0018's second clause.
@@ -30,7 +35,7 @@ let service = null;
 function get() {
   if (!service)
     service = createChangeStream({
-      watchDir: `${resolveContentRoot(process.env)}/data`,
+      watchDir: resolveContentRoot(process.env),
       heartbeatMs: Number(process.env.VPW_HEARTBEAT_MS ?? 5000),
     });
   return service;
