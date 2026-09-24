@@ -1,0 +1,56 @@
+{
+  "id": "EVD-0140",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the deterministic non-billable provider fixture, resolved and answered through the pinned runtime",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0062, COMPONENT WORK ONLY. It does not evaluate ACC-0086, which needs TSK-0063's journey from an empty directory. The fixture is `test/helpers/provider-fixture.mjs`, commit 702ee9c. It is a provider bound to 127.0.0.1 that answers `/v1/chat/completions` in the streamed shape Pi's `openai-completions` client reads, and `modelsJson()` names it as `kiln-fixture/fixture-model` with its key as a `$KILN_FIXTURE_PROVIDER_KEY` reference. DETERMINISTIC. Every id and timestamp in a reply is fixed, and the scripted step that answers is chosen by the number of assistant messages after the last user message, not by how many requests came before. Two identical requests got byte-identical replies, and a second user turn started the script again. IT CANNOT LOOP. Past the end of its script every reply is prose, so a tool call is issued once and is not re-issued because its triggering text is still in the conversation. THROUGH THE PINNED RUNTIME. Pi's `ModelRegistry` listed the model and reported configured authentication only with the key variable set (the control, without it, listed neither). Pi's own CLI, in print mode with only the `read` tool, sent two authorised requests: the fixture's `read` call was executed, the file's sentinel reached the provider in the tool message, the closing prose was in Pi's output, and Pi exited 0. Kiln's live canary passed through it, with the fixture echoing the challenge from the request. CONTROLS. A missing or wrong key is refused with 401, a non-streamed request with 400, any other route with 404, and the key is never recorded. A mutation that forced every request to the first step failed the conversation test and the CLI test; the CLI run is bounded at 60 seconds, so a looping regression fails instead of hanging the suite. The canary still passed under that mutation, because the canary stops after one call of its own. WHAT THIS DOES NOT SHOW. No Kiln project was started against the fixture, because `bin/start-kiln.mjs` cannot start a custom-provider project (now TSK-0072, a prerequisite of TSK-0063). No Stage 1 exchange was driven through it; that is TSK-0063's.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0062, commit 702ee9c",
+      "test/helpers/provider-fixture.mjs": "sha256:afcf42dc862a097fc7b154f5998f338173d3fb4065630601c9c7d0559bf4ffb6",
+      "test/provider-fixture.test.mjs": "sha256:773d93dc5f3f5da0e1fc4206b9213d9fdd11b60e292eee320d4448f77142b4a3",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/provider-fixture.test.mjs: 5 tests, 5 pass",
+      "resolution": "ModelRegistry over the fixture's models.json: without the key variable, not in getAvailable() and hasConfiguredAuth() false; with it, listed and true; zero requests reached the fixture while resolving",
+      "cli-turn": "pinned CLI, --mode json -p, --tools read, extensions, skills, prompt templates and context files off, base environment only: 2 requests, both authorised, the second carrying one tool message with the file's sentinel; closing prose in stdout; exit 0",
+      "canary": "runLiveCanary against the fixture as a custom provider: passed",
+      "mutation": "one: the step position forced to 0; the conversation test and the CLI test failed (the CLI test at its 60 s bound), the fixture restored and 5 of 5 passing after",
+      "no-billable-request": "the fixture binds 127.0.0.1 only and its key is a placeholder no service accepts",
+      "full-suite-local": "node --test on Windows: 1628 tests, 1623 pass, 0 fail, 5 skipped. The run before it had one failure, the real-project handoff test, because TSK-0072 was draft and DEC-0015 blocks handoff on an unreviewed task; it passed once TSK-0072 was approved.",
+      "plan-lint": "no findings over 517 artifacts",
+      "ci-run": "not yet run; recorded after the push"
+    },
+    "omissions": [
+      {
+        "fact": "kiln-launch-against-fixture",
+        "state": "not-captured",
+        "reason": "bin/start-kiln.mjs cannot start a custom-provider project; checkLaunch refuses it with unsupported-credential-contract. TSK-0072 owns it, accepted by ACC-0116, and TSK-0063 depends on it."
+      },
+      {
+        "fact": "stage-1-exchange",
+        "state": "not-captured",
+        "reason": "The fixture can emit any named tool call with any arguments, but no Kiln session was driven through it here. TSK-0063 drives the Stage 1 exchange."
+      },
+      {
+        "fact": "posix-platform",
+        "state": "not-captured",
+        "reason": "Measured locally on Windows only; the CI run covers Ubuntu."
+      }
+    ]
+  }
+}

@@ -27,7 +27,8 @@
     "TSK-0057",
     "TSK-0060",
     "TSK-0062",
-    "TSK-0071"
+    "TSK-0071",
+    "TSK-0072"
   ],
-  "notes": "⚠️ D14 (2026-09-13): ACC-0114 accepts the user-visible first Stage 1 turn with a real model, judged by a human against a retained record, because a scripted provider cannot establish a model's choice of question (F98)."
+  "notes": "⚠️ D14 (2026-09-13): ACC-0114 accepts the user-visible first Stage 1 turn with a real model, judged by a human against a retained record, because a scripted provider cannot establish a model's choice of question (F98). ⚠️ DEPENDS ON TSK-0072, ADDED 2026-09-24. The fixture TSK-0062 built is a custom provider, and `bin/start-kiln.mjs` cannot yet start a custom-provider project."
 }

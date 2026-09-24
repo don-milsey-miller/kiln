@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0072",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Launch a project bound to a custom provider",
+  "statement": "Give `bin/start-kiln.mjs` the credential declaration and provider configuration a custom-provider project was set up with, so `checkLaunch` can evaluate that project instead of refusing it with `unsupported-credential-contract`, and the supervisor can start it. Setup already proves such a project; this task owns only starting it.",
+  "role": "platform",
+  "implements": [
+    "CMP-0028"
+  ],
+  "fulfils": [
+    "REQ-0025",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0116"
+  ],
+  "dependsOn": [
+    "TSK-0037"
+  ],
+  "notes": "Created 2026-09-24 from TSK-0037's STILL OWED note (D25, D13), which TSK-0037's acceptance did not cover. TSK-0063 depends on it: its journey binds the TSK-0062 fixture, a custom provider, and cannot reach a running Kiln until this lands. The launcher's own refusal codes (owed against CMP-0037) are not part of this task."
+}

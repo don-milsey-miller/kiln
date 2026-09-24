@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0116",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "A project set up with a custom provider starts",
+  "statement": "A project whose recorded selection is a custom provider, set up with its credential declaration, passes the launch checks and starts through `bin/start-kiln.mjs` with Pi held to that selection. With the declared credential variable absent, the same launch refuses and names the recorded provider and model. Measured by running the command against a non-billable local provider.",
+  "evaluates": [
+    "CMP-0028"
+  ],
+  "verifies": [
+    "REQ-0025"
+  ]
+}
