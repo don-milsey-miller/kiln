@@ -32,7 +32,7 @@
         "credentialVar": {
           "type": "string",
           "pattern": "^[A-Z][A-Z0-9_]*$",
-          "description": "For a provider Kiln has no built-in credential contract for: the NAME of the environment variable the operator declared, on this host, as holding its key (`--credential-var`). ⚠️ A NAME, NEVER A VALUE. ⚠️ HERE AND NOT IN `.pi/kiln.json` BECAUSE IT IS THIS HOST'S: another computer may keep the same key under another name. ⚠️ ON THE GRANT, SO IT GOES WHERE THE GRANT GOES: a different provider or model clears the grant and the declaration with it. Launch reads it to resolve the same contract setup proved."
+          "description": "For a provider Kiln has no built-in credential contract for: the NAME of the environment variable the operator declared, on this host, as holding its key (`--credential-var`). ⚠️ A NAME, NEVER A VALUE. ⚠️ HERE AND NOT IN `.pi/kiln.json` BECAUSE IT IS THIS HOST'S: another computer may keep the same key under another name. ⚠️ ON THE GRANT, SO IT GOES WHERE THE GRANT GOES: a different provider or model clears the grant and the declaration with it. ⚠️ AND IT IS PART OF WHAT WAS CONFIRMED: setup discloses it in the confirmation, and a different variable for the same model is a different grant, asked for again. Launch reads it to resolve the same contract setup proved."
         }
       },
       "required": ["provider", "model"]
