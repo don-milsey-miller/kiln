@@ -22,7 +22,7 @@
     },
     "facts": {
       "implementation": "TSK-0062, commit 702ee9c",
-      "test/helpers/provider-fixture.mjs": "sha256:afcf42dc862a097fc7b154f5998f338173d3fb4065630601c9c7d0559bf4ffb6",
+      "test/helpers/provider-fixture.mjs": "sha256:afcf42dc862a097fc7b154f5998f338173d3fb4065630601c9c7d0559bf4ffb6 (the blob at 702ee9c, which this record measured)",
       "test/provider-fixture.test.mjs": "sha256:773d93dc5f3f5da0e1fc4206b9213d9fdd11b60e292eee320d4448f77142b4a3",
       "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
       "tests": "test/provider-fixture.test.mjs: 5 tests, 5 pass",
@@ -37,7 +37,8 @@
       "cell-windows-22": "job 107638454890, 1628 tests / 1627 pass / 0 fail / 1 skipped",
       "cell-windows-24": "job 107638455110, 1628 tests / 1627 pass / 0 fail / 1 skipped",
       "cell-ubuntu-22": "job 107638454941, 1628 tests / 1618 pass / 0 fail / 10 skipped",
-      "cell-ubuntu-24": "job 107638455156, 1628 tests / 1618 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass)"
+      "cell-ubuntu-24": "job 107638455156, 1628 tests / 1618 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass)",
+      "test/helpers/provider-fixture.mjs@8ab0b16": "sha256:17e5d915b4c5329d2774c017f77e906d94588a27550e1b340240152fc6a5cce2. The successor: models.json no longer sets compat, which the canary cannot carry to its child (EVD-0141). This record's five tests were rerun at it: 5 pass."
     },
     "omissions": [
       {

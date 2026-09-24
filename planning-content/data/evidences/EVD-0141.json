@@ -41,7 +41,8 @@
       "cell-windows-24": "job 107664902432, 1630 tests / 1629 pass / 0 fail / 1 skipped",
       "cell-ubuntu-22": "job 107664902262, 1630 tests / 1620 pass / 0 fail / 10 skipped",
       "cell-ubuntu-24": "job 107664902382, 1630 tests / 1620 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass)",
-      "no-billable-request": "every request went to the loopback fixture"
+      "no-billable-request": "every request went to the loopback fixture",
+      "superseded-by": "EVD-0142 (2026-09-24). The review of 1d0ee30 found that the variable could change without confirmation (F11), that a failed save did not stop readiness (F12), that the declared route was not checked against Pi's (F13), and that no Pi process was started (F14). The design recorded here, a separate writer on the grant, was removed."
     },
     "omissions": [
       {

@@ -1,0 +1,72 @@
+{
+  "id": "EVD-0142",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a custom-provider project's credential variable is confirmed, kept, checked against Pi's route, and the project starts and stops for real",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0072, toward ACC-0116, which is left not-evaluated for review. It supersedes EVD-0141's design, which the review of 1d0ee30 rejected on four findings. The implementation is 8db3f35 and fc7d72b, with the schema wording in 19e487c. F11, CONFIRMED WITH THE MODEL. For a custom provider the declared variable is part of the model-use choice. Setup's confirmation prints \"Key from: the environment variable NAME\" before the operator answers, and the grant is recorded with that name. A different variable for the same model makes the old grant stale: it is cleared and asked for again. The silent writer EVD-0141 described (recordCredentialVar) is removed. Launch does not know the name, so its grant check does not compare it; it reads the name from the grant. F12, KEPT OR REFUSED. Before the live check, setup refuses (exit 13, declaration-not-remembered) unless this host's grant stands granted and carries exactly the declared name. Measured by setting up a project, then tracking its consent record in Git: the rerun refused, and the provider received no second request. F13, PI'S ROUTE. After consent, setup and launch both read Pi's models.json for the selected provider and refuse unless its apiKey is a reference to exactly the declared variable. Setup refuses with exit 13 (declared-route-mismatch), before the preflight, so EXIT.UNUSABLE stays unobserved through setup as EVD-0139 states. Launch refuses with exit 2 (credential-route-mismatch). The refusal carries a code (different-variable, not-a-variable, provider-absent, models-unreadable) and never a value: with a literal key in models.json, the key appears nowhere in the output. F14, STARTS. test/custom-provider-start.test.mjs replaces nothing. Real setup runs as a process with --credential-var against TSK-0062's fixture. Then the real bin/start-kiln.mjs runs its launch checks, which pass on the record for kiln-fixture fixture-model (thinking off). It starts the real shell, which is identity-confirmed ready, and the real pinned Pi. Pi's input is a pipe: on the pinned Pi, with no TTY, it reads its input to the end and runs it as one prompt. The one line written reached the fixture as one authorised request for fixture-model, offering Kiln's tools, including kiln_project_status. Pi printed the provider's answer and exited 0. The supervisor reported \"stopped (agent-exit)\" with the launcher tree stopped, the command exited 0, and nothing answered on its port afterwards. The run holds the .next build lock and is bounded at five minutes. CONTROLS. Five mutations, each failing its case, with every file restored byte-identically: the variable dropped from the staleness rule (F11); the keep check disabled (F12); setup's route check disabled (F13); launch's route check disabled (F13); launch's reading of the declaration disabled (F14, the real start).",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0072, commits 8db3f35 and fc7d72b, schema wording 19e487c; builds on c3c8fd0 and 8ab0b16",
+      "bin/setup.mjs": "sha256:98272a33aeee74dfb516df9ac498a66b23d65e05769482108471d70d68a77a40",
+      "bin/start-kiln.mjs": "sha256:e179986090c47a51db966fd6396704f3aeb219b333799f55eb9b3d20fb7911ff",
+      "lib/consent-record.mjs": "sha256:f51c538141a92c5243d4423807762af59c585d9f7a37283666cf08ef321f81be",
+      "lib/launch-checks.mjs": "sha256:4bae7e752ef78f40e0569b121e35affe7f11d7806b3befef79f950c09afc0237",
+      "lib/model-selection.mjs": "sha256:91e80cf3efbe6a8716f6248137195efd9b9a14cb15ba0a8a8a5cf58987fc8a38",
+      "lib/pi-provider-credentials.mjs": "sha256:2e7743304951391c2b45467016e7b08abce632dbf42d1089bbb4d53c397dfc53",
+      "schemas/runtime/consent.schema.json": "sha256:d05b18e447f53837bde69ece661f121c57a4aa4976507585b99c4d5de38834ad",
+      "test/consent-record.test.mjs": "sha256:6873a584d0ea0f942a9a08fc4e7ef9c887298bf8f68638612cb4d15d37c9113a",
+      "test/setup-command.test.mjs": "sha256:081f1a7e53a6477b5ec15ff99c77096d5f2ff0a218408e11f670274355f0a8d4",
+      "test/custom-provider-start.test.mjs": "sha256:8cabeddc7b4e9c47e81e12ee7d0f7312124535c5a0e9c7a6b9a1ee684f4bf870",
+      "test/helpers/provider-fixture.mjs": "sha256:17e5d915b4c5329d2774c017f77e906d94588a27550e1b340240152fc6a5cce2",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "cases": "setup-command: ACC-0116 (recorder launch, and the refusal without the key), TSK-0072 F11, F12, F13; consent-record: TSK-0072 grant through a named variable; custom-provider-start: ACC-0116 real start",
+      "real-start-local": "Windows, 21.3 s: launch checks passed on the record; shell identity-confirmed ready; one authorised request carrying the prompt, offering Kiln's tools; Pi exit 0; supervisor stopped (agent-exit), launcher tree stopped; command exit 0; port not answering afterwards",
+      "mutations": "five, each failing its case, files restored byte-identically",
+      "full-suite-local": "node --test on Windows with this code: 1634 tests, 0 failures outside the real-project handoff test, 5 skipped. That test failed only while an unapproved draft task sat in the working tree (DEC-0015) and passed with it set aside. An earlier run failed launcher.test.mjs on a vpw-launch directory left by a scratch experiment force-killed on Windows; once it was removed, the launcher test passed, and no run of the new test leaves one.",
+      "plan-lint": "no findings",
+      "ci-run": "GitHub Actions run 36017066917 at fc7d72b, attempt 1, no job re-run, all four cells succeeded; every TSK-0072 and ACC-0116 case passed in every cell",
+      "cell-windows-22": "job 107692206685, 1634 tests / 1633 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 107692207177, 1634 tests / 1633 pass / 0 fail / 1 skipped; real start 26.5 s",
+      "cell-ubuntu-22": "job 107692206858, 1634 tests / 1624 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 107692207025, 1634 tests / 1624 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass); real start 13.7 s",
+      "no-billable-request": "every request went to the loopback fixture"
+    },
+    "omissions": [
+      {
+        "fact": "interactive-terminal",
+        "state": "not-captured",
+        "reason": "Pi's input was a pipe, so Pi ran the input as one prompt; an interactive terminal session is TSK-0063's to observe."
+      },
+      {
+        "fact": "custom-override",
+        "state": "not-captured",
+        "reason": "A one-run override of the model has no grant and so no declaration, so a custom provider cannot be used as a one-run override. A declared limit of this criterion."
+      },
+      {
+        "fact": "custom-compat",
+        "state": "not-captured",
+        "reason": "A custom provider whose models.json sets compat fails setup's canary with canary-inputs-differ. A follow-up task for it is drafted and awaits review; until it is committed, nothing owns it."
+      },
+      {
+        "fact": "junction-entry-point",
+        "state": "not-captured",
+        "reason": "Observed on the way: run through a .planning junction on Windows, bin/setup.mjs and bin/start-kiln.mjs exit 0 without running, because each entry-point guard compares the junction path with the resolved module URL. The tests run the checkout's own paths. Not owned by this task."
+      }
+    ]
+  }
+}
