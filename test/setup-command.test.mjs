@@ -1509,7 +1509,8 @@ test("⚠️ readiness is what the record says on disk, not what the writer repo
 
 test("⚠️ the live check is given this host's saved credential, and a recovery file is never trusted for what it prints", async () => {
   // Two production paths that no earlier control reached.
-  const { canaryRequest, readJournal, resumeCommand: resume } = await import("../bin/setup.mjs");
+  const { readJournal, resumeCommand: resume } = await import("../bin/setup.mjs");
+  const { canaryRequest } = await import("../lib/launch-checks.mjs");
 
   // ⚠️ **THE SAVED CREDENTIAL REACHES THE CHECK.** Pi authenticates a provider from its stored auth.json as
   // readily as from the environment; a canary run against an empty store would fail a model that works on this
@@ -1645,7 +1646,7 @@ test("⚠️ a host authenticated by an environment variable is not handed a sto
   // The canary refuses a stored path that is not there, and a host authenticated by a variable commonly has no
   // auth.json at all — so always supplying one would fail a check whose credential never needed that file. What
   // decides is what the preflight found: the source that actually authenticates this selection.
-  const { canaryRequest } = await import("../bin/setup.mjs");
+  const { canaryRequest } = await import("../lib/launch-checks.mjs");
   const selection = { provider: "openai", model: "gpt-4o", thinkingLevel: "off" };
 
   assert.equal(
@@ -2223,7 +2224,7 @@ test("⚠️ D22 a built-in provider with unbounded configuration fails closed: 
   // then describes a request the child did not make, and this is what must happen next — a refusal, with
   // nothing recorded — rather than a record vouching for a request nobody made.
   const { computeCompatibilityKey, proofProblem } = await import("../lib/compatibility-record.mjs");
-  const { canaryRequest } = await import("../bin/setup.mjs");
+  const { canaryRequest } = await import("../lib/launch-checks.mjs");
 
   const selection = { provider: "openai", model: "gpt-4o", thinkingLevel: "off" };
   const asConfigured = {

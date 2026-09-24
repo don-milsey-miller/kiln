@@ -748,7 +748,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
        * the project has committed.
        */
       const declared = await tx.phase("declared-identities", () => declareIdentities({ tx, paths, args, print, modules, validators }));
-      const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(canaryRequest(ctx, preflight, custom)));
+      const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(modules.launch.canaryRequest(ctx, preflight, custom)));
       const compatibility = modules.compatibility.compatibilityLocationFrom(location);
       const live = await tx.phase("live-check", () =>
         modules.liveCheck.runLiveModelCheck({
@@ -1247,56 +1247,6 @@ export async function verifyRecorded({ compatibility, preflight, declared = {}, 
       { fields: differing }
     );
   return { key, record: found.record };
-}
-
-/**
- * What the live canary is asked to do: this run's selection, and where its credential lives.
- *
- * ⚠️ **THE SAVED CREDENTIAL HAS TO REACH THE CHECK, OR THE CHECK ANSWERS A DIFFERENT QUESTION.** Pi authenticates
- * a provider from its stored `auth.json` as readily as from the environment, and the preflight has just
- * established which source authenticates this selection. A canary given no auth path runs against an empty store,
- * so a model that works perfectly well on this computer fails a check that was never handed what makes it work.
- *
- * ⚠️ **AND PASSING THE PATH NARROWS RATHER THAN WIDENS.** The canary copies the SELECTED provider's entry alone
- * into its own isolated root; the child never sees the operator's file, and never sees another provider's
- * credential. That boundary is the canary's, measured in test/pi-provider-canary.test.mjs; this hands it the
- * file it narrows.
- *
- * @param {{selection: object, declared?: object}} ctx  what the live check passes its runner
- * @param {object} preflight  the zero-cost preflight's result, including the agent directory it resolved
- */
-export function canaryRequest(ctx, preflight, custom = null) {
-  // ⚠️ **ONLY WHEN THE PREFLIGHT SAID THE STORED FILE IS WHAT AUTHENTICATES THIS SELECTION.** The canary refuses a
-  // stored path that is not there, so a host authenticated by an environment variable — which commonly has no
-  // auth.json at all — would fail a check its credential never reached. The environment route needs nothing here:
-  // the canary builds its child's environment from the provider's declared names, which is its own boundary.
-  const stored = preflight.authSource === "stored" ? join(preflight.agentDir, "auth.json") : null;
-
-  // ⚠️ **A CUSTOM PROVIDER'S CHILD NEEDS TO KNOW WHERE THE PROVIDER IS, AND THAT IS NOT A CREDENTIAL.** The child
-  // runs against its own isolated agent directory, so nothing of the operator's `models.json` reaches it: without
-  // the endpoint and the model's shape it would resolve the id against Pi's built-in catalogue and check a
-  // different service. What crosses is exactly the non-credential half — the base URL, the API kind and the one
-  // model — taken from what the preflight resolved rather than re-derived here, so the check and the record
-  // describe the same request. The key itself never crosses: the canary writes the DECLARED NAME.
-  const config = custom === null ? null : providerConfigFor(preflight);
-  return {
-    ...ctx.selection,
-    declared: ctx.declared,
-    storedAuthPath: stored,
-    ...(custom === null ? {} : { custom, customProviderConfig: config }),
-  };
-}
-
-/** The non-credential half of the selected custom provider, as the canary's child needs it. */
-function providerConfigFor(preflight) {
-  const model = preflight.model ?? {};
-  const entry = { id: model.id };
-  // ⚠️ ONLY THE FIELDS THE CANARY ACCEPTS, and only when Pi resolved them: an undefined bound is not a bound, and
-  // the canary refuses a configuration carrying anything it does not know.
-  // ⚠️ INCLUDING `samplingParams`, WHICH IS PART OF THE REQUEST: without it the child sends something else, and
-  // the check would prove a request this project does not make. It is named by the declared identity in the key.
-  for (const key of ["name", "contextWindow", "maxTokens", "reasoning", "samplingParams"]) if (model[key] !== undefined) entry[key] = model[key];
-  return { baseUrl: preflight.effectiveBaseUrl, api: model.api, models: [entry] };
 }
 
 /**
