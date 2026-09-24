@@ -22,29 +22,36 @@ What you cannot do yet is hand the planning work to a packaged agent roster.
 
 ## Start a new project
 
-From an empty project directory:
+From an empty project directory, in a terminal:
 
 ```sh
 git init
 git clone https://github.com/don-milsey-miller/kiln.git .planning
 
-node .planning/bin/init-project.mjs \
-  --project-root . \
+node .planning/bin/setup.mjs \
   --name "My Project" \
   --description "What this project is intended to accomplish"
 
-npm --prefix .planning start
+node .planning/bin/start-kiln.mjs
 ```
 
-That creates your project's `planning-content/` directory beside the tool, adds `.planning/` to your
-`.gitignore`, and opens the workspace at <http://127.0.0.1:3000>.
+Setup installs Kiln's locked dependencies inside `.planning/` and creates your project's
+`planning-content/` beside it. It asks before each decision it needs from you: how to keep Kiln's
+local state out of your repository (adding `.planning/`, `.pi/sessions/` and `.pi/runtime/` to your
+`.gitignore`), whether to trust the project in Pi, whether Kiln may look at the models this computer
+has configured, which model to use, whether that model's use is confirmed, whether to enable web
+research, and whether to run the one live check that sends a model request. Each question has a flag
+for answering it in advance, such as `--state-protection fix-ignore` for the first;
+`node .planning/bin/setup.mjs --help` lists them. Running setup again with the same answers leaves a
+completed project's files unchanged.
 
-The initializer needs only Node's built-in modules, so it runs before Kiln's dependencies have been
-installed. It creates structure and nothing else — no planning artifacts, no stage approvals, no
-decisions — and it is safe to run again: a completed project is left untouched, and it will not
-overwrite anything you have written.
+`start-kiln.mjs` checks the recorded model, starts the workspace on loopback and prints its address,
+then gives the terminal to Pi. A new session opens with `/kiln-start`, which begins Stage 1 by asking
+one question about your project. Answer in the terminal and follow the workspace in the browser. Quit
+Pi with `/quit`; Kiln stops the workspace with it. Running `start-kiln.mjs` again resumes the same
+session.
 
-For options, exit codes, what gets created, and how reruns and refusals behave, see
+To create only the planning content and browse it without an agent, see
 [`docs/initializing-a-project.md`](docs/initializing-a-project.md).
 
 ## Requirements
@@ -58,9 +65,9 @@ require credentials for the configured search provider.
 
 ## First-run assumptions and current boundaries
 
-Kiln's current content initializer needs only Node's built-in modules. The planned Pi agent-delivery
-setup described in [`docs/agent-delivery-technical-proposal.md`](docs/agent-delivery-technical-proposal.md)
-has additional operating assumptions:
+Kiln's content initializer needs only Node's built-in modules. The Pi agent-delivery setup described
+in [`docs/agent-delivery-technical-proposal.md`](docs/agent-delivery-technical-proposal.md) has
+additional operating assumptions:
 
 - **Internet connectivity is assumed.** A normal first run must be able to clone Kiln from GitHub,
   install its locked npm dependencies, complete any provider authentication that requires a network,
