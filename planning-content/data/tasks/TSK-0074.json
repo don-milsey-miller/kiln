@@ -1,0 +1,23 @@
+{
+  "id": "TSK-0074",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Run the four entry-point commands when invoked through a linked .planning",
+  "statement": "Make `bin/setup.mjs`, `bin/start-kiln.mjs`, `bin/init-project.mjs` and `bin/generate-stage-skills.mjs` run their command when invoked through a `.planning` directory that is a link to the tool checkout. Each decides whether it is the entry point by comparing `pathToFileURL(process.argv[1]).href` with `import.meta.url`. Node resolves the main module's real path, so through a link the two differ, the command does not run, and the process exits 0. Importing any of the four as a module must still not run its command.",
+  "role": "platform",
+  "implements": [
+    "CMP-0039",
+    "CMP-0037",
+    "CMP-0022",
+    "CMP-0033"
+  ],
+  "fulfils": [
+    "REQ-0022"
+  ],
+  "acceptedBy": [
+    "ACC-0118"
+  ],
+  "notes": "Created 2026-09-24. Scope revised on review: the same guard is in all four commands, not only setup and launch. The link is a junction on Windows and a directory symlink on POSIX."
+}

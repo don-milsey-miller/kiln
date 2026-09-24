@@ -1,0 +1,19 @@
+{
+  "id": "ACC-0118",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The four entry-point commands run through a linked .planning and not on import",
+  "statement": "With `.planning` a junction to the tool checkout on Windows and a directory symlink on POSIX, `bin/setup.mjs`, `bin/start-kiln.mjs`, `bin/init-project.mjs` and `bin/generate-stage-skills.mjs`, each invoked through the link, execute their command. Each run is asserted to have executed by an observable effect of that command, not by its exit status, so none of these linked invocations exits 0 without running. Importing each of the four as a module runs no command. Verified on Windows and the supported POSIX CI platform.",
+  "evaluates": [
+    "CMP-0039",
+    "CMP-0037",
+    "CMP-0022",
+    "CMP-0033"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

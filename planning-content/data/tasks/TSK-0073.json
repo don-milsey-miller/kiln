@@ -1,0 +1,24 @@
+{
+  "id": "TSK-0073",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "approved",
+  "lifecycle": "active",
+  "title": "Give the live canary's child the compat configuration Pi resolves for a custom provider",
+  "statement": "Carry the `compat` configuration Pi resolves for the selected custom-provider model into the live canary child's provider configuration, so the canary sends the request this project's Pi sends and the compatibility record describes that request. `customProviderConfig` in `lib/launch-checks.mjs` builds the child's configuration from the resolved model without `compat`, and `lib/pi-provider-canary.mjs` refuses a configuration that carries it, so a provider that declares `compat` is checked with a different request than the one it is launched with. Only the non-credential configuration crosses: `apiKey`, `headers`, `authHeader` and any credential-bearing nested value stay out of the child.",
+  "role": "platform",
+  "implements": [
+    "CMP-0030"
+  ],
+  "fulfils": [
+    "REQ-0025",
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0117"
+  ],
+  "dependsOn": [
+    "TSK-0072"
+  ],
+  "notes": "Created 2026-09-24. Commit 8ab0b16 removed `compat` from the TSK-0062 provider fixture because the canary could not carry it to its child. The compatibility key already includes the resolved `compat` through `projectRequestProfile`, so a changed `compat` already changes the key. What is missing is that the canary's proof is taken with `compat` absent, so a record can claim a request profile the canary did not send. Pi merges `compat` from the provider block, the model definition and `modelOverrides`, so the child receives the merged value Pi resolved, not a re-derivation from `models.json`."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0117",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "The live canary sends a custom provider's resolved compat configuration and nothing credential-bearing",
+  "statement": "For a custom provider whose `models.json` declares `compat`, the live canary's child receives the `compat` configuration Pi resolves for the selected model. Measured against a local loopback provider: the request observed at the provider matches the request that configuration produces, and the compatibility record written from that run matches the same configuration. Controls: (1) changing `compat` after a passed canary makes the stored record fail to prove the next launch; (2) a configuration passed to the child that contains `apiKey`, `headers`, `authHeader` or a credential-bearing nested value is refused before any child is created, and the child's configuration file contains none of them.",
+  "evaluates": [
+    "CMP-0030"
+  ],
+  "verifies": [
+    "REQ-0025"
+  ]
+}
