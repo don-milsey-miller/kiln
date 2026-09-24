@@ -31,6 +31,7 @@ import { dirname, join, relative } from "node:path";
 
 import { FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
 import { findBrowser, launchBrowser, until } from "./helpers/browser.mjs";
+import { withBuildLock } from "./helpers/build-lock.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -187,123 +188,128 @@ test(
     const agentDir = join(base, "agent");
     let browser = null;
     try {
-      const source = trackedSnapshot(join(base, "tool-source"));
-      mkdirSync(project);
-      mkdirSync(agentDir);
-      writeFileSync(join(agentDir, "auth.json"), "{}");
-      writeFileSync(join(agentDir, "models.json"), JSON.stringify(modelsJson(fixture.url)));
-      const port = await freePort();
-      const env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PORT: String(port), [FIXTURE_KEY_VAR]: FIXTURE_KEY, PI_OFFLINE: "1" };
-      // ⚠️ THE CONTENT ROOT IS THE CONSUMER LAYOUT'S, resolved beside the clone as the README's operator gets it.
-      delete env.PLANNING_CONTENT_DIR;
+      // ⚠️ THE BUILD LOCK, FOR THE WHOLE JOURNEY. Its shell builds inside the clone, not this checkout's .next, but
+      // the launcher tests assert that no launcher's temporary directory exists anywhere once theirs has stopped, and
+      // every test that starts a launcher takes this lock so that no other launcher is running while they look.
+      await withBuildLock(async () => {
+        const source = trackedSnapshot(join(base, "tool-source"));
+        mkdirSync(project);
+        mkdirSync(agentDir);
+        writeFileSync(join(agentDir, "auth.json"), "{}");
+        writeFileSync(join(agentDir, "models.json"), JSON.stringify(modelsJson(fixture.url)));
+        const port = await freePort();
+        const env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PORT: String(port), [FIXTURE_KEY_VAR]: FIXTURE_KEY, PI_OFFLINE: "1" };
+        // ⚠️ THE CONTENT ROOT IS THE CONSUMER LAYOUT'S, resolved beside the clone as the README's operator gets it.
+        delete env.PLANNING_CONTENT_DIR;
 
-      // ---- the README's sequence --------------------------------------------------------------------------------
-      git(["init", "-q"], project);
-      git(["clone", "-q", source, ".planning"], project);
-      const setupArgs = [
-        join(".planning", "bin", "setup.mjs"),
-        ...["--name", NAME, "--description", DESCRIPTION, "--trust", "approve", "--inspect", "approve"],
-        ...["--provider", FIXTURE_PROVIDER, "--model", FIXTURE_MODEL, "--thinking", "off", "--model-use", "approve"],
-        ...["--research", "disabled", "--live-model-check", "approve", "--credential-var", FIXTURE_KEY_VAR, "--non-interactive"],
-        ...["--state-protection", "fix-ignore"],
-      ];
-      const setup = await node(setupArgs, { cwd: project, env, boundMs: LONG_MS });
-      assert.equal(setup.signal, null, `setup was killed at its bound: ${setup.out}`);
-      assert.equal(setup.status, 0, setup.out);
-      const contentRoot = join(project, "planning-content");
-      assert.ok(existsSync(join(contentRoot, "stages", "01-intake.md")), "setup created the Stage 1 document beside the clone");
-      assert.ok(existsSync(join(project, ".planning", "node_modules", "@earendil-works", "pi-coding-agent")), "setup installed the locked dependencies inside the clone");
-      const ignore = readFileSync(join(project, ".gitignore"), "utf8");
-      assert.match(ignore, /^\/?\.planning\/?$/m, `setup did not ignore .planning: ${ignore}`);
+        // ---- the README's sequence --------------------------------------------------------------------------------
+        git(["init", "-q"], project);
+        git(["clone", "-q", source, ".planning"], project);
+        const setupArgs = [
+          join(".planning", "bin", "setup.mjs"),
+          ...["--name", NAME, "--description", DESCRIPTION, "--trust", "approve", "--inspect", "approve"],
+          ...["--provider", FIXTURE_PROVIDER, "--model", FIXTURE_MODEL, "--thinking", "off", "--model-use", "approve"],
+          ...["--research", "disabled", "--live-model-check", "approve", "--credential-var", FIXTURE_KEY_VAR, "--non-interactive"],
+          ...["--state-protection", "fix-ignore"],
+        ];
+        const setup = await node(setupArgs, { cwd: project, env, boundMs: LONG_MS });
+        assert.equal(setup.signal, null, `setup was killed at its bound: ${setup.out}`);
+        assert.equal(setup.status, 0, setup.out);
+        const contentRoot = join(project, "planning-content");
+        assert.ok(existsSync(join(contentRoot, "stages", "01-intake.md")), "setup created the Stage 1 document beside the clone");
+        assert.ok(existsSync(join(project, ".planning", "node_modules", "@earendil-works", "pi-coding-agent")), "setup installed the locked dependencies inside the clone");
+        const ignore = readFileSync(join(project, ".gitignore"), "utf8");
+        assert.match(ignore, /^\/?\.planning\/?$/m, `setup did not ignore .planning: ${ignore}`);
 
-      const start = (input, boundMs) => node([join(".planning", "bin", "start-kiln.mjs")], { cwd: project, env, input: `${input}\n`, boundMs });
-      const attestations = () => fingerprint(join(contentRoot, "state", "stage-attestations"));
-      const checkRun = async (r, label) => {
-        assert.equal(r.signal, null, `${label} was killed at its bound: ${r.out}`);
-        assert.equal(r.status, 0, `${label}: ${r.out}`);
-        assert.match(r.stdout, /\[kiln\] ready — identity confirmed/, `${label}: ${r.out}`);
-        assert.match(r.stdout, new RegExp(`\\[kiln\\] run \\S+ · project \\S+ · http://127\\.0\\.0\\.1:${port}`), `${label} did not print the workspace address: ${r.out}`);
-        assert.match(r.stdout, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, `${label}: ${r.out}`);
-        assert.equal(r.stdout.includes("run file(s) from earlier runs"), false, `${label} found an earlier run's files left behind: ${r.out}`);
-        assert.equal(await answers(port), false, `${label}: something still answers on port ${port}`);
-        return /\[kiln\] session (\S+) \(([^)]*)\)/.exec(r.stdout)?.slice(1) ?? [null, null];
-      };
+        const start = (input, boundMs) => node([join(".planning", "bin", "start-kiln.mjs")], { cwd: project, env, input: `${input}\n`, boundMs });
+        const attestations = () => fingerprint(join(contentRoot, "state", "stage-attestations"));
+        const checkRun = async (r, label) => {
+          assert.equal(r.signal, null, `${label} was killed at its bound: ${r.out}`);
+          assert.equal(r.status, 0, `${label}: ${r.out}`);
+          assert.match(r.stdout, /\[kiln\] ready — identity confirmed/, `${label}: ${r.out}`);
+          assert.match(r.stdout, new RegExp(`\\[kiln\\] run \\S+ · project \\S+ · http://127\\.0\\.0\\.1:${port}`), `${label} did not print the workspace address: ${r.out}`);
+          assert.match(r.stdout, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, `${label}: ${r.out}`);
+          assert.equal(r.stdout.includes("run file(s) from earlier runs"), false, `${label} found an earlier run's files left behind: ${r.out}`);
+          assert.equal(await answers(port), false, `${label}: something still answers on port ${port}`);
+          return /\[kiln\] session (\S+) \(([^)]*)\)/.exec(r.stdout)?.slice(1) ?? [null, null];
+        };
 
-      // ---- run 1: /kiln-start reaches a Stage 1 question (ACC-0086) ------------------------------------------------
-      const before1 = fixture.requests.length;
-      const run1 = await start("/kiln-start", LONG_MS);
-      const [sessionId, state1] = await checkRun(run1, "run 1");
-      assert.equal(state1, "new, recorded", run1.out);
-      const turn1 = fixture.requests.slice(before1);
-      assert.equal(turn1.length, 2, `run 1 made ${turn1.length} provider requests, not two: ${run1.out}`);
-      assert.deepEqual(users(turn1[1].body), [startBody], "the first turn is Pi's own expansion of /kiln-start");
-      const status1 = JSON.parse(toolResults(turn1[1].body).at(-1));
-      assert.equal(status1.ok, true, JSON.stringify(status1));
-      assert.equal(status1.artifactCount, 0, JSON.stringify(status1));
-      assert.ok(JSON.stringify(status1.blockers).includes("Stage 01-intake"), JSON.stringify(status1));
-      assert.ok(run1.stdout.includes(Q1), `Pi did not print the Stage 1 question: ${run1.out}`);
+        // ---- run 1: /kiln-start reaches a Stage 1 question (ACC-0086) ------------------------------------------------
+        const before1 = fixture.requests.length;
+        const run1 = await start("/kiln-start", LONG_MS);
+        const [sessionId, state1] = await checkRun(run1, "run 1");
+        assert.equal(state1, "new, recorded", run1.out);
+        const turn1 = fixture.requests.slice(before1);
+        assert.equal(turn1.length, 2, `run 1 made ${turn1.length} provider requests, not two: ${run1.out}`);
+        assert.deepEqual(users(turn1[1].body), [startBody], "the first turn is Pi's own expansion of /kiln-start");
+        const status1 = JSON.parse(toolResults(turn1[1].body).at(-1));
+        assert.equal(status1.ok, true, JSON.stringify(status1));
+        assert.equal(status1.artifactCount, 0, JSON.stringify(status1));
+        assert.ok(JSON.stringify(status1.blockers).includes("Stage 01-intake"), JSON.stringify(status1));
+        assert.ok(run1.stdout.includes(Q1), `Pi did not print the Stage 1 question: ${run1.out}`);
 
-      // ---- run 2: the answer, written while the browser watches, then a refused advance (ACC-0087) ---------------
-      browser = await launchBrowser(browserPath);
-      const { page } = browser;
-      const stageUrl = `http://127.0.0.1:${port}/stage/01-intake`;
-      const seen = {};
-      hooks.beforeWrite = async () => {
-        await page.goto(stageUrl);
-        const ready = await until(page, PAGE_STATE, (s) => s?.stream === "live" && s.document === "01-intake.md", PAGE_MS);
-        seen.before = ready;
-        if (!ready.ok) throw new Error(`the stage page never showed a live stream and its document: ${JSON.stringify(ready.value)}`);
-        await page.eval("window.__kilnJourneyMark = true");
-        seen.navigationsBefore = page.events.filter((e) => e.method === "Page.frameNavigated").length;
-      };
-      hooks.afterWrite = async () => {
-        seen.after = await until(page, PAGE_STATE, (s) => s?.stream === "live" && !s.marked && s.text.includes(ANSWER), PAGE_MS);
-        seen.navigationsAfter = page.events.filter((e) => e.method === "Page.frameNavigated").length;
-      };
-      const attestationsBefore = attestations();
-      const before2 = fixture.requests.length;
-      const run2 = await start(ANSWER, RUN_MS);
-      const [id2, state2] = await checkRun(run2, "run 2");
-      assert.equal(state2, "resumed from the record", run2.out);
-      assert.equal(id2, sessionId, "run 2 resumed the exact recorded session");
+        // ---- run 2: the answer, written while the browser watches, then a refused advance (ACC-0087) ---------------
+        browser = await launchBrowser(browserPath);
+        const { page } = browser;
+        const stageUrl = `http://127.0.0.1:${port}/stage/01-intake`;
+        const seen = {};
+        hooks.beforeWrite = async () => {
+          await page.goto(stageUrl);
+          const ready = await until(page, PAGE_STATE, (s) => s?.stream === "live" && s.document === "01-intake.md", PAGE_MS);
+          seen.before = ready;
+          if (!ready.ok) throw new Error(`the stage page never showed a live stream and its document: ${JSON.stringify(ready.value)}`);
+          await page.eval("window.__kilnJourneyMark = true");
+          seen.navigationsBefore = page.events.filter((e) => e.method === "Page.frameNavigated").length;
+        };
+        hooks.afterWrite = async () => {
+          seen.after = await until(page, PAGE_STATE, (s) => s?.stream === "live" && !s.marked && s.text.includes(ANSWER), PAGE_MS);
+          seen.navigationsAfter = page.events.filter((e) => e.method === "Page.frameNavigated").length;
+        };
+        const attestationsBefore = attestations();
+        const before2 = fixture.requests.length;
+        const run2 = await start(ANSWER, RUN_MS);
+        const [id2, state2] = await checkRun(run2, "run 2");
+        assert.equal(state2, "resumed from the record", run2.out);
+        assert.equal(id2, sessionId, "run 2 resumed the exact recorded session");
 
-      assert.ok(seen.before?.ok, `the page before the write: ${JSON.stringify(seen.before)}`);
-      assert.equal(seen.before.value.text.includes(ANSWER), false, "the page showed the answer before it was written");
-      assert.ok(seen.after?.ok, `the page never showed the answer after the write: ${JSON.stringify(seen.after)}`);
-      assert.ok(seen.navigationsAfter > seen.navigationsBefore, "the page did not reload");
-      const turn2 = fixture.requests.slice(before2);
-      assert.equal(turn2.length, 3, `run 2 made ${turn2.length} provider requests, not three: ${run2.out}`);
-      const written = JSON.parse(toolResults(turn2[1].body).at(-1));
-      assert.equal(written.ok, true, `the typed write failed: ${JSON.stringify(written)}`);
-      assert.equal(written.path, "stages/01-intake.md");
-      const stageDoc = readFileSync(join(contentRoot, "stages", "01-intake.md"), "utf8");
-      assert.ok(stageDoc.includes(ANSWER) && stageDoc.includes(READING), "the answer and its reading are in the Stage 1 document");
-      const advance = JSON.parse(toolResults(turn2[2].body).at(-1));
-      assert.equal(advance.ok, false, `the unauthorised attestation was not refused: ${JSON.stringify(advance)}`);
-      assert.equal(advance.code, "operator-confirmation-not-granted", JSON.stringify(advance));
-      assert.deepEqual(changedBetween(attestationsBefore, attestations()), [], "an attestation changed");
-      assert.ok(run2.stdout.includes(Q2), `Pi did not print the next question: ${run2.out}`);
+        assert.ok(seen.before?.ok, `the page before the write: ${JSON.stringify(seen.before)}`);
+        assert.equal(seen.before.value.text.includes(ANSWER), false, "the page showed the answer before it was written");
+        assert.ok(seen.after?.ok, `the page never showed the answer after the write: ${JSON.stringify(seen.after)}`);
+        assert.ok(seen.navigationsAfter > seen.navigationsBefore, "the page did not reload");
+        const turn2 = fixture.requests.slice(before2);
+        assert.equal(turn2.length, 3, `run 2 made ${turn2.length} provider requests, not three: ${run2.out}`);
+        const written = JSON.parse(toolResults(turn2[1].body).at(-1));
+        assert.equal(written.ok, true, `the typed write failed: ${JSON.stringify(written)}`);
+        assert.equal(written.path, "stages/01-intake.md");
+        const stageDoc = readFileSync(join(contentRoot, "stages", "01-intake.md"), "utf8");
+        assert.ok(stageDoc.includes(ANSWER) && stageDoc.includes(READING), "the answer and its reading are in the Stage 1 document");
+        const advance = JSON.parse(toolResults(turn2[2].body).at(-1));
+        assert.equal(advance.ok, false, `the unauthorised attestation was not refused: ${JSON.stringify(advance)}`);
+        assert.equal(advance.code, "operator-confirmation-not-granted", JSON.stringify(advance));
+        assert.deepEqual(changedBetween(attestationsBefore, attestations()), [], "an attestation changed");
+        assert.ok(run2.stdout.includes(Q2), `Pi did not print the next question: ${run2.out}`);
 
-      // ---- run 3: the exchange continues in the same session -----------------------------------------------------
-      const before3 = fixture.requests.length;
-      const run3 = await start(FOLLOWUP, RUN_MS);
-      const [id3, state3] = await checkRun(run3, "run 3");
-      assert.equal(state3, "resumed from the record", run3.out);
-      assert.equal(id3, sessionId, "run 3 resumed the exact recorded session");
-      const turn3 = fixture.requests.slice(before3);
-      assert.equal(turn3.length, 2, `run 3 made ${turn3.length} provider requests, not two`);
-      assert.deepEqual(users(turn3[1].body), [startBody, ANSWER, FOLLOWUP], "the session carries every turn");
-      assert.ok(run3.stdout.includes(Q3), run3.out);
+        // ---- run 3: the exchange continues in the same session -----------------------------------------------------
+        const before3 = fixture.requests.length;
+        const run3 = await start(FOLLOWUP, RUN_MS);
+        const [id3, state3] = await checkRun(run3, "run 3");
+        assert.equal(state3, "resumed from the record", run3.out);
+        assert.equal(id3, sessionId, "run 3 resumed the exact recorded session");
+        const turn3 = fixture.requests.slice(before3);
+        assert.equal(turn3.length, 2, `run 3 made ${turn3.length} provider requests, not two`);
+        assert.deepEqual(users(turn3[1].body), [startBody, ANSWER, FOLLOWUP], "the session carries every turn");
+        assert.ok(run3.stdout.includes(Q3), run3.out);
 
-      // ---- setup again changes no byte of the project (ACC-0088) --------------------------------------------------
-      const projectBefore = fingerprint(project, project, new Set([".planning", ".git"]));
-      const again = await node(setupArgs, { cwd: project, env, boundMs: LONG_MS });
-      assert.equal(again.status, 0, again.out);
-      assert.deepEqual(changedBetween(projectBefore, fingerprint(project, project, new Set([".planning", ".git"]))), [], "setup's rerun changed the project");
-      assert.equal(git(["status", "--porcelain"], join(project, ".planning")), "", "the clone's tracked files changed");
+        // ---- setup again changes no byte of the project (ACC-0088) --------------------------------------------------
+        const projectBefore = fingerprint(project, project, new Set([".planning", ".git"]));
+        const again = await node(setupArgs, { cwd: project, env, boundMs: LONG_MS });
+        assert.equal(again.status, 0, again.out);
+        assert.deepEqual(changedBetween(projectBefore, fingerprint(project, project, new Set([".planning", ".git"]))), [], "setup's rerun changed the project");
+        assert.equal(git(["status", "--porcelain"], join(project, ".planning")), "", "the clone's tracked files changed");
 
-      // The outer repository still has no commit: nothing in the journey committed on the operator's behalf.
-      assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: project }).status, 0, "a commit was made in the operator's repository");
+        // The outer repository still has no commit: nothing in the journey committed on the operator's behalf.
+        assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: project }).status, 0, "a commit was made in the operator's repository");
+      });
     } finally {
       if (browser) await browser.close();
       await fixture.close();
