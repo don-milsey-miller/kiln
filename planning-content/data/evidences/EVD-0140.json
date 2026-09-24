@@ -33,7 +33,11 @@
       "no-billable-request": "the fixture binds 127.0.0.1 only and its key is a placeholder no service accepts",
       "full-suite-local": "node --test on Windows: 1628 tests, 1623 pass, 0 fail, 5 skipped. The run before it had one failure, the real-project handoff test, because TSK-0072 was draft and DEC-0015 blocks handoff on an unreviewed task; it passed once TSK-0072 was approved.",
       "plan-lint": "no findings over 517 artifacts",
-      "ci-run": "not yet run; recorded after the push"
+      "ci-run": "GitHub Actions run 36001340544 at 083d6a6, attempt 1, no job re-run, all four cells succeeded, 0 failures in any cell; test/provider-fixture.test.mjs ran in every cell",
+      "cell-windows-22": "job 107638454890, 1628 tests / 1627 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 107638455110, 1628 tests / 1627 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 107638454941, 1628 tests / 1618 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 107638455156, 1628 tests / 1618 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass)"
     },
     "omissions": [
       {
@@ -45,11 +49,6 @@
         "fact": "stage-1-exchange",
         "state": "not-captured",
         "reason": "The fixture can emit any named tool call with any arguments, but no Kiln session was driven through it here. TSK-0063 drives the Stage 1 exchange."
-      },
-      {
-        "fact": "posix-platform",
-        "state": "not-captured",
-        "reason": "Measured locally on Windows only; the CI run covers Ubuntu."
       }
     ]
   }
