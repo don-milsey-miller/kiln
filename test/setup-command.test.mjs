@@ -2427,17 +2427,17 @@ test("⚠️ ACC-0084 each refusal class exits with its own published code, obse
   assert.equal(new Set(byClass.values()).size, byClass.size, `two classes arrived as one code: ${[...byClass]}`);
 
   /**
-   * ⚠️ **WHAT THIS MATRIX DOES NOT REACH, SAID HERE RATHER THAN LEFT TO BE INFERRED.** ACC-0084 names ten
-   * classes, and two of them are not setup's to raise:
+   * ⚠️ **WHAT THIS MATRIX DOES NOT REACH, SAID HERE RATHER THAN LEFT TO BE INFERRED.** Two codes in the
+   * published mapping are not setup's to raise:
    *
    * • `EXIT.UNUSABLE` — the preflight's `LaunchRefusal`. In THIS command the selection phase refuses first
    *   in every case that would reach it: an unavailable model is offered for reselection, a model this host
    *   declined leaves setup partial (measured above), and a provider with no contract is a credential refusal.
-   *   It is reached by `bin/start-kiln.mjs`, which has no selection phase in front of it.
-   * • Launch failure — the launcher's, for the same reason.
+   * • Launch failure — raised on the way to a running Kiln, which has no selection phase in front of it.
    *
-   * Both remain in the published mapping, and the mapping is checked against the classes below, so neither is
-   * unpublished; what is declared is that this file does not observe them through `bin/setup.mjs`.
+   * ACC-0084 was amended to `bin/setup.mjs` on that basis and names neither; a criterion against CMP-0037, the
+   * combined runtime supervisor that raises them, is owed. Both codes stay in setup's mapping and are checked
+   * below, so neither is unpublished — what is declared is that this file does not observe them.
    */
   const { exitFor } = await import("../bin/setup.mjs");
   for (const [name, code] of [["LaunchRefusal", EXIT.UNUSABLE]]) {
