@@ -252,9 +252,15 @@ for (const mode of ["natural", "interrupt"]) {
 
     assert.ok(record, "the run must record an observation whether it completed or refused");
 
+    // ⚠️ F130: WHETHER EACH KNOWN DESCENDANT WAS STILL RUNNING WHEN THE SUPERVISOR RETURNED, read at once and before
+    // any assertion, so a shutdown reported unobserved says whether something it could not verify was in fact alive.
+    const aliveAtReturn = Object.fromEntries(
+      ["launcherChild", "agentChild"].map((k) => [k, existsSync(paths[k]) ? { pid: readJson(paths[k]).pid, alive: pidAlive(readJson(paths[k]).pid) } : null])
+    );
+
     // ⚠️ THE RECORD IS PRINTED SO A CI LOG CARRIES IT. The assertions below are the gate; this is
     // what a person reads when one of them fails on a platform they do not have.
-    console.log(`\n[evidence ${process.platform}/${mode}]\n${JSON.stringify({ delivery, ...record }, null, 2)}\n`);
+    console.log(`\n[evidence ${process.platform}/${mode}]\n${JSON.stringify({ delivery, aliveAtReturn, ...record }, null, 2)}\n`);
 
     if (delivery.how === "console-ctrl-event") {
       assert.equal(delivery.isolated, true, "the event must have gone to a console holding only the supervisor");
