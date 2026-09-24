@@ -712,16 +712,37 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // contracts; anything else needs the operator to say which variable carries its key, by name. Without that
       // this refuses, which is the honest answer: a contract Kiln invented would be a guess about somebody's
       // credential.
-      // ⚠️ **AND WHAT WAS DECLARED IS REMEMBERED FOR THIS HOST (TSK-0072)**, on the model-use grant, so launch
-      // resolves the contract setup proved and a later setup run need not be told again.
-      const credentialVar = args.credentialVar ?? modules.consent.declaredCredentialVar(location, selection.selection, { validators });
+      // ⚠️ **AND WHAT WAS DECLARED WAS CONFIRMED WITH THE MODEL (TSK-0072).** The model phase disclosed the variable in
+      // its confirmation and recorded it on this host's grant, so launch resolves the contract setup proved.
+      const isCustom = !modules.credentials.supportedProviders().includes(selection.selection.provider);
+      const credentialVar = isCustom ? (args.credentialVar ?? modules.consent.declaredCredentialVar(location, selection.selection, { validators })) : null;
       const custom = credentialVar ? { id: selection.selection.provider, apiKey: `$${credentialVar}` } : null;
-      const contract = await tx.phase("credential-contract", async () => {
+      const contract = await tx.phase("credential-contract", () => {
         const resolved = modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom });
-        if (args.credentialVar && !modules.credentials.supportedProviders().includes(selection.selection.provider)) {
-          const kept = await modules.consent.recordCredentialVar(location, { model: selection.selection, credentialVar: args.credentialVar }, { validators });
-          if (!kept.written && kept.reason !== "unchanged")
-            print(`credential variable ${args.credentialVar} was not remembered on this computer (${kept.reason}); launch will not find it`);
+        if (custom) {
+          const { CONTRACT_REFUSAL, CredentialContractRefusal } = modules.credentials;
+          const { declaredRouteProblem } = modules.launch;
+          const named = `${selection.selection.provider} ${selection.selection.model}`;
+          // ⚠️ A DECLARATION LAUNCH CANNOT FIND IS NOT READY, SO NOTHING BILLABLE IS SENT FOR IT.
+          const { standing } = modules.consent.peekGrant(location, modules.consent.GRANT.MODEL_USE, { model: selection.selection }, { validators });
+          const kept = modules.consent.declaredCredentialVar(location, selection.selection, { validators });
+          if (standing !== modules.consent.STANDING.GRANTED || kept !== credentialVar)
+            throw new CredentialContractRefusal(
+              CONTRACT_REFUSAL.NOT_REMEMBERED,
+              `The variable ${credentialVar} for ${named} was not remembered on this computer, so a launch would have no ` +
+                `declaration for it. Nothing was sent to the provider.${selection.notRemembered ? `
+${selection.notRemembered}` : ""}`,
+              { provider: selection.selection.provider }
+            );
+          // ⚠️ AND IT IS THE ROUTE PI TAKES: `models.json` must read the key from the same variable.
+          const route = declaredRouteProblem({ agentDir, provider: selection.selection.provider, name: credentialVar });
+          if (route)
+            throw new CredentialContractRefusal(
+              CONTRACT_REFUSAL.ROUTE_MISMATCH,
+              `Pi's models.json does not read ${named}'s key from ${credentialVar}, the variable declared for it (${route}). ` +
+                `Correct models.json, or run setup again with --credential-var naming the variable it reads. Nothing was sent to the provider.`,
+              { provider: selection.selection.provider, route }
+            );
         }
         return resolved;
       });
@@ -1065,6 +1086,12 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
     confirmation: args.modelUse === undefined ? undefined : args.modelUse === "approve",
     settings: { stateMode: selectionStateMode, skillsEntry },
     validators,
+    // ⚠️ A CUSTOM PROVIDER'S VARIABLE IS CONFIRMED WITH THE MODEL (TSK-0072): the flag, else the one this host's grant
+    // was given through. A built-in provider has none.
+    credentialFor: (s) =>
+      modules.credentials.supportedProviders().includes(s.provider)
+        ? undefined
+        : (args.credentialVar ?? modules.consent.declaredCredentialVar(location, s, { validators })),
   });
 }
 

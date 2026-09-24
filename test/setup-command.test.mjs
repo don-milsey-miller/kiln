@@ -1862,6 +1862,112 @@ test("⚠️ ACC-0116 a project set up with a custom provider starts, and refuse
   }
 });
 
+/**
+ * A project whose Pi knows only TSK-0062's fixture, and the fixture answering the canary. `apiKey` is what Pi's
+ * `models.json` says the key is, so a case can make Pi's route differ from the declared one.
+ */
+async function fixtureProject({ apiKey } = {}) {
+  const fx = await import("./helpers/provider-fixture.mjs");
+  const echo = (request) => ({ toolCalls: [{ name: "kiln_preflight", arguments: { challenge: /[0-9a-f]{32}/.exec(JSON.stringify(request.messages))?.[0] ?? "absent" } }] });
+  const fixture = await fx.startProviderFixture({ script: [echo] });
+  const p = project({ ignored: true, models: false });
+  const models = (key) => {
+    const config = fx.modelsJson(fixture.url);
+    if (key !== undefined) config.providers[fx.FIXTURE_PROVIDER].apiKey = key;
+    writeFileSync(join(p.agentDir, "models.json"), JSON.stringify(config));
+  };
+  models(apiKey);
+  const pick = ["--provider", fx.FIXTURE_PROVIDER, "--model", fx.FIXTURE_MODEL, "--thinking", "off"];
+  const close = async () => {
+    await fixture.close();
+    rmSync(p.root, { recursive: true, force: true });
+  };
+  return { fx, fixture, p, models, pick, close };
+}
+
+test("⚠️ TSK-0072 F11 the credential variable is disclosed before confirmation, and a new one is confirmed again", async () => {
+  const { fx, fixture, p, pick, close } = await fixtureProject({ apiKey: "$KILN_FIXTURE_OTHER_KEY" });
+  const env = { [fx.FIXTURE_KEY_VAR]: fx.FIXTURE_KEY, KILN_FIXTURE_OTHER_KEY: fx.FIXTURE_KEY };
+  const confirmations = (o) => o.seen.asks.filter((q) => /^Use this model for this project/.test(q));
+  try {
+    const first = await setup(p, ["--credential-var", "KILN_FIXTURE_OTHER_KEY"], { pick, env, canary: null, liveCheck: "approve" });
+    assert.equal(first.code, EXIT.OK, first.printed.concat(first.warned).join("\n"));
+    assert.equal(confirmations(first).length, 1);
+    assert.match(confirmations(first)[0], /Key from: the environment variable KILN_FIXTURE_OTHER_KEY/, "the variable was not disclosed before confirmation");
+
+    // The same model through a different variable: the old grant goes, and the new name is asked about by name.
+    const changed = await setup(p, ["--credential-var", fx.FIXTURE_KEY_VAR], { pick: [], env, canary: null, liveCheck: "approve", answers: [[/^Use this model/i, "no"]] });
+    assert.equal(confirmations(changed).length, 1, "a new credential variable was used without confirmation");
+    assert.match(confirmations(changed)[0], new RegExp(`Key from: the environment variable ${fx.FIXTURE_KEY_VAR}`));
+    assert.notEqual(changed.code, EXIT.OK, "a declined change left the project ready");
+    const { consentLocation, readConsent } = await import("../lib/consent-record.mjs");
+    const use = readConsent(consentLocation({ projectRoot: p.dir })).record?.modelUse ?? null;
+    assert.ok(use === null || use.granted === false, `the grant for the old variable survived the change: ${JSON.stringify(use)}`);
+    assert.equal(fixture.requests.length, 1, "the declined change contacted the provider");
+  } finally {
+    await close();
+  }
+});
+
+test("⚠️ TSK-0072 F12 a declaration this computer cannot keep refuses before the live check", async () => {
+  const { fx, fixture, p, pick, close } = await fixtureProject();
+  const env = { [fx.FIXTURE_KEY_VAR]: fx.FIXTURE_KEY };
+  try {
+    const first = await setup(p, ["--credential-var", fx.FIXTURE_KEY_VAR], { pick, env, canary: null, liveCheck: "approve" });
+    assert.equal(first.code, EXIT.OK, first.printed.concat(first.warned).join("\n"));
+    assert.equal(fixture.requests.length, 1);
+
+    // ⚠️ THEN GIT TRACKS THE CONSENT RECORD, which is never trusted or written again: the model is confirmed for this
+    // run only, and the grant with its variable cannot be kept. The compatibility record still matches, so without
+    // this refusal setup would call the project ready although no launch could find the declaration.
+    execFileSync("git", ["add", "-f", ".pi/runtime/consent.json"], { cwd: p.dir });
+    const o = await setup(p, ["--credential-var", fx.FIXTURE_KEY_VAR], { pick: [], env, canary: null, liveCheck: "approve" });
+    const all = o.printed.concat(o.warned).join("\n");
+    assert.equal(o.code, EXIT.CREDENTIALS, all);
+    assert.ok(all.includes(`The variable ${fx.FIXTURE_KEY_VAR} for ${fx.FIXTURE_PROVIDER} ${fx.FIXTURE_MODEL} was not remembered on this computer`), all);
+    assert.equal(fixture.requests.length, 1, "a declaration launch cannot find was proved with a billable request");
+  } finally {
+    await close();
+  }
+});
+
+test("⚠️ TSK-0072 F13 the declared variable must be the one Pi's models.json reads, at setup and at launch", async () => {
+  const LITERAL = "kiln-fixture-LITERAL-KEY-9c41";
+  const { fx, fixture, p, models, pick, close } = await fixtureProject({ apiKey: "$KILN_FIXTURE_OTHER_KEY" });
+  const env = { [fx.FIXTURE_KEY_VAR]: fx.FIXTURE_KEY, KILN_FIXTURE_OTHER_KEY: fx.FIXTURE_KEY };
+  const launch = (extra = {}) =>
+    spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "start-kiln", "capture-launch.mjs")], {
+      env: { ...process.env, PLANNING_CONTENT_DIR: p.contentRoot, PI_CODING_AGENT_DIR: p.agentDir, KILN_CAPTURE_LAUNCH: "1", KILN_CAPTURE_REAL_CHECKS: "1", ...env, ...extra },
+      encoding: "utf-8",
+      cwd: ROOT,
+    });
+  try {
+    // Setup: Pi reads KILN_FIXTURE_OTHER_KEY, the declaration names another. Refused before anything is sent.
+    const mismatched = await setup(p, ["--credential-var", fx.FIXTURE_KEY_VAR], { pick, env, canary: null, liveCheck: "approve" });
+    assert.equal(mismatched.code, EXIT.CREDENTIALS, mismatched.printed.concat(mismatched.warned).join("\n"));
+    assert.ok(mismatched.warned.join("\n").includes(`key from ${fx.FIXTURE_KEY_VAR}, the variable declared for it (different-variable)`), mismatched.warned.join("\n"));
+    assert.equal(fixture.requests.length, 0);
+
+    // Made to agree, setup completes; then Pi's route is changed under a proved project, and launch refuses.
+    models(undefined);
+    const proved = await setup(p, ["--credential-var", fx.FIXTURE_KEY_VAR, "--resume"], { pick, env, canary: null, liveCheck: "approve" });
+    assert.equal(proved.code, EXIT.OK, proved.printed.concat(proved.warned).join("\n"));
+    assert.equal(launch().status, 0, "the agreeing project did not start");
+
+    for (const [key, route] of [["$KILN_FIXTURE_OTHER_KEY", "different-variable"], [LITERAL, "not-a-variable"]]) {
+      models(key);
+      const r = launch();
+      assert.equal(r.status, 2, `${route}: ${r.stdout}${r.stderr}`);
+      assert.equal(`${r.stdout}`.includes("KILN_LAUNCH "), false, `${route}: the supervisor was reached`);
+      assert.ok(`${r.stderr}`.includes(`does not read its key from the variable declared for it on this computer (${route})`), `${r.stderr}`);
+      assert.equal(`${r.stdout}${r.stderr}`.includes(LITERAL), false, "the refusal quoted models.json");
+    }
+    assert.equal(fixture.requests.length, 1, "a refused launch contacted the provider");
+  } finally {
+    await close();
+  }
+});
+
 test("⚠️ D22 a request Kiln cannot digest safely is proved only with a declared identity, and the record carries it", async () => {
   // ⚠️ **THE CONFIGURATION THAT HAS NO KEY WITHOUT A NAME.** Sampling parameters override named request
   // fields, so they are part of what a proof is about — and they are unbounded operator-authored values, which
