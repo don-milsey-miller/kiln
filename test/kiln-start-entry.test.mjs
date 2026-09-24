@@ -28,7 +28,13 @@ import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 import { START_PROMPT } from "../lib/supervisor.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
+/** The bound on one whole run: launch checks, the shell's build and start, Pi, and the supervisor's cleanup. */
 const BOUND_MS = 5 * 60_000;
+/**
+ * How long Pi has, once it has drawn its session, to settle. A new session settles when the provider has answered
+ * the start turn; a missing turn fails at this bound, not at BOUND_MS.
+ */
+const SETTLE_MS = 30_000;
 /** How long a resumed session is watched for a turn nobody typed, once Pi has drawn it. */
 const QUIET_MS = 5000;
 
@@ -70,28 +76,44 @@ const answers = (port) =>
 const quote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const plain = (s) => s.replace(/\x1b\][^\x07]*\x07/g, "").replace(/\x1b\[[0-9;?<>=]*[a-zA-Z~]/g, "").replace(/\r/g, "");
 
+/** Whether Pi has drawn its session: its footer names the model after the supervisor's session line. */
+const drawn = (out) => {
+  const at = out.indexOf("[kiln] session ");
+  return at >= 0 && out.indexOf(FIXTURE_MODEL, at) >= 0;
+};
+
 /**
- * The real launcher in a pseudo-terminal, quit by typing `/quit` once `ready(output)` says Pi has settled.
- * The quit is typed once only, and a run that never settles is killed at the bound and fails.
+ * The real launcher in a pseudo-terminal, quit by typing `/quit` once `settled(output)` says Pi has settled.
+ *
+ * ⚠️ **A RUN THAT DOES NOT SETTLE IS STILL QUIT, SETTLE_MS AFTER PI HAS DRAWN ITS SESSION,** and reported unsettled,
+ * so a missing turn fails in seconds and the supervisor still shuts down the way it does for an operator. BOUND_MS
+ * only kills a run that never draws a session or never stops.
  */
-function startInTerminal({ dir, env, ready, afterReadyMs }) {
+function startInTerminal({ dir, env, settled, afterSettledMs }) {
   return new Promise((done) => {
     const command = [process.execPath, join(ROOT, "bin", "start-kiln.mjs")].map(quote).join(" ");
     const child = spawn("script", ["-qfec", command, "/dev/null"], { cwd: dir, env, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
-    let quit = false;
+    let quit = null;
+    let settleTimer = null;
+    const typeQuit = (how, delay) => {
+      quit = how;
+      clearTimeout(settleTimer);
+      setTimeout(() => child.stdin.write("/quit\r"), delay);
+    };
     const onData = (d) => {
       output += d;
-      if (!quit && ready(plain(output))) {
-        quit = true;
-        setTimeout(() => child.stdin.write("/quit\r"), afterReadyMs);
-      }
+      if (quit !== null) return;
+      const out = plain(output);
+      if (settled(out)) return typeQuit("settled", afterSettledMs);
+      if (settleTimer === null && drawn(out)) settleTimer = setTimeout(() => quit === null && typeQuit("unsettled", 0), SETTLE_MS);
     };
     child.stdout.on("data", onData);
     child.stderr.on("data", onData);
     const bound = setTimeout(() => child.kill("SIGKILL"), BOUND_MS);
     child.on("close", (status, signal) => {
       clearTimeout(bound);
+      clearTimeout(settleTimer);
       done({ status, signal, output: plain(output), quit });
     });
   });
@@ -133,6 +155,9 @@ test(
         PORT: String(port),
         [FIXTURE_KEY_VAR]: FIXTURE_KEY,
         TERM: "xterm-256color",
+        // ⚠️ NO STARTUP DOWNLOADS. An interactive Pi fetches fd and ripgrep when it cannot find them; measured in WSL, a
+        // run that was downloading them when /quit was typed did not exit before the bound.
+        PI_OFFLINE: "1",
       };
 
       const setup = await run(
@@ -148,56 +173,59 @@ test(
       const afterSetup = fixture.requests.length;
       assert.equal(afterSetup, 1, "setup's live check made other than one request");
 
-      const [first, afterFirst, second] = await withBuildLock(async () => {
-        // ⚠️ THE FIRST RUN IS QUIT ONLY AFTER THE PROVIDER HAS ANSWERED THE START TURN AND PI HAS SHOWN THE ANSWER.
-        const one = await startInTerminal({
+      await withBuildLock(async () => {
+        // ---- the new session ----------------------------------------------------------------------
+        // ⚠️ QUIT ONCE THE PROVIDER HAS ANSWERED THE START TURN AND PI HAS SHOWN THE ANSWER, or SETTLE_MS after Pi drew
+        // its session if it never does, so a missing turn fails here in seconds.
+        const first = await startInTerminal({
           dir,
           env,
-          ready: (out) => fixture.requests.length > afterSetup && out.includes(FIXTURE_DONE),
-          afterReadyMs: 1500,
+          settled: (out) => fixture.requests.length > afterSetup && out.includes(FIXTURE_DONE),
+          afterSettledMs: 1500,
         });
-        const count = fixture.requests.length;
-        // ⚠️ THE RESUME IS WATCHED FOR QUIET_MS AFTER PI HAS DRAWN THE SESSION, THEN QUIT. Anything sent in that
-        // window was sent by nobody the operator could see.
-        const two = await startInTerminal({
+        const afterFirst = fixture.requests.length;
+        const firstOut = first.output;
+        assert.match(firstOut, /\[kiln\] ready — identity confirmed/, firstOut);
+        const newId = /\[kiln\] session (\S+) \(new, recorded\)/.exec(firstOut)?.[1];
+        assert.ok(newId, `the first run did not record a new session: ${firstOut}`);
+        assert.ok(firstOut.includes(`new session: Pi opens it with ${START_PROMPT}`), firstOut);
+        const turns = fixture.requests.slice(afterSetup, afterFirst);
+        assert.equal(turns.length, 1, `the first run made ${turns.length} provider requests, not one (Pi ${first.quit ?? "never drew its session"}): ${firstOut}`);
+        assert.equal(first.quit, "settled", `Pi did not show the provider's answer within ${SETTLE_MS} ms: ${firstOut}`);
+        const [turn] = turns;
+        assert.deepEqual(userText(turn.body), [startBody], "the one user turn is Pi's own expansion of /kiln-start, byte for byte");
+        assert.ok(turn.authorized, "the request carried the declared variable's key");
+        assert.ok(offered(turn.body).includes("kiln_project_status"), `Kiln's tools were not offered: ${offered(turn.body)}`);
+        assert.match(firstOut, /\[kiln\] the agent exited \(code 0\)/, firstOut);
+        assert.match(firstOut, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, firstOut);
+        assert.equal(first.signal, null, `the first run was killed at its bound: ${firstOut}`);
+        assert.equal(first.status, 0, firstOut);
+        assert.equal(await answers(port), false, `something still answers on port ${port} after the first run`);
+
+        // ---- the resume ---------------------------------------------------------------------------
+        // ⚠️ WATCHED FOR QUIET_MS AFTER PI HAS DRAWN THE RESUMED CONVERSATION, THEN QUIT. Anything sent in that window
+        // was sent by nobody the operator could see.
+        const second = await startInTerminal({
           dir,
           env,
-          ready: (out) => /\[kiln\] session \S+ \(resumed from the record\)/.test(out) && out.includes(FIXTURE_MODEL) && out.lastIndexOf(FIXTURE_DONE) > out.indexOf("resumed from the record"),
-          afterReadyMs: QUIET_MS,
+          settled: (out) => {
+            const at = out.indexOf("(resumed from the record)");
+            return at >= 0 && drawn(out) && out.indexOf(FIXTURE_DONE, at) >= 0;
+          },
+          afterSettledMs: QUIET_MS,
         });
-        return [one, count, two];
+        const secondOut = second.output;
+        assert.equal(second.quit, "settled", `the resumed conversation was never drawn: ${secondOut}`);
+        const resumedId = /\[kiln\] session (\S+) \(resumed from the record\)/.exec(secondOut)?.[1];
+        assert.equal(resumedId, newId, "the rerun resumed the exact session the first run recorded");
+        assert.equal(secondOut.includes(`opens it with ${START_PROMPT}`), false, secondOut);
+        assert.equal(fixture.requests.length, afterFirst, `the resume sent ${fixture.requests.length - afterFirst} request(s) nobody typed`);
+        assert.match(secondOut, /\[kiln\] the agent exited \(code 0\)/, secondOut);
+        assert.match(secondOut, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, secondOut);
+        assert.equal(second.signal, null, `the resume was killed at its bound: ${secondOut}`);
+        assert.equal(second.status, 0, secondOut);
+        assert.equal(await answers(port), false, `something still answers on port ${port} after the resume`);
       });
-
-      // ---- the new session ------------------------------------------------------------------------
-      const firstOut = first.output;
-      assert.match(firstOut, /\[kiln\] ready — identity confirmed/, firstOut);
-      const newId = /\[kiln\] session (\S+) \(new, recorded\)/.exec(firstOut)?.[1];
-      assert.ok(newId, `the first run did not record a new session: ${firstOut}`);
-      assert.ok(firstOut.includes(`new session: Pi opens it with ${START_PROMPT}`), firstOut);
-      const turns = fixture.requests.slice(afterSetup, afterFirst);
-      assert.equal(turns.length, 1, `the first run made ${turns.length} provider requests, not one: ${firstOut}`);
-      const [turn] = turns;
-      assert.deepEqual(userText(turn.body), [startBody], "the one user turn is Pi's own expansion of /kiln-start, byte for byte");
-      assert.ok(turn.authorized, "the request carried the declared variable's key");
-      assert.ok(offered(turn.body).includes("kiln_project_status"), `Kiln's tools were not offered: ${offered(turn.body)}`);
-      assert.match(firstOut, /\[kiln\] the agent exited \(code 0\)/, firstOut);
-      assert.match(firstOut, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, firstOut);
-      assert.equal(first.signal, null, `the first run was killed at its bound: ${firstOut}`);
-      assert.equal(first.status, 0, firstOut);
-      assert.equal(await answers(port), false, `something still answers on port ${port} after the first run`);
-
-      // ---- the resume --------------------------------------------------------------------------------
-      const secondOut = second.output;
-      assert.ok(second.quit, `the resumed session was never drawn: ${secondOut}`);
-      const resumedId = /\[kiln\] session (\S+) \(resumed from the record\)/.exec(secondOut)?.[1];
-      assert.equal(resumedId, newId, "the rerun resumed the exact session the first run recorded");
-      assert.equal(secondOut.includes(`opens it with ${START_PROMPT}`), false, secondOut);
-      assert.equal(fixture.requests.length, afterFirst, `the resume sent ${fixture.requests.length - afterFirst} request(s) nobody typed`);
-      assert.match(secondOut, /\[kiln\] the agent exited \(code 0\)/, secondOut);
-      assert.match(secondOut, /\[kiln\] stopped \(agent-exit\) — stop sent: true, stdin end requested: true, launcher exit observed: true, launcher tree stopped: true/, secondOut);
-      assert.equal(second.signal, null, `the resume was killed at its bound: ${secondOut}`);
-      assert.equal(second.status, 0, secondOut);
-      assert.equal(await answers(port), false, `something still answers on port ${port} after the resume`);
     } finally {
       await fixture.close();
       rmSync(root, { recursive: true, force: true });
