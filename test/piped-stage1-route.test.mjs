@@ -161,6 +161,7 @@ test("⚠️ TSK-0063 without a terminal, piped /kiln-start reaches Stage 1 and 
     });
   } finally {
     await fixture.close();
-    rmSync(root, { recursive: true, force: true });
+    // F11 (EVD-0144): the same bounded wait as ACC-0116's cleanup, at most 15.3 s for a directory Windows still holds.
+    rmSync(root, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
   }
 });
