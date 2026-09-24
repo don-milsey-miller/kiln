@@ -235,6 +235,8 @@ test(
           const runDir = /run directory: (\S+)/.exec(r.out)?.[1];
           assert.ok(runDir, `${label}: the launcher did not report its run directory: ${r.out}`);
           assert.equal(existsSync(runDir), false, `${label} left its launcher's run directory behind: ${runDir}\n${r.out}`);
+          // ⚠️ AND IT WAS A STOP, NOT A KILL: neither the supervisor nor the launcher had to escalate (F15).
+          assert.equal(/did not exit within|escalating/.test(r.out), false, `${label} had to kill something to stop: ${r.out}`);
           assert.equal(await answers(port), false, `${label}: something still answers on port ${port}`);
           return /\[kiln\] session (\S+) \(([^)]*)\)/.exec(r.stdout)?.slice(1) ?? [null, null];
         };
@@ -280,6 +282,10 @@ test(
         assert.ok(seen.before?.ok, `the page before the write: ${JSON.stringify(seen.before)}`);
         assert.equal(seen.before.value.text.includes(ANSWER), false, "the page showed the answer before it was written");
         assert.ok(seen.after?.ok, `the page never showed the answer after the write: ${JSON.stringify(seen.after)}`);
+        // ⚠️ THE BROWSER WAS STILL OPEN AND SUBSCRIBED WHEN RUN 2 STOPPED, so the graceful stop checked above was made
+        // with a page connected (F15). It has since lost its stream because the server went away, not because it closed.
+        const afterStop = await until(page, PAGE_STATE, (st) => st !== null && st.stream !== "live", PAGE_MS);
+        assert.ok(afterStop.ok, `the page still reports a live stream after shutdown: ${JSON.stringify(afterStop.value)}`);
         assert.ok(seen.navigationsAfter > seen.navigationsBefore, "the page did not reload");
         const turn2 = fixture.requests.slice(before2);
         assert.equal(turn2.length, 3, `run 2 made ${turn2.length} provider requests, not three: ${run2.out}`);

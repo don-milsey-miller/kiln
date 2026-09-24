@@ -46,17 +46,43 @@ export async function launchBrowser(browserPath) {
     ...(process.platform === "linux" ? ["--no-sandbox"] : []),
     "about:blank",
   ];
-  const proc = spawn(browserPath, args, { stdio: ["ignore", "ignore", "ignore"] });
+  // ⚠️ ITS OWN PROCESS GROUP ON POSIX, so this browser's whole tree can be stopped without touching any other.
+  // Killing only the main process left its renderers writing into the profile, and removing it failed (F16).
+  const proc = spawn(browserPath, args, { stdio: ["ignore", "ignore", "ignore"], detached: process.platform !== "win32" });
+  let page = null;
   const close = async () => {
-    if (proc.exitCode === null) {
-      if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
-      else proc.kill("SIGKILL");
-      await new Promise((r) => (proc.exitCode !== null ? r() : proc.once("exit", r)));
+    try {
+      page?.close();
+    } catch {
+      /* already closed */
+    }
+    if (process.platform === "win32") {
+      if (proc.exitCode === null && proc.signalCode === null) spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      try {
+        process.kill(-proc.pid, "SIGKILL");
+      } catch {
+        /* the group is already gone */
+      }
+    }
+    if (proc.exitCode === null && proc.signalCode === null) await new Promise((r) => proc.once("exit", r));
+    // ⚠️ THE GROUP, NOT JUST ITS LEADER: wait until no process of this browser's group remains, within a bound.
+    if (process.platform !== "win32") {
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        try {
+          process.kill(-proc.pid, 0);
+        } catch {
+          break;
+        }
+        if (Date.now() > deadline) throw new Error(`the browser's process group ${proc.pid} did not exit`);
+        await sleep(100);
+      }
     }
     rmSync(profile, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
   };
   try {
-    const page = await attachToPage(profile);
+    page = await attachToPage(profile);
     return { page, close };
   } catch (e) {
     await close();
