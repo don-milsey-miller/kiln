@@ -213,6 +213,7 @@ const VALUED = new Set([
   "--credential-var",
   "--endpoint-identity",
   "--request-identity",
+  "--state-protection",
 ]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
@@ -246,6 +247,7 @@ export function parseArgs(argv) {
     if (flag === "--research") out.research = value;
     if (flag === "--live-model-check") out.liveModelCheck = value;
     if (flag === "--credential-var") out.credentialVar = value;
+    if (flag === "--state-protection") out.stateProtection = value;
   }
   if (out.localState !== "project" && out.localState !== "user") return { error: choiceRefusal("--local-state", ["project", "user"]) };
   // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
@@ -267,6 +269,11 @@ export function parseArgs(argv) {
   // approval — the same rule as --trust and --live-model-check.
   if (out.modelUse !== undefined && out.modelUse !== "approve" && out.modelUse !== "deny")
     return { error: choiceRefusal("--model-use", ["approve", "deny"]) };
+  // ⚠️ **ONLY THE CHOICE THIS SLICE CAN APPLY.** The state-protection question also offers `user-state` and `stop`;
+  // the first is not built and the second is what omitting the flag already does without a terminal, so neither is
+  // accepted here. Whether `fix-ignore` is available is the project's answer, checked after the install.
+  if (out.stateProtection !== undefined && out.stateProtection !== "fix-ignore")
+    return { error: choiceRefusal("--state-protection", ["fix-ignore"]) };
   if (out.research !== undefined && out.research !== "tavily" && out.research !== "disabled")
     return { error: choiceRefusal("--research", ["tavily", "disabled"]) };
   // ⚠️ THE ONE CHECK THAT COSTS MONEY IS SPELLED OUT, BOTH WAYS. It sends a request to the selected provider, so
@@ -546,19 +553,34 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
   if (!covers.covered) {
     const decided = modules.localState.openStateRoot({ projectRoot: paths.projectRoot, mode: stateMode, projectId });
     const options = decided.options ?? [];
-    if (args.nonInteractive)
+    if (args.stateProtection !== undefined) {
+      // ⚠️ **THE FLAG ANSWERS THE SAME QUESTION, WITH THE SAME OPTIONS.** It is accepted only when the check offers
+      // that choice as available, and its plan is applied inside the transaction exactly as a typed answer's is.
+      const chosen = options.find((o) => o.id === args.stateProtection);
+      if (!chosen || chosen.available !== true)
+        throw new SetupCommandRefusal(
+          EXIT.STATE,
+          `--state-protection ${args.stateProtection} cannot protect this project's runtime state: ` +
+            `${chosen?.unavailableBecause ?? "that choice is not offered here"}. Nothing was written.\n${renderChoices(options)}`,
+          { chosen: args.stateProtection, options: options.map((o) => o.id) }
+        );
+      print(`runtime state will be protected by ${chosen.id}, as --state-protection chose`);
+      coverageFix = chosen.plan;
+    } else if (args.nonInteractive) {
       throw new SetupCommandRefusal(EXIT.STATE, `${decided.refusal.message}\n${renderChoices(options)}`, { options: options.map((o) => o.id) });
-    print(decided.refusal.message);
-    print(renderChoices(options));
-    const answer = await ask(`Which? (${options.map((o) => o.id).join(", ")}) `);
-    const chosen = options.find((o) => o.id === String(answer ?? "").trim());
-    if (!chosen || chosen.id === "stop" || chosen.available !== true)
-      throw new SetupCommandRefusal(EXIT.STATE, `Nothing was written. ${chosen?.unavailableBecause ?? "Setup stopped without protecting the runtime state."}`, {
-        chosen: chosen?.id ?? null,
-      });
-    if (chosen.id !== "fix-ignore")
-      throw new SetupCommandRefusal(EXIT.STATE, `The "${chosen.id}" choice is not part of this slice. Nothing was written.`, { chosen: chosen.id });
-    coverageFix = chosen.plan;
+    } else {
+      print(decided.refusal.message);
+      print(renderChoices(options));
+      const answer = await ask(`Which? (${options.map((o) => o.id).join(", ")}) `);
+      const chosen = options.find((o) => o.id === String(answer ?? "").trim());
+      if (!chosen || chosen.id === "stop" || chosen.available !== true)
+        throw new SetupCommandRefusal(EXIT.STATE, `Nothing was written. ${chosen?.unavailableBecause ?? "Setup stopped without protecting the runtime state."}`, {
+          chosen: chosen?.id ?? null,
+        });
+      if (chosen.id !== "fix-ignore")
+        throw new SetupCommandRefusal(EXIT.STATE, `The "${chosen.id}" choice is not part of this slice. Nothing was written.`, { chosen: chosen.id });
+      coverageFix = chosen.plan;
+    }
   }
 
   // ⚠️ **FOUND BEFORE THE PLAN, SO THE PLAN CAN CONTAIN THEM.** A stage document written before the `## Intake`
@@ -1186,6 +1208,8 @@ export function usage() {
     "  --endpoint-identity <url>        a non-secret URL naming an endpoint Kiln cannot identify on its own",
     "  --request-identity <label>       a non-secret label for request configuration Kiln cannot digest safely;",
     "                                   without these two, such a model has no compatibility key and is not ready",
+    "  --state-protection fix-ignore    protect runtime state without a prompt by adding Kiln's marked block to",
+    "                                   .gitignore; nothing is written when the project is already protected",
     "  --non-interactive                never ask; refuse rather than assume",
     "  --resume                         continue a run that was interrupted",
     "  --help                           this text",

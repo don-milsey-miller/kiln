@@ -3305,3 +3305,42 @@ test("⚠️ a recovery that cannot be proved safe stops the command and names t
     rmSync(p.root, { recursive: true, force: true });
   }
 });
+
+test("⚠️ TSK-0063 --state-protection fix-ignore answers the coverage question without a prompt, only when fix-ignore is available, and writes nothing once protected", async () => {
+  // Checked with the other arguments, before anything is installed: only the choice this slice applies is taken.
+  assert.equal(parseArgs(["--state-protection", "fix-ignore"]).stateProtection, "fix-ignore");
+  for (const bad of ["user-state", "stop", "yes"]) assert.ok(parseArgs(["--state-protection", bad]).error, `--state-protection ${bad} was accepted`);
+
+  // A fresh repository, nobody to ask: the flag is the answer, and the owner's own block is written.
+  const p = project();
+  try {
+    const o = await setup(p, ["--non-interactive", "--state-protection", "fix-ignore"]);
+    assert.notEqual(o.code, EXIT.STATE, [...o.printed, ...o.warned].join("\n"));
+    assert.equal(o.seen.asks.length, 0, "a non-interactive run asked");
+    assert.ok(o.printed.includes("runtime state will be protected by fix-ignore, as --state-protection chose"), o.printed.join("\n"));
+    const ignore = readFileSync(join(p.dir, ".gitignore"));
+    assert.equal(ignore.toString("utf-8").includes(blockText()), true, "the block is not what was written");
+
+    // Already protected: the same flag causes no write.
+    const again = await setup(p, ["--non-interactive", "--state-protection", "fix-ignore"]);
+    assert.notEqual(again.code, EXIT.STATE, [...again.printed, ...again.warned].join("\n"));
+    assert.equal(again.printed.some((l) => l.startsWith("runtime state will be protected")), false, "a protected project was protected again");
+    assert.ok(readFileSync(join(p.dir, ".gitignore")).equals(ignore), "the ignore file changed");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // An edited Kiln block is the operator's decision, so fix-ignore is not available and the flag cannot take it.
+  const q = project();
+  try {
+    const edited = blockText().replace(".pi/runtime/", ".pi/runtime-edited/");
+    writeFileSync(join(q.dir, ".gitignore"), edited);
+    const o = await setup(q, ["--non-interactive", "--state-protection", "fix-ignore"]);
+    assert.equal(o.code, EXIT.STATE, [...o.printed, ...o.warned].join("\n"));
+    assert.ok(o.warned.some((l) => l.includes("--state-protection fix-ignore cannot protect this project's runtime state")), o.warned.join("\n"));
+    assert.equal(readFileSync(join(q.dir, ".gitignore"), "utf-8"), edited, "the refusal changed the ignore file");
+    assert.equal(existsSync(join(q.dir, ".pi")), false, "runtime data was written before the refusal");
+  } finally {
+    rmSync(q.root, { recursive: true, force: true });
+  }
+});
