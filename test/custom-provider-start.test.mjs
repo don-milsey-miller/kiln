@@ -175,8 +175,7 @@ test("⚠️ ACC-0116 a custom-provider project starts for real, answers through
       }
       record.removedAfterMs = removedAfterMs;
       if (removedAfterMs === null) record.atGiveUp = snap();
-      appendFileSync(process.env.F11_OUT ?? "f11-events.jsonl", JSON.stringify(record) + "
-");
+      appendFileSync(process.env.F11_OUT ?? "f11-events.jsonl", JSON.stringify(record) + "\n");
       throw e;
     }
   }

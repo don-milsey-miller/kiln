@@ -1,5 +1,5 @@
-# F11 DIAGNOSTIC BRANCH ONLY. Never merged. Measures what holds a custom-provider project's directory after the
-# real launcher stops, on the Windows cells where ACC-0116's cleanup failed with EBUSY.
+# F11 DIAGNOSTIC BRANCH ONLY. Never merged. The full suite, repeated on Windows, with ACC-0116's cleanup instrumented:
+# on EBUSY it records handle owners, the process table and the time until the directory can be removed.
 name: CI
 
 on:
@@ -7,14 +7,14 @@ on:
 
 jobs:
   f11:
-    name: ${{ matrix.os }} · node ${{ matrix.node }} · f11
-    runs-on: ${{ matrix.os }}
+    name: windows · node ${{ matrix.node }} · f11 ${{ matrix.attempt }}
+    runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
         node: ["22", "24"]
+        attempt: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -26,20 +26,12 @@ jobs:
         run: |
           Invoke-WebRequest -Uri https://live.sysinternals.com/handle64.exe -OutFile "$env:RUNNER_TEMP\handle64.exe"
           "HANDLE_EXE=$env:RUNNER_TEMP\handle64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Alone, 6 iterations per mode
-        run: node tools/diag/f11-cleanup.mjs 6 f11-alone.json
-      - name: Beside the full suite, 6 iterations per mode
-        shell: pwsh
-        run: |
-          $suite = Start-Process -FilePath cmd -ArgumentList '/c','npm test > suite.log 2>&1' -PassThru -NoNewWindow
-          node tools/diag/f11-cleanup.mjs 6 f11-loaded.json
-          $suite.WaitForExit()
-          Select-String -Path suite.log -Pattern '^# (tests|pass|fail)|^not ok' | ForEach-Object { $_.Line }
+          "F11_OUT=$env:GITHUB_WORKSPACE\f11-events.jsonl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run the test suite
+        run: npm test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: f11-node${{ matrix.node }}
-          path: |
-            f11-alone.json
-            f11-loaded.json
-            suite.log
+          name: f11-node${{ matrix.node }}-${{ matrix.attempt }}
+          path: f11-events.jsonl
+          if-no-files-found: ignore
