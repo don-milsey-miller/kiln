@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A project set up with a custom provider starts",
   "statement": "A project whose recorded selection is a custom provider, set up with its credential declaration, passes the launch checks and starts through `bin/start-kiln.mjs` with Pi held to that selection. With the declared credential variable absent, the same launch refuses and names the recorded provider and model. Measured by running the command against a non-billable local provider.",
   "evaluates": [
@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0025"
+  ],
+  "notes": "PASS 2026-09-24 on EVD-0142, accepted on review. The real bin/start-kiln.mjs, with nothing replaced, started a project set up against TSK-0062's loopback provider with --credential-var: the launch checks passed on setup's record, the shell was identity-confirmed ready, and the started Pi sent one authorised request for the recorded model, offering Kiln's tools, then exited 0 and the supervisor stopped everything with nothing left serving. With the declared variable empty the same launch exited 2, refusing by provider and model, and reached no supervisor. CI runs 36017066917 (fc7d72b) and 36019484188 (c9d7dd9) passed all four cells. Pi's input was a pipe: an interactive terminal session is not covered here and remains TSK-0063's. A custom provider cannot be a one-run override, a declared limit of this criterion.",
+  "evidencedBy": [
+    "EVD-0142"
   ]
 }
