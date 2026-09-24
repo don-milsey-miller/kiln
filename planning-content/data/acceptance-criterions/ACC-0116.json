@@ -13,8 +13,9 @@
   "verifies": [
     "REQ-0025"
   ],
-  "notes": "PASS 2026-09-24 on EVD-0142, accepted on review. The real bin/start-kiln.mjs, with nothing replaced, started a project set up against TSK-0062's loopback provider with --credential-var: the launch checks passed on setup's record, the shell was identity-confirmed ready, and the started Pi sent one authorised request for the recorded model, offering Kiln's tools, then exited 0 and the supervisor stopped everything with nothing left serving. With the declared variable empty the same launch exited 2, refusing by provider and model, and reached no supervisor. CI runs 36017066917 (fc7d72b) and 36019484188 (c9d7dd9) passed all four cells. Pi's input was a pipe: an interactive terminal session is not covered here and remains TSK-0063's. A custom provider cannot be a one-run override, a declared limit of this criterion.",
+  "notes": "PASS 2026-09-24 on EVD-0142, accepted on review. The real bin/start-kiln.mjs, with nothing replaced, started a project set up against TSK-0062's loopback provider with --credential-var: the launch checks passed on setup's record, the shell was identity-confirmed ready, and the started Pi sent one authorised request for the recorded model, offering Kiln's tools, then exited 0 and the supervisor stopped everything with nothing left serving. With the declared variable empty the same launch exited 2, refusing by provider and model, and reached no supervisor. CI runs 36017066917 (fc7d72b) and 36019484188 (c9d7dd9) passed all four cells. Pi's input was a pipe: an interactive terminal session is not covered here and remains TSK-0063's. A custom provider cannot be a one-run override, a declared limit of this criterion. F11, 2026-09-24 (EVD-0144): the test's cleanup failed with EBUSY on Windows Node 22 in CI runs 36040353843 and 36040712503 after every assertion had passed. Measured on a diagnostic branch: in two captured events no Kiln process was alive and no handle was found, and the directory was removable within 8.1 s. The pass stands. The test's cleanup now waits at most 15.3 s.",
   "evidencedBy": [
-    "EVD-0142"
+    "EVD-0142",
+    "EVD-0144"
   ]
 }

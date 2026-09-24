@@ -1,0 +1,45 @@
+{
+  "id": "EVD-0144",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: F11, a Windows CI temporary project refused removal after a clean shutdown with no Kiln process alive",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "F11. ACC-0116's test failed on windows-latest Node 22 in CI runs 36040353843 (5a15594) and 36040712503 (280557e). Every assertion passed, including the supervisor's clean agent-exit shutdown and the free port, and the test's own cleanup then failed with EBUSY on rmdir of the temporary project directory. The code under test was the same as at 009a16e, where it passed. It was measured on branch diag/f11-cleanup, never merged. ISOLATED: tools/diag/f11-cleanup.mjs ran ACC-0116's flow 48 times on windows-latest (Node 22.23.2 and 24.20.0; alone and beside a concurrent full suite; with and without PI_OFFLINE=1), run 36042628514: every removal succeeded on the first attempt, the port never answered and Pi downloaded nothing. IN THE SUITE: ACC-0116's cleanup was instrumented and the full suite repeated on windows-latest, 28 suite runs in runs 36044328925 (Node 22 and 24, 4 each), 36045505107 (Node 22, 10) and 36046760284 (Node 22, 10). Two EBUSY events, both in 36045505107 on Node 22, both on the project directory, 12.7 s and 11.8 s after the launch began. In each, the full process table (Win32_Process, with parents and command lines) listed no Kiln process created since the launch, only other tests' python and git children and Windows services, and Sysinternals handle64 found no handle under the temporary root. The directory was removed on the first retry, 6.9 s and 8.1 s after the failure. The process-table query ran first and took 6.9 s and 8.0 s, so the release time is bounded at 8.1 s or less and is not measured more precisely. The reordered batch (36046760284) that would have timed it captured no event. CONCLUSION: no surviving Kiln process was observed, so ACC-0081's and ACC-0116's shutdown verdicts stand, and the cleanup of ACC-0116's test and of test/piped-stage1-route.test.mjs now waits at most 15.3 s (rmSync maxRetries 17, retryDelay 100) before failing.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "failing-runs": "36040353843 job 107770702835 and 36040712503 job 107771906411, windows-latest Node 22, ACC-0116 cleanup EBUSY",
+      "isolated-run": "36042628514 at 4c7c818 (diag/f11-cleanup): 48 launches, 0 EBUSY",
+      "suite-runs": "36044328925 at 9dd463f (8 runs), 36045505107 at a0e098c (10 runs, 2 EBUSY, jobs f11 2 and f11 3), 36046760284 at 82c8a36 (10 runs, 0 EBUSY)",
+      "event-1": "rmdir project EBUSY 12,719 ms after launch; no Kiln process; handle64 no matching handles; removed 6,935 ms after the failure on the first retry",
+      "event-2": "rmdir project EBUSY 11,764 ms after launch; no Kiln process; handle64 no matching handles; removed 8,052 ms after the failure on the first retry",
+      "branch-only-failures": "every diagnostic suite run failed ACC-0066's CI-workflow check, because the branch replaced the workflow; one job (107792102267) failed the Windows interrupt platform evidence with shutdown-not-observed, the F130 watch item recorded on TSK-0058",
+      "no-billable-request": "every request went to the loopback fixture"
+    },
+    "omissions": [
+      {
+        "fact": "release-interval",
+        "state": "not-captured",
+        "reason": "Only bounded at 8.1 s or less: in both events the process-table query ran before the removal was retried. Measuring it precisely needs another instrumented batch that captures an event; tabled on 2026-09-24 until the remaining tasks are complete."
+      },
+      {
+        "fact": "defender-handles",
+        "state": "not-captured",
+        "reason": "handle64 cannot list handles held by protected processes such as Microsoft Defender, so a scanner holding the directory is neither shown nor ruled out."
+      }
+    ]
+  }
+}
