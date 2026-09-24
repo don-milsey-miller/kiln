@@ -2,15 +2,19 @@
   "id": "ACC-0084",
   "type": "acceptance-criterion",
   "schemaVersion": 2,
-  "reviewStatus": "draft",
+  "reviewStatus": "amended",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
-  "title": "Each refusal class has a distinct published exit code",
-  "statement": "Invalid arguments, content conflict, filesystem or settings refusal, missing runtime, trust denial, interactive authentication required, provider or credential-contract failure, live compatibility refusal, package or capability failure, and launch failure each exit with their own code, and the mapping in `--help` matches the codes the tests observe.",
+  "outcome": "pass",
+  "title": "Each of the setup command's refusal classes has a distinct published exit code",
+  "statement": "For `bin/setup.mjs`: invalid arguments, a content conflict, a runtime that is not the pinned one, a failed bootstrap, runtime state that could not be protected, a file it owns that it cannot read, a trust denial, an answer that leaves setup partial, an interrupted run, a model that was not shown to work, a model that cannot be chosen or confirmed, a provider or credential-contract failure, a package or registration failure, a research refusal, a recovery that cannot be proved safe, and a computer with no authenticated provider each exit with their own code, and the mapping published by `--help` is the mapping the command returns, observed by running it.",
   "evaluates": [
     "CMP-0039"
   ],
   "verifies": [
     "REQ-0022"
+  ],
+  "notes": "PASS 2026-09-24 on EVD-0139, observed by running the command rather than by reading the table. Twenty scenarios are driven through `main()` and the code each returns is compared with what `--help` publishes: four kinds of bad argument, a project root that does not own the content, an install that is not the pin, a bootstrap that could not complete, a repository that does not ignore the runtime paths with nobody to ask, a settings file somebody broke, a package entry that cannot be proved, a project nobody trusts, a refused look at this computer, a refused billable check, an interrupted run nobody chose to continue, a model that did not pass the check, a model named but never confirmed, a model this computer declined, a provider Kiln has no contract for, research that cannot be turned back on safely, a recovery whose files only the operator may remove, and a computer with no provider connected. Scenarios are grouped by class, so several bad arguments are one code while two different instructions may not share one, and every code observed is asserted to be published with a meaning. AUTHENTICATION BECAME ITS OWN CLASS WHILE MEASURING THIS: \"connect a provider in Pi\" cannot be answered by rerunning with flags, and arriving as the selection code would have a script retry forever, so it is exit 18.\n\n⚠️ AMENDED 2026-09-24 TO THE COMMAND IT EVALUATES (D3). This criterion evaluates CMP-0039, the setup command, and its original wording also named launch failure and the unusable-selection class. Neither can be observed through `bin/setup.mjs`: the selection phase refuses first in every case that would reach the preflight's `LaunchRefusal`, and launch failure belongs to `bin/start-kiln.mjs` altogether. Leaving the criterion open on classes another command owns would have kept it open forever while telling nobody where the gap was. Both codes remain in setup's published mapping, which is checked here; what moved is WHERE THEY ARE MEASURED. The launcher's refusal classes and their codes are owed their own criterion against CMP-0020, recorded on TSK-0037 and on CMP-0020, and are not evaluated by this one — so no record yet claims the launcher's codes are distinct or published.",
+  "evidencedBy": [
+    "EVD-0139"
   ]
 }

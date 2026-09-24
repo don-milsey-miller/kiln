@@ -2309,6 +2309,70 @@ test("⚠️ ACC-0084 each refusal class exits with its own published code, obse
   // ⚠️ **AUTHENTICATION IS ITS OWN CLASS, WHICH ACC-0084 NAMES.** "Choose a model" and "connect a provider
   // in Pi" are different instructions: the first can be answered with flags, the second cannot be answered by
   // this command at all. A host with nothing configured gets the second.
+  // ⚠️ THE CLASSES THAT NEED THE PROJECT PUT IN A PARTICULAR STATE FIRST, each one a state an operator
+  // can actually arrive in: a settings file somebody broke, a run that was interrupted, a provider Kiln has no
+  // contract for, and a consent record a colleague committed.
+  await run("a file setup owns that it cannot read", EXIT.SETUP, (p) => {
+    mkdirSync(join(p.dir, ".pi"), { recursive: true });
+    writeFileSync(join(p.dir, ".pi", "settings.json"), "{ this is not settings");
+    return setup(p);
+  });
+  await run("a package entry that cannot be proved", EXIT.REGISTRATION, (p) => {
+    // The link Kiln registers itself through, pointing somewhere that is not this checkout: the portable entry
+    // is written only after it is proved to resolve to the canonical package directory, and here it cannot be.
+    rmSync(join(p.dir, ".planning"), { recursive: true, force: true });
+    mkdirSync(join(p.root, "not-kiln"), { recursive: true });
+    symlinkSync(join(p.root, "not-kiln"), join(p.dir, ".planning"), process.platform === "win32" ? "junction" : "dir");
+    return setup(p);
+  });
+  await run("an interrupted run nobody chose to continue", EXIT.INTERRUPTED, async (p) => {
+    const first = await setup(p, ["--inspect", "deny"]);
+    assert.equal(first.code, EXIT.CONSENT, first.warned.join("\n"));
+    writeFileSync(join(p.dir, ".pi", "runtime", "setup-transaction.json"), JSON.stringify({
+      recordVersion: 1,
+      startedAt: new Date().toISOString(),
+      projectRoot: p.dir,
+      phases: [{ name: "trust", status: "running" }],
+      resumeCommand: "node .planning/bin/setup.mjs --resume",
+    }));
+    return setup(p);
+  });
+  await run("a provider Kiln has no contract for", EXIT.CREDENTIALS, (p) => {
+    writeFileSync(join(p.agentDir, "auth.json"), "{}");
+    return setup(p, [], { pick: ["--provider", "kiln-local", "--model", "kiln-plain", "--thinking", "off"] });
+  });
+  // ⚠️ THE STATE THE RUNTIME DIRECTORY IS IN, which is its own class: what could not be protected was not
+  // written. A project whose repository does not ignore the runtime paths, and nobody to ask about it.
+  await run("runtime state that could not be protected", EXIT.STATE, () => {
+    const bare = project();
+    return setup(bare, ["--non-interactive", "--project-root", bare.dir]).finally(() => rmSync(bare.root, { recursive: true, force: true }));
+  });
+
+  // ⚠️ AND A RECOVERY THAT CANNOT BE PROVED SAFE, which is the lock's own class: the files another run left
+  // are the operator's to remove, and this run says which.
+  await run("a recovery that cannot be proved safe", EXIT.LOCK_RECOVERY, (p) => {
+    const gone = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf-8" });
+    const owner = JSON.stringify({ pid: Number(gone.stdout), hostname: hostname() });
+    const lock = join(p.dir, ".planning-init.lock");
+    const stale = Date.now() / 1000 - 600;
+    for (const path of [lock, `${lock}.breaking`, `${lock}.breaking.reclaim`]) {
+      writeFileSync(path, owner);
+      utimesSync(path, stale, stale);
+    }
+    return setup(p);
+  });
+
+  // ⚠️ AND THE RESEARCH CLASS, WHICH NEEDS A PROJECT SOMEBODY ELSE HAS ALREADY TOUCHED: turning research
+  // back on has to clear this host's earlier approval first, and it cannot clear one a colleague committed.
+  await run("research that cannot be turned back on safely", EXIT.RESEARCH, async (p) => {
+    const research = { tavily: "kiln-fake-tavily-key-4c7f", researchAdapter: { probe: async () => ({ ok: true, backend: "tavily", checkedWithoutSearching: true }) } };
+    const off = await setup(p, ["--research", "disabled"], research);
+    assert.equal(off.code, EXIT.OK, off.printed.concat(off.warned).join("\n"));
+    // A consent record in version control is one Kiln may not act on: it reached this clone from somewhere else.
+    execFileSync("git", ["add", "-f", ".pi/runtime/consent.json"], { cwd: p.dir });
+    execFileSync("git", ["-c", "user.email=t@example.test", "-c", "user.name=T", "commit", "-qm", "committed by a colleague"], { cwd: p.dir });
+    return setup(p, ["--research", "tavily"], research);
+  });
   await run("a computer with no provider connected", EXIT.AUTHENTICATION, (p) => {
     writeFileSync(join(p.agentDir, "auth.json"), "{}");
     writeFileSync(join(p.agentDir, "models.json"), JSON.stringify({ providers: {} }));
