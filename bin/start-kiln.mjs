@@ -266,9 +266,16 @@ export function withSelection(agent, selection) {
  * store exists. The environment is this process's, scoped by the canary to the provider's contract.
  */
 export function liveCanaryRunner() {
-  return ({ selection, agentDir, declared }) => {
+  // ⚠️ A CUSTOM PROVIDER ARRIVES WITH ITS DECLARATION AND ITS NON-CREDENTIAL CONFIGURATION (TSK-0072), both from the checks.
+  return ({ selection, agentDir, declared, custom = null, customProviderConfig = null }) => {
     const storedAuthPath = join(agentDir, "auth.json");
-    return runLiveCanary({ ...selection, storedAuthPath: existsSync(storedAuthPath) ? storedAuthPath : null, hostEnv: process.env, declared });
+    return runLiveCanary({
+      ...selection,
+      storedAuthPath: existsSync(storedAuthPath) ? storedAuthPath : null,
+      hostEnv: process.env,
+      declared,
+      ...(custom ? { custom, customProviderConfig } : {}),
+    });
   };
 }
 

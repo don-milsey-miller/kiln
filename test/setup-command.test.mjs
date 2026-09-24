@@ -1802,6 +1802,66 @@ test("⚠️ D25 a custom provider is declared, not guessed, and the real canary
   }
 });
 
+test("⚠️ ACC-0116 a project set up with a custom provider starts, and refuses by name without its key", async () => {
+  // ⚠️ **BOTH COMMANDS FOR REAL, AGAINST TSK-0062's FIXTURE.** Setup declares the variable and runs the real canary
+  // against the loopback provider; the real `bin/start-kiln.mjs`, with its real launch checks and only its supervisor
+  // replaced by a recorder, then has to find that declaration on its own. Nothing billable exists to reach.
+  const { FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } = await import("./helpers/provider-fixture.mjs");
+  const { consentLocation, readConsent } = await import("../lib/consent-record.mjs");
+  const echo = (request) => ({ toolCalls: [{ name: "kiln_preflight", arguments: { challenge: /[0-9a-f]{32}/.exec(JSON.stringify(request.messages))?.[0] ?? "absent" } }] });
+  const fixture = await startProviderFixture({ script: [echo] });
+  const p = project({ ignored: true, models: false });
+  const launch = (env) => {
+    const r = spawnSync(process.execPath, [join(ROOT, "test", "fixtures", "start-kiln", "capture-launch.mjs")], {
+      env: { ...process.env, PLANNING_CONTENT_DIR: p.contentRoot, PI_CODING_AGENT_DIR: p.agentDir, KILN_CAPTURE_LAUNCH: "1", KILN_CAPTURE_REAL_CHECKS: "1", ...env },
+      encoding: "utf-8",
+      cwd: ROOT,
+    });
+    const line = `${r.stdout}`.split("\n").find((l) => l.startsWith("KILN_LAUNCH "));
+    return { status: r.status, launch: line ? JSON.parse(line.slice("KILN_LAUNCH ".length)) : null, stdout: `${r.stdout}`, stderr: `${r.stderr}` };
+  };
+  const pick = ["--provider", FIXTURE_PROVIDER, "--model", FIXTURE_MODEL, "--thinking", "off"];
+  const keyed = { [FIXTURE_KEY_VAR]: FIXTURE_KEY };
+  const savedKey = process.env[FIXTURE_KEY_VAR];
+  delete process.env[FIXTURE_KEY_VAR];
+  try {
+    writeFileSync(join(p.agentDir, "models.json"), JSON.stringify(modelsJson(fixture.url)));
+    const o = await setup(p, ["--credential-var", FIXTURE_KEY_VAR], { pick, env: keyed, canary: null, liveCheck: "approve" });
+    assert.equal(o.code, EXIT.OK, o.printed.concat(o.warned).join("\n"));
+    assert.equal(fixture.requests.length, 1, `setup's canary made ${fixture.requests.length} requests`);
+
+    // ⚠️ THE NAME IS THIS HOST'S, ON THE GRANT, AND NOWHERE COMMITTED.
+    const consent = readConsent(consentLocation({ projectRoot: p.dir }));
+    assert.equal(consent.record?.modelUse?.credentialVar, FIXTURE_KEY_VAR, `the declaration was not remembered: ${JSON.stringify(consent)}`);
+    for (const committed of [join(p.dir, ".pi", "settings.json"), join(p.dir, ".pi", "kiln.json")])
+      assert.equal(readFileSync(committed, "utf-8").includes(FIXTURE_KEY_VAR), false, `${committed} carries the variable's name`);
+
+    // A later setup run is not told again, and reuses the record rather than asking the provider.
+    const again = await setup(p, [], { pick: [], env: keyed, canary: null, liveCheck: null });
+    assert.equal(again.code, EXIT.OK, again.printed.concat(again.warned).join("\n"));
+    assert.equal(fixture.requests.length, 1, "the rerun asked the provider again");
+
+    // ⚠️ THE LAUNCH: the project's own selection, proved by setup's record, and Pi held to it.
+    const started = launch(keyed);
+    assert.ok(started.launch, `the custom-provider project did not start: ${started.stdout}${started.stderr}`);
+    assert.deepEqual(started.launch.agentArgs.slice(-6), ["--provider", FIXTURE_PROVIDER, "--model", FIXTURE_MODEL, "--thinking", "off"]);
+    assert.match(started.stdout, /compatibility proved by this computer's record/);
+    assert.equal(fixture.requests.length, 1, "launch asked the provider for something already proved");
+
+    // ⚠️ THE CONTROL: the same project with the declared variable absent refuses, names the selection, starts nothing.
+    const refused = launch({ [FIXTURE_KEY_VAR]: "" });
+    assert.equal(refused.launch, null, `launched without its key: ${refused.stdout}`);
+    assert.equal(refused.status, 2, refused.stderr);
+    assert.match(refused.stderr, new RegExp(`\\[kiln\\] No authentication is configured for ${FIXTURE_PROVIDER} ${FIXTURE_MODEL}`));
+    assert.equal(fixture.requests.length, 1, "a refused launch contacted the provider");
+  } finally {
+    if (savedKey === undefined) delete process.env[FIXTURE_KEY_VAR];
+    else process.env[FIXTURE_KEY_VAR] = savedKey;
+    await fixture.close();
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ D22 a request Kiln cannot digest safely is proved only with a declared identity, and the record carries it", async () => {
   // ⚠️ **THE CONFIGURATION THAT HAS NO KEY WITHOUT A NAME.** Sampling parameters override named request
   // fields, so they are part of what a proof is about — and they are unbounded operator-authored values, which
@@ -2155,10 +2215,8 @@ test("⚠️ a project proved with a declared identity passes the launch checks,
      * the launcher gives it: the project's committed declarations. The record setup wrote matches, so the checks
      * pass without asking the provider anything.
      *
-     * ⚠️ **AND THIS CONTROL STOPS AT THE CHECKS, NOT AT A STARTED PROCESS (D2).** `bin/start-kiln.mjs` cannot
-     * start a CUSTOM-provider project at all: it has no input for the credential declaration `--credential-var`
-     * gives setup, so `checkLaunch` refuses it with `unsupported-credential-contract`. That gap predates these
-     * flags and is deferred to its own work; nothing here should be read as "this project starts".
+     * ⚠️ **AND THIS CONTROL STOPS AT THE CHECKS, NOT AT A STARTED PROCESS.** Starting a custom-provider project
+     * is ACC-0116's, measured through the real command in its own case above; here the declaration is passed in.
      */
     const { checkLaunch } = await import("../lib/launch-checks.mjs");
     const { consentLocation } = await import("../lib/consent-record.mjs");

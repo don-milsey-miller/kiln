@@ -29,10 +29,12 @@ import {
   clearGrants,
   committedResearchChoice,
   consentLocation,
+  declaredCredentialVar,
   gitProtection,
   obtainGrant,
   readConsent,
   reconcileConsent,
+  recordCredentialVar,
   recordGrant,
 } from "../lib/consent-record.mjs";
 import { INSPECTION, INSPECTION_PROMPT, RESEARCH_CREDENTIAL, inspectWithConsent } from "../lib/connection-inspection.mjs";
@@ -233,6 +235,39 @@ test("⚠️ a model change clears the grant, and changing back does not revive 
     assert.deepEqual(none.cleared, [GRANT.MODEL_USE]);
     assert.equal(none.standings.modelUse, STANDING.NOT_APPLICABLE);
     assert.equal((await reconcileConsent(where, choice(A, null))).standings.modelUse, STANDING.ASK);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ TSK-0072 a custom provider's credential variable rides on a granted model-use grant, and leaves with it", async () => {
+  const { root, dir } = project();
+  try {
+    const where = consentLocation({ projectRoot: dir });
+    const C = { provider: "acme", model: "acme-model" };
+
+    // No grant, or a declined one: nothing is written, and nothing is read back.
+    assert.deepEqual(await recordCredentialVar(where, { model: C, credentialVar: "ACME_KEY" }), { written: false, reason: "no-grant" });
+    await recordGrant(where, { grant: GRANT.MODEL_USE, granted: false, choice: choice(C, null) });
+    assert.deepEqual(await recordCredentialVar(where, { model: C, credentialVar: "ACME_KEY" }), { written: false, reason: "no-grant" });
+    assert.equal(declaredCredentialVar(where, C), null);
+
+    // A yes for exactly this model: written, read back for this model only.
+    await recordGrant(where, { grant: GRANT.MODEL_USE, granted: true, choice: choice(C, null) });
+    assert.equal((await recordCredentialVar(where, { model: C, credentialVar: "ACME_KEY" })).written, true);
+    assert.equal(declaredCredentialVar(where, C), "ACME_KEY");
+    assert.equal(declaredCredentialVar(where, { ...C, model: "acme-other" }), null, "a declaration was applied to another model");
+    assert.equal((await recordCredentialVar(where, { model: C, credentialVar: "ACME_KEY" })).reason, "unchanged");
+
+    // ⚠️ A NAME ONLY: a value in its place is refused before anything is written.
+    for (const bad of ["acme_key", "sk-live-0123456789", "$ACME_KEY", ""])
+      await assert.rejects(() => recordCredentialVar(where, { model: C, credentialVar: bad }), TypeError, `${JSON.stringify(bad)} was accepted`);
+    assert.equal(readConsent(where).record.modelUse.credentialVar, "ACME_KEY");
+
+    // A model change clears the grant, and the declaration goes with it.
+    await reconcileConsent(where, choice(A, null));
+    await recordGrant(where, { grant: GRANT.MODEL_USE, granted: true, choice: choice(C, null) });
+    assert.equal(declaredCredentialVar(where, C), null, "a declaration outlived the grant it was recorded on");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

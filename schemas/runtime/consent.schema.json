@@ -5,7 +5,7 @@
   "x-location": "<local-state>/runtime/consent.json",
   "x-committed": false,
   "title": "Host consent record",
-  "description": "What THIS operator, on THIS machine, permitted — and nothing else. ⚠️ IT IS IGNORED RATHER THAN COMMITTED, AND THAT IS THE WHOLE DESIGN. A committed consent record would mean cloning a repository handed you somebody else's permission to use your machine's credentials, and nobody would ever see the prompt again (section 3.3). ⚠️ THREE PERMISSIONS, RECORDED SEPARATELY, BECAUSE THEY ARE THREE DIFFERENT QUESTIONS: may Kiln LOOK at what is configured here; may it USE a named provider and model, which authorises ongoing billable work; may it validate and use an optional external service. Detection is not consent and one grant is not another. ⚠️ NO CREDENTIAL, NO FINGERPRINT, NO VARIABLE VALUE — the record says what was permitted, never what was found.",
+  "description": "What THIS operator, on THIS machine, permitted — and nothing else. ⚠️ IT IS IGNORED RATHER THAN COMMITTED, AND THAT IS THE WHOLE DESIGN. A committed consent record would mean cloning a repository handed you somebody else's permission to use your machine's credentials, and nobody would ever see the prompt again (section 3.3). ⚠️ THREE PERMISSIONS, RECORDED SEPARATELY, BECAUSE THEY ARE THREE DIFFERENT QUESTIONS: may Kiln LOOK at what is configured here; may it USE a named provider and model, which authorises ongoing billable work; may it validate and use an optional external service. Detection is not consent and one grant is not another. ⚠️ NO CREDENTIAL, NO FINGERPRINT, NO VARIABLE VALUE — the record says what was permitted, never what was found. The one declaration it carries is a custom provider's credential variable NAME, which the operator supplied rather than Kiln found.",
   "type": "object",
   "required": ["recordVersion"],
   "additionalProperties": false,
@@ -28,6 +28,11 @@
         "model": {
           "$ref": "runtime-common.schema.json#/$defs/nonEmptyString",
           "description": "The exact model the grant was given for, for the same reason."
+        },
+        "credentialVar": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "For a provider Kiln has no built-in credential contract for: the NAME of the environment variable the operator declared, on this host, as holding its key (`--credential-var`). ⚠️ A NAME, NEVER A VALUE. ⚠️ HERE AND NOT IN `.pi/kiln.json` BECAUSE IT IS THIS HOST'S: another computer may keep the same key under another name. ⚠️ ON THE GRANT, SO IT GOES WHERE THE GRANT GOES: a different provider or model clears the grant and the declaration with it. Launch reads it to resolve the same contract setup proved."
         }
       },
       "required": ["provider", "model"]

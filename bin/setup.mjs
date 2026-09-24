@@ -712,10 +712,19 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // contracts; anything else needs the operator to say which variable carries its key, by name. Without that
       // this refuses, which is the honest answer: a contract Kiln invented would be a guess about somebody's
       // credential.
-      const custom = args.credentialVar ? { id: selection.selection.provider, apiKey: `$${args.credentialVar}` } : null;
-      const contract = await tx.phase("credential-contract", () =>
-        modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom })
-      );
+      // ⚠️ **AND WHAT WAS DECLARED IS REMEMBERED FOR THIS HOST (TSK-0072)**, on the model-use grant, so launch
+      // resolves the contract setup proved and a later setup run need not be told again.
+      const credentialVar = args.credentialVar ?? modules.consent.declaredCredentialVar(location, selection.selection, { validators });
+      const custom = credentialVar ? { id: selection.selection.provider, apiKey: `$${credentialVar}` } : null;
+      const contract = await tx.phase("credential-contract", async () => {
+        const resolved = modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom });
+        if (args.credentialVar && !modules.credentials.supportedProviders().includes(selection.selection.provider)) {
+          const kept = await modules.consent.recordCredentialVar(location, { model: selection.selection, credentialVar: args.credentialVar }, { validators });
+          if (!kept.written && kept.reason !== "unchanged")
+            print(`credential variable ${args.credentialVar} was not remembered on this computer (${kept.reason}); launch will not find it`);
+        }
+        return resolved;
+      });
       print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
 
       const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
