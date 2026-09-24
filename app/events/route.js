@@ -32,12 +32,26 @@ export const dynamic = "force-dynamic";
 
 let service = null;
 
+/**
+ * ⚠️ **SHUTDOWN ENDS EVERY OPEN STREAM (TSK-0063, F15).** `next start` answers SIGTERM and SIGINT with
+ * `server.close()`, which in production waits for open connections to finish, and an event stream never
+ * does. Measured on Ubuntu: with a page open, the application did not exit, the launcher was killed before
+ * its own cleanup ran, and its run directory survived. So the same signals close the service, which ends
+ * every subscriber's stream; each response says `connection: close`, so its socket goes with it.
+ */
+function closeOnShutdown(stream) {
+  const close = () => void stream.close().catch(() => {});
+  for (const signal of ["SIGTERM", "SIGINT"]) process.once(signal, close);
+}
+
 function get() {
-  if (!service)
+  if (!service) {
     service = createChangeStream({
       watchDir: resolveContentRoot(process.env),
       heartbeatMs: Number(process.env.VPW_HEARTBEAT_MS ?? 5000),
     });
+    closeOnShutdown(service);
+  }
   return service;
 }
 
@@ -90,7 +104,7 @@ export async function GET(request) {
     headers: {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-cache, no-transform",
-      connection: "keep-alive",
+      connection: "close",
     },
   });
 }

@@ -236,6 +236,47 @@ async function cleanupCheck(t) {
   assert.deepEqual(strays, [], `launcher temp directories survived: ${strays.join(", ")}`);
 }
 
+test("⚠️ TSK-0063 F15 stopping the launcher while a page is subscribed to the change stream is still a graceful stop", async (t) => {
+  t.diagnostic("a real build and a real server, stopped with a change-stream subscriber still connected");
+  await withBuildLock(async () => {
+    const { proc, log } = await launch();
+    const runDir = runDirFrom(log());
+    assert.ok(runDir, "the launcher must report its run directory");
+
+    // ⚠️ A SUBSCRIBER THAT IS STILL READING WHEN THE STOP ARRIVES, as an open page is. It is not aborted here:
+    // the stream has to be ended by the server's own shutdown, or the application never exits.
+    const res = await fetch(`http://${HOST}:${PORT}/events`, { headers: { accept: "text/event-stream" } });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!/event: heartbeat/.test(text)) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    assert.match(text, /event: heartbeat/, "the subscriber must be connected before the stop");
+    const ended = (async () => {
+      for (;;) {
+        const { done } = await reader.read().catch(() => ({ done: true }));
+        if (done) return Date.now();
+      }
+    })();
+
+    const askedAt = Date.now();
+    proc.stdin.write("stop\n");
+    while (Date.now() < askedAt + 30_000 && proc.exitCode === null) await sleep(200);
+    const out = log();
+    assert.notEqual(proc.exitCode, null, `the launcher did not exit:\n${out.slice(-2000)}`);
+    assert.equal(/did not exit within/.test(out), false, `the application had to be killed:\n${out.slice(-2000)}`);
+    assert.match(out, /\[vpw\] stopped\.$/m, `the launcher did not report a graceful stop:\n${out.slice(-2000)}`);
+    const endedAt = await Promise.race([ended, sleep(5000).then(() => null)]);
+    assert.ok(endedAt, "the subscriber's stream was not ended by the shutdown");
+    assert.equal(existsSync(runDir), false, `the launcher's run directory survived: ${runDir}`);
+    assert.equal(await portFree(PORT), true, `something is still listening on ${PORT}`);
+  });
+});
+
+
 test("the launcher refuses a content root that does not exist, rather than guessing", async () => {
   // #70's rule at the launcher: the application would otherwise fall back to its own directory and
   // read a different project's content while reporting success.
