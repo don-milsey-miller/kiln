@@ -102,6 +102,7 @@ test("⚠️ ACC-0116 a custom-provider project starts for real, answers through
     const started = await withBuildLock(
       () =>
         new Promise((done) => {
+          globalThis.__f11StartedAt = Date.now();
           const child = spawn(process.execPath, [join(ROOT, "bin", "start-kiln.mjs")], { cwd: dir, env, stdio: ["pipe", "pipe", "pipe"] });
           let stdout = "";
           let stderr = "";
@@ -147,6 +148,36 @@ test("⚠️ ACC-0116 a custom-provider project starts for real, answers through
     assert.equal(await answers(port), false, `something still answers on port ${port}`);
   } finally {
     await fixture.close();
-    rmSync(root, { recursive: true, force: true });
+    // F11 DIAGNOSTIC (branch only): on a failed removal, record who holds what, then how long until it goes, and
+    // rethrow the original error so the test still fails.
+    const startedAtMs = globalThis.__f11StartedAt ?? 0;
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch (e) {
+      const { spawnSync } = await import("node:child_process");
+      const { appendFileSync } = await import("node:fs");
+      const t0 = Date.now();
+      const snap = () => {
+        const ps = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+          "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine,@{n='Created';e={$_.CreationDate.ToUniversalTime().ToString('o')}} | ConvertTo-Json -Compress"],
+          { encoding: "utf-8", timeout: 60_000 });
+        let rows = [];
+        try { rows = JSON.parse(ps.stdout || "[]"); } catch { rows = [{ parseError: (ps.stdout || ps.stderr || "").slice(0, 300) }]; }
+        rows = (Array.isArray(rows) ? rows : [rows]).filter((p) => !p.Created || Date.parse(p.Created) >= startedAtMs - 2000);
+        const h = process.env.HANDLE_EXE ? spawnSync(process.env.HANDLE_EXE, ["-accepteula", "-nobanner", root], { encoding: "utf-8", timeout: 60_000 }) : null;
+        return { at: Date.now() - t0, processes: rows, handles: h ? (h.stdout || h.stderr || "").trim().slice(0, 6000) : null };
+      };
+      const record = { error: { code: e.code, path: e.path }, startedAtMs, failedAtMs: t0, atFailure: snap() };
+      let removedAfterMs = null;
+      while (Date.now() - t0 < 15_000) {
+        await new Promise((r) => setTimeout(r, 50));
+        try { rmSync(root, { recursive: true, force: true }); removedAfterMs = Date.now() - t0; break; } catch (again) { record.lastError = again.code; }
+      }
+      record.removedAfterMs = removedAfterMs;
+      if (removedAfterMs === null) record.atGiveUp = snap();
+      appendFileSync(process.env.F11_OUT ?? "f11-events.jsonl", JSON.stringify(record) + "
+");
+      throw e;
+    }
   }
 });
