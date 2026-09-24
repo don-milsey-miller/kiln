@@ -48,6 +48,7 @@ import {
   EXTENSION_FLAG,
   SESSION_ID_FLAG,
   SESSION_RESUME_FLAG,
+  START_PROMPT,
   generateSessionId,
   stopLauncher,
   withSessionDir,
@@ -1853,6 +1854,79 @@ test("⚠️ F128 a resume opens the recorded session by id, guarded; a first ru
   assert.equal(env.includes(transcript.id), false, "no session id in the environment");
   assert.equal(env.includes(expectation.digest), false, "no digest in the environment");
   assert.deepEqual(guardFilesIn(dir), [], "and both guard files are cleared when the run ends");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("⚠️ ACC-0103 a new session is opened with /kiln-start as Pi's first message, only when asked for and never on a resume", async () => {
+  const dir = repoProject({ state: true, sessions: true });
+  ignoreAll(dir);
+  const port = String(await freePort());
+  const transcript = piTranscript(dir, "start077-0000-4000-8000-00000000abcd");
+
+  // Without a terminal on both ends the caller does not ask for it, and a new session gets no message.
+  const plainCalls = [];
+  await runSupervisor({ ...resumeRun(dir, port), sessionLister: listNothing, spawn: guardAnswers(plainCalls) });
+  const plain = plainCalls.find((c) => c.command === "A");
+  assert.equal(plain.args.includes(START_PROMPT), false, "no start prompt unless the caller says Pi has a terminal");
+  rmSync(join(dir, ".pi", "runtime", "kiln-session.json"));
+
+  // A new session, asked for: the prompt is Pi's last argument, after the session flag.
+  const firstCalls = [];
+  const logged = [];
+  await runSupervisor({ ...resumeRun(dir, port), startPrompt: true, sessionLister: listNothing, spawn: guardAnswers(firstCalls), log: (l) => logged.push(l) });
+  const first = firstCalls.find((c) => c.command === "A");
+  assert.equal(first.args.at(-1), START_PROMPT);
+  assert.equal(first.args.filter((a) => a === START_PROMPT).length, 1, "exactly once");
+  assert.equal(first.args[first.args.indexOf(SESSION_ID_FLAG) + 1], first.args.at(-2), "the session id precedes it");
+  assert.ok(logged.some((l) => l.includes(`Pi opens it with ${START_PROMPT}`)), logged.join("\n"));
+
+  // A resume of the recorded session, asked for: no start prompt.
+  writeFileSync(
+    join(dir, ".pi", "runtime", "kiln-session.json"),
+    JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId: transcript.id, stateMode: "project" })
+  );
+  const resumeCalls = [];
+  await runSupervisor({ ...resumeRun(dir, port), startPrompt: true, sessionLister: transcript.lister, spawn: guardAnswers(resumeCalls) });
+  const resumed = resumeCalls.find((c) => c.command === "A");
+  assert.equal(resumed.args[resumed.args.indexOf(SESSION_RESUME_FLAG) + 1], transcript.id);
+  assert.equal(resumed.args.includes(START_PROMPT), false, "a resume is never sent a start prompt");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("⚠️ ACC-0103 a run that planned a new session but adopts another run's under the lock sends no start prompt", async () => {
+  const dir = repoProject({ state: true, sessions: true });
+  ignoreAll(dir);
+  const port = String(await freePort());
+  const transcript = piTranscript(dir, "race0077-0000-4000-8000-00000000abcd");
+
+  // The plan is made before the launcher starts and sees nothing. While the launcher starts, another run records
+  // its session, so the re-plan under the lock finds it.
+  let raced = false;
+  const lister = Object.assign(async (...a) => (raced ? transcript.lister(...a) : []), { sessionVersion: transcript.lister.sessionVersion });
+  const calls = [];
+  const answer = guardAnswers(calls);
+  const logged = [];
+  await runSupervisor({
+    ...resumeRun(dir, port),
+    startPrompt: true,
+    sessionLister: lister,
+    log: (l) => logged.push(l),
+    spawn: (command, args, options) => {
+      if (command === "L" && !raced) {
+        writeFileSync(
+          join(dir, ".pi", "runtime", "kiln-session.json"),
+          JSON.stringify({ recordVersion: 1, projectId: PROJECT_ID, sessionId: transcript.id, stateMode: "project" })
+        );
+        raced = true;
+      }
+      return answer(command, args, options);
+    },
+  });
+
+  const agent = calls.find((c) => c.command === "A");
+  assert.equal(agent.args[agent.args.indexOf(SESSION_RESUME_FLAG) + 1], transcript.id, "the other run's session is adopted");
+  assert.equal(agent.args.includes(START_PROMPT), false, "and it is not opened with a second start");
+  assert.equal(logged.some((l) => l.includes(START_PROMPT)), false, logged.join("\n"));
   rmSync(dir, { recursive: true, force: true });
 });
 

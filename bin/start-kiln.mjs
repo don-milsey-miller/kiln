@@ -364,6 +364,8 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     spawn,
     randomBytes,
     interactive,
+    // ⚠️ BOTH ENDS, BECAUSE THAT IS PI'S OWN TEST: with either one not a terminal it runs in print mode.
+    startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     ask,
     askLine,
     log: say,
