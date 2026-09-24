@@ -1,0 +1,66 @@
+{
+  "id": "EVD-0145",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the documented journey from an empty repository reaches Stage 1, shows the answer in a running browser, refuses an unauthorised advance and shuts down cleanly",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0063, toward ACC-0086 and ACC-0087. CI RUN 36065687783 AT 0d5343d WAS RED OVERALL: Windows Node 24 failed one unrelated test (F130, below). This record rests on two controls that passed in all four cells of that run, not on a green gate. THE JOURNEY, test/clean-consumer-journey.test.mjs, replaces nothing. It runs `git init` in an empty directory and leaves that repository with no commit to the end. It makes a real `git clone` of a tracked snapshot of the checkout into .planning. It runs `node .planning/bin/setup.mjs` without --project-root; setup installs the locked dependencies inside the clone, and its questions are answered by flags, including --state-protection fix-ignore. The model is TSK-0062's loopback fixture, so nothing billable is reachable. Then `node .planning/bin/start-kiln.mjs` runs three times, one piped turn per run. WHY PIPED. CI has no terminal, so Pi runs in print mode: one turn, then exit. The first run's input is /kiln-start as test input. It is not the supervisor's automatic start prompt, which ACC-0103 sends only to an interactive session. Each later run resumes the recorded session with one answer. An operator gets one interactive session instead, which the README documents. RUN 1 (ACC-0086). The session is new and recorded, readiness is identity-confirmed, and the workspace address is printed. The provider receives Pi's own expansion of /kiln-start and a real kiln_project_status result: ok, 0 artifacts, Stage 01-intake blockers. Pi prints the Stage 1 question. RUN 2 (ACC-0087). Headless Chromium opens /stage/01-intake while the fixture holds the answer turn. The page's change stream is live and the answer is absent, and the page is marked. The typed write kiln_write_stage_document is then released. The page shows the answer after a reload: the mark is gone, the test navigated nowhere, and the stream is live. Only then is kiln_write_stage_attestation for ask-without-solution released. It is refused with operator-confirmation-not-granted, and no file under state/stage-attestations changes. The browser stays open and subscribed through run 2's shutdown. RUNS 2 AND 3. Each resumes the exact recorded session id, and run 3's request carries every earlier turn. EVERY RUN. It exits 0, and the supervisor's line reports agent-exit with every observation true. Nothing had to be killed: no 'did not exit within' and no 'escalating'. The launcher's run directory is gone, no earlier run's files are reported, and the port does not answer. SETUP RERUN. With the same flags it changes no byte of the project outside .planning and .git, and the clone's tracked files are unchanged. WHAT THE JOURNEY FOUND AND WHAT WAS FIXED. F12: the change stream watched only planning-content/data, so the Stage 1 answer written under stages/ never reached an open page. It now watches the content root (34b4a4a), and test/shell-smoke.test.mjs checks that a stages/ write reaches /events. F13: setup could not protect runtime state without a terminal. --state-protection fix-ignore answers that question, only when fix-ignore is available (97b0d27). F14: a setup rerun re-recorded a standing model-use grant with a new decidedAt. A rerun naming the committed selection now reuses the standing grant and writes nothing (c17d085). F15: on POSIX, `next start` did not exit on SIGTERM while a page held /events open, so the supervisor killed the launcher before its cleanup and its run directory survived. Shutdown now ends every open stream, and the stream says connection: close (564277c). The launcher control 'F15 stopping the launcher while a page is subscribed' passed in WSL in 4.3 s and failed with 'had to be killed' when the fix was reverted. F16: the browser helper killed only Chrome's main process on Linux, and removing its profile failed. It now stops only its own process group, waits for it, and then removes the profile (0d5343d). MUTATIONS. Reverting the watch scope to data/ made the journey fail at 'the page never showed the answer after the write'. The F15 revert is above. OPEN, NOT EXPLAINED. F17: in run 36056185119 the Ubuntu Node 22 job was cancelled at its 45-minute limit after the journey failed its Chrome profile cleanup (F16). What kept it running is not identified. In 36065687783 the same cell finished in 7 min 39 s. F130: Windows Node 24 failed PLATFORM EVIDENCE (win32, natural) with shutdown-not-observed in this run. That is the third F130-type failure on 2026-09-24, and it stays open for a focused shutdown investigation.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0063 commits 34b4a4a, 97b0d27, c17d085, 8e41d78, 911d857, fb6079a, 9e8055f, 564277c, 0d5343d",
+      "app/events/route.js": "sha256:f126b49868f4b597ca9b18ecb80b45f8af020e38eef11b852a1f5079c4094f2e",
+      "bin/setup.mjs": "sha256:284d731cedde3661a56f24294aa98956db9f7ab4a5e4a15f79df6ee0b2c262b2",
+      "lib/model-selection.mjs": "sha256:dd5f907a1c63f2ee3d69f12c3f8548cb4da7332b49726a665e69db1fb4fda501",
+      "test/clean-consumer-journey.test.mjs": "sha256:38ef6e3daa8a4867307af4829a90db06f963c5d23c1dcb447be7a1498b3bd487",
+      "test/helpers/browser.mjs": "sha256:6baa171a3254b622c0b5ba5c81daf4d52dc76c04190e72e55de096bc7faa2b33",
+      "test/helpers/provider-fixture.mjs": "sha256:b6a5d6043b85f94fdb7fc8006ef05d9fa4536748cc1d63ea8401912985deae6a",
+      "test/launcher.test.mjs": "sha256:e3236836c7e736e1a9e865fab4aa024aeea4f2939562c78a59e48b0dfcb257a7",
+      "test/shell-smoke.test.mjs": "sha256:791764240d594521d47be6b6cb484d161b7aefbb4830c5c984d42f30c34388d5",
+      "README.md": "sha256:f2cb908bb7d1cbc1c1fe9f5c72617053b19a3cc9cf3cf49aa017599000e6ec50",
+      "ci-run": "GitHub Actions run 36065687783 at 0d5343d, attempt 1, no job re-run. RED OVERALL: Windows Node 24 failed one test unrelated to this task. The journey and the F15 control passed in all four cells.",
+      "cell-windows-22": "job 107854776468, 1643 tests / 1641 pass / 0 fail / 2 skipped; journey 309.6 s; F15 control 7.1 s; job 13 min 30 s",
+      "cell-ubuntu-22": "job 107854776770, 1643 tests / 1633 pass / 0 fail / 10 skipped; journey 83.3 s; F15 control 4.2 s; job 7 min 39 s",
+      "cell-ubuntu-24": "job 107854776792, suite 0 fail; journey 49.5 s; F15 control 4.2 s; job 8 min 41 s",
+      "cell-windows-24": "job 107854776797, 1643 tests / 1640 pass / 1 fail / 2 skipped; journey 403.0 s; F15 control 7.0 s; the failure is PLATFORM EVIDENCE (win32, natural): shutdown-not-observed (F130)",
+      "local": "Windows 11, Node 24.18.0, Chrome: journey passed (77.8 s) after A1 and A2; WSL Ubuntu 24.04, Node 24.11.0: F15 control passed, and failed with the fix reverted",
+      "browser": "headless Chromium over CDP from test/helpers/browser.mjs: Google Chrome on the runners and locally",
+      "no-billable-request": "every model request went to the loopback fixture"
+    },
+    "omissions": [
+      {
+        "fact": "interactive-terminal",
+        "state": "not-captured",
+        "reason": "The journey is piped: one print-mode turn per resumed run. The interactive path is ACC-0103's POSIX terminal control, and ACC-0088's Windows Node 24 immediate-quit run, which is manual."
+      },
+      {
+        "fact": "real-model-first-turn",
+        "state": "not-captured",
+        "reason": "The model is a scripted fixture. ACC-0114's judgement of a real model's first turn is manual."
+      },
+      {
+        "fact": "green-gate",
+        "state": "not-captured",
+        "reason": "Run 36065687783 was red overall because of F130 on Windows Node 24. No all-green run of 0d5343d exists."
+      },
+      {
+        "fact": "f17-cause",
+        "state": "not-captured",
+        "reason": "The Ubuntu Node 22 cancellation at 45 minutes in run 36056185119 is unexplained."
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "The documented journey completes from an empty directory on both platforms",
   "statement": "From a temporary empty directory the documented sequence — including `git init` into a repository with no commits, before any commit exists — initialises, installs, registers, binds a deterministic non-billable model, starts both processes with identity-confirmed readiness, and reaches a Stage 1 question. Verified on Windows and the supported POSIX CI platform.",
   "evaluates": [
@@ -13,5 +13,9 @@
   "verifies": [
     "REQ-0022",
     "REQ-0020"
-  ]
+  ],
+  "evidencedBy": [
+    "EVD-0145"
+  ],
+  "notes": "PASS 2026-09-24 on EVD-0145, on the journey control, which passed in all four cells of CI run 36065687783. That run was RED OVERALL: Windows Node 24 failed an unrelated shutdown platform-evidence test (F130). The documented sequence ran as the README states it, from an empty repository with no commit. Setup's questions were answered by flags and the model was a non-billable loopback fixture. The run reached a Stage 1 question with identity-confirmed readiness. The first turn was piped /kiln-start test input; an interactive session is observed by ACC-0103 and ACC-0088."
 }

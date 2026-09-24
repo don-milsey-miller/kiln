@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "A Stage 1 exchange reaches the browser and cannot cross the gate",
   "statement": "A deterministic Stage 1 answer is written through the typed path, observed arriving in the browser through the change stream, and an attempted unauthorised stage advance is refused with no attestation changed.",
   "evaluates": [
@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0022"
-  ]
+  ],
+  "evidencedBy": [
+    "EVD-0145"
+  ],
+  "notes": "PASS 2026-09-24 on EVD-0145, on the journey control, which passed in all four cells of CI run 36065687783. That run was RED OVERALL: Windows Node 24 failed an unrelated shutdown platform-evidence test (F130). The answer was written through kiln_write_stage_document while a headless browser had the Stage 1 page open and subscribed. The page showed it after a reload the change stream caused. An unauthorised kiln_write_stage_attestation was then refused with operator-confirmation-not-granted, and no attestation file changed. This required F12's fix: the stream now watches the whole content root."
 }
