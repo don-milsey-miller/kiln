@@ -25,6 +25,7 @@ import assert from "node:assert/strict";
 import {
   waitUntil,
   createShutdownDeadline,
+  createTableBroker,
   identityFloor,
   shutdown,
   stopTree,
@@ -397,11 +398,11 @@ const fakeServer = (free) => {
   };
 };
 
-test("⚠️ O12 the first tree's grace period is assigned knowing the second tree still has work", async () => {
-  // ⚠️ **WHAT THE AGENT WAITS OUT IS TIME THE LAUNCHER CANNOT HAVE.** Every period was a share of
-  // what remained, and what remained was whatever the step before it left — so the agent's grace, taken
-  // first and out of the whole budget, was assigned as if the launcher had nothing left to do. A
-  // recorded Windows teardown left its launcher's identity read 337ms of a table that costs 850.
+test("⚠️ O1 the two trees' grace periods run side by side, each leaving its own verification, termination and the tail", async () => {
+  // ⚠️ **THE TREES NO LONGER QUEUE BEHIND EACH OTHER (F130).** The agent's grace used to be taken first and held
+  // back the launcher's whole teardown, which is how a loaded Windows host left the launcher's identity read too
+  // little time. Now both stop at once: each wait leaves room for its own read, its termination and the tail, and
+  // the two waits overlap.
   //
   // Both trees settle at once here: what is asserted is the ALLOWANCE the deadline handed out, which
   // is arithmetic over the budget and not a measurement of anything.
@@ -424,13 +425,60 @@ test("⚠️ O12 the first tree's grace period is assigned knowing the second tr
   });
 
   const treeReserveMs = identityFloor(8000) + SHUTDOWN_MIN_PHASE_MS + WAIT_SLACK_MS;
-  const agentGrace = r.timeline.entries.find((e) => e.kind === "grace-wait" && e.tree === "agent");
-  assert.ok(
-    agentGrace.ms <= r.budget.ms - 2 * treeReserveMs - SHUTDOWN_TAIL_RESERVE_MS,
-    `the first tree's wait left the second tree's verification, termination and the tail: ${agentGrace.ms} of ${r.budget.ms}`
-  );
-  assert.ok(agentGrace.ms > 0, "and is still a wait");
+  const grace = (tree) => r.timeline.entries.find((e) => e.kind === "grace-wait" && e.tree === tree);
+  for (const tree of ["agent", "launcher"])
+    assert.ok(
+      grace(tree).ms > 0 && grace(tree).ms <= r.budget.ms - treeReserveMs - SHUTDOWN_TAIL_RESERVE_MS,
+      `the ${tree} tree's wait left its own verification, termination and the tail: ${grace(tree).ms} of ${r.budget.ms}`
+    );
   assert.equal(r.complete, true, JSON.stringify(r.unfinished));
+});
+
+test("⚠️ O1 (F130) a read requested while another is running joins it, so one table answers both trees", async () => {
+  // Both trees keep a live descendant through their grace periods, which end together, and the table is slow.
+  const h = host(
+    [
+      [200, 1, "1100"],
+      [950, 1, "950"],
+    ],
+    { slow: 300 }
+  );
+  let reads = 0;
+  const r = await shutdown({
+    agent: leader(100, { exited: true }),
+    launcher: politeLauncher(300),
+    agentDescendants: tracked([[200, "1100"]]),
+    launcherDescendants: tracked([[950, "950"]]),
+    port: 1,
+    createServerImpl: () => fakeServer(true),
+    platform: "win32",
+    graceMs: 1000,
+    hardMs: 1500,
+    run: h.run,
+    kill: h.kill,
+    psRun: (...a) => (reads++, h.psRun(...a)),
+  });
+
+  const grace = (tree) => r.timeline.entries.find((e) => e.kind === "grace-wait" && e.tree === tree);
+  assert.ok(grace("launcher").startMs < grace("agent").endMs, "the launcher's wait began while the agent's was still running");
+  const escalationReads = r.timeline.entries.filter((e) => e.kind === "identity-read");
+  assert.deepEqual(escalationReads.map((e) => e.tree).sort(), ["agent", "launcher"], JSON.stringify(escalationReads));
+  assert.equal(escalationReads.filter((e) => e.outcome.joined === true).length, 1, "the second tree's read joined the first");
+  assert.equal(reads, 1, "one process table answered both trees");
+  assert.equal(r.complete, true, JSON.stringify(r.unfinished));
+  assert.deepEqual(r.agent.descendantsSurviving, []);
+  assert.deepEqual(r.launcherTree.descendantsSurviving, []);
+});
+
+test("⚠️ O1 (F130) a table that has already answered is never handed out again", async () => {
+  const h = host([[200, 1, "1100"]]);
+  let reads = 0;
+  const tables = createTableBroker({ run: (...a) => (reads++, h.psRun(...a)), platform: "win32" });
+  const first = await tables.read(1000);
+  const second = await tables.read(1000);
+  assert.equal(reads, 2, "each read after the last one answered is a new read");
+  assert.equal(first.joined, undefined);
+  assert.equal(second.joined, undefined);
 });
 
 test("⚠️ O12 a completed shutdown is always inside the budget it declares", async () => {

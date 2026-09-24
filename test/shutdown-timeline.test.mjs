@@ -296,27 +296,16 @@ test("⚠️ R19 the whole shutdown record carries one finalized timeline, and l
   assert.equal(r.budget.withinBudget, true);
   assert.deepEqual(r.unfinished, []);
   const entries = r.timeline.entries;
-  assert.deepEqual(
-    entries.map((e) => [e.kind, e.tree ?? null]),
-    [
-      ["grace-wait", "agent"],
-      ["identity-read", "agent"],
-      ["taskkill", "agent"],
-      ["hard-wait", "agent"],
-      ["launcher-control", "launcher"],
-      ["grace-wait", "launcher-control"],
-      ["grace-wait", "launcher"],
-      ["identity-read", "launcher"],
-      ["taskkill", "launcher"],
-      ["hard-wait", "launcher"],
-      ["owned-file-cleanup", null],
-      ["port-probe", null],
-    ]
-  );
+  // ⚠️ O1 (F130): THE TREES STOP SIDE BY SIDE, so their entries interleave. Each tree's own sequence is fixed, and the
+  // cleanup and the probe still come after both.
+  const of = (...trees) => entries.filter((e) => trees.includes(e.tree ?? null)).map((e) => e.kind);
+  assert.deepEqual(of("agent"), ["grace-wait", "identity-read", "taskkill", "hard-wait"]);
+  assert.deepEqual(of("launcher", "launcher-control"), ["launcher-control", "grace-wait", "grace-wait", "identity-read", "taskkill", "hard-wait"]);
+  assert.deepEqual(entries.slice(-2).map((e) => e.kind), ["owned-file-cleanup", "port-probe"]);
+  assert.equal(entries.length, 12, JSON.stringify(entries.map((e) => [e.kind, e.tree ?? null])));
   assert.ok(entries.every((e) => e.endMs !== null && e.startMs <= e.endMs), JSON.stringify(entries));
   assert.deepEqual(entries.at(-1).outcome, { free: true, timedOut: false }, "the probe answered inside its own bound (O12)");
   assert.ok(r.timeline.finalizedMs >= entries.at(-1).endMs, "the record is finalized after its last operation");
-  assert.ok(r.agent.timing.treeStopObservedMs <= r.launcherTree.timing.treeStopObservedMs, "the agent tree stopped first");
   assert.ok(r.launcherTree.timing.treeStopObservedMs <= entries.at(-2).startMs, "and both stopped before cleanup began");
   assert.equal(typeof r.launcher.exitObservedMs, "number", "the launcher's own exit was observed");
 
