@@ -144,9 +144,10 @@ test("⚠️ O6 a query records its pid, exit, close and byte counts, and keeps 
   assert.equal(q.stdoutBytes, Buffer.byteLength("10 4 133 éé\n"), "bytes, not characters");
   assert.equal(q.killRequestedMs, null);
 
-  // ⚠️ NO OUTPUT IN THE RECORD: not a row, not a byte of what the command printed.
+  // ⚠️ NO OUTPUT IN THE RECORD: not a row, not a byte of what the command printed. The whole row is searched
+  // for, not its last field: "133" alone is also a millisecond timing, and failed CI run 36002382936 that way.
   const text = JSON.stringify(d.snapshot());
-  assert.equal(text.includes("133"), false, "no process-table row");
+  assert.equal(text.includes("10 4 133"), false, "no process-table row");
   assert.equal(text.includes("é"), false, "no output text");
 });
 
