@@ -1963,6 +1963,51 @@ test("⚠️ no refusal repeats the value it refused, because the value may be t
   assert.ok(/COMMITTED to this project's record/.test(tooLong.error), `the refusal does not say where it goes: ${tooLong.error}`);
 });
 
+test("⚠️ a declared identity in the shape of a key is refused before anything is printed, written or committed", async () => {
+  // ⚠️ **THE ONE MISTAKE WORTH CATCHING IS THE COMMON ONE.** A declared identity is printed, committed to
+  // `.pi/kiln.json` and written into the compatibility key, so a pasted credential there is published rather than
+  // merely mistyped. What is recognised is a shape somebody issues — a prefix, a JWT, a long opaque token —
+  // and a key in a shape nothing publishes still passes, which is stated as a limit rather than papered over.
+  const { parseArgs } = await import("../bin/setup.mjs");
+  const refused = [
+    ["an issuer prefix", "--request-identity", "sk-live-0123456789"],
+    ["a Tavily key", "--request-identity", "tvly-9f3a2b1c9d4e5f60"],
+    ["a JWT", "--request-identity", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk"],
+    ["a long opaque token", "--request-identity", "AcmeGatewayRevision2024xyzAbc123456"],
+    // ⚠️ A KEY DOES NOT HAVE TO BE THE WHOLE VALUE: pasted beside a word, it is still pasted.
+    ["a key beside a word", "--request-identity", "acme sk-live-0123456789"],
+    ["a header pasted whole", "--request-identity", "Bearer 0123456789abcdef"],
+    ["a key routed as a path segment", "--endpoint-identity", "https://gate.example.com/v1/sk-live-0123456789abcdef/chat"],
+  ];
+  for (const [what, flag, value] of refused) {
+    const parsed = parseArgs([flag, value]);
+    assert.ok(parsed.error, `${what} was accepted as a declared identity`);
+    assert.equal(parsed.error.includes(value), false, `${what}: the refusal repeated it: ${parsed.error}`);
+  }
+  // And a label that names a configuration is still a label.
+  for (const [flag, value] of [
+    ["--request-identity", "acme-gateway-v3"],
+    ["--request-identity", "house style v2"],
+    ["--endpoint-identity", "https://gate.example.com/v1"],
+  ])
+    assert.equal(parseArgs([flag, value]).error, undefined, `${value} was refused`);
+
+  // ⚠️ **AND THROUGH THE REAL COMMAND, NOTHING IS WRITTEN.** The check is an argument check, so it happens
+  // before the install, the scaffold and the record it would otherwise have been committed to.
+  const p = project({ ignored: true });
+  try {
+    const before = tree(p.dir);
+    const o = await setup(p, ["--request-identity", "sk-live-0123456789"]);
+    assert.equal(o.code, EXIT.ARGUMENTS, o.warned.join("\n"));
+    assert.equal(o.seen.installs, 0, "the bootstrap ran for a run that could not start");
+    assert.deepEqual(tree(p.dir), before, "a refused argument changed the project");
+    assert.equal(existsSync(join(p.dir, ".pi")), false, "runtime state was written for a refused argument");
+    assert.equal(o.printed.concat(o.warned).join("\n").includes("sk-live-0123456789"), false, "the value reached the terminal");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ a fresh non-interactive run confirms the model it names, and confirms nothing it did not", async () => {
   // ⚠️ **THE GAP TSK-0061 OWNS (EVD-0128).** A model is used only after an explicit confirmation, and a run
   // with nobody to ask cannot get one — so a fresh non-interactive setup could never finish. The answer is the
@@ -2044,7 +2089,7 @@ class LaunchRefusalStub extends Error {
   }
 }
 
-test("⚠️ a project proved with a declared identity is launchable, and is not without it", async () => {
+test("⚠️ a project proved with a declared identity passes the launch checks, and does not without it", async () => {
   // ⚠️ **THE KEY IS RECOMPUTED AT LAUNCH, NOT READ BACK.** So a declaration that lived only on setup's command
   // line would leave every later start computing a different key and refusing the record setup had just written.
   // This runs the launcher's own checks — the real `checkLaunch`, with only the supervisor stubbed — against
@@ -2104,9 +2149,16 @@ test("⚠️ a project proved with a declared identity is launchable, and is not
     assert.equal(proved.code, EXIT.OK, proved.printed.concat(proved.warned).join("\n"));
     assert.equal(requests.length, 1, `setup made ${requests.length} requests`);
 
-    // ⚠️ **THE LAUNCH CHECKS THEMSELVES, RECOMPUTING THE KEY.** This is what the launcher calls, given what
-    // the launcher gives it: the project's committed declarations. The record setup wrote matches, so the project
-    // is launchable without asking the provider anything.
+    /**
+     * ⚠️ **THE LAUNCH CHECKS THEMSELVES, RECOMPUTING THE KEY.** This is what the launcher calls, given what
+     * the launcher gives it: the project's committed declarations. The record setup wrote matches, so the checks
+     * pass without asking the provider anything.
+     *
+     * ⚠️ **AND THIS CONTROL STOPS AT THE CHECKS, NOT AT A STARTED PROCESS (D2).** `bin/start-kiln.mjs` cannot
+     * start a CUSTOM-provider project at all: it has no input for the credential declaration `--credential-var`
+     * gives setup, so `checkLaunch` refuses it with `unsupported-credential-contract`. That gap predates these
+     * flags and is deferred to its own work; nothing here should be read as "this project starts".
+     */
     const { checkLaunch } = await import("../lib/launch-checks.mjs");
     const { consentLocation } = await import("../lib/consent-record.mjs");
     const { committedDeclarations } = await import("../lib/local-state.mjs");

@@ -1,0 +1,69 @@
+{
+  "id": "EVD-0139",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the setup command's argument surface, its non-interactive consent contract, and the declared identities it commits for setup and launch",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0061, THE ARGUMENT SURFACE AND THE NON-INTERACTIVE CONTRACT. What this task's three open notes asked for, measured through `bin/setup.mjs` itself. The implementation is 4f07b18 onwards; the sha256 of each file is in the facts. MODEL USE, CONFIRMED BY A RUN WITH NOBODY TO ASK. A model is used only after an explicit confirmation (EVD-0128), and a fresh non-interactive run could not obtain one, so it could never finish. `--model-use approve|deny` is that same answer given in advance: the confirmation text is printed in full before either answer is applied, because the prompt is where the billing is disclosed and a flag that skipped the words would authorise ongoing charges with nothing saying so in the terminal or the log. IT CONFIRMS, IT DOES NOT CHOOSE: a run that names no model still refuses, and `--non-interactive` alone confirms nothing. A SECOND ANSWER WAS MISSING AND IS NOW HERE TOO: the inspection question had no non-interactive answer either, so such a run stopped before the model phase ever ran; `--inspect approve|deny` settles it, and only an explicit value does. A complete run is now `--non-interactive --inspect approve --provider X --model Y --thinking Z --model-use approve`, which asks nothing, commits the selection and records the grant; `--model-use deny` reads the same disclosure, records nothing and leaves a valid project. DECLARED IDENTITIES, AS INPUTS AND AS THE PROJECT'S. A model whose endpoint cannot be canonicalised, or whose request depends on values Kiln may neither persist nor hash, has no compatibility key without a non-secret identity somebody declares (D22). `--endpoint-identity` is checked by `canonicalizeEndpoint` — the one canonicaliser, moved to a built-ins-only module so an argument is still checked before anything is installed or written — and `--request-identity` by the pattern its own schema declares, with a test holding the two spellings equal. BOTH ARE COMMITTED TO `.pi/kiln.json`, WHICH IS WHAT MAKES THEM USABLE AT ALL: the key is recomputed at every setup and every launch, so a declaration living only on the command line that first supplied it would leave the next run recomputing a different key and refusing the record it had just written. Measured end to end against a loopback endpoint with the real canary: without the identity the run reports not ready and sends nothing; with it the canary runs once and the record carries `{categories: [samplingParams], declaredIdentity: acme-gateway-v3}` and none of the configuration's own values; a later run naming no identity reuses the record; changing the label is a different request and is not reused. AND AT LAUNCH. `bin/start-kiln.mjs` now passes the project's committed declarations to `checkLaunch`, which is the same key recomputed a second time. The control runs the real launch checks against the project setup proved: they pass by reusing the record, with the declaration removed from the committed record they refuse, and the launcher is shown handing the committed value through. REFUSALS THAT REPEAT NOTHING. An operator who pastes a key into the wrong option has already put it in their shell history; a refusal that echoed it would spread it to a terminal, a log and a CI transcript. Every option with a fixed set of answers now names the answers instead, the endpoint canonicaliser no longer quotes the URL it was given, and a key-shaped sentinel through all eight options — and through the real command with the whole help printed after it — appears nowhere. AND A DECLARED IDENTITY IN THE SHAPE OF A KEY IS REFUSED BEFORE IT IS PRINTED, COMMITTED OR HASHED. A label is published by design, so the mistake worth catching is the common one: an issuer prefix, a JWT, a long opaque token, the same beside a word, or a token routed as a path segment in an endpoint. Through the real command the refusal happens as an argument check — no install, no scaffold, no `.pi`, the project byte-identical — and the value is not repeated. HELP. `--help` documents every option, and says in the words every user-disabled research outcome carries (EVD-0127) that research is turned on by running setup again with `--research tavily`. ACC-0084, AS FAR AS THIS COMMAND GOES. Each refusal class is driven through `main()` and the code it returns is compared with what `--help` publishes: a value the command cannot read, an unknown option, a credential where a variable name belongs, an endpoint identity carrying credentials, a project root that does not own the content, an install that is not the pin, a bootstrap that could not complete, a project nobody trusts, a refused look at this computer, a model named but never confirmed, a computer with no provider connected, a billable check the operator refused, a model that did not pass the check, and a model this computer declined. Scenarios are grouped by class, so several bad arguments are one code while two different instructions may not share one. AUTHENTICATION BECAME ITS OWN CLASS while doing this: \"connect a provider in Pi\" cannot be answered by rerunning with flags, and arriving as the selection code would have a script retry forever, so it is exit 18. LIMITS, EACH ONE A BOUNDARY OF WHAT WAS MEASURED. (1) A SHAPE CHECK IS NOT A SECRET DETECTOR. What is refused is a credential in a shape somebody issues; a secret in no recognised shape is accepted, and `--request-identity` is committed and printed by design. \"Bounded\" is not \"non-secret\", and nothing here establishes that an accepted label is safe to publish. (2) THE CUSTOM-PROVIDER CONTROL REACHES `checkLaunch`, NOT A STARTED PROCESS. `bin/start-kiln.mjs` cannot start a custom-provider project at all: it has no input for the credential declaration `--credential-var` gives setup, so the launch refuses with `unsupported-credential-contract`. That gap predates these flags and is TSK-0037's (D2); no project in this record should be read as \"starts\". (3) `EXIT.UNUSABLE` AND LAUNCH FAILURE ARE NOT OBSERVED THROUGH SETUP. The selection phase refuses first in every case that would reach the preflight's `LaunchRefusal`. Both stay in the published mapping, and the test declares the boundary rather than leaving it to be inferred, so ACC-0084's two launch-side classes are not assessed here. (4) NOTHING BILLABLE IS CONTACTED. The one real canary answers to a loopback server this suite runs; every other case injects its runner, the research probe is an injected adapter, and npm is a seam. (5) A BUILT-IN PROVIDER'S UNBOUNDED CONFIGURATION STILL CANNOT BE PROVED, AND FAILS CLOSED. A custom provider's non-credential configuration crosses into the canary's isolated directory, so the child makes the request this project makes; a built-in provider's does not, so the child's key cannot be computed, `proofProblem` answers `canary-key-unavailable`, and nothing is recorded. Controlled as a refusal rather than worked around. WHAT PROVES THE CONTROLS BITE. Fourteen mutations across three rounds, each caught: the standing answer applied without printing what it authorises; `--non-interactive` alone confirming; a refusal appending the value it refused; the canonicaliser quoting what it was given; the declaration never committed; the launcher handing no declarations; the canary child deprived of the sampling parameters; an unauthenticated computer reported as a selection problem; the help dropping what re-enables research; the credential guard disabled, skipped for path segments, examining only whole values, or moved after the write. One earlier mutation was a no-op of my own making — it changed a helper's signature without using it — and was rewritten to leak the value for real.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0061, commit 4f07b18 and the credential-shape guard that follows it",
+      "bin/setup.mjs": "sha256:8a0b0401abcec57dfcc3222b65b24f75b10c0df57b8091739becd6dd6e07f1d8",
+      "bin/start-kiln.mjs": "sha256:bbb2294f9599d9e133a2ff17824e0feb3e87c419530c0d7a7cea74d053cbf33c",
+      "lib/declared-identity.mjs": "sha256:7c05eac6be9065b2dc6f50729b91fe7964f74e877392e71c91b5117af5f696fc",
+      "lib/model-selection.mjs": "sha256:f5c34e4d448e830770efdce5ea869d5a3ad7422c234d89b778c24d6bf8318536",
+      "lib/local-state.mjs": "sha256:76b5c6d49227c6447af91f13059f65b00e76a80474cffcc1f79bdab70d58b82d",
+      "lib/pi-provider-canary.mjs": "sha256:3c169df9f1f99fff1da06a0e1b30fb249e4748726ac74ddce2898d44cf62deeb",
+      "test/setup-command.test.mjs": "sha256:4abe3bb30eeb79b1d89d818f3510fed1da9c0f2c852accfac2b1e2e920b8ffc4",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "tests": "test/setup-command.test.mjs: 58 tests against real projects, two of which run the real canary against a loopback server this suite runs",
+      "model-use": "a fresh non-interactive run: refused without --model-use, refused with it but no model named, complete with both, and a deny that reads the same disclosure and grants nothing — zero questions asked in every case",
+      "declared-identities": "committed to .pi/kiln.json and reused by a later run naming none; the record carries the label and none of the configuration's values; a changed label is not reused; the launch checks reuse the record with them and refuse without them",
+      "no-echo": "a key-shaped sentinel through --trust, --inspect, --model-use, --research, --live-model-check, --local-state, --credential-var and --endpoint-identity, and through the real command with the help printed after it: absent from everything the operator is shown",
+      "credential-shape-guard": "an issuer prefix, a Tavily key, a JWT, a long opaque token, a key beside a word, a header pasted whole, and a key routed as an endpoint path segment are each refused as arguments — no install, no scaffold, no .pi, the project byte-identical",
+      "acc-0084-observed": "fourteen scenarios driven through main(), each returning the code --help publishes, grouped by class so two different instructions cannot share one number",
+      "exit-18": "authentication is its own class: a computer with no provider connected exits 18, not 12",
+      "mutations": "fourteen across three rounds, all caught; files restored byte-identically after each",
+      "no-billable-request": "the real canary answers to a loopback server; every other canary is injected; the research probe is an injected adapter; npm is a seam",
+      "full-suite-local": "npm test on Windows: 1622 tests, 1617 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 514 artifacts",
+      "ci-run": "PLACEHOLDER"
+    },
+    "omissions": [
+      {
+        "fact": "custom-provider-launch",
+        "state": "not-captured",
+        "reason": "bin/start-kiln.mjs has no input for a custom provider's credential declaration, so it cannot start such a project; the control reaches checkLaunch and stops there. TSK-0037 owns it (D2)."
+      },
+      {
+        "fact": "launch-side-refusal-classes",
+        "state": "not-captured",
+        "reason": "ACC-0084 names launch failure and the unusable-selection class; setup's selection phase refuses first in every case that would reach them, so they are not observed through this command."
+      },
+      {
+        "fact": "secret-detection",
+        "state": "not-captured",
+        "reason": "The guard recognises credential SHAPES. A secret in no recognised shape is accepted as a label, and a label is committed and printed by design."
+      },
+      {
+        "fact": "real-provider-and-registry",
+        "state": "not-captured",
+        "reason": "No billable request and no registry install: the one real canary answers to a loopback server, other canaries and the research probe are injected, and npm is a seam."
+      }
+    ]
+  }
+}

@@ -34,7 +34,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ContentRootError, canonicalPath, contentRootCandidate, isAtOrInside, pathIdentityKey } from "../lib/content-root.mjs";
-import { EndpointIdentityError, REQUEST_IDENTITY, canonicalizeEndpoint } from "../lib/declared-identity.mjs";
+import { EndpointIdentityError, REQUEST_IDENTITY, canonicalizeEndpoint, looksLikeCredential } from "../lib/declared-identity.mjs";
 import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { breakDeadLock, withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
@@ -308,6 +308,18 @@ export function parseArgs(argv) {
   }
   // ⚠️ **AND WHAT WAS GIVEN IS NOT REPEATED**, for the same reason --credential-var does not repeat it: an
   // operator who pasted a key instead of a label has already put it in their shell history.
+  // ⚠️ **A LABEL IN THE SHAPE OF A KEY IS REFUSED BEFORE IT IS PRINTED, COMMITTED OR HASHED.** The shape rule
+  // below says what a label looks like; this says what it must not be. Neither can identify every secret — that
+  // is stated where this is measured — but the mistake worth catching is the common one, and catching it after
+  // the value had been written to a committed file would be too late to matter.
+  if (out.requestIdentity !== undefined && looksLikeCredential(out.requestIdentity))
+    return {
+      error:
+        `--request-identity was given something in the shape of an API key or token. It is a NAME for a ` +
+        `configuration — "acme-gateway-v3", "house-style-v2" — and it is printed, committed to this project's ` +
+        `record and written into the compatibility key, so it may not be the configuration's credential. What was ` +
+        `given is not repeated here.`,
+    };
   if (out.requestIdentity !== undefined && !REQUEST_IDENTITY.test(out.requestIdentity))
     return {
       error:
