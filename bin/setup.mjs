@@ -34,6 +34,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ContentRootError, canonicalPath, contentRootCandidate, isAtOrInside, pathIdentityKey } from "../lib/content-root.mjs";
+import { EndpointIdentityError, REQUEST_IDENTITY, canonicalizeEndpoint } from "../lib/declared-identity.mjs";
 import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { breakDeadLock, withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
@@ -103,6 +104,8 @@ export const EXIT = Object.freeze({
   UNUSABLE: 16,
   /** A previous recovery left its files beside the setup lock, and only the operator may remove them. */
   LOCK_RECOVERY: 17,
+  /** Nothing on this computer is authenticated, so there was nothing to choose from: Pi's login is what fixes it. */
+  AUTHENTICATION: 18,
 });
 
 /**
@@ -130,6 +133,7 @@ export const EXIT_MEANING = Object.freeze({
   [EXIT.RESEARCH]: "the web-research choice could not be settled",
   [EXIT.UNUSABLE]: "the committed selection cannot be used on this computer as it stands",
   [EXIT.LOCK_RECOVERY]: "a previous recovery left files beside the setup lock; the message names what to remove",
+  [EXIT.AUTHENTICATION]: "no provider is authenticated on this computer; connect one in Pi, then run setup again",
 });
 
 /**
@@ -157,9 +161,17 @@ const EXIT_BY_REFUSAL = Object.freeze({
   TrustRefusal: EXIT.TRUST,
 });
 
-/** The exit code for one thrown thing, or null when this table does not name its class. */
+/**
+ * The exit code for one thrown thing, or null when this table does not name its class.
+ *
+ * ⚠️ **ONE CLASS SPLITS BY ITS REASON, BECAUSE THE TWO ARE DIFFERENT INSTRUCTIONS.** "Choose a model" and
+ * "nothing here is authenticated" both arrive as a selection refusal, and an operator can act on the first by
+ * rerunning with flags while the second needs Pi's login first. A script branching on one number for both would
+ * retry forever against a computer that has no provider connected.
+ */
 export function exitFor(error) {
   if (typeof error?.name !== "string") return null;
+  if (error.name === "ModelSelectionRefusal" && error.reason === "no-available-models") return EXIT.AUTHENTICATION;
   return Object.hasOwn(EXIT_BY_REFUSAL, error.name) ? EXIT_BY_REFUSAL[error.name] : null;
 }
 
@@ -172,19 +184,35 @@ export class SetupCommandRefusal extends Error {
   }
 }
 
-/** The options this slice reads. The whole argument surface, and its `--help`, belong to TSK-0061. */
+/**
+ * What an option with a fixed set of answers says when it gets something else.
+ *
+ * ⚠️ **IT DOES NOT REPEAT WHAT IT WAS GIVEN.** Every one of these options is typed on a command line beside
+ * `--credential-var`, and an operator who pasted a key into the wrong one has already put it in their shell
+ * history; echoing it into a refusal spreads it to a terminal, a log and a CI transcript. The answers that ARE
+ * accepted are what they need in order to fix it, and those are a fixed list this command already knows.
+ */
+const choiceRefusal = (flag, allowed) =>
+  `${flag} takes ${allowed.map((a) => `"${a}"`).join(" or ")}, and was given something else. What was given is ` +
+  `not repeated here in case it is a credential.`;
+
+/** Every option this command takes. */
 const VALUED = new Set([
   "--project-root",
   "--name",
   "--description",
   "--local-state",
   "--trust",
+  "--inspect",
   "--provider",
   "--model",
   "--thinking",
+  "--model-use",
   "--research",
   "--live-model-check",
   "--credential-var",
+  "--endpoint-identity",
+  "--request-identity",
 ]);
 const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
 
@@ -208,29 +236,43 @@ export function parseArgs(argv) {
     if (flag === "--description") out.description = value;
     if (flag === "--local-state") out.localState = value;
     if (flag === "--trust") out.trust = value;
+    if (flag === "--inspect") out.inspect = value;
     if (flag === "--provider") out.provider = value;
     if (flag === "--model") out.model = value;
     if (flag === "--thinking") out.thinking = value;
+    if (flag === "--model-use") out.modelUse = value;
+    if (flag === "--endpoint-identity") out.endpointIdentity = value;
+    if (flag === "--request-identity") out.requestIdentity = value;
     if (flag === "--research") out.research = value;
     if (flag === "--live-model-check") out.liveModelCheck = value;
     if (flag === "--credential-var") out.credentialVar = value;
   }
-  if (out.localState !== "project" && out.localState !== "user") return { error: `--local-state is "project" or "user", got ${JSON.stringify(out.localState)}.` };
+  if (out.localState !== "project" && out.localState !== "user") return { error: choiceRefusal("--local-state", ["project", "user"]) };
   // ⚠️ THE ANSWER IS SPELLED OUT, BOTH WAYS. `--trust` with no value, or a value this does not understand, is a
   // mistake about the one decision that must never be defaulted (ACC-0108), so it is refused rather than read as
   // approval.
   if (out.trust !== undefined && out.trust !== "approve" && out.trust !== "deny")
-    return { error: `--trust is "approve" or "deny", got ${JSON.stringify(out.trust)}.` };
+    return { error: choiceRefusal("--trust", ["approve", "deny"]) };
   // ⚠️ A CHANGED SELECTION NEEDS BOTH HALVES. `--provider` alone cannot name a model and `--model` alone cannot say
   // whose it is, and guessing either from the other is how a run binds to something nobody asked for.
   if ((out.provider === undefined) !== (out.model === undefined))
     return { error: `--provider and --model are given together, or neither.` };
+  // ⚠️ **THE ONE-TIME LOOK AT THIS COMPUTER IS AN ANSWER TOO.** Everything setup knows about this host is
+  // behind that question, so a run with nobody to ask cannot get past it without one — and an answer it cannot
+  // read is not consent to read anything.
+  if (out.inspect !== undefined && out.inspect !== "approve" && out.inspect !== "deny")
+    return { error: choiceRefusal("--inspect", ["approve", "deny"]) };
+  // ⚠️ **THE BILLING DECISION IS SPELLED OUT, BOTH WAYS.** Confirming a model authorises ongoing charges on
+  // the operator's account, so a value this cannot read is a mistake about that and is refused rather than read as
+  // approval — the same rule as --trust and --live-model-check.
+  if (out.modelUse !== undefined && out.modelUse !== "approve" && out.modelUse !== "deny")
+    return { error: choiceRefusal("--model-use", ["approve", "deny"]) };
   if (out.research !== undefined && out.research !== "tavily" && out.research !== "disabled")
-    return { error: `--research is "tavily" or "disabled", got ${JSON.stringify(out.research)}.` };
+    return { error: choiceRefusal("--research", ["tavily", "disabled"]) };
   // ⚠️ THE ONE CHECK THAT COSTS MONEY IS SPELLED OUT, BOTH WAYS. It sends a request to the selected provider, so
   // an unreadable value is a mistake about a billable action and is refused rather than read as approval.
   if (out.liveModelCheck !== undefined && out.liveModelCheck !== "approve" && out.liveModelCheck !== "deny")
-    return { error: `--live-model-check is "approve" or "deny", got ${JSON.stringify(out.liveModelCheck)}.` };
+    return { error: choiceRefusal("--live-model-check", ["approve", "deny"]) };
   // ⚠️ **A NAME, NOT A KEY.** This says which environment variable holds the provider's credential; a value here
   // would put a credential on the command line, in the shell history and in every process listing.
   if (out.credentialVar !== undefined && !/^[A-Z][A-Z0-9_]*$/.test(out.credentialVar))
@@ -243,6 +285,36 @@ export function parseArgs(argv) {
         `--credential-var takes the NAME of an environment variable — uppercase letters, digits and underscores — ` +
         `not a key and not a value. What was given is not a name of that shape, and is not repeated here in case ` +
         `it is the credential itself.`,
+    };
+  /**
+   * ⚠️ **A DECLARED ENDPOINT IS CHECKED BY THE CANONICALISER THAT WILL USE IT, NOT BY A PATTERN HERE.** It
+   * is refused for the reasons that make an endpoint unusable as a cache identity — userinfo, a query, a
+   * fragment, a scheme with no default port — and those reasons live in one implementation. Checking them now
+   * means a declaration that cannot work is a bad argument, before anything is installed or written.
+   */
+  if (out.endpointIdentity !== undefined) {
+    try {
+      out.endpointIdentity = canonicalizeEndpoint(out.endpointIdentity);
+    } catch (e) {
+      if (!(e instanceof EndpointIdentityError)) throw e;
+      return {
+        error:
+          `--endpoint-identity takes a URL naming the endpoint, and this one cannot be used: ${e.message}\n` +
+          `It is a non-secret label for an endpoint Kiln cannot identify on its own, and it is written into the ` +
+          `compatibility record, so it cannot carry anything private. What was given is not repeated here in case ` +
+          `it is a credential.`,
+      };
+    }
+  }
+  // ⚠️ **AND WHAT WAS GIVEN IS NOT REPEATED**, for the same reason --credential-var does not repeat it: an
+  // operator who pasted a key instead of a label has already put it in their shell history.
+  if (out.requestIdentity !== undefined && !REQUEST_IDENTITY.test(out.requestIdentity))
+    return {
+      error:
+        `--request-identity takes a short printable label naming the configuration this model's requests use, ` +
+        `such as "acme-gateway-v3". What was given is not a label of that shape, and is not repeated here in case ` +
+        `it is a credential. ⚠️ The label is COMMITTED to this project's record and written into the ` +
+        `compatibility key, so it must name the configuration rather than be any part of it.`,
     };
   return out;
 }
@@ -518,6 +590,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         "model",
         "credential-contract",
         "research",
+        "declared-identities",
         "preflight",
         "live-check",
         "read-back",
@@ -649,6 +722,20 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // resolved: the same model object, the same endpoint, the same version. A runner handed only the selection
       // would have to resolve those again and could resolve them differently, which is the disagreement the
       // compatibility key exists to catch.
+      /**
+       * ⚠️ **A CONFIGURATION KILN CANNOT DIGEST SAFELY IS IDENTIFIED BY THE OPERATOR OR NOT AT ALL.** An
+       * endpoint whose URL cannot be a cache identity, and a request whose shape depends on values that must not
+       * be persisted or hashed, each need a declared non-secret name; without one there is no key, nothing is
+       * sent, and the run reports not ready (D22). These are those names, and they go to the key, the canary and
+       * the read-back alike — a read-back computed without them would disagree with the record this run just
+       * wrote and report a failure that is only a missing argument.
+       *
+       * ⚠️ **AND THEY ARE THE PROJECT'S, NOT THIS COMMAND LINE'S.** The key is recomputed at every setup and
+       * every launch, so a declaration that existed only here would leave the next start recomputing a different
+       * key and refusing the record this run wrote. A flag declares or changes it; a run without one uses what
+       * the project has committed.
+       */
+      const declared = await tx.phase("declared-identities", () => declareIdentities({ tx, paths, args, print, modules, validators }));
       const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(canaryRequest(ctx, preflight, custom)));
       const compatibility = modules.compatibility.compatibilityLocationFrom(location);
       const live = await tx.phase("live-check", () =>
@@ -658,6 +745,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
           ask: asking.choice,
           request: args.liveModelCheck,
           canary,
+          declared,
           validators,
         })
       );
@@ -668,7 +756,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // use: the gate that refuses a tracked or unprotected record applies on read as well, and a record that
       // cannot be read back is one the next start will refuse. So readiness is what the file says now, checked
       // against the key this run computed, rather than what the writer said a moment ago.
-      const readBack = await tx.phase("read-back", () => verifyRecorded({ compatibility, preflight, modules, validators }));
+      const readBack = await tx.phase("read-back", () => verifyRecorded({ compatibility, preflight, declared, modules, validators }));
       // ⚠️ WHAT IS PRINTED COMES FROM THE RECORD THAT WAS READ, not from the fact that a write returned: a line
       // that could be printed without reading the file would report a readiness nobody checked.
       print(
@@ -909,6 +997,11 @@ const READY_SELECTIONS = new Set(["selected", "confirmed", "reused"]);
  * ⚠️ **AND A RUN WITH NOBODY TO ASK DOES NOT ASK.** `grant` answers `null` without prompting, so a consent
  * record is never written for a question nobody saw; `choice` is undefined, which is how the selection and the
  * research choice know they cannot ask and refuse instead of defaulting.
+ *
+ * ⚠️ **AN ANSWER GIVEN IN ADVANCE IS STILL THE OPERATOR ANSWERING.** `--inspect approve|deny` is the
+ * inspection question settled on the command line, which is what lets a run with nobody to ask get past it at all;
+ * it outranks the prompt in an interactive run for the same reason `--trust` does. What it is not is a default:
+ * absent, the question is asked, or the run refuses.
  */
 function interactively(args, ask) {
   const typed = async (prompt) => {
@@ -919,7 +1012,9 @@ function interactively(args, ask) {
     if (/^(n|no)$/i.test(said)) return false;
     return said;
   };
-  return args.nonInteractive ? { grant: async () => null, choice: undefined } : { grant: typed, choice: typed };
+  const declaredGrant = args.inspect === undefined ? null : async () => args.inspect === "approve";
+  if (args.nonInteractive) return { grant: declaredGrant ?? (async () => null), choice: undefined };
+  return { grant: declaredGrant ?? typed, choice: typed };
 }
 
 /**
@@ -943,9 +1038,51 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
     ask: asking.choice,
     print,
     requested: { provider: args.provider, model: args.model, thinking: args.thinking },
+    // ⚠️ **THE FLAG IS AN ANSWER, NOT A DEFAULT.** Absent, it is undefined and the model is confirmed at a
+    // prompt as before; present, it is the yes or no the operator gave in advance, and nothing else is inferred
+    // from --non-interactive.
+    confirmation: args.modelUse === undefined ? undefined : args.modelUse === "approve",
     settings: { stateMode: selectionStateMode, skillsEntry },
     validators,
   });
+}
+
+/**
+ * The project's declared identities: what a flag says, else what the project already committed.
+ *
+ * ⚠️ **A DECLARATION IS COMMITTED CONFIGURATION, SO IT IS A PLANNED WRITE LIKE ANY OTHER.** It goes into
+ * `.pi/kiln.json` through the transaction's own merge, validated by that record's schema — which is what keeps
+ * a label that the command accepted from being one the record would refuse. Nothing is written when the flags
+ * repeat what is already there.
+ */
+async function declareIdentities({ tx, paths, args, print, modules, validators }) {
+  const committed = modules.localState.committedDeclarations(paths.projectRoot, { validators });
+  const declared = {
+    ...committed,
+    ...(args.endpointIdentity ? { endpointIdentity: args.endpointIdentity } : {}),
+    ...(args.requestIdentity ? { requestIdentity: args.requestIdentity } : {}),
+  };
+  const same =
+    JSON.stringify(committed.endpointIdentity ?? null) === JSON.stringify(declared.endpointIdentity ?? null) &&
+    (committed.requestIdentity ?? null) === (declared.requestIdentity ?? null);
+  if (same) return declared;
+
+  await tx.merge(modules.localState.PROJECT_RECORD_KEY, (current) => {
+    if (current === null) throw new SetupCommandRefusal(EXIT.STATE, `${modules.localState.PROJECT_RECORD} does not exist, so nothing can declare an identity for it.`);
+    const record = JSON.parse(current);
+    const declaredIdentities = {
+      ...(declared.endpointIdentity ? { endpoint: declared.endpointIdentity } : {}),
+      ...(declared.requestIdentity ? { request: declared.requestIdentity } : {}),
+    };
+    return JSON.stringify({ ...record, declaredIdentities }, null, 2) + "\n";
+  });
+  // ⚠️ WHAT IS DECLARED IS SAID, because it changes what a proof means and it reaches every clone.
+  if (declared.endpointIdentity) {
+    const e = declared.endpointIdentity;
+    print(`declared endpoint identity ${e.scheme}://${e.hostname}:${e.port}${e.pathname}`);
+  }
+  if (declared.requestIdentity) print(`declared request identity ${declared.requestIdentity}`);
+  return declared;
 }
 
 /**
@@ -986,11 +1123,21 @@ export function usage() {
     "  --description <text>             the project's one-line description, on a first run",
     "  --local-state project|user       where runtime state lives: the project's ignored .pi, or a per-user root",
     "  --trust approve|deny             answer the project trust question without a prompt",
+    "  --inspect approve|deny           allow, or refuse, the one-time look at this computer's configured",
+    "                                   providers, models and credential variables",
     "  --provider <id> --model <id>     choose the model without the interactive list",
     "  --thinking <level>               the thinking level for that model",
-    "  --research tavily|disabled       settle web research without a prompt",
+    "  --model-use approve|deny         confirm, or refuse, use of that model without a prompt; it authorises the",
+    "                                   ongoing billable use the prompt describes, and it confirms only the model",
+    "                                   named by --provider and --model or already committed",
+    "  --research tavily|disabled       settle web research without a prompt. Research that is disabled, declined",
+    "                                   or was never enabled stays that way until it is asked for: to enable web",
+    "                                   research later, run setup again with --research tavily",
     "  --live-model-check approve|deny  allow, or refuse, the one check that sends a billable request",
     "  --credential-var <NAME>          the variable holding the key for a provider Kiln has no built-in contract for",
+    "  --endpoint-identity <url>        a non-secret URL naming an endpoint Kiln cannot identify on its own",
+    "  --request-identity <label>       a non-secret label for request configuration Kiln cannot digest safely;",
+    "                                   without these two, such a model has no compatibility key and is not ready",
     "  --non-interactive                never ask; refuse rather than assume",
     "  --resume                         continue a run that was interrupted",
     "  --help                           this text",
@@ -1059,11 +1206,14 @@ export function readJournal(roots, validate) {
  * has to match is what this run resolved from Pi and the selection it confirmed. The live check computed the
  * same key to decide what to write, and this asks the question again of what is actually on disk.
  */
-export async function verifyRecorded({ compatibility, preflight, modules, validators }) {
+export async function verifyRecorded({ compatibility, preflight, declared = {}, modules, validators }) {
   const key = modules.compatibility.computeCompatibilityKey({
     selection: preflight.selection,
     model: preflight.model,
     piVersion: preflight.piVersion,
+    // ⚠️ THE SAME DECLARED IDENTITIES THE CHECK USED: a key recomputed without them is a different key,
+    // and the difference would be reported as a record that does not describe what this run checked.
+    declared,
     effectiveBaseUrl: preflight.effectiveBaseUrl,
   });
   const found = modules.compatibility.readCompatibility(compatibility, { validators });
@@ -1131,7 +1281,9 @@ function providerConfigFor(preflight) {
   const entry = { id: model.id };
   // ⚠️ ONLY THE FIELDS THE CANARY ACCEPTS, and only when Pi resolved them: an undefined bound is not a bound, and
   // the canary refuses a configuration carrying anything it does not know.
-  for (const key of ["name", "contextWindow", "maxTokens", "reasoning"]) if (model[key] !== undefined) entry[key] = model[key];
+  // ⚠️ INCLUDING `samplingParams`, WHICH IS PART OF THE REQUEST: without it the child sends something else, and
+  // the check would prove a request this project does not make. It is named by the declared identity in the key.
+  for (const key of ["name", "contextWindow", "maxTokens", "reasoning", "samplingParams"]) if (model[key] !== undefined) entry[key] = model[key];
   return { baseUrl: preflight.effectiveBaseUrl, api: model.api, models: [entry] };
 }
 

@@ -1801,6 +1801,547 @@ test("⚠️ D25 a custom provider is declared, not guessed, and the real canary
   }
 });
 
+test("⚠️ D22 a request Kiln cannot digest safely is proved only with a declared identity, and the record carries it", async () => {
+  // ⚠️ **THE CONFIGURATION THAT HAS NO KEY WITHOUT A NAME.** Sampling parameters override named request
+  // fields, so they are part of what a proof is about — and they are unbounded operator-authored values, which
+  // must not be hashed or persisted. The request profile therefore refuses to be cached until the operator
+  // declares a non-secret label for it. Until then there is no compatibility key: nothing is sent, nothing is
+  // charged, and the run reports not ready. This is that whole path through the real command, against a loopback
+  // endpoint, with the real canary.
+  const requests = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const parsed = JSON.parse(body);
+      requests.push({
+        path: req.url,
+        model: parsed.model,
+        temperature: parsed.temperature ?? null,
+        tools: (parsed.tools ?? []).map((t) => t.function?.name ?? t.name),
+        stream: parsed.stream ?? null,
+      });
+      const seen = /[0-9a-f]{32}/.exec(JSON.stringify(parsed.messages))?.[0];
+      const base = { id: "x", object: "chat.completion.chunk", created: 0, model: parsed.model };
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(
+        `data: ${JSON.stringify({
+          ...base,
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", tool_calls: [{ index: 0, id: "c0", type: "function", function: { name: "kiln_preflight", arguments: JSON.stringify({ challenge: seen }) } }] },
+              finish_reason: null,
+            },
+          ],
+        })}\n\n`
+      );
+      res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] })}\n\ndata: [DONE]\n\n`);
+      res.end();
+    });
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+
+  const p = project({ ignored: true, models: false });
+  const declare = ["--credential-var", "ACME_SETUP_KEY"];
+  const flags = { pick: ["--provider", "acme", "--model", "acme-model", "--thinking", "off"], env: { ACME_SETUP_KEY: "acme-setup-KEY-7b2f" }, canary: null, liveCheck: "approve" };
+  try {
+    writeFileSync(
+      join(p.agentDir, "models.json"),
+      JSON.stringify({
+        providers: {
+          acme: {
+            baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+            api: "openai-completions",
+            apiKey: "$ACME_SETUP_KEY",
+            models: [
+              {
+                id: "acme-model",
+                name: "Acme Model",
+                contextWindow: 128000,
+                maxTokens: 4096,
+                reasoning: false,
+                // ⚠️ THE POINT OF THE FIXTURE: a value that changes the request and cannot go in the key.
+                samplingParams: { temperature: 0.2 },
+              },
+            ],
+          },
+        },
+      })
+    );
+
+    const undeclared = await setup(p, declare, flags);
+    assert.notEqual(undeclared.code, EXIT.OK, undeclared.printed.join("\n"));
+    const said = undeclared.printed.concat(undeclared.warned).join("\n");
+    assert.ok(/non-secret identity|cannot be identified/.test(said), `the run does not say what is missing: ${said}`);
+    assert.deepEqual(requests, [], "a model with no compatibility key was still checked live");
+
+    // ⚠️ WITH THE LABEL, the key exists: the canary runs once, and the record carries the declared name
+    // rather than anything derived from the configuration it stands for.
+    const declared = await setup(p, [...declare, "--request-identity", "acme-gateway-v3", "--resume"], flags);
+    assert.equal(declared.code, EXIT.OK, declared.printed.concat(declared.warned).join("\n"));
+    assert.equal(requests.length, 1, `the canary made ${requests.length} requests`);
+    // ⚠️ **FIELD BY FIELD, BECAUSE "IT PASSED" IS NOT THE CLAIM.** What the record vouches for is this
+    // model, at this endpoint, with this project's sampling parameters and Kiln's one preflight tool. A child
+    // that reached the endpoint with anything else would have proved a request nobody makes.
+    assert.deepEqual(
+      { model: requests[0].model, temperature: requests[0].temperature, tools: requests[0].tools },
+      { model: "acme-model", temperature: 0.2, tools: ["kiln_preflight"] },
+      `the canary sent a different request: ${JSON.stringify(requests[0])}`
+    );
+    // The credential half is refused by the canary rather than carried: apiKey, headers and authHeader in a
+    // supplied provider configuration are each rejected, measured in test/pi-provider-canary.test.mjs.
+
+    const record = JSON.parse(readFileSync(recordPath(p), "utf-8"));
+    assert.deepEqual(record.key.effectiveRequestProfile.unboundedInputs, { categories: ["samplingParams"], declaredIdentity: "acme-gateway-v3" });
+    assert.equal(readFileSync(recordPath(p), "utf-8").includes("temperature"), false, "the record carries the configuration's own values");
+
+    // ⚠️ **AND THE READ-BACK USED THE SAME LABEL.** A read-back that recomputed the key without it would
+    // find a record describing something else and report a run that actually succeeded as not proved.
+    assert.ok(
+      declared.printed.some((l) => /^compatibility recorded and read back/.test(l)),
+      declared.printed.join("\n")
+    );
+
+    // ⚠️ **THE DECLARATION IS THE PROJECT'S, NOT THAT COMMAND LINE'S.** It is committed to `.pi/kiln.json`,
+    // so the next run — which names no identity at all — recomputes the same key and reuses the record
+    // instead of asking the provider again.
+    const record2 = JSON.parse(readFileSync(join(p.dir, ".pi", "kiln.json"), "utf-8"));
+    assert.deepEqual(record2.declaredIdentities, { request: "acme-gateway-v3" });
+    const reused = await setup(p, declare, { ...flags, liveCheck: null });
+    assert.equal(reused.code, EXIT.OK, reused.printed.concat(reused.warned).join("\n"));
+    assert.equal(requests.length, 1, "a recorded check was run again");
+
+    // A label that changes is a different request: the next run does not reuse the record.
+    const changed = await setup(p, [...declare, "--request-identity", "acme-gateway-v4"], { ...flags, liveCheck: "deny" });
+    assert.notEqual(changed.code, EXIT.OK, changed.printed.join("\n"));
+    assert.equal(requests.length, 1, "a declined check was sent anyway");
+  } finally {
+    server.close();
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ no refusal repeats the value it refused, because the value may be the credential", async () => {
+  // ⚠️ **AN OPERATOR WHO PASTES A KEY INTO THE WRONG OPTION HAS ALREADY PUT IT IN THEIR SHELL HISTORY.**
+  // Repeating it in a refusal spreads it to a terminal, a log and a CI transcript, so every option with a fixed
+  // set of answers says what it accepts instead of what it got. The sentinel is shaped like a real key so that a
+  // single leak anywhere in what the command printed is visible.
+  const SENTINEL = "sk-live-Ax7Kq2ZmT4pR9wLd";
+  const { parseArgs, usage } = await import("../bin/setup.mjs");
+  const options = [
+    "--trust",
+    "--inspect",
+    "--model-use",
+    "--research",
+    "--live-model-check",
+    "--local-state",
+    "--credential-var",
+    "--endpoint-identity",
+  ];
+  for (const flag of options) {
+    const parsed = parseArgs([flag, SENTINEL]);
+    assert.ok(parsed.error, `${flag} accepted a credential-shaped value`);
+    assert.equal(parsed.error.includes(SENTINEL), false, `${flag} repeated what it refused: ${parsed.error}`);
+  }
+  // ⚠️ AND THROUGH THE REAL COMMAND, where the refusal is printed with the whole help text after it.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p, ["--inspect", SENTINEL]);
+    assert.equal(o.code, EXIT.ARGUMENTS, o.warned.join("\n"));
+    const everything = o.printed.concat(o.warned).concat(usage()).join("\n");
+    assert.equal(everything.includes(SENTINEL), false, `the refused value reached the operator's terminal: ${everything}`);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ **A LABEL IS DIFFERENT, AND ITS LIMIT IS DECLARED.** `--request-identity` is written into the project
+  // record and the compatibility key on purpose, so Kiln cannot tell a label from a secret and does not pretend
+  // to: what it does is bound the shape and refuse without echoing.
+  const tooLong = parseArgs(["--request-identity", "x".repeat(200)]);
+  assert.ok(tooLong.error && !tooLong.error.includes("x".repeat(200)), tooLong.error);
+  assert.ok(/COMMITTED to this project's record/.test(tooLong.error), `the refusal does not say where it goes: ${tooLong.error}`);
+});
+
+test("⚠️ a fresh non-interactive run confirms the model it names, and confirms nothing it did not", async () => {
+  // ⚠️ **THE GAP TSK-0061 OWNS (EVD-0128).** A model is used only after an explicit confirmation, and a run
+  // with nobody to ask cannot get one — so a fresh non-interactive setup could never finish. The answer is the
+  // same one, given in advance, and it is an answer to the BILLING question only: naming a model is still
+  // --provider and --model, and this flag confirms what they name rather than picking anything.
+  for (const [what, argv, expected] of [
+    ["nothing to confirm it", ["--non-interactive", "--inspect", "approve", ...PICKED], EXIT.SELECTION],
+    ["nothing to confirm", ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], EXIT.SELECTION],
+  ]) {
+    const p = project({ ignored: true });
+    try {
+      const o = await setup(p, argv, { pick: [], liveCheck: "approve" });
+      assert.equal(o.code, expected, `${what}: ${o.printed.concat(o.warned).join("\n")}`);
+      assert.deepEqual(o.seen.asks, [], `${what}: a non-interactive run asked something`);
+      // The inspection was allowed on the command line and is recorded; the model was not, and is not.
+      const consent = existsSync(join(p.dir, ".pi", "runtime", "consent.json")) ? consentOf(p) : {};
+      assert.notEqual(consent.modelUse?.granted, true, `${what}: a model nobody confirmed was granted`);
+      // ⚠️ AND THE REFUSAL SAYS WHAT WOULD MAKE IT WORK, which is the only part of it an operator can act on.
+      const said = o.warned.join("\n");
+      assert.ok(/--model-use approve/.test(said), `${what}: the refusal does not name the flag: ${said}`);
+    } finally {
+      rmSync(p.root, { recursive: true, force: true });
+    }
+  }
+
+  // ⚠️ AND WITH BOTH HALVES: the model named, and its use confirmed. Nothing is asked, and the project is ready.
+  const p = project({ ignored: true });
+  try {
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], { liveCheck: "approve" });
+    assert.equal(o.code, EXIT.OK, o.printed.concat(o.warned).join("\n"));
+    assert.deepEqual(o.seen.asks, [], "a non-interactive run asked something");
+
+    // ⚠️ **WHAT WAS AUTHORISED IS ON THE SCREEN.** The prompt is where the billing is disclosed, so a flag
+    // that skipped the words would authorise ongoing charges with nothing saying so in the terminal or the log.
+    // ⚠⚠ THE WORDS BEFORE THE ANSWER: the prompt is where the billing is disclosed, so a flag that applied
+    // the answer first, or printed only its own outcome, would authorise ongoing charges with nothing saying so.
+    const disclosure = o.printed.findIndex((l) => /may consume billable tokens or provider quota/.test(l));
+    const outcome = o.printed.findIndex((l) => /confirmed by --model-use approve/.test(l));
+    assert.ok(disclosure >= 0, `the disclosure was not printed: ${o.printed.join("\n")}`);
+    assert.ok(outcome > disclosure, `the answer was applied before what it authorises was said: ${o.printed.join("\n")}`);
+    assert.ok(
+      o.printed.some((l) => /Confirming authorises that ongoing use on this computer/.test(l)),
+      o.printed.join("\n")
+    );
+
+    const settings = settingsOf(p);
+    assert.equal(settings.defaultModel, "gpt-4o");
+    assert.equal(consentOf(p).modelUse.granted, true, "the model-use grant was not recorded");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ AND DENY IS AN ANSWER TOO: nothing is granted, nothing is committed, and the scaffold is left valid.
+  const denied = project({ ignored: true });
+  try {
+    const o = await setup(denied, ["--non-interactive", "--inspect", "approve", "--model-use", "deny"], { liveCheck: "approve" });
+    assert.notEqual(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.deepEqual(o.seen.asks, [], "a non-interactive run asked something");
+    // ⚠️ AND A DENIAL READS THE SAME WORDS FIRST: what is being refused has to be as clear as what is agreed.
+    const saidNo = o.printed.join("\n");
+    assert.ok(/may consume billable tokens or provider quota/.test(saidNo), `the disclosure was not printed: ${saidNo}`);
+    assert.ok(/declined by --model-use deny/.test(saidNo), saidNo);
+    const consent = existsSync(join(denied.dir, ".pi", "runtime", "consent.json")) ? consentOf(denied) : {};
+    assert.notEqual(consent.modelUse?.granted, true, "a denial granted the model");
+    assert.equal(settingsOf(denied).defaultModel, undefined, "a denied model was committed anyway");
+    assert.equal(existsSync(join(denied.dir, "planning-content", "project.yaml")), true, "the scaffold did not survive");
+  } finally {
+    rmSync(denied.root, { recursive: true, force: true });
+  }
+});
+
+/** Stops the launcher after the checks it is given, without starting anything. */
+class LaunchRefusalStub extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "LaunchRefusal";
+    this.reason = "stub";
+    this.remedies = [];
+  }
+}
+
+test("⚠️ a project proved with a declared identity is launchable, and is not without it", async () => {
+  // ⚠️ **THE KEY IS RECOMPUTED AT LAUNCH, NOT READ BACK.** So a declaration that lived only on setup's command
+  // line would leave every later start computing a different key and refusing the record setup had just written.
+  // This runs the launcher's own checks — the real `checkLaunch`, with only the supervisor stubbed — against
+  // a project setup proved, and then removes the declaration from the committed record to show it was load-bearing.
+  const requests = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const parsed = JSON.parse(body);
+      requests.push(parsed.model);
+      const seen = /[0-9a-f]{32}/.exec(JSON.stringify(parsed.messages))?.[0];
+      const base = { id: "x", object: "chat.completion.chunk", created: 0, model: parsed.model };
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(
+        `data: ${JSON.stringify({
+          ...base,
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", tool_calls: [{ index: 0, id: "c0", type: "function", function: { name: "kiln_preflight", arguments: JSON.stringify({ challenge: seen }) } }] },
+              finish_reason: null,
+            },
+          ],
+        })}\n\n`
+      );
+      res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] })}\n\ndata: [DONE]\n\n`);
+      res.end();
+    });
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+
+  const p = project({ ignored: true, models: false });
+  const saved = { content: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR, key: process.env.ACME_SETUP_KEY };
+  try {
+    writeFileSync(
+      join(p.agentDir, "models.json"),
+      JSON.stringify({
+        providers: {
+          acme: {
+            baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+            api: "openai-completions",
+            apiKey: "$ACME_SETUP_KEY",
+            models: [
+              { id: "acme-model", name: "Acme Model", contextWindow: 128000, maxTokens: 4096, reasoning: false, samplingParams: { temperature: 0.2 } },
+            ],
+          },
+        },
+      })
+    );
+    const proved = await setup(p, ["--credential-var", "ACME_SETUP_KEY", "--request-identity", "acme-gateway-v3"], {
+      pick: ["--provider", "acme", "--model", "acme-model", "--thinking", "off"],
+      env: { ACME_SETUP_KEY: "acme-setup-KEY-7b2f" },
+      canary: null,
+      liveCheck: "approve",
+    });
+    assert.equal(proved.code, EXIT.OK, proved.printed.concat(proved.warned).join("\n"));
+    assert.equal(requests.length, 1, `setup made ${requests.length} requests`);
+
+    // ⚠️ **THE LAUNCH CHECKS THEMSELVES, RECOMPUTING THE KEY.** This is what the launcher calls, given what
+    // the launcher gives it: the project's committed declarations. The record setup wrote matches, so the project
+    // is launchable without asking the provider anything.
+    const { checkLaunch } = await import("../lib/launch-checks.mjs");
+    const { consentLocation } = await import("../lib/consent-record.mjs");
+    const { committedDeclarations } = await import("../lib/local-state.mjs");
+    process.env.PI_CODING_AGENT_DIR = p.agentDir;
+    process.env.ACME_SETUP_KEY = "acme-setup-KEY-7b2f";
+    const declared = committedDeclarations(p.dir);
+    assert.deepEqual(declared, { requestIdentity: "acme-gateway-v3" }, "the declaration did not survive as the project's");
+
+    const launchable = await checkLaunch({
+      projectRoot: p.dir,
+      location: consentLocation({ projectRoot: p.dir }),
+      declared,
+      custom: { id: "acme", apiKey: "$ACME_SETUP_KEY" },
+      canary: async () => { throw new Error("the launch checks asked the provider for something already proved"); },
+    });
+    assert.equal(launchable.proof, "record", `launch did not reuse the record: ${JSON.stringify(launchable)}`);
+    assert.equal(requests.length, 1, "launch re-ran a check the record already proved");
+
+    // ⚠️ **AND WITHOUT THE DECLARATION THERE IS NO KEY AT ALL**, so launch refuses rather than starting on a
+    // proof it cannot match. This is the same project, one input removed.
+    await assert.rejects(
+      () =>
+        checkLaunch({
+          projectRoot: p.dir,
+          location: consentLocation({ projectRoot: p.dir }),
+          declared: {},
+          custom: { id: "acme", apiKey: "$ACME_SETUP_KEY" },
+          canary: async () => { throw new Error("a request was sent for a key that cannot be computed"); },
+        }),
+      (e) => e.name === "LaunchRefusal" && /identit|cannot be cached|uncacheable/i.test(e.message),
+      "launch started a project whose key it cannot compute"
+    );
+
+    // ⚠️ **AND THE LAUNCHER IS WHAT SUPPLIES THEM.** Its own checks are the ones above; what is asserted here
+    // is the wiring — that `bin/start-kiln.mjs` hands the project's committed declarations to those checks
+    // rather than nothing, which is the defect this control exists for.
+    const { main: startKiln } = await import("../bin/start-kiln.mjs");
+    process.env.PLANNING_CONTENT_DIR = p.contentRoot;
+    let handed = "never called";
+    await startKiln([], {
+      checkLaunch: async (opts) => {
+        handed = opts.declared;
+        throw new LaunchRefusalStub("stopping before anything starts");
+      },
+      runSupervisor: async () => ({ code: 0 }),
+    }).catch(() => {});
+    assert.deepEqual(handed, { requestIdentity: "acme-gateway-v3" }, `the launcher passed ${JSON.stringify(handed)}`);
+  } finally {
+    for (const [k, v] of Object.entries({ PLANNING_CONTENT_DIR: saved.content, PI_CODING_AGENT_DIR: saved.agent, ACME_SETUP_KEY: saved.key }))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    server.close();
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ D22 a built-in provider with unbounded configuration fails closed: the boundary is declared, not worked around", async () => {
+  // ⚠️ **WHAT DECLARING AN IDENTITY DOES NOT FIX.** The canary proves a request by making it in an isolated
+  // agent directory. A CUSTOM provider's non-credential configuration crosses into that directory, so the child
+  // makes the same request this project makes. A BUILT-IN provider's does not: the child resolves the model from
+  // Pi's own catalogue, so an operator's `samplingParams` for `openai gpt-4o` never reach it. The parent's key
+  // then describes a request the child did not make, and this is what must happen next — a refusal, with
+  // nothing recorded — rather than a record vouching for a request nobody made.
+  const { computeCompatibilityKey, proofProblem } = await import("../lib/compatibility-record.mjs");
+  const { canaryRequest } = await import("../bin/setup.mjs");
+
+  const selection = { provider: "openai", model: "gpt-4o", thinkingLevel: "off" };
+  const asConfigured = {
+    provider: "openai",
+    id: "gpt-4o",
+    api: "openai-completions",
+    baseUrl: "https://api.example.test/v1",
+    reasoning: false,
+    samplingParams: { temperature: 0.2 },
+  };
+  // The parent's key: the request as this project configures it, named by the declared identity.
+  const key = computeCompatibilityKey({
+    selection,
+    model: asConfigured,
+    piVersion: "0.84.4",
+    declared: { requestIdentity: "house-style-v2" },
+    effectiveBaseUrl: asConfigured.baseUrl,
+  });
+  assert.deepEqual(key.effectiveRequestProfile.unboundedInputs, { categories: ["samplingParams"], declaredIdentity: "house-style-v2" });
+
+  // What the child computes from the catalogue's model, which carries none of that configuration.
+  const inTheChild = { ...asConfigured, samplingParams: undefined };
+  assert.throws(
+    () => computeCompatibilityKey({ selection, model: inTheChild, piVersion: "0.84.4", declared: { requestIdentity: "house-style-v2" }, effectiveBaseUrl: asConfigured.baseUrl }),
+    (e) => e.name === "CompatibilityKeyRefusal",
+    "the child computed a key for a request it was not given"
+  );
+
+  // ⚠️ SO THE CHECK CANNOT PASS, AND SAYS SO. A child that reports no key is not a proof of anything.
+  assert.deepEqual(proofProblem(key, { observed: { keyError: "request-profile-uncacheable" }, requests: [] }), { reason: "canary-key-unavailable" });
+
+  // ⚠️ AND THE REASON IT CANNOT REACH THE CHILD IS STRUCTURAL, NOT AN OVERSIGHT: only a declared custom
+  // provider's configuration crosses, because only that provider's credential is a declared variable name.
+  const built = canaryRequest({ selection, declared: { requestIdentity: "house-style-v2" } }, { authSource: "environment", agentDir: "/nowhere", model: asConfigured }, null);
+  assert.equal(Object.hasOwn(built, "customProviderConfig"), false, "a built-in provider's configuration crossed into the canary");
+  assert.deepEqual(built.declared, { requestIdentity: "house-style-v2" });
+});
+
+test("⚠️ ACC-0084 each refusal class exits with its own published code, observed through the command", async () => {
+  // ⚠️ **THE MAPPING IS ONLY WORTH HAVING IF IT IS WHAT RUNS.** `exitFor` is checked against the table
+  // elsewhere; this drives the real command into each class and compares what it RETURNS with what `--help`
+  // publishes. A table that agrees with itself and disagrees with the command is the failure this exists to catch.
+  const { EXIT_MEANING, usage } = await import("../bin/setup.mjs");
+  const help = usage();
+  const observed = new Map();
+
+  const run = async (what, expected, make) => {
+    const p = project({ ignored: true });
+    try {
+      const o = await make(p);
+      assert.equal(o.code, expected, `${what}: expected ${expected}, got ${o.code}\n${o.printed.concat(o.warned).join("\n")}`);
+      // ⚠️ WHAT THE OPERATOR IS TOLD IS PART OF THE CLASS: a code with no words is a number to guess at.
+      if (expected !== EXIT.OK) assert.ok(o.warned.join("").length > 0, `${what}: refused with nothing said`);
+      observed.set(what, o.code);
+    } finally {
+      rmSync(p.root, { recursive: true, force: true });
+    }
+  };
+
+  await run("a value the command cannot read", EXIT.ARGUMENTS, (p) => setup(p, ["--trust", "maybe"]));
+  await run("an unknown option", EXIT.ARGUMENTS, (p) => setup(p, ["--wat"]));
+  await run("a credential where a variable name belongs", EXIT.ARGUMENTS, (p) => setup(p, ["--credential-var", "sk-live-0123456789"]));
+  await run("an endpoint identity carrying credentials", EXIT.ARGUMENTS, (p) => setup(p, ["--endpoint-identity", "https://u:p@gate.example.com/v1"]));
+  await run("a project root that does not own the content", EXIT.PATHS, (p) => setup(p, ["--project-root", join(p.root, "elsewhere")]));
+  // ⚠️ THE REAL RESOLVER, held to a version this checkout does not have: the refusal is Pi's own class, and
+  // the command tells "your install is not the pin" apart from "setup could not write something".
+  const { resolvePinnedAgent } = await import("../lib/pi-runtime.mjs");
+  await run("an install that is not the pinned runtime", EXIT.RUNTIME, (p) =>
+    setup(p, [], { verifyRuntime: (_m, paths) => resolvePinnedAgent(paths.toolRoot, { version: "0.0.0-not-this-one" }) })
+  );
+  // ⚠️ AND THE BOOTSTRAP'S OWN CLASS, raised where the real one raises it. What a test may not do is run a
+  // registry install, so the seam throws what `installDependencies` throws when the lockfile check fails.
+  await run("a bootstrap that could not complete", EXIT.INSTALL, (p) =>
+    setup(p, [], {
+      install: () => {
+        throw new SetupCommandRefusal(EXIT.INSTALL, ["npm ci did not complete.", "Nothing of the project was changed."].join("\n"));
+      },
+    })
+  );
+  await run("a project nobody trusts", EXIT.TRUST, (p) => setup(p, [], { trust: "deny" }));
+  await run("a look at this computer that was refused", EXIT.CONSENT, (p) => setup(p, ["--inspect", "deny"]));
+  await run("a model named but never confirmed", EXIT.SELECTION, (p) => setup(p, ["--non-interactive", "--inspect", "approve", ...PICKED], { pick: [] }));
+  // ⚠️ **AUTHENTICATION IS ITS OWN CLASS, WHICH ACC-0084 NAMES.** "Choose a model" and "connect a provider
+  // in Pi" are different instructions: the first can be answered with flags, the second cannot be answered by
+  // this command at all. A host with nothing configured gets the second.
+  await run("a computer with no provider connected", EXIT.AUTHENTICATION, (p) => {
+    writeFileSync(join(p.agentDir, "auth.json"), "{}");
+    writeFileSync(join(p.agentDir, "models.json"), JSON.stringify({ providers: {} }));
+    return setup(p, ["--non-interactive", "--inspect", "approve"], { pick: [] });
+  });
+  // ⚠️ TWO ANSWERS, ONE CLASS: a refused look at this computer and a refused billable check both leave setup
+  // partial with the project valid, which is what code 9 means. What they are not is "the model failed".
+  await run("a billable check the operator refused", EXIT.CONSENT, (p) =>
+    setup(p, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], { liveCheck: "deny" })
+  );
+  await run("a model that did not pass the check", EXIT.NOT_PROVED, (p) =>
+    setup(p, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], { liveCheck: "approve", canary: async () => ({ passed: false }) })
+  );
+
+  // ⚠️ **A MODEL THIS COMPUTER DECLINED IS AN ANSWER, NOT A FAULT**, which is why it arrives as the partial
+  // code and not as "this selection cannot be used". The latter is the preflight's class, and in THIS command the
+  // selection phase refuses first in every case that would reach it — an unavailable model is offered for
+  // reselection, a missing credential is a contract refusal. It is reached for real by the launcher, which has no
+  // selection phase in front of it, and is proved there and in the mapping below.
+  const declined = project({ ignored: true });
+  try {
+    const first = await setup(declined, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], { liveCheck: "approve" });
+    assert.equal(first.code, EXIT.OK, first.printed.join("\n"));
+    const consentPath = join(declined.dir, ".pi", "runtime", "consent.json");
+    const consent = JSON.parse(readFileSync(consentPath, "utf-8"));
+    consent.modelUse.granted = false;
+    writeFileSync(consentPath, JSON.stringify(consent));
+    const after = await setup(declined, ["--non-interactive", "--inspect", "approve"], { pick: [], liveCheck: "approve" });
+    assert.equal(after.code, EXIT.CONSENT, `a declined model: ${after.printed.concat(after.warned).join("\n")}`);
+    assert.ok(
+      after.printed.every((l) => !/^compatibility recorded/.test(l)),
+      `a declined model was checked live: ${after.printed.join("\n")}`
+    );
+  } finally {
+    rmSync(declined.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ AND THE CONTRACT ITSELF: every code observed is published, distinct, and described in --help.
+  assert.equal(new Set(Object.values(EXIT)).size, Object.values(EXIT).length, "two classes share a code");
+  for (const [what, code] of observed) {
+    assert.ok(Object.hasOwn(EXIT_MEANING, String(code)), `${what}: ${code} has no published meaning`);
+    assert.ok(help.some((line) => new RegExp(`^\\s*${code}\\s`).test(line)), `${what}: ${code} is not in --help`);
+  }
+  // ⚠️ **A CODE PER CLASS, NOT PER SCENARIO.** Several bad arguments are one class, and so are the answers
+  // that leave setup partial; what may not happen is two DIFFERENT instructions to the operator arriving as one
+  // number. So the scenarios are grouped by the class they belong to, and those groups may not share a code.
+  const byClass = new Map();
+  for (const [what, code] of observed) {
+    const cls = code === EXIT.ARGUMENTS ? "arguments" : code === EXIT.CONSENT ? "an answer that left setup partial" : what;
+    byClass.set(cls, code);
+  }
+  assert.equal(new Set(byClass.values()).size, byClass.size, `two classes arrived as one code: ${[...byClass]}`);
+
+  /**
+   * ⚠️ **WHAT THIS MATRIX DOES NOT REACH, SAID HERE RATHER THAN LEFT TO BE INFERRED.** ACC-0084 names ten
+   * classes, and two of them are not setup's to raise:
+   *
+   * • `EXIT.UNUSABLE` — the preflight's `LaunchRefusal`. In THIS command the selection phase refuses first
+   *   in every case that would reach it: an unavailable model is offered for reselection, a model this host
+   *   declined leaves setup partial (measured above), and a provider with no contract is a credential refusal.
+   *   It is reached by `bin/start-kiln.mjs`, which has no selection phase in front of it.
+   * • Launch failure — the launcher's, for the same reason.
+   *
+   * Both remain in the published mapping, and the mapping is checked against the classes below, so neither is
+   * unpublished; what is declared is that this file does not observe them through `bin/setup.mjs`.
+   */
+  const { exitFor } = await import("../bin/setup.mjs");
+  for (const [name, code] of [["LaunchRefusal", EXIT.UNUSABLE]]) {
+    assert.equal(exitFor(Object.assign(new Error("x"), { name, reason: "whatever" })), code, `${name} is not mapped`);
+    assert.ok(Object.hasOwn(EXIT_MEANING, String(code)), `${code} has no published meaning`);
+    assert.ok([...observed.values()].includes(code) === false, `${code} was observed after all; move it out of the boundary list`);
+  }
+
+  // ⚠️ AND THE OPTIONS THE HELP DESCRIBES ARE THE OPTIONS THE COMMAND TAKES, including what re-enables research.
+  // Read as an operator reads it, so a sentence wrapped across two lines is still the sentence.
+  const text = help.join(" ").replace(/\s+/g, " ");
+  for (const flag of ["--inspect", "--model-use", "--endpoint-identity", "--request-identity"]) assert.ok(text.includes(flag), `${flag} is undocumented`);
+  // ⚠️ THE SAME INSTRUCTION EVERY USER-DISABLED RESEARCH OUTCOME CARRIES (EVD-0127): one way to turn it on,
+  // said in one form, wherever the operator meets it.
+  assert.ok(
+    /to enable web research later, run setup again with --research tavily/i.test(text),
+    `--help does not say what re-enables research: ${text}`
+  );
+});
+
 test("⚠️ every refusal class this command can raise has its own published exit code", async () => {
   // ⚠️ **A CODE PER CLASS IS WHAT A CALLER CAN ACT ON.** "Choose a model", "this provider needs a credential
   // declaration" and "the package entry could not be written" are three different instructions; one code for all

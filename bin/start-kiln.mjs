@@ -37,7 +37,7 @@ import { consentLocation } from "../lib/consent-record.mjs";
 import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/content-root.mjs";
 import { LaunchRefusal, checkLaunch as checkLaunchDefault } from "../lib/launch-checks.mjs";
 import { runLiveCanary } from "../lib/live-canary.mjs";
-import { LocalStateRefusal } from "../lib/local-state.mjs";
+import { LocalStateRefusal, committedDeclarations } from "../lib/local-state.mjs";
 import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
@@ -307,6 +307,13 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     projectRoot,
     location: consentLocation({ projectRoot }),
     override: args.override,
+    /**
+     * ⚠️ **THE PROJECT'S OWN DECLARATIONS, BECAUSE THE KEY IS RECOMPUTED HERE TOO.** A model whose endpoint
+     * cannot be canonicalised, or whose request depends on values Kiln may not persist, has no compatibility key
+     * without the non-secret identities the operator declared to setup (D22). Recomputing without them produces a
+     * different key, so the record setup wrote would not match and a proved project would refuse to start.
+     */
+    declared: committedDeclarations(projectRoot),
     ...(interactive ? { ask } : {}),
     canary: liveCanaryRunner(),
   });

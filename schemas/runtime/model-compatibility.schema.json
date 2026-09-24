@@ -54,38 +54,7 @@
           "description": "Determinant 5. `openai-completions` and `anthropic-messages` serialise tool calls differently, so the same model behind a different API type is an unproven path."
         },
         "endpointIdentity": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scheme",
-            "hostname",
-            "port",
-            "pathname"
-          ],
-          "description": "Determinant 6, STRUCTURED RATHER THAN A STRING, because a regex over a URL could exclude userinfo and a query and still accept three non-canonical spellings of one endpoint — an uppercase hostname, an implicit port and a trailing slash all validated against the previous pattern, so two records for the same endpoint would have compared unequal and re-run a billable check. The parts are produced by `canonicalizeEndpoint()` and there is exactly one of it. ⚠️ USERINFO, QUERY AND FRAGMENT ARE REFUSED BY THE CANONICALISER, not stripped: a query can carry routing, so removing it would let two differently routed endpoints share one proof, and an identity that is only non-secret after sanitising is not a property a persisted file may rely on.",
-          "properties": {
-            "scheme": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9+.-]*$",
-              "description": "Lowercased. `HTTPS` and `https` are one scheme and must not be two cache keys."
-            },
-            "hostname": {
-              "type": "string",
-              "pattern": "^(?!.*[A-Z])[a-z0-9._~\\-]+$|^\\[[0-9a-f:.]+\\]$",
-              "description": "Lowercased; an IPv6 literal keeps its brackets. ⚠️ THE PATTERN REFUSES ANY UPPERCASE rather than trusting the writer to have lowered it — hostnames are case-insensitive, so an uppercase spelling is the same host and a different key."
-            },
-            "port": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535,
-              "description": "ALWAYS EXPLICIT, with the scheme default filled in. ⚠️ `https://h/v1` and `https://h:443/v1` are the same endpoint; leaving the port implicit would make them different records."
-            },
-            "pathname": {
-              "type": "string",
-              "pattern": "^/$|^/(?:[^/]+/)*[^/]+$",
-              "description": "PRESERVED, because a path is routing and two deployments differing only after the host are two endpoints. Canonical form: a leading slash, no trailing slash except at the root, and no empty segments."
-            }
-          }
+          "$ref": "runtime-common.schema.json#/$defs/endpointIdentity"
         },
         "endpointIdentitySource": {
           "enum": [
@@ -549,9 +518,7 @@
                   "description": "Which unbounded inputs were present. ⚠️ THE CATEGORY NAMES ONLY — never a key, a value or a count, because a key name from an operator-authored record is itself unbounded content. ⚠️ AUTHENTICATION HEADERS ARE NOT A CATEGORY: they are credential transport, they are excluded from the profile entirely, and they must not invalidate a proof — rotating a key does not change what the model can do."
                 },
                 "declaredIdentity": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:@/-]{0,127}$",
-                  "description": "An operator-supplied, non-secret label standing for the unbounded configuration — for example a template revision or a routing profile name. ⚠️ SUPPLIED, NEVER DERIVED. Deriving it from the values would reintroduce the fingerprint this whole field exists to avoid, whatever function did the deriving."
+                  "$ref": "runtime-common.schema.json#/$defs/declaredRequestIdentity"
                 }
               },
               "allOf": [
