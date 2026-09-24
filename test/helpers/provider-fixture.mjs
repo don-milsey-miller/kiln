@@ -66,7 +66,7 @@ export function render(step, model, position) {
 /**
  * Start the fixture.
  *
- * @param {{script?: Array<object|((request: object) => object)>, key?: string}} [options]
+ * @param {{script?: Array<object|((request: object) => object|Promise<object>)>, key?: string}} [options]
  *   `script[position]` answers a request at that position; a function step receives the parsed request, so a
  *   step can echo a value only the request carries (the canary's challenge). Past the end of the script, prose.
  * @returns {Promise<{url: string, port: number, requests: Array<object>, close: () => Promise<void>}>}
@@ -77,7 +77,7 @@ export async function startProviderFixture({ script = [], key = FIXTURE_KEY } = 
   const server = createServer((req, res) => {
     let raw = "";
     req.on("data", (d) => (raw += d));
-    req.on("end", () => {
+    req.on("end", async () => {
       let body = null;
       try {
         body = JSON.parse(raw);
@@ -98,7 +98,14 @@ export async function startProviderFixture({ script = [], key = FIXTURE_KEY } = 
 
       const position = positionIn(body);
       const entry = script[position];
-      const step = entry === undefined ? { text: FIXTURE_DONE } : typeof entry === "function" ? entry(body) : entry;
+      // ⚠️ A FUNCTION STEP MAY RETURN A PROMISE, so a test can hold a turn until it has observed something, such as a
+      // browser showing the state before the answer. A step that throws is a 500, never a hung request.
+      let step;
+      try {
+        step = entry === undefined ? { text: FIXTURE_DONE } : typeof entry === "function" ? await entry(body) : entry;
+      } catch (e) {
+        return refuse(500, `the scripted step failed: ${e?.message ?? e}`);
+      }
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "close" });
       res.end(render(step, body.model ?? FIXTURE_MODEL, position));
     });
