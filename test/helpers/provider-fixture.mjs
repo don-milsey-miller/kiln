@@ -128,7 +128,6 @@ export function modelsJson(url) {
         baseUrl: url,
         api: "openai-completions",
         apiKey: `$${FIXTURE_KEY_VAR}`,
-        compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
         models: [{ id: FIXTURE_MODEL, name: "Kiln Fixture", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 }],
       },
     },
