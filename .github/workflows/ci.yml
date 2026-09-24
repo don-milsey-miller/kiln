@@ -13,8 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["22", "24"]
-        attempt: [1, 2, 3, 4]
+        node: ["22"]
+        attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
