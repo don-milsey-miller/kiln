@@ -1,0 +1,64 @@
+{
+  "id": "EVD-0141",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: a custom-provider project starts through bin/start-kiln.mjs, with its credential variable remembered on this host",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0072, toward ACC-0116, which is left not-evaluated for review. The implementation is c3c8fd0 (a mechanical move of canaryRequest and its custom-provider config to lib/launch-checks.mjs), 8ab0b16 (the TSK-0062 fixture) and 1d0ee30. WHERE THE DECLARATION LIVES. Setup's `--credential-var` NAME is now written to this host's consent record, as `modelUse.credentialVar`, beside the grant for exactly that provider and model and only when that grant says yes. It is never committed: `.pi/settings.json` and `.pi/kiln.json` do not carry it. A model or provider change clears the grant and the declaration with it. The schema admits a variable name only. THE LAUNCH. After the model-use grant stands, `zeroCostPreflight` reads the declaration for the recorded selection and resolves the same custom contract setup proved; a one-run override of the model has no grant and so no declaration. When a one-run canary is needed, `checkLaunch` passes the declaration and the provider's non-credential configuration to it. MEASURED THROUGH BOTH REAL COMMANDS, against the TSK-0062 fixture. Setup with `--credential-var` ran the real canary once and completed. A second setup run named no variable, reused the declaration and the record, and made no request. The real `bin/start-kiln.mjs`, with its real launch checks and only its supervisor replaced by a recorder, passed on this computer's record with Pi held to `--provider kiln-fixture --model fixture-model --thinking off`, and made no request. With the declared variable empty the same launch exited 2, refused as `No authentication is configured for kiln-fixture fixture-model`, and started nothing. CONTROL. With launch's derivation of the declaration disabled, the ACC-0116 case failed. A FINDING ON THE WAY. The fixture's `models.json` first set `compat`, and setup refused it with `canary-inputs-differ`: the canary accepts only baseUrl, api and models for a custom provider, so a `compat` block changes the parent's request and not the child's. That fails closed. The fixture no longer sets `compat` (8ab0b16), and a custom provider that needs `compat` still cannot pass setup.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0072, commits c3c8fd0, 8ab0b16 and 1d0ee30",
+      "bin/setup.mjs": "sha256:6b521801ccdb43a7afed767cf934a6bee950d89d09603069a13eab2f847c41bb",
+      "bin/start-kiln.mjs": "sha256:e179986090c47a51db966fd6396704f3aeb219b333799f55eb9b3d20fb7911ff",
+      "lib/consent-record.mjs": "sha256:ce7796a4a82dd815fd473bae47c7abf551cebed6060a3c5ac6d45203ecb4a7b0",
+      "lib/launch-checks.mjs": "sha256:6830bc59d145d2c0e58f07baeca742111462c77a420db93a3382f1c9c3cf2a2a",
+      "schemas/runtime/consent.schema.json": "sha256:659a43590d49231808a292c5ce6369e0a897923b414ca0437a71eebc2b1b5af6",
+      "test/consent-record.test.mjs": "sha256:17b45bbb8cd7e8d77393cf066657aaf485ea3a4a60c0846ba56b9886a54138a6",
+      "test/setup-command.test.mjs": "sha256:0f9c490324e33170f3e906b4fb975f247f03c2d25706f7f2fb6fcca88215b0e5",
+      "test/helpers/provider-fixture.mjs": "sha256:17e5d915b4c5329d2774c017f77e906d94588a27550e1b340240152fc6a5cce2",
+      "platform": "Windows 11, Node 24.18.0, Git 2.52.0.windows.1, Pi 0.84.4 (the pin)",
+      "acc-0116-case": "test/setup-command.test.mjs, 'ACC-0116 a project set up with a custom provider starts, and refuses by name without its key': setup, setup again, launch, launch without the key; 1 fixture request in total",
+      "consent-case": "test/consent-record.test.mjs, 'TSK-0072 a custom provider's credential variable rides on a granted model-use grant, and leaves with it': no grant and a declined grant write nothing; a yes writes it for that model only; a value in place of a name is refused; a model change clears it",
+      "mutation": "one: launch's derivation of the declaration disabled; the ACC-0116 case failed; restored",
+      "full-suite-local": "node --test on Windows: 1630 tests, 1625 pass, 0 fail, 5 skipped",
+      "plan-lint": "no findings over 517 artifacts",
+      "ci-run": "GitHub Actions run 36009116433 at 1d0ee30, attempt 1, no job re-run, all four cells succeeded; the ACC-0116 case passed in every cell",
+      "cell-windows-22": "job 107664902082, 1630 tests / 1629 pass / 0 fail / 1 skipped",
+      "cell-windows-24": "job 107664902432, 1630 tests / 1629 pass / 0 fail / 1 skipped",
+      "cell-ubuntu-22": "job 107664902262, 1630 tests / 1620 pass / 0 fail / 10 skipped",
+      "cell-ubuntu-24": "job 107664902382, 1630 tests / 1620 pass / 0 fail / 10 skipped, plus the live compatibility tier (6 tests, 6 pass)",
+      "no-billable-request": "every request went to the loopback fixture"
+    },
+    "omissions": [
+      {
+        "fact": "running-agent",
+        "state": "not-captured",
+        "reason": "The supervisor was replaced by a recorder, so what is measured is that the checks pass and Pi's arguments hold the selection, not an interactive session. A started session is TSK-0063's."
+      },
+      {
+        "fact": "custom-override-canary",
+        "state": "not-captured",
+        "reason": "A one-run override of the model has no grant and so no declaration; a custom provider cannot be used as a one-run override. Not required by ACC-0116."
+      },
+      {
+        "fact": "custom-compat",
+        "state": "not-captured",
+        "reason": "A custom provider whose models.json sets compat fails setup's canary with canary-inputs-differ, because the canary does not carry compat to its child. Fails closed; not owned by any task yet."
+      }
+    ]
+  }
+}

@@ -20,5 +20,5 @@
   "dependsOn": [
     "TSK-0037"
   ],
-  "notes": "Created 2026-09-24 from TSK-0037's STILL OWED note (D25, D13), which TSK-0037's acceptance did not cover. TSK-0063 depends on it: its journey binds the TSK-0062 fixture, a custom provider, and cannot reach a running Kiln until this lands. The launcher's own refusal codes (owed against CMP-0037) are not part of this task."
+  "notes": "Created 2026-09-24 from TSK-0037's STILL OWED note (D25, D13), which TSK-0037's acceptance did not cover. TSK-0063 depends on it: its journey binds the TSK-0062 fixture, a custom provider, and cannot reach a running Kiln until this lands. The launcher's own refusal codes (owed against CMP-0037) are not part of this task. ⚠️ IMPLEMENTED 2026-09-24 (EVD-0141, commits c3c8fd0, 8ab0b16, 1d0ee30). The declaration lives on this host's model-use grant (`modelUse.credentialVar`), never committed. ACC-0116 is left not-evaluated for review."
 }
