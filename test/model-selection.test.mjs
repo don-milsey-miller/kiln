@@ -539,3 +539,41 @@ test("⚠️ a committed level the model does not support is not confirmed as if
     rmSync(p.root, { recursive: true, force: true });
   }
 });
+
+test("⚠️ TSK-0063 a rerun naming the committed selection with --model-use approve reuses the standing grant and writes nothing", async () => {
+  const p = project();
+  const via = (name) => () => name;
+  const flags = { requested: { ...A, thinking: "high" }, confirmation: true };
+  try {
+    const first = await select(p, { ...flags, credentialFor: via("KEY_ONE") });
+    assert.equal(first.outcome, SELECTION_OUTCOME.SELECTED);
+    const before = { settings: bytes(settingsPath(p.dir)), consent: bytes(p.where.path) };
+
+    // The same provider, model, level and variable, with the grant standing: reused, silently, byte for byte.
+    const printed = [];
+    const again = await select(p, { ...flags, credentialFor: via("KEY_ONE"), print: (l) => printed.push(l) });
+    assert.equal(again.outcome, SELECTION_OUTCOME.REUSED);
+    assert.deepEqual(printed, [], "a reused grant printed a new confirmation");
+    assert.ok(bytes(settingsPath(p.dir)).equals(before.settings), "settings changed");
+    assert.ok(bytes(p.where.path).equals(before.consent), "the grant was recorded again");
+
+    // A different variable is a different grant: it is confirmed again, and recorded.
+    const other = await select(p, { ...flags, credentialFor: via("KEY_TWO"), print: () => {} });
+    assert.equal(other.outcome, SELECTION_OUTCOME.SELECTED, "a new variable was not taken through the decision path");
+    assert.equal(grantOf(p).credentialVar, "KEY_TWO");
+
+    // A different thinking level is a change: confirmed again, and recorded.
+    const level = await select(p, { requested: { ...A, thinking: "low" }, confirmation: true, credentialFor: via("KEY_TWO"), print: () => {} });
+    assert.equal(level.outcome, SELECTION_OUTCOME.SELECTED, "a new level was not taken through the decision path");
+    assert.equal(committedSelection(p.dir).thinkingLevel, "low");
+
+    // An explicit deny still takes its existing decision path: declined, never reused, and through the flags it
+    // refuses the change without recording anything.
+    const consentBeforeDeny = bytes(p.where.path);
+    const denied = await select(p, { requested: { ...A, thinking: "low" }, confirmation: false, credentialFor: via("KEY_TWO"), print: () => {} });
+    assert.equal(denied.outcome, SELECTION_OUTCOME.DECLINED);
+    assert.ok(bytes(p.where.path).equals(consentBeforeDeny), "a deny through the flags recorded a decision");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
