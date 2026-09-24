@@ -167,14 +167,29 @@ test("⚠️ ACC-0116 a custom-provider project starts for real, answers through
         const h = process.env.HANDLE_EXE ? spawnSync(process.env.HANDLE_EXE, ["-accepteula", "-nobanner", root], { encoding: "utf-8", timeout: 60_000 }) : null;
         return { at: Date.now() - t0, processes: rows, handles: h ? (h.stdout || h.stderr || "").trim().slice(0, 6000) : null };
       };
-      const record = { error: { code: e.code, path: e.path }, startedAtMs, failedAtMs: t0, atFailure: snap() };
+      // ORDER MATTERS: what is left and who holds it first, then the release timed at 50 ms, then the slow process table.
+      const { readdirSync } = await import("node:fs");
+      let left;
+      try { left = readdirSync(e.path ?? root); } catch (x) { left = x.code; }
+      const hStart = Date.now();
+      const h = process.env.HANDLE_EXE ? spawnSync(process.env.HANDLE_EXE, ["-accepteula", "-nobanner", root], { encoding: "utf-8", timeout: 60_000 }) : null;
+      const record = {
+        error: { code: e.code, path: e.path },
+        startedAtMs,
+        failedAtMs: t0,
+        leftInPath: left,
+        handlesAt: { startMs: hStart - t0, endMs: Date.now() - t0, out: h ? (h.stdout || h.stderr || "").trim().slice(0, 6000) : null },
+      };
       let removedAfterMs = null;
+      let attempts = 0;
       while (Date.now() - t0 < 15_000) {
         await new Promise((r) => setTimeout(r, 50));
+        attempts++;
         try { rmSync(root, { recursive: true, force: true }); removedAfterMs = Date.now() - t0; break; } catch (again) { record.lastError = again.code; }
       }
       record.removedAfterMs = removedAfterMs;
-      if (removedAfterMs === null) record.atGiveUp = snap();
+      record.attempts = attempts;
+      record.afterRelease = snap();
       appendFileSync(process.env.F11_OUT ?? "f11-events.jsonl", JSON.stringify(record) + "\n");
       throw e;
     }
