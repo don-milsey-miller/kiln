@@ -54,7 +54,7 @@ test("⚠️ F11 a holder that outlasts the bound is named in the first refusal'
   const { dir, holder } = await held(60_000);
   try {
     const { thrown, record } = removeRecorded(dir);
-    console.log(`[f11 test] handles ${JSON.stringify(record?.handles)} inventory ${record?.inventory?.ms} ms`);
+    console.log(`[f11 test] handles ${JSON.stringify(record?.handles)} diagnostics ${record?.diagnosticsMs} ms, retry ${record?.retry?.ms} ms`);
     assert.ok(record, "no record was written");
     assert.ok(["EBUSY", "EPERM", "ENOTEMPTY"].includes(record.error.code), JSON.stringify(record.error));
     assert.ok(thrown && thrown.code === record.error.code, "the original error was not thrown");
@@ -70,7 +70,9 @@ test("⚠️ F11 a holder that outlasts the bound is named in the first refusal'
     for (const d of ["handles", "inventory", "remaining"]) assert.equal(typeof record[d].ms, "number", `${d} was not timed`);
     assert.equal(record.retry.removed, false);
     assert.equal(record.retry.tries, 17, "the whole bound was used");
-    assert.ok(record.retry.afterMs - record.diagnosticsMs >= 15_300, `the bound was cut short: ${JSON.stringify(record.retry)}`);
+    assert.equal(typeof record.diagnosticsMs, "number", "the diagnostics were not timed as a whole");
+    assert.ok(record.retry.startMs >= record.diagnosticsMs, "the retry began before the diagnostics ended");
+    assert.ok(record.retry.ms >= 15_300, `the bound was cut short: ${JSON.stringify(record.retry)}`);
   } finally {
     holder.kill();
     await new Promise((r) => setTimeout(r, 300));

@@ -6,7 +6,8 @@
  * in this order and each within a bound: `handle64` for the exact directory, a process inventory, and what is left
  * inside the directory, each with its own start and duration. Then the removal is retried within the bound it always
  * had (17 tries, 100 ms more each, at most 15.3 s), kept by this module's own loop, and if the directory is still
- * held the original error is thrown.
+ * held the original error is thrown. The record gives the diagnostics' total (`diagnosticsMs`) and the retry loop's
+ * own start and duration (`retry.startMs`, `retry.ms`) separately.
  *
  * ⚠️ **NO COMMAND LINES, NO ENVIRONMENT VALUES.** The inventory is pid, parent pid, creation time and image name. A
  * diagnostic that cannot run is recorded as unavailable, with the reason, never omitted.
@@ -124,13 +125,17 @@ export function removeTestTree(dir, label) {
       record[name].startMs = at - t0;
       record[name].ms = Date.now() - at;
     };
-    // handle64 first: it is the one that can name the holder of the exact path, if it can see the hold at all.
-    timed("handles", () => handles(first.path ?? dir));
+    // handle64 first: it is the one that can name the holder of the exact path. Asked with `dir`, not the error's path: on
+    // Node 24 that carries the `\\?\` prefix, which handle64 matches against nothing (CI run 36160238262).
+    timed("handles", () => handles(dir));
     timed("inventory", () => inventory());
     timed("remaining", () => remaining(dir));
     record.diagnosticsMs = Date.now() - t0;
-    const retried = { ...removeWithinBound(dir), afterMs: null };
-    retried.afterMs = Date.now() - t0;
+    // The retry loop's own duration is reported apart from the diagnostics' so a hold's length is not read off their sum.
+    const retryAt = Date.now();
+    const retried = removeWithinBound(dir);
+    retried.startMs = retryAt - t0;
+    retried.ms = Date.now() - retryAt;
     record.retry = retried;
     const line = JSON.stringify(record);
     if (process.env.F11_OUT) {
