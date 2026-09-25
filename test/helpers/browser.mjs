@@ -12,6 +12,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { PROCESS_TABLE_COMMAND } from "../../lib/supervisor.mjs";
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const BROWSERS = [
@@ -42,6 +44,10 @@ export async function launchBrowser(browserPath) {
     "--no-default-browser-check",
     "--disable-gpu",
     "--disable-extensions",
+    // ⚠️ CHROME'S OWN LOG ON STDERR, kept as a bounded tail: a start that never wrote DevToolsActivePort said nothing
+    // else (CI run 36197842986), and this is where Chrome says what it was doing.
+    "--enable-logging=stderr",
+    "--v=1",
     // Ubuntu 24.04 restricts the unprivileged user namespaces Chromium's sandbox needs; the page is loopback-only.
     ...(process.platform === "linux" ? ["--no-sandbox"] : []),
     "about:blank",
@@ -52,7 +58,7 @@ export async function launchBrowser(browserPath) {
   // ⚠️ **WHY A START FAILED, BOUNDED.** A page that never appeared used to fail with one line and nothing else (CI run
   // 36178450744, Windows Node 22). The browser's exit and the tail of its stderr are kept, at most STDERR_TAIL characters.
   const started = Date.now();
-  const startup = { exit: null, stderrTail: "" };
+  const startup = { pid: proc.pid ?? null, exit: null, stderrTail: "" };
   proc.stderr.on("data", (d) => (startup.stderrTail = (startup.stderrTail + d).slice(-STDERR_TAIL)));
   proc.once("exit", (code, signal) => (startup.exit = { code, signal, afterMs: Date.now() - started }));
   let page = null;
@@ -97,7 +103,7 @@ export async function launchBrowser(browserPath) {
 }
 
 /** The most of the browser's stderr kept for a failed start. */
-const STDERR_TAIL = 4000;
+const STDERR_TAIL = 12_000;
 
 /**
  * Which node, PowerShell and browser processes were running when a start failed: image name and pid only, no command
@@ -107,12 +113,21 @@ function runningProcesses() {
   const [cmd, args] = process.platform === "win32" ? ["tasklist", ["/fo", "csv", "/nh"]] : ["ps", ["-A", "-o", "pid=,comm="]];
   const r = spawnSync(cmd, args, { encoding: "utf-8", timeout: 10_000 });
   if (r.error || r.status !== 0) return { available: false, reason: r.error?.code ?? `${cmd} exited ${r.status}` };
+  // Parent pid and creation time from the supervisor's own WMI-free table, so each process can be tied to this launch.
+  const table = new Map();
+  if (process.platform === "win32") {
+    const t = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", PROCESS_TABLE_COMMAND.win32[1][3]], { encoding: "utf-8", timeout: 10_000 });
+    for (const line of t.stdout?.split(/\r?\n/) ?? []) {
+      const m = /^(\d+)\s+(\d+)\s+(\S+)$/.exec(line.trim());
+      if (m) table.set(Number(m[1]), { ppid: Number(m[2]), created: m[3] });
+    }
+  }
   const rows = [];
   for (const line of r.stdout.split(/\r?\n/)) {
     const m = process.platform === "win32" ? /^"([^"]*)","(\d+)"/.exec(line) : /^\s*(\d+)\s+(.+)$/.exec(line);
     if (!m) continue;
     const [name, pid] = process.platform === "win32" ? [m[1], Number(m[2])] : [m[2].trim(), Number(m[1])];
-    if (/^(node|powershell|pwsh|chrome|msedge|chromium|google-chrome)(\.exe)?$/i.test(name)) rows.push({ name, pid });
+    if (/^(node|powershell|pwsh|chrome|msedge|chromium|google-chrome)(\.exe)?$/i.test(name)) rows.push({ name, pid, ...(table.get(pid) ?? {}) });
   }
   return { available: true, rows };
 }
