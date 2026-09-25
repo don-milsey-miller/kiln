@@ -4249,6 +4249,7 @@ test(
     );
     writeFileSync(agentScript, "setTimeout(() => process.exit(0), 300);");
     const logged = [];
+    const tableReads = [];
     try {
       const result = await runSupervisor({
         sessionLister: listNothing,
@@ -4260,7 +4261,8 @@ test(
         spawn: () => assert.fail("nothing is spawned directly in job mode"),
         env: { ...process.env, PORT: String(await freePort()) },
         randomBytes: () => Buffer.alloc(16, 7),
-        psRun: NO_DESCENDANTS,
+        // ⚠️ COUNTED: with both trees in jobs, neither the launch nor the shutdown reads a process table (ACC-0081).
+        psRun: (...args) => (tableReads.push(args), NO_DESCENDANTS(...args)),
         signalTarget: fakeSignals(),
         fetchImpl: healthyFetch(),
         build: null,
@@ -4280,6 +4282,8 @@ test(
       assert.equal(result.shutdown.agent.treeStopped, true);
       assert.equal(result.shutdown.budget.withinBudget, true);
       assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+      assert.deepEqual(result.preflight, { ran: false, ok: true, verified: false, reason: "both-trees-in-jobs", ms: 0, rows: null });
+      assert.equal(tableReads.length, 0, "a process table was read");
       let gone = false;
       for (let i = 0; i < 40 && !gone; i++) {
         try {

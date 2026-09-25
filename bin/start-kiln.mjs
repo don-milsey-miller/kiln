@@ -371,10 +371,11 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     // ⚠️ THE SAME TEST, FOR THE SAME REASON: only an interactive Pi reads Ctrl+C as a key, so only then is it Kiln's stop.
     keyboardStop: Boolean(process.stdin.isTTY && process.stdout.isTTY),
-    // F130 mechanism 2, PROTOTYPE and opt-in: on Windows, KILN_WINDOWS_JOB_HOST=1 starts the agent and the launcher, each inside a job its host
-    // holds. Unset, nothing changes.
-    agentJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,
-    launcherJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,
+    // ⚠️ **ON WINDOWS BOTH TREES ALWAYS START INSIDE A JOB ITS HOST HOLDS (F130, ACC-0081's launch prerequisite).** A process
+    // table read raced a short-lived Pi and could not name what it left; a job names every member. A host that cannot start
+    // a tree refuses the launch through the spawn-failure path, and there is no setting that falls back to a plain spawn.
+    agentJob: process.platform === "win32" ? startInJob : null,
+    launcherJob: process.platform === "win32" ? startInJob : null,
     ask,
     askLine,
     log: say,

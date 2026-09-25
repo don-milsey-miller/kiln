@@ -99,8 +99,8 @@ async function untilAny(paths, ms = 60_000) {
  * `mode` is `natural` (Pi finishes on its own) or `interrupt` (the operator's interrupt, delivered
  * once both trees and both grandchildren are up).
  */
-async function observe(mode, { jobMode = false } = {}) {
-  const env = jobMode ? { ...process.env, KILN_EVIDENCE_JOB: "1" } : process.env;
+async function observe(mode) {
+  const env = process.env;
   const dir = project();
   const out = join(dir, "evidence.json");
   const paths = {
@@ -236,8 +236,11 @@ async function goneWithin(pid, ms = 15_000) {
   return false;
 }
 
+// ⚠️ **RETIRED ON WINDOWS, WHERE NO RUN STARTS A TREE OUTSIDE A JOB ANY MORE (ACC-0081).** The job-mode cells below are the
+// Windows evidence; these remain the POSIX platform's.
+const posixOnly = { skip: process.platform === "win32" ? "on Windows both trees start in jobs; the job-mode cells are this platform's evidence" : false };
 for (const mode of ["natural", "interrupt"]) {
-  test(`⚠️ PLATFORM EVIDENCE (${process.platform}, ${mode}): both trees stopped, each with a known descendant`, async (t) => {
+  test(`⚠️ PLATFORM EVIDENCE (${process.platform}, ${mode}): both trees stopped, each with a known descendant`, posixOnly, async (t) => {
     const { record, paths, dir, delivery } = await observe(mode);
 
     // ⚠️ **AN OBSERVATION THAT COULD NOT BE MADE IS RECORDED AS UNMADE, NEVER APPROXIMATED.** The
@@ -331,7 +334,7 @@ for (const mode of ["natural", "interrupt"]) {
     async (t) => {
       // ⚠️ F130, PROTOTYPE: THE FLAG IS NOT THE EVIDENCE. Every claim below is read from the shutdown record the
       // supervisor wrote, and the descendants are checked against the operating system.
-      const { record, paths, delivery } = await observe(mode, { jobMode: true });
+      const { record, paths, delivery } = await observe(mode);
       if (!record && delivery.refusal) return t.skip(`the Windows interrupt could not be delivered safely here: ${delivery.refusal}`);
       assert.ok(record, "the run must record an observation");
       const aliveAtReturn = Object.fromEntries(

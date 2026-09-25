@@ -1,8 +1,8 @@
 /**
- * Job mode end to end on Windows — F130 mechanism 2 (TSK-0058), PROTOTYPE, opt-in with KILN_WINDOWS_JOB_HOST=1.
+ * Job mode end to end on Windows — F130 mechanism 2 (TSK-0058): the default, with no setting to turn it off (ACC-0081).
  *
- * ⚠️ **THE REAL COMMAND, PIPED.** This runs ACC-0116's flow through the real bin/start-kiln.mjs with job mode
- * on: the provider must receive the piped prompt (input), Pi must print the provider's answer (output), and Pi must
+ * ⚠️ **THE REAL COMMAND, PIPED, WITH NOTHING SET.** This runs ACC-0116's flow through the real bin/start-kiln.mjs as an
+ * operator would, and job mode is what it gets: the provider must receive the piped prompt (input), Pi must print the provider's answer (output), and Pi must
  * be the model and tools it was told (arguments). The host's start-up time is printed for the record. The survivor case,
  * with the real host and a stand-in agent, is in test/supervisor.test.mjs.
  */
@@ -75,8 +75,9 @@ test("⚠️ F130 JOB MODE the real launcher runs a piped Pi inside a job: its i
     );
     assert.equal(setup.status, 0, setup.out);
 
-    const started = await withBuildLock(() => run([join(ROOT, "bin", "start-kiln.mjs")], { ...env, KILN_WINDOWS_JOB_HOST: "1" }, `${PROMPT}\n`));
+    const started = await withBuildLock(() => run([join(ROOT, "bin", "start-kiln.mjs")], env, `${PROMPT}\n`));
     console.log(`[job mode launch] ${(/agent started inside a job by its host in \d+ ms/.exec(started.out) ?? ["no host line"])[0]}`);
+    assert.match(started.out, /launcher started inside a job by its host in \d+ ms/, started.out);
     assert.match(started.out, /agent started inside a job by its host in \d+ ms/, started.out);
     const turn = fixture.requests.slice(1).find((r) => JSON.stringify(r.body?.messages ?? []).includes(PROMPT));
     assert.ok(turn, `the piped prompt did not reach the provider: ${started.out}`);

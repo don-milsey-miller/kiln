@@ -24,7 +24,8 @@ import { firstLookWindowMs } from "./observation-window.mjs";
 import { createQueryDiagnostic } from "./query-diagnostic.mjs";
 import { startInJob } from "../../../lib/windows-job.mjs";
 
-const jobMode = process.platform === "win32" && process.env.KILN_EVIDENCE_JOB === "1";
+// ⚠️ ON WINDOWS BOTH TREES START IN JOBS, as `bin/start-kiln.mjs` starts them there (ACC-0081's launch prerequisite).
+const jobMode = process.platform === "win32";
 
 if (process.argv.length < 9) process.exit(0);
 
@@ -92,7 +93,7 @@ try {
     readyMs: 30_000,
     graceMs: 5000,
     hardMs: 3000,
-    // F130, PROTOTYPE: KILN_EVIDENCE_JOB=1 runs both trees inside jobs their hosts hold, on Windows only.
+    // On Windows, both trees inside jobs their hosts hold, exactly as the command starts them.
     ...(jobMode ? { agentJob: startInJob, launcherJob: startInJob } : {}),
     // ⚠️ **TO A FILE WHEN ONE IS NAMED, because the console route has no pipe to read.** The Windows
     // interrupt harness starts this process with `CreateProcess`, in its own process group and with
