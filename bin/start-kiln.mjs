@@ -38,7 +38,7 @@ import { ContentRootError, canonicalPath, resolveProjectRoot } from "../lib/cont
 import { LaunchRefusal, checkLaunch as checkLaunchDefault } from "../lib/launch-checks.mjs";
 import { runLiveCanary } from "../lib/live-canary.mjs";
 import { LocalStateRefusal, committedDeclarations } from "../lib/local-state.mjs";
-import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
+import { REFUSAL, SHUTDOWN_BUDGET, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
@@ -371,6 +371,8 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     // ⚠️ THE SAME TEST, FOR THE SAME REASON: only an interactive Pi reads Ctrl+C as a key, so only then is it Kiln's stop.
     keyboardStop: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    // ⚠️ ACC-0081's 8,000 ms deadline, stated here so the command's budget is the one its evidence measures.
+    ...SHUTDOWN_BUDGET,
     // ⚠️ **ON WINDOWS BOTH TREES ALWAYS START INSIDE A JOB ITS HOST HOLDS (F130, ACC-0081's launch prerequisite).** A process
     // table read raced a short-lived Pi and could not name what it left; a job names every member. A host that cannot start
     // a tree refuses the launch through the spawn-failure path, and there is no setting that falls back to a plain spawn.

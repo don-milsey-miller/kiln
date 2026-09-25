@@ -32,6 +32,7 @@ import {
   HOST,
   BROWSER_ONLY_COMMAND,
   REFUSAL,
+  SHUTDOWN_BUDGET,
   SupervisorRefusal,
   assertProjectTrusted,
   resolveSelfHost,
@@ -2094,7 +2095,7 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
  * `agentExitsOn` lets the agent itself write the notice and exit in one synchronous step: the race the notice's
  * ordering exists for.
  */
-async function keyboardRun({ keyboardStop = true, env = {}, logs = [] } = {}) {
+async function keyboardRun({ keyboardStop = true, env = {}, logs = [], budget = { graceMs: 400, hardMs: 200 } } = {}) {
   const dir = repoProject({ state: true });
   ignoreAll(dir);
   const calls = [];
@@ -2137,8 +2138,7 @@ async function keyboardRun({ keyboardStop = true, env = {}, logs = [] } = {}) {
     signalTarget: fakeSignals(),
     fetchImpl: healthyFetch(),
     build: null,
-    graceMs: 400,
-    hardMs: 200,
+    ...budget,
     keyboardStop,
     log: (line) => logs.push(line),
   });
@@ -2180,6 +2180,17 @@ test("⚠️ F130 A CTRL+C WHOSE PI EXITS AT ONCE IS STILL THE KEYBOARD STOP: th
   assert.equal(result.shutdown.signal, null);
   assert.ok(logs.some((l) => /stopped by Ctrl\+C at the keyboard.*\(check\)/.test(l)), `the exit path found it: ${logs.join(" | ")}`);
   assert.equal(result.shutdown.complete, true);
+});
+
+test("⚠️ ACC-0081 A RUN GIVEN NO PERIODS RECORDS THE 8,000 MS BUDGET THE CRITERION STATES, from the one shared configuration", async () => {
+  // The command recorded 11,000 ms while the criterion and its evidence said 8,000 (EVD-0150): the defaults were not the
+  // configuration the evidence ran. There is one configuration now, and a run that passes none records it.
+  assert.equal(SHUTDOWN_BUDGET.graceMs + SHUTDOWN_BUDGET.hardMs, 8000);
+  const { run, agent } = await keyboardRun({ budget: {} });
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+  const result = await run;
+  assert.equal(result.shutdown.budget.ms, 8000);
 });
 
 test("⚠️ F130 CONTROL: a Pi that exits with no notice is recorded as its own exit", async () => {

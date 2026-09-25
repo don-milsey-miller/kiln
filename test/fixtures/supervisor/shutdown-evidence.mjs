@@ -18,7 +18,7 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
+import { runSupervisor, SHUTDOWN_BUDGET, SupervisorRefusal } from "../../../lib/supervisor.mjs";
 import { resolvePinnedSessionLister } from "../../../lib/pi-runtime.mjs";
 import { firstLookWindowMs } from "./observation-window.mjs";
 import { createQueryDiagnostic } from "./query-diagnostic.mjs";
@@ -91,8 +91,8 @@ try {
     env: { ...process.env, PORT: port },
     build: null,
     readyMs: 30_000,
-    graceMs: 5000,
-    hardMs: 3000,
+    // The command's own configuration, not a copy of its numbers (ACC-0081).
+    ...SHUTDOWN_BUDGET,
     // On Windows, both trees inside jobs their hosts hold, exactly as the command starts them.
     ...(jobMode ? { agentJob: startInJob, launcherJob: startInJob } : {}),
     // ⚠️ **TO A FILE WHEN ONE IS NAMED, because the console route has no pipe to read.** The Windows
