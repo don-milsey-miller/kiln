@@ -99,7 +99,8 @@ async function untilAny(paths, ms = 60_000) {
  * `mode` is `natural` (Pi finishes on its own) or `interrupt` (the operator's interrupt, delivered
  * once both trees and both grandchildren are up).
  */
-async function observe(mode) {
+async function observe(mode, { jobMode = false } = {}) {
+  const env = jobMode ? { ...process.env, KILN_EVIDENCE_JOB: "1" } : process.env;
   const dir = project();
   const out = join(dir, "evidence.json");
   const paths = {
@@ -130,9 +131,9 @@ async function observe(mode) {
     agentDir,
   ];
 
-  if (mode === "interrupt" && process.platform === "win32") return viaConsoleEvent({ dir, out, argv, paths });
+  if (mode === "interrupt" && process.platform === "win32") return viaConsoleEvent({ dir, out, argv, paths, env });
 
-  const child = execFile(process.execPath, argv);
+  const child = execFile(process.execPath, argv, { env });
   reapLater(child);
   const finished = new Promise((resolve) => child.once("exit", (code) => resolve(code)));
 
@@ -176,7 +177,7 @@ async function observe(mode) {
  * test run. The harness proves the console is private — `GetConsoleProcessList` naming only itself
  * and the supervisor — before sending, and reports the observation unmade if it cannot.
  */
-async function viaConsoleEvent({ dir, out, argv, paths }) {
+async function viaConsoleEvent({ dir, out, argv, paths, env = process.env }) {
   const plan = join(dir, "ctrl-break-plan.json");
   const result = join(dir, "ctrl-break-result.json");
   const trigger = join(dir, "ctrl-break-trigger");
@@ -192,7 +193,7 @@ async function viaConsoleEvent({ dir, out, argv, paths }) {
     join(FIXTURES, "ctrl-break.ps1"),
     "-Plan",
     plan,
-  ]);
+  ], { env });
   reapLater(ps);
   const finished = new Promise((resolve) => ps.once("exit", (code) => resolve(code)));
 
@@ -321,6 +322,50 @@ for (const mode of ["natural", "interrupt"]) {
     assert.equal(await goneWithin(launcherChild), true, `the launcher's descendant ${launcherChild} is still alive`);
     assert.equal(await goneWithin(agentChild), true, `the agent's descendant ${agentChild} is still alive`);
   });
+}
+
+for (const mode of ["natural", "interrupt"]) {
+  test(
+    `⚠️ PLATFORM EVIDENCE (win32, ${mode}, job mode): both jobs were active, both hosts exited, and each known detached descendant stopped within the deadline`,
+    { skip: process.platform === "win32" ? false : "job mode exists only on Windows" },
+    async (t) => {
+      // ⚠️ F130, PROTOTYPE: THE FLAG IS NOT THE EVIDENCE. Every claim below is read from the shutdown record the
+      // supervisor wrote, and the descendants are checked against the operating system.
+      const { record, paths, delivery } = await observe(mode, { jobMode: true });
+      if (!record && delivery.refusal) return t.skip(`the Windows interrupt could not be delivered safely here: ${delivery.refusal}`);
+      assert.ok(record, "the run must record an observation");
+      const aliveAtReturn = Object.fromEntries(
+        ["launcherChild", "agentChild"].map((k) => [k, existsSync(paths[k]) ? { pid: readJson(paths[k]).pid, alive: pidAlive(readJson(paths[k]).pid) } : null])
+      );
+      console.log(`
+[evidence win32/${mode}/job]
+${JSON.stringify({ delivery, aliveAtReturn, ...record }, null, 2)}
+`);
+      if (delivery.how === "console-ctrl-event") {
+        assert.equal(delivery.isolated, true);
+        assert.equal(delivery.sent, true);
+      }
+      assert.equal(record.ok, true, `the shutdown must complete: ${record.refusal ?? ""}`);
+      assert.equal(record.trigger, mode === "interrupt" ? "signal" : "agent-exit");
+      const launcherChild = readJson(paths.launcherChild).pid;
+      const agentChild = readJson(paths.agentChild).pid;
+      for (const [name, tree, known] of [["agent", record.shutdown.agent, agentChild], ["launcher", record.shutdown.launcherTree, launcherChild]]) {
+        assert.ok(tree.job, `the ${name} tree was not stopped through a job: ${JSON.stringify(tree.method)}`);
+        assert.ok(Array.isArray(tree.job.members), `the ${name} job's members were not observed`);
+        assert.ok(tree.job.members.includes(known), `the ${name} job did not name its known descendant ${known}: ${tree.job.members}`);
+        assert.deepEqual(tree.job.remaining, [], `the ${name} job did not empty`);
+        assert.equal(tree.job.hostExited, true, `the ${name} host did not exit`);
+        assert.equal(tree.treeStopped, true, `the ${name} tree was not stopped`);
+      }
+      assert.equal(aliveAtReturn.agentChild?.alive, false, "the agent's detached descendant was alive when the supervisor returned");
+      assert.equal(aliveAtReturn.launcherChild?.alive, false, "the launcher's detached descendant was alive when the supervisor returned");
+      assert.equal(record.shutdown.budget.ms, 8000, "the existing deadline");
+      assert.equal(record.shutdown.budget.withinBudget, true, `spent ${record.shutdown.budget.spentMs} ms of ${record.shutdown.budget.ms}`);
+      assert.deepEqual(record.shutdown.unfinished, []);
+      assert.deepEqual(record.shutdown.notObserved, []);
+      assert.equal(record.shutdown.complete, true);
+    }
+  );
 }
 
 test("⚠️ the enumeration really ran on this platform, rather than finding nothing to do", async () => {

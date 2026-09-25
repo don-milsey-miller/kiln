@@ -22,6 +22,9 @@ import { runSupervisor, SupervisorRefusal } from "../../../lib/supervisor.mjs";
 import { resolvePinnedSessionLister } from "../../../lib/pi-runtime.mjs";
 import { firstLookWindowMs } from "./observation-window.mjs";
 import { createQueryDiagnostic } from "./query-diagnostic.mjs";
+import { startInJob } from "../../../lib/windows-job.mjs";
+
+const jobMode = process.platform === "win32" && process.env.KILN_EVIDENCE_JOB === "1";
 
 if (process.argv.length < 9) process.exit(0);
 
@@ -89,6 +92,8 @@ try {
     readyMs: 30_000,
     graceMs: 5000,
     hardMs: 3000,
+    // F130, PROTOTYPE: KILN_EVIDENCE_JOB=1 runs both trees inside jobs their hosts hold, on Windows only.
+    ...(jobMode ? { agentJob: startInJob, launcherJob: startInJob } : {}),
     // ⚠️ **TO A FILE WHEN ONE IS NAMED, because the console route has no pipe to read.** The Windows
     // interrupt harness starts this process with `CreateProcess`, in its own process group and with
     // its own hidden console: nothing is capturing stdout, and a run that refuses there would leave a
