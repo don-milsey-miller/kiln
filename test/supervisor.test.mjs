@@ -4014,3 +4014,127 @@ test(
     }
   }
 );
+
+test("⚠️ F130 job mode for both trees: nothing is spawned directly, and the launcher's stop reaches it through its host", async () => {
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const agent = fakeAgentJob({ lifeMs: 30 });
+  const written = [];
+  let launcherGone = null;
+  const launcherOps = [];
+  const launcherJob = async (spec) => {
+    const host = {
+      pid: 8888,
+      once: () => {},
+      on: () => {},
+      stdin: { destroyed: false, write: (d) => (written.push(String(d)), true), end: () => setTimeout(() => (launcherGone = { code: 0 }), 5) },
+    };
+    return {
+      host,
+      pid: 7777,
+      startedMs: 4,
+      exited: () => launcherGone,
+      list: async () => (launcherOps.push("list"), { ok: true, pids: launcherGone ? [6161] : [7777, 6161] }),
+      terminate: async () => (launcherOps.push("terminate"), { ok: true, pids: [] }),
+      release: async () => (launcherOps.push("release"), { ok: true }),
+    };
+  };
+  const result = await runSupervisor({
+    sessionLister: listNothing,
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: () => assert.fail("nothing is spawned directly in job mode"),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+    agentJob: agent.starter,
+    launcherJob,
+  });
+  assert.ok(written.join("").includes("stop"), "the launcher's stop went through its host's stdin");
+  assert.deepEqual(launcherOps, ["list", "terminate", "release"], "the launcher's worker was listed, ended and the host released");
+  assert.deepEqual(result.shutdown.launcherTree.descendants, [6161]);
+  assert.equal(result.shutdown.launcherTree.treeStopped, true);
+  assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+});
+
+test(
+  "⚠️ F130 JOB MODE both trees in real jobs: the launcher's worker is named by its job and ended, and its stop arrives through the host",
+  { skip: process.platform === "win32" ? false : "job mode exists only on Windows" },
+  async () => {
+    const { startInJob } = await import("../lib/windows-job.mjs");
+    const dir = repoProject({ state: true });
+    ignoreAll(dir);
+    const base = mkdtempSync(join(tmpdir(), "kiln-job-mode-both-"));
+    const launcherScript = join(base, "launcher.mjs");
+    const agentScript = join(base, "agent.mjs");
+    const workerFile = join(base, "worker.json");
+    const stopFile = join(base, "stop.txt");
+    // A stand-in launcher: a worker that would outlive it, as `next start`'s can, and a stop read from its pipe.
+    writeFileSync(
+      launcherScript,
+      [
+        'import { spawn } from "node:child_process";',
+        'import { writeFileSync } from "node:fs";',
+        'const w = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", detached: true });',
+        `writeFileSync(${JSON.stringify(workerFile)}, JSON.stringify({ launcher: process.pid, worker: w.pid }));`,
+        'let got = "";',
+        'process.stdin.setEncoding("utf-8");',
+        `process.stdin.on("data", (d) => { got += d; if (got.includes("stop")) { writeFileSync(${JSON.stringify(stopFile)}, got); setTimeout(() => process.exit(0), 20); } });`,
+        "process.stdin.on('end', () => setTimeout(() => process.exit(0), 20));",
+        "setInterval(() => {}, 1000);",
+      ].join(NEWLINE)
+    );
+    writeFileSync(agentScript, "setTimeout(() => process.exit(0), 300);");
+    const logged = [];
+    try {
+      const result = await runSupervisor({
+        sessionLister: listNothing,
+        agentDir: AGENT_DIR,
+        readTrust: APPROVED,
+        projectRoot: dir,
+        launcher: { command: process.execPath, args: [launcherScript] },
+        agent: { command: process.execPath, args: [agentScript] },
+        spawn: () => assert.fail("nothing is spawned directly in job mode"),
+        env: { ...process.env, PORT: String(await freePort()) },
+        randomBytes: () => Buffer.alloc(16, 7),
+        psRun: NO_DESCENDANTS,
+        signalTarget: fakeSignals(),
+        fetchImpl: healthyFetch(),
+        build: null,
+        agentJob: startInJob,
+        launcherJob: startInJob,
+        log: (l) => logged.push(l),
+      });
+      const { launcher, worker } = JSON.parse(readFileSync(workerFile, "utf-8"));
+      const tree = result.shutdown.launcherTree;
+      console.log(`[job mode both] ${logged.filter((l) => l.includes("inside a job")).join(" | ")}; launcher ${JSON.stringify(tree.job)}; agent ${JSON.stringify(result.shutdown.agent.job)}; spent ${result.shutdown.budget.spentMs} ms`);
+      assert.ok(readFileSync(stopFile, "utf-8").includes("stop"), "the stop reached the launcher through its host");
+      assert.ok(tree.descendants.includes(worker), `the launcher's job did not name its worker: ${JSON.stringify(tree)}`);
+      assert.equal(tree.descendants.includes(launcher), false, "the launcher itself had exited");
+      assert.equal(tree.job.terminated, true);
+      assert.equal(tree.job.hostExited, true);
+      assert.equal(tree.treeStopped, true);
+      assert.equal(result.shutdown.agent.treeStopped, true);
+      assert.equal(result.shutdown.budget.withinBudget, true);
+      assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+      let gone = false;
+      for (let i = 0; i < 40 && !gone; i++) {
+        try {
+          process.kill(worker, 0);
+          await new Promise((r) => setTimeout(r, 50));
+        } catch {
+          gone = true;
+        }
+      }
+      assert.ok(gone, "the launcher's worker is still running");
+    } finally {
+      rmSync(base, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+    }
+  }
+);
