@@ -28,7 +28,7 @@
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 import { existsSync } from "node:fs";
@@ -41,6 +41,7 @@ import { LocalStateRefusal, committedDeclarations } from "../lib/local-state.mjs
 import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "../lib/supervisor.mjs";
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
+import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -381,7 +382,8 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
  * command against the TEST RUNNER's argv — starting a launcher and handing something the terminal.
  * The exports are the reason the guard exists.
  */
-const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+// ⚠️ Real paths on both sides, so a command run through a linked `.planning` runs (TSK-0074).
+const isEntryPoint = isModuleEntryPoint(import.meta.url);
 
 /**
  * How a failed run ends: a refusal prints as one, anything else as the error it is.

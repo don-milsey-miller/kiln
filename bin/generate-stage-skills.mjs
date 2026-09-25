@@ -11,9 +11,10 @@
  */
 
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { DRIFT, checkStageSkills, writeStageSkills } from "../lib/stage-skills-files.mjs";
+import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 
@@ -115,7 +116,8 @@ export async function main(argv = process.argv.slice(2), { toolRoot = TOOL_ROOT,
 }
 
 /** Run only when this file is the program, so importing it to test `parseArgs` and `main` runs nothing. */
-const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+// ⚠️ Real paths on both sides, so a command run through a linked `.planning` runs (TSK-0074).
+const isEntryPoint = isModuleEntryPoint(import.meta.url);
 
 if (isEntryPoint) {
   try {

@@ -27,10 +27,10 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { relative } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { initializeProject, REFUSAL_CLASS, STATUS } from "../lib/initialize-project.mjs";
 import { toolRoot } from "../lib/content-root.mjs";
+import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
 
 const USAGE = `Create a project's planning-content/ directory.
 
@@ -258,7 +258,8 @@ async function main() {
  * without this guard importing it would run the whole command against the TEST RUNNER's argv, in the
  * test runner's working directory. The exported function is the reason the guard exists.
  */
-const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+// ⚠️ Real paths on both sides, so a command run through a linked `.planning` runs (TSK-0074).
+const isEntryPoint = isModuleEntryPoint(import.meta.url);
 
 if (isEntryPoint) {
   try {

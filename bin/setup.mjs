@@ -31,7 +31,7 @@ import { createInterface } from "node:readline";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { ContentRootError, canonicalPath, contentRootCandidate, isAtOrInside, pathIdentityKey } from "../lib/content-root.mjs";
 import { EndpointIdentityError, REQUEST_IDENTITY, canonicalizeEndpoint, looksLikeCredential } from "../lib/declared-identity.mjs";
@@ -40,6 +40,7 @@ import { breakDeadLock, withLock } from "../lib/lock.mjs";
 import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-transaction.mjs";
 import { initializeProject } from "../lib/initialize-project.mjs";
 import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
+import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
 
 const TOOL_ROOT = canonicalPath(resolve(join(dirname(fileURLToPath(import.meta.url)), "..")));
 
@@ -1592,5 +1593,6 @@ export function reportFailure(e, print = say) {
   return EXIT.SETUP;
 }
 
-const isEntryPoint = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+// ⚠️ Real paths on both sides, so a command run through a linked `.planning` runs (TSK-0074).
+const isEntryPoint = isModuleEntryPoint(import.meta.url);
 if (isEntryPoint) main().then((code) => process.exit(code), (e) => process.exit(reportFailure(e)));
