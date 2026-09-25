@@ -9,13 +9,14 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { KEYBOARD_STOP_ENV, ctrlCInput, keyboardStopFor, keyboardStopListener, watchKeyboardStop } from "../lib/keyboard-stop.mjs";
+import { KEYBOARD_STOP_ENV, UNNOTIFIED_STOP_EXIT_CODE, ctrlCInput, keyboardStopFor, keyboardStopListener, watchKeyboardStop } from "../lib/keyboard-stop.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 import register from "../pi-package/extensions/kiln.js";
 
@@ -79,14 +80,47 @@ test("⚠️ F130 an idle Pi is not aborted, a release is consumed without a sec
   assert.equal(listener("q"), undefined, "anything else passes through");
 
   const failing = fakeContext();
+  const exits = [];
+  let atExit = null;
   keyboardStopListener(failing.ctx, "notice", {
     write: () => {
       throw Object.assign(new Error("denied"), { code: "EACCES" });
     },
+    onExit: (fn) => (atExit = fn),
+    setExitCode: (code) => exits.push(["exitCode", code]),
+    forceExit: (code) => exits.push(["forced", code]),
+    forceAfterMs: 60_000,
   })("\x03");
   assert.equal(failing.calls.length, 3);
   assert.match(failing.calls[0], /^notify .*EACCES/);
   assert.deepEqual(failing.calls.slice(1), ["abort", "shutdown"]);
+  atExit();
+  assert.deepEqual(exits, [["exitCode", UNNOTIFIED_STOP_EXIT_CODE]], "the exit is marked as an interrupt");
+});
+
+/** Run the listener in a real Node process whose notice cannot be written, and return how that process ended. */
+function unnotified(shutdownBody, forceAfterMs) {
+  const script = [
+    `const { keyboardStopListener } = await import(${JSON.stringify(pathToFileURL(join(ROOT, "lib", "keyboard-stop.mjs")).href)});`,
+    "setInterval(() => {}, 1000);",
+    `const ctx = { isIdle: () => true, abort() {}, ui: { notify() {} }, shutdown() { ${shutdownBody} } };`,
+    `keyboardStopListener(ctx, ${JSON.stringify(join(ROOT, "no-such-directory", "stop.json"))}, { forceAfterMs: ${forceAfterMs} })("\\x03");`,
+  ].join("\n");
+  const started = Date.now();
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf-8", timeout: 30_000 });
+  return { status: r.status, ms: Date.now() - started, stderr: r.stderr };
+}
+
+test("⚠️ F130 IN A REAL PROCESS, PI'S OWN CLEAN EXIT AFTER AN UNNOTIFIED CTRL+C LEAVES WITH 130, NOT 0", () => {
+  // Pi's shutdown ends in process.exit(0); the exit listener's status is the one the process leaves with.
+  const r = unnotified("setImmediate(() => process.exit(0));", 60_000);
+  assert.equal(r.status, UNNOTIFIED_STOP_EXIT_CODE, r.stderr);
+});
+
+test("⚠️ F130 AND A PI WHOSE SHUTDOWN NEVER ENDS IS ENDED WITH 130 WITHIN THE BOUND, NOT WAITED ON FOREVER", () => {
+  const r = unnotified("/* never exits */", 300);
+  assert.equal(r.status, UNNOTIFIED_STOP_EXIT_CODE, r.stderr);
+  assert.ok(r.ms < 20_000, `took ${r.ms} ms`);
 });
 
 test("⚠️ F130 outside a Kiln supervisor there is no listener, and Pi keeps its own Ctrl+C", () => {

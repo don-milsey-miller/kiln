@@ -2203,6 +2203,44 @@ test("⚠️ F130 WITHOUT A TERMINAL NO CHILD IS TOLD OF A NOTICE, AND AN INHERI
 });
 
 
+test("⚠️ F130 THE KEYBOARD STOP'S DEADLINE COUNTS FROM THE KEY: a notice seen late spends that delay from the same bound", async () => {
+  // graceMs 400 + hardMs 200: a 600 ms bound. The notice says the key was pressed 250 ms before it was written.
+  const { run, file } = await keyboardRun();
+  const keyAt = Date.now() - 250;
+  writeFileSync(file, JSON.stringify({ at: keyAt }), { flag: "wx" });
+  const result = await run;
+  assert.equal(result.trigger, "keyboard");
+  assert.ok(result.shutdown.budget.spentMs >= 250, `the delay was not counted: ${JSON.stringify(result.shutdown.budget)}`);
+  assert.equal(result.shutdown.budget.ms, 600);
+});
+
+test("⚠️ F130 A KEYBOARD NOTICE SEEN AFTER THE WHOLE BOUND HAS PASSED IS A SHUTDOWN NOT OBSERVED COMPLETE, NEVER A PASS", async () => {
+  const { run, file } = await keyboardRun();
+  writeFileSync(file, JSON.stringify({ at: Date.now() - 5000 }), { flag: "wx" });
+  await assert.rejects(run, (e) => e?.reason === REFUSAL.SHUTDOWN_NOT_OBSERVED && /The run ended \(keyboard\)/.test(e.message));
+});
+
+test("⚠️ F130 A KEY TIME LATER THAN NOW IS NOT TRUSTED TO LENGTHEN THE BOUND", async () => {
+  const { run, file } = await keyboardRun();
+  writeFileSync(file, JSON.stringify({ at: Date.now() + 60_000 }), { flag: "wx" });
+  const result = await run;
+  assert.equal(result.trigger, "keyboard");
+  assert.ok(result.shutdown.budget.spentMs >= 0 && result.shutdown.budget.withinBudget, JSON.stringify(result.shutdown.budget));
+});
+
+test("⚠️ F130 A CTRL+C WHOSE NOTICE COULD NOT BE WRITTEN ENDS AS PI'S EXIT 130: an interrupt, never a clean quit", async () => {
+  // With no notice the supervisor has only Pi's exit to go on. The extension's listener makes that exit 130
+  // (test/keyboard-stop.test.mjs proves it in a real process); here, that status is what the run reports.
+  const { run, agent } = await keyboardRun();
+  agent.child.exitCode = 130;
+  agent.child.onExit(130, null);
+  const result = await run;
+  assert.equal(result.trigger, "agent-exit", "no keyboard stop was observed, and none is claimed");
+  assert.equal(result.agentExit.code, 130);
+  assert.equal(exitStatusFor(result), 130, "not a successful exit");
+});
+
+
 test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () => {
   // The control the previous test could not be. There, the signal handler's teardown killed the
   // agent, so awaiting its exit resolved anyway and a version that awaited instead of racing looked
