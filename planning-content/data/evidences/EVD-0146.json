@@ -1,0 +1,41 @@
+{
+  "id": "EVD-0146",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: after an interrupt on a loaded Windows runner, a launcher descendant was still running when the supervisor returned",
+  "kind": "experiment",
+  "outcome": "failure",
+  "observedAt": "2026-09-24",
+  "summary": "F130, against ACC-0081. The focused Windows batch was CI run 36074016941 on the never-merged branch diag/f130-batch, after O1 (ca476de). It ran the full suite 8 times on windows-latest, 4 on Node 22 and 4 on Node 24. INTERRUPT MODE FAILED ONCE. In job 107881093769 (Node 24), test/shutdown-evidence.test.mjs's interrupt cell went like this. The launcher tree waited 4,226 ms for a descendant that did not exit. Its identity read was then allowed 2,225 ms, and the process table took 2,435 ms to its first byte, so the read was abandoned at 7,735 ms of the 8,000 ms budget. The supervisor returned shutdown-not-observed with launcher-descendants-unverified. It sent that pid nothing, because it could not verify the pid's identity, and that fail-closed report is correct. But the descendant, pid 5700, was STILL RUNNING when the supervisor returned, as the test's aliveAtReturn observation records. So both trees were not stopped, which ACC-0081 requires after an interrupt. ALSO OBSERVED AND OPEN. ACC-0116's real launch reported 'Not observed: agent-descendants' in 3 of 8 jobs. The piped Pi lives for about 1 to 2 seconds, and the Windows tracker samples every 3,000 ms with reads of 0.4 to 2.4 s, so no clean look completes while the agent is alive. WHAT O1 DID FIX. Natural-mode platform evidence passed 8 of 8, after 3 failures earlier on 2026-09-24. O1 is verified for natural shutdown only.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "ci-run": "GitHub Actions run 36074016941 on diag/f130-batch at d05c27d (main ca476de plus a Windows-only workflow), attempt 1",
+      "failing-job": "107881093769, windows-latest Node 24: PLATFORM EVIDENCE (win32, interrupt): the shutdown must complete: shutdown-not-observed",
+      "timeline": "launcher grace-wait 1239 to 5474 ms, settled false; launcher identity-read 5475 ms, allowed 2225 ms, abandoned at 7735 ms, process-table-timeout; budget 7740 of 8000 ms",
+      "read-latency": "15 reads in that cell: first byte after 559 to 2435 ms; one read produced no output before it was abandoned",
+      "alive-at-return": "launcherChild pid 5700 alive: true; agentChild pid 6284 alive: false",
+      "acc-0116-jobs": "Not observed: agent-descendants in jobs f130 1 (Node 24), f130 3 (Node 22) and f130 4 (Node 22)",
+      "natural-mode": "8 of 8 passed",
+      "branch-only-failures": "every job failed ACC-0066's CI-workflow check, because the branch replaced the workflow"
+    },
+    "omissions": [
+      {
+        "fact": "survivor-fate",
+        "state": "not-captured",
+        "reason": "The test failed at the record's `ok` before its own later check of whether pid 5700 exited, so how long it outlived the supervisor is not recorded."
+      }
+    ]
+  }
+}
