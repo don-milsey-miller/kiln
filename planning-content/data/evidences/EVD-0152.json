@@ -1,0 +1,30 @@
+{
+  "id": "EVD-0152",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the shipped command and its evidence share one 8,000 ms shutdown budget, recorded by the real command and in four-cell CI",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-25",
+  "summary": "ACC-0081's 8,000 ms deadline, as the shipped command runs it. EVD-0150 showed the command recording an 11,000 ms budget (the supervisor's defaults, 8,000 ms grace plus 3,000 ms hard) while the evidence fixture ran 5,000 plus 3,000. 41162cc made one shared configuration, SHUTDOWN_BUDGET (5,000 ms grace plus 3,000 ms hard), the default of runSupervisor and shutdown(), passed explicitly by start-kiln and imported by the evidence fixture; 658388d made it the default of stopTree, stopJobTree and stopLauncher too, which in a run always receive their share of the deadline from shutdown(). THE REAL COMMAND. start-kiln's own main() with the real supervisor, wrapped only to retain its returned record, recorded budget.ms 8000 at a3ad951 (piped, spent 654 ms) and in both interactive Windows Terminal runs of EVD-0151 (spent 515 ms and 466 ms), each complete. CI. Run 36195110976 at a3ad951 passed all four cells. Run 36196549020 at 658388d passed all four cells, and every shutdown record the evidence cells printed carries budget.ms 8000, within budget: windows-latest Node 22, job-mode natural 587 ms, job-mode interrupt 5,980 ms, enumeration 525 ms; windows-latest Node 24, 336, 5,370 and 721 ms; ubuntu-latest Node 24, POSIX natural 5,088, interrupt 5,092 and enumeration 5,081 ms, and the POSIX terminal Ctrl+C test passed; ubuntu-latest Node 22, 5,086, 5,092 and 5,092 ms, and the terminal test passed. The non-job Windows cells are retired and skipped, and the job-mode cells are skipped on Linux.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "real-command": "Windows 11, Node 24.18.0, a3ad951: budget.ms 8000 piped (654 ms spent); EVD-0151 runs R4 and R5 budget.ms 8000 (515 and 466 ms)",
+      "ci-a3ad951": "GitHub Actions run 36195110976, all four cells green",
+      "ci-658388d": "GitHub Actions run 36196549020, all four cells green; every printed evidence record budget.ms 8000, withinBudget true"
+    },
+    "omissions": []
+  }
+}
