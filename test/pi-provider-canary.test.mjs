@@ -656,7 +656,42 @@ test("⚠️ a custom configuration is closed, and its refusals name neither the
       assert.ok(!e.message.includes(name), `${label}: the refusal names ${name}`);
     assertNoTrace(`config ${label}`, { message: e.message, detail: JSON.stringify(e.detail) });
   }
+
+  // ⚠️ TSK-0073: `compat` crosses only in its known shape, and no credential-named key crosses at any depth.
+  const model = CUSTOM_CONFIG.models[0];
+  for (const [label, entry, problem] of [
+    ["an unknown compat field", { ...model, compat: { supportsStore: false, sendsCredentials: true } }, "unknown-property"],
+    ["an unknown key in a structured compat field", { ...model, compat: { openRouterRouting: { only: ["x"], apiKey: SECRET } } }, "unknown-property"],
+    ["a credential in samplingParams", { ...model, samplingParams: { api_key: SECRET } }, "credential-bearing"],
+    ["a credential in a chat template kwarg", { ...model, compat: { chatTemplateKwargs: { Authorization: `Bearer ${SECRET}` } } }, "credential-bearing"],
+    ["a token nested in samplingParams", { ...model, samplingParams: { extra: { access_token: SECRET } } }, "credential-bearing"],
+  ]) {
+    const e = await refusalOf(
+      run({ provider: "acme", model: "acme-model", custom: CUSTOM_DECLARATION, customProviderConfig: { ...CUSTOM_CONFIG, models: [entry] } }),
+      CANARY_REFUSAL.CUSTOM_CONFIG_INVALID
+    );
+    assert.equal(e.detail.problem, problem, label);
+    assertNoTrace(`config ${label}`, { message: e.message, detail: JSON.stringify(e.detail) });
+  }
   assertNothingSurvived(parent, "invalid configuration — no root may have been created");
+});
+
+test("⚠️ TSK-0073 a custom model's known compat, and a field named like a token that is not one, are accepted", async () => {
+  const parent = privateParent();
+  let spawned = false;
+  const compat = { supportsStore: false, supportsUsageInStreaming: false, maxTokensField: "max_tokens", openRouterRouting: { only: ["acme"] } };
+  await canary(parent, {
+    hostEnv: cleanHost({ ACME_CANARY_KEY: SECRET }),
+    provider: "acme",
+    model: "acme-model",
+    custom: CUSTOM_DECLARATION,
+    customProviderConfig: { ...CUSTOM_CONFIG, models: [{ ...CUSTOM_CONFIG.models[0], maxTokens: 4096, compat }] },
+    spawnImpl: () => {
+      spawned = true;
+      throw new Error("stop at the spawn: only acceptance is under test");
+    },
+  }).catch(() => {});
+  assert.equal(spawned, true, "a known compat and maxTokens were refused before any child");
 });
 
 test("an invalid request refuses before anything exists", async () => {
