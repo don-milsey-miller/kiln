@@ -368,9 +368,10 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     interactive,
     // ⚠️ BOTH ENDS, BECAUSE THAT IS PI'S OWN TEST: with either one not a terminal it runs in print mode.
     startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
-    // F130 mechanism 2, PROTOTYPE and opt-in: on Windows, KILN_WINDOWS_JOB_HOST=1 starts the agent inside a job its host
+    // F130 mechanism 2, PROTOTYPE and opt-in: on Windows, KILN_WINDOWS_JOB_HOST=1 starts the agent and the launcher, each inside a job its host
     // holds. Unset, nothing changes.
     agentJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,
+    launcherJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,
     ask,
     askLine,
     log: say,
