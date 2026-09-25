@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { AUTH_SOURCE, resolveProviderCredentials } from "../lib/pi-provider-credentials.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
-import { BASE_ENV } from "../lib/specialists/contract.mjs";
+import { AGENT_DIR_ENV, BASE_ENV } from "../lib/specialists/contract.mjs";
 import {
   CANARY_CHILD_PATH,
   CANARY_REFUSAL,
@@ -665,6 +665,13 @@ test("⚠️ a custom configuration is closed, and its refusals name neither the
     ["a credential in samplingParams", { ...model, samplingParams: { api_key: SECRET } }, "credential-bearing"],
     ["a credential in a chat template kwarg", { ...model, compat: { chatTemplateKwargs: { Authorization: `Bearer ${SECRET}` } } }, "credential-bearing"],
     ["a token nested in samplingParams", { ...model, samplingParams: { extra: { access_token: SECRET } } }, "credential-bearing"],
+    // ⚠️ A KEY'S NAME CANNOT VOUCH FOR ITS VALUE: a string under an innocuous key is refused wherever it is not bounded.
+    ["a string in samplingParams under an innocuous key", { ...model, samplingParams: { stop: SECRET } }, "unbounded-value"],
+    ["a structure in samplingParams", { ...model, samplingParams: { extra: { depth: 1 } } }, "unbounded-value"],
+    ["a string chat-template argument under an innocuous key", { ...model, compat: { chatTemplateKwargs: { persona: SECRET } } }, "unbounded-value"],
+    ["a string in a structured routing field", { ...model, compat: { openRouterRouting: { only: [SECRET] } } }, "unbounded-value"],
+    ["a compat string Pi leaves open", { ...model, compat: { thinkingTokenBudgetField: SECRET } }, "unbounded-value"],
+    ["a compat literal Pi does not allow", { ...model, compat: { maxTokensField: SECRET } }, "unbounded-value"],
   ]) {
     const e = await refusalOf(
       run({ provider: "acme", model: "acme-model", custom: CUSTOM_DECLARATION, customProviderConfig: { ...CUSTOM_CONFIG, models: [entry] } }),
@@ -673,25 +680,51 @@ test("⚠️ a custom configuration is closed, and its refusals name neither the
     assert.equal(e.detail.problem, problem, label);
     assertNoTrace(`config ${label}`, { message: e.message, detail: JSON.stringify(e.detail) });
   }
+  for (const [label, baseUrl] of [
+    ["a user and password in the base URL", `http://user:${SECRET}@127.0.0.1:9/v1`],
+    ["a query in the base URL", `http://127.0.0.1:9/v1?key=${SECRET}`],
+  ]) {
+    const e = await refusalOf(
+      run({ provider: "acme", model: "acme-model", custom: CUSTOM_DECLARATION, customProviderConfig: { ...CUSTOM_CONFIG, baseUrl } }),
+      CANARY_REFUSAL.CUSTOM_CONFIG_INVALID
+    );
+    assert.equal(e.detail.problem, "credential-bearing", label);
+    assertNoTrace(`config ${label}`, { message: e.message, detail: JSON.stringify(e.detail) });
+  }
   assertNothingSurvived(parent, "invalid configuration — no root may have been created");
 });
 
-test("⚠️ TSK-0073 a custom model's known compat, and a field named like a token that is not one, are accepted", async () => {
+test("⚠️ TSK-0073 a model in the contract crosses, and the child's models.json holds exactly it and the declared $NAME", async () => {
   const parent = privateParent();
-  let spawned = false;
-  const compat = { supportsStore: false, supportsUsageInStreaming: false, maxTokensField: "max_tokens", openRouterRouting: { only: ["acme"] } };
+  let written = null;
+  const compat = {
+    supportsStore: false,
+    supportsUsageInStreaming: false,
+    maxTokensField: "max_tokens",
+    chatTemplateKwargs: { enable_thinking: { $var: "thinking.enabled", omitWhenOff: true }, top_k: 20 },
+  };
+  const entry = { ...CUSTOM_CONFIG.models[0], maxTokens: 4096, samplingParams: { temperature: 0.2 }, compat };
   await canary(parent, {
     hostEnv: cleanHost({ ACME_CANARY_KEY: SECRET }),
     provider: "acme",
     model: "acme-model",
     custom: CUSTOM_DECLARATION,
-    customProviderConfig: { ...CUSTOM_CONFIG, models: [{ ...CUSTOM_CONFIG.models[0], maxTokens: 4096, compat }] },
-    spawnImpl: () => {
-      spawned = true;
-      throw new Error("stop at the spawn: only acceptance is under test");
+    customProviderConfig: { ...CUSTOM_CONFIG, models: [entry] },
+    spawnImpl: (cmd, args, opts) => {
+      written = readFileSync(join(opts.env[AGENT_DIR_ENV], "models.json"), "utf-8");
+      throw new Error("stop at the spawn: only what the child would read is under test");
     },
   }).catch(() => {});
-  assert.equal(spawned, true, "a known compat and maxTokens were refused before any child");
+  assert.ok(written, "a model inside the contract was refused before any child");
+
+  // ⚠️ THE ONE CREDENTIAL FIELD IN THE FILE IS THE PROVIDER'S `apiKey`, AND IT IS EXACTLY THE DECLARED NAME. The canary
+  // writes it; nothing the caller supplied can. The bytes hold no key value, no header and no other credential field.
+  assert.deepEqual(JSON.parse(written), {
+    providers: { acme: { baseUrl: CUSTOM_CONFIG.baseUrl, api: CUSTOM_CONFIG.api, apiKey: "$ACME_CANARY_KEY", models: [entry] } },
+  });
+  assert.equal(written.includes(SECRET), false, "the key's value is in the child's models.json");
+  assert.equal(written.split('"apiKey"').length - 1, 1, "more than the one provider apiKey");
+  for (const field of ["headers", "authHeader", "Authorization"]) assert.equal(written.includes(field), false, `${field} is in the child's models.json`);
 });
 
 test("an invalid request refuses before anything exists", async () => {
