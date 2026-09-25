@@ -4,11 +4,12 @@
  * ⚠️ **THE DIAGNOSTICS COME AT THE FIRST `EBUSY`, BEFORE ANY RETRY.** Earlier attempts took a slow process snapshot
  * first and asked who held the directory seconds later, by which time it had been let go. So on the first refusal,
  * in this order and each within a bound: `handle64` for the exact directory, a process inventory, and what is left
- * inside the directory. Then the removal is retried within the bound it always had (17 tries, 100 ms more each, at most
- * 15.3 s), kept by this module's own loop, and if the directory is still held the original error is thrown.
+ * inside the directory, each with its own start and duration. Then the removal is retried within the bound it always
+ * had (17 tries, 100 ms more each, at most 15.3 s), kept by this module's own loop, and if the directory is still
+ * held the original error is thrown.
  *
- * ⚠️ **NO COMMAND LINES, NO ENVIRONMENT VALUES.** The inventory is pid, parent pid, name and start time. A diagnostic
- * that cannot run is recorded as unavailable, with the reason, never omitted.
+ * ⚠️ **NO COMMAND LINES, NO ENVIRONMENT VALUES.** The inventory is pid, parent pid, creation time and image name. A
+ * diagnostic that cannot run is recorded as unavailable, with the reason, never omitted.
  *
  * The record is appended to `F11_OUT` when set, and always printed as one `[f11]` line so a CI log carries it.
  */
@@ -17,9 +18,15 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readdirSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import { PROCESS_TABLE_COMMAND } from "../../lib/supervisor.mjs";
+
+/** The supervisor's own WMI-free process-table script: pid, parent pid and creation time. */
+const WINDOWS_PROCESS_TABLE = PROCESS_TABLE_COMMAND.win32[1][3];
+
 const HOLD_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY"]);
 const RETRIES = 17;
 const RETRY_STEP_MS = 100;
+const LINE_BREAK = /\r?\n/;
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
@@ -50,24 +57,31 @@ function handles(dir) {
   return { available: true, status: r.status, output: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().slice(0, 6000) };
 }
 
+/**
+ * Every process: pid, parent pid and creation time from the supervisor's own process table, which is read without WMI,
+ * and each image name from `tasklist`. No command lines and no environment values are read.
+ */
 function inventory() {
   if (process.platform !== "win32") {
     const r = spawnSync("ps", ["-A", "-o", "pid=,ppid=,lstart=,comm="], { encoding: "utf-8", timeout: 15_000 });
     if (r.error || r.status !== 0) return { available: false, reason: r.error?.code ?? `ps exited ${r.status}` };
-    return { available: true, processes: r.stdout.trim().split("\n").slice(0, 2000) };
+    return { available: true, processes: r.stdout.trim().split(LINE_BREAK).slice(0, 2000) };
   }
-  // Id, name and start time from Get-Process; the parent from Win32_Process, asked for that one property only.
-  const script =
-    "$p = @{}; Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId | ForEach-Object { $p[[int]$_.ProcessId] = [int]$_.ParentProcessId }; " +
-    "Get-Process | ForEach-Object { try { $s = $_.StartTime.ToUniversalTime().ToString('o') } catch { $s = $null }; " +
-    "[pscustomobject]@{ pid = $_.Id; ppid = $p[$_.Id]; name = $_.ProcessName; started = $s } } | ConvertTo-Json -Compress";
-  const r = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf-8", timeout: 30_000 });
-  if (r.error || r.status !== 0) return { available: false, reason: r.error?.code ?? `powershell exited ${r.status}` };
-  try {
-    return { available: true, processes: JSON.parse(r.stdout || "[]") };
-  } catch {
-    return { available: false, reason: "inventory-unparseable" };
+  const table = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_PROCESS_TABLE], { encoding: "utf-8", timeout: 15_000 });
+  if (table.error || table.status !== 0) return { available: false, reason: table.error?.code ?? `process table exited ${table.status}` };
+  const names = new Map();
+  const tl = spawnSync("tasklist", ["/fo", "csv", "/nh"], { encoding: "utf-8", timeout: 15_000 });
+  if (!tl.error && tl.status === 0)
+    for (const line of tl.stdout.split(LINE_BREAK)) {
+      const m = line.match(/^"([^"]*)","(\d+)"/);
+      if (m) names.set(Number(m[2]), m[1]);
+    }
+  const processes = [];
+  for (const line of table.stdout.split(LINE_BREAK)) {
+    const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)$/);
+    if (m) processes.push({ pid: Number(m[1]), ppid: Number(m[2]), created: m[3] === "-" ? null : m[3], name: names.get(Number(m[1])) ?? null });
   }
+  return { available: true, names: names.size > 0, processes };
 }
 
 function remaining(dir) {
@@ -103,10 +117,17 @@ export function removeTestTree(dir, label) {
       label,
       at: new Date(t0).toISOString(),
       error: { code: first.code, path: first.path },
-      handles: handles(first.path ?? dir),
-      remaining: remaining(dir),
-      inventory: inventory(),
     };
+    const timed = (name, fn) => {
+      const at = Date.now();
+      record[name] = fn();
+      record[name].startMs = at - t0;
+      record[name].ms = Date.now() - at;
+    };
+    // handle64 first: it is the one that can name the holder of the exact path, if it can see the hold at all.
+    timed("handles", () => handles(first.path ?? dir));
+    timed("inventory", () => inventory());
+    timed("remaining", () => remaining(dir));
     record.diagnosticsMs = Date.now() - t0;
     const retried = { ...removeWithinBound(dir), afterMs: null };
     retried.afterMs = Date.now() - t0;
