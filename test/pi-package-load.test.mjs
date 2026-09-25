@@ -177,8 +177,9 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "validation_run",
         ],
         commands: 0,
-        // ⚠️ EXACTLY ONE HOOK (G4): the stage context, added before each agent start. No other event is handled.
-        handlers: [["before_agent_start", 1]],
+        // ⚠️ EXACTLY TWO HOOKS: the keyboard stop's subscription at session start (F130), and the stage context (G4),
+        // added before each agent start. No other event is handled.
+        handlers: [["session_start", 1], ["before_agent_start", 1]],
       },
     ]);
 

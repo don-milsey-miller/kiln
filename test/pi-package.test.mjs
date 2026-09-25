@@ -457,7 +457,7 @@ test("⚠️ ACC-0063 loading and registering touches no project, no credential,
   const seen = JSON.parse(r.stdout);
 
   assert.deepEqual(seen.registered, [...REGISTERED_TOOLS], "registration ran and produced every declared tool");
-  assert.deepEqual(seen.hooks, ["before_agent_start"], "registration adds exactly the one hook, and runs none of it");
+  assert.deepEqual(seen.hooks, ["session_start", "before_agent_start"], "registration adds exactly these hooks, and runs none of them");
   assert.equal(seen.signatureVersion, 1);
 
   assert.deepEqual(seen.after.writes, [], "registration wrote a file");

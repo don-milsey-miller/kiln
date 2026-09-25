@@ -110,7 +110,8 @@ export function stoppedSummary(result) {
  * leaving to the next change.
  */
 export function exitStatusFor(result) {
-  if (result.trigger === "signal") return 1;
+  // A keyboard stop is an interrupt too (lib/keyboard-stop.mjs): Pi's own code does not decide it.
+  if (result.trigger === "signal" || result.trigger === "keyboard") return 1;
   const { code, signal, observed } = result.agentExit;
   if (observed === false) return 1;
   return code ?? (signal ? 1 : 0);
@@ -368,6 +369,8 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     interactive,
     // ⚠️ BOTH ENDS, BECAUSE THAT IS PI'S OWN TEST: with either one not a terminal it runs in print mode.
     startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    // ⚠️ THE SAME TEST, FOR THE SAME REASON: only an interactive Pi reads Ctrl+C as a key, so only then is it Kiln's stop.
+    keyboardStop: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     // F130 mechanism 2, PROTOTYPE and opt-in: on Windows, KILN_WINDOWS_JOB_HOST=1 starts the agent and the launcher, each inside a job its host
     // holds. Unset, nothing changes.
     agentJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,

@@ -1139,7 +1139,28 @@ async function stageContextBlock(event, deps) {
 }
 
 export default function register(pi, deps = {}) {
-  // ⚠️ THE ONE HOOK, AND NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when it fires.
+  // ⚠️ NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when a hook fires.
+  //
+  // ⚠️ **THE KEYBOARD STOP, AND ONLY UNDER A KILN SUPERVISOR.** Outside Kiln the variable is unset and Pi's own Ctrl+C is
+  // untouched; in print mode there is no terminal to listen to. A new session clears extension listeners, so each
+  // `session_start` subscribes afresh and drops the previous subscription.
+  //
+  // The listener, and the one variable it needs, live in `lib/keyboard-stop.mjs`, imported when the hook fires; a package
+  // loaded without Kiln's `lib/` beside it has no supervisor to tell, and leaves Ctrl+C to Pi.
+  let unsubscribeKeyboardStop = null;
+  pi?.on?.("session_start", async (_event, ctx) => {
+    if (!ctx?.hasUI || typeof ctx.ui?.onTerminalInput !== "function") return;
+    let listener = null;
+    try {
+      listener = (deps.keyboardStop ?? (await import("../../lib/keyboard-stop.mjs"))).keyboardStopFor(ctx);
+    } catch {
+      return;
+    }
+    if (!listener) return;
+    unsubscribeKeyboardStop?.();
+    unsubscribeKeyboardStop = ctx.ui.onTerminalInput(listener);
+  });
+
   pi?.on?.("before_agent_start", async (event) => {
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
     // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.

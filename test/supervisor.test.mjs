@@ -71,6 +71,7 @@ import {
   withToolAllowlist,
 } from "../bin/start-kiln.mjs";
 import { validatePackage } from "../lib/pi-package.mjs";
+import { KEYBOARD_STOP_ENV } from "../lib/keyboard-stop.mjs";
 import { HEALTH_PATH, matchHealth } from "../lib/run-identity.mjs";
 
 installReaper();
@@ -2083,6 +2084,124 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
   assert.equal(result.shutdown.signal, "SIGINT", "recorded where it was handled, not inferred");
   assert.equal(result.shutdown.complete, true);
 });
+
+/* ================================ the keyboard stop, integrated (F130, TSK-0058, ACC-0081) ============= */
+
+/**
+ * The supervisor's side of one Ctrl+C in an interactive session: fake children that go only when stopped, the notice
+ * file the extension would write, and nothing installed on the real process.
+ *
+ * `agentExitsOn` lets the agent itself write the notice and exit in one synchronous step: the race the notice's
+ * ordering exists for.
+ */
+async function keyboardRun({ keyboardStop = true, env = {}, logs = [] } = {}) {
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const calls = [];
+  const byPid = new Map();
+  let nextPid = 5100;
+  const end = (pid) => {
+    const child = byPid.get(Number(pid));
+    if (!child || child.exitCode !== null) return;
+    child.exitCode = 0;
+    child.onExit?.(0, null);
+  };
+  const spawn = (command, args, options) => {
+    const child = {
+      pid: nextPid++,
+      exitCode: null,
+      signalCode: null,
+      stdin: command === "L" ? { destroyed: false, write: () => {}, end: () => {} } : null,
+      kill: () => (end(child.pid), true),
+      once: (event, cb) => {
+        if (event === "exit") child.onExit = cb;
+      },
+    };
+    byPid.set(child.pid, child);
+    calls.push({ command, args, options, child });
+    return child;
+  };
+  const run = runSupervisor({
+    sessionLister: listNothing,
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn,
+    env: { PORT: String(await freePort()), ...env },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    kill: (pid, signal) => (signal !== 0 && end(pid), true),
+    run: (cmd, args) => (cmd === "taskkill" && end(args[args.indexOf("/pid") + 1]), { status: 0, stdout: "" }),
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+    graceMs: 400,
+    hardMs: 200,
+    keyboardStop,
+    log: (line) => logs.push(line),
+  });
+  for (let i = 0; i < 200 && calls.length < 2; i++) await sleep(10);
+  assert.equal(calls.length, 2, "both children started");
+  const [launcher, agent] = calls;
+  return { run, launcher, agent, file: agent.options.env[KEYBOARD_STOP_ENV], logs };
+}
+
+test("⚠️ F130 ONE CTRL+C AT THE KEYBOARD STARTS THE SHUTDOWN WITHOUT WAITING FOR PI, AND IS RECORDED AS `keyboard`", async () => {
+  // This agent never exits on its own: Pi's own shutdown waits until it is idle, so only the supervisor's teardown,
+  // started from the notice, can end the run.
+  const { run, launcher, file } = await keyboardRun();
+  assert.ok(file, "the interactive agent is told where the notice goes");
+  assert.equal(launcher.options.env[KEYBOARD_STOP_ENV], undefined, "the launcher is not");
+  writeFileSync(file, JSON.stringify({ at: Date.now() }), { flag: "wx" });
+
+  const result = await run;
+  assert.equal(result.trigger, "keyboard");
+  assert.equal(result.shutdown.trigger, "keyboard");
+  assert.equal(result.shutdown.signal, null, "no signal occurred, and none is recorded");
+  assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+  assert.equal(result.shutdown.budget.withinBudget, true);
+  assert.equal(exitStatusFor(result), 1, "a keyboard stop is an interrupt, not a clean exit");
+  assert.equal(existsSync(dirname(file)), false, "the notice's directory is removed with the run");
+});
+
+test("⚠️ F130 A CTRL+C WHOSE PI EXITS AT ONCE IS STILL THE KEYBOARD STOP: the notice is written before Pi goes", async () => {
+  // The extension writes the notice synchronously and only then asks Pi to go. Here both happen in one synchronous
+  // step, so the agent's exit reaches the run loop before the file watch or the poll can have fired.
+  const logs = [];
+  const { run, agent, file } = await keyboardRun({ logs });
+  writeFileSync(file, JSON.stringify({ at: Date.now() }), { flag: "wx" });
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+
+  const result = await run;
+  assert.equal(result.trigger, "keyboard", "an exit observed first did not erase the key");
+  assert.equal(result.shutdown.signal, null);
+  assert.ok(logs.some((l) => /stopped by Ctrl\+C at the keyboard.*\(check\)/.test(l)), `the exit path found it: ${logs.join(" | ")}`);
+  assert.equal(result.shutdown.complete, true);
+});
+
+test("⚠️ F130 CONTROL: a Pi that exits with no notice is recorded as its own exit", async () => {
+  const { run, agent } = await keyboardRun();
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+  const result = await run;
+  assert.equal(result.trigger, "agent-exit");
+  assert.equal(exitStatusFor(result), 0);
+});
+
+test("⚠️ F130 WITHOUT A TERMINAL NO CHILD IS TOLD OF A NOTICE, AND AN INHERITED ONE NEVER REACHES EITHER", async () => {
+  // Pi keeps its own Ctrl+C outside an interactive Kiln session, and a path exported by some other run names a file
+  // this run did not create.
+  const { run, launcher, agent } = await keyboardRun({ keyboardStop: false, env: { [KEYBOARD_STOP_ENV.toLowerCase()]: "elsewhere", [KEYBOARD_STOP_ENV]: "elsewhere" } });
+  for (const { options } of [launcher, agent])
+    assert.deepEqual(Object.keys(options.env).filter((k) => k.toUpperCase() === KEYBOARD_STOP_ENV), []);
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+  assert.equal((await run).trigger, "agent-exit");
+});
+
 
 test("⚠️ AN AGENT THAT NEVER GOES DOES NOT HANG THE SUPERVISOR", async () => {
   // The control the previous test could not be. There, the signal handler's teardown killed the

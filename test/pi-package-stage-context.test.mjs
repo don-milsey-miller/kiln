@@ -103,12 +103,12 @@ async function loadedSkills(fx) {
   }
 }
 
-/** Exactly one `before_agent_start` handler, registered against the fixture's tool root. */
+/** Exactly one `before_agent_start` handler, registered against the fixture's tool root, beside the keyboard stop's `session_start`. */
 function hookFor(fx, toolRoot = fx.tool) {
   const hooks = [];
   register({ registerTool: () => {}, on: (event, handler) => hooks.push([event, handler]) }, { toolRoot });
-  assert.deepEqual(hooks.map(([event]) => event), ["before_agent_start"], "exactly one hook");
-  return hooks[0][1];
+  assert.deepEqual(hooks.map(([event]) => event), ["session_start", "before_agent_start"], "exactly these hooks");
+  return hooks.find(([event]) => event === "before_agent_start")[1];
 }
 
 async function runHook(fx, skills, { systemPrompt = BASE, toolRoot } = {}) {
