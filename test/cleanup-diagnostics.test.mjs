@@ -1,7 +1,8 @@
 /**
  * F11: the first refusal to remove a test's directory is diagnosed before any retry — test/helpers/cleanup.mjs.
  *
- * A process whose working directory is the directory holds it the way F11's hold behaves: the directory cannot be
+ * A process whose working directory is the directory holds it for six seconds, long enough for a slow inventory to list
+ * it and well inside the 15.3 s bound. It holds it the way F11's hold behaves: the directory cannot be
  * removed while it runs and can be once it has gone. The record must carry the refusal, the remaining entries, a
  * process inventory that names the holder, and `handle64` or the reason it was unavailable; and the unchanged retry
  * must then remove the directory.
@@ -24,7 +25,7 @@ test(
     const out = join(tmpdir(), `kiln-f11-out-${process.pid}.jsonl`);
     mkdirSync(join(dir, "inner"));
     writeFileSync(join(dir, "inner", "file.txt"), "x");
-    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 2500)"], { cwd: dir, stdio: "ignore" });
+    const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 6000)"], { cwd: dir, stdio: "ignore" });
     await new Promise((r) => setTimeout(r, 300));
     const saved = process.env.F11_OUT;
     process.env.F11_OUT = out;
