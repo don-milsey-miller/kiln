@@ -19,5 +19,5 @@
   "acceptedBy": [
     "ACC-0118"
   ],
-  "notes": "Created 2026-09-24. Scope revised on review: the same guard is in all four commands, not only setup and launch. The link is a junction on Windows and a directory symlink on POSIX."
+  "notes": "Created 2026-09-24. Scope revised on review: the same guard is in all four commands, not only setup and launch. The link is a junction on Windows and a directory symlink on POSIX. ⚠️ IMPLEMENTED 2026-09-24 (EVD-0148, commits 94e8a36 and 564f8a7). ACC-0118 passes."
 }

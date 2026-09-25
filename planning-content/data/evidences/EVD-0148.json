@@ -1,0 +1,36 @@
+{
+  "id": "EVD-0148",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: the four entry-point commands run through a linked .planning and not on import",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-24",
+  "summary": "TSK-0074, toward ACC-0118. THE DEFECT. Each command decided whether to run by comparing pathToFileURL(process.argv[1]) with import.meta.url. Node loads the main module from its real path, so through a linked .planning the two differed, and the command exited 0 having done nothing. IMPLEMENTATION, 94e8a36. lib/entry-point.mjs (Node built-ins only) resolves both paths with realpathSync before comparing, and bin/setup.mjs, bin/start-kiln.mjs, bin/init-project.mjs and bin/generate-stage-skills.mjs use it. CONTROL, test/linked-entry-points.test.mjs (564f8a7). A real junction on Windows and a directory symlink on POSIX point .planning at the checkout, and each command runs through it. Each is proved by its effect: setup --help prints its usage, init-project --help prints its usage, generate-stage-skills --check reports clean, and start-kiln with an unknown argument refuses naming it and exits 2. Importing each of the four, through the link and by its real path, prints nothing and exits 0. MUTATION. With the four old guards restored, the linked-run case failed. CI. Run 36077139114 at 564f8a7 passed all four cells, and both ACC-0118 cases passed in each.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "implementation": "TSK-0074 commits 94e8a36 (the check and the four commands) and 564f8a7 (the control)",
+      "lib/entry-point.mjs": "sha256:6118a9aade011d08b7e8cc4932d2bc355b16a7680cbdd49183fa743daf9f9cbe",
+      "bin/setup.mjs": "sha256:2211306c67b30bdf185a35b072b335853d17aea98451563770a905b16aa72ef9",
+      "bin/start-kiln.mjs": "sha256:c7f9fe4d17de0f2bc1efbb9f3a0fca4194721c0d174446a92a3b57e07b2d28a1",
+      "bin/init-project.mjs": "sha256:41ad48c22f5f7caa60d12a7504b4043576ee48693c1a7682399141db73a98bcf",
+      "bin/generate-stage-skills.mjs": "sha256:e8ea05dca995dcbc8ed74f033c800424ff177a1593a4de01a3399657947bbcf6",
+      "test/linked-entry-points.test.mjs": "sha256:c23e23c73ca8a798d603d82feeba65a44619a9c21c05681599a454452d86c569",
+      "ci-run": "GitHub Actions run 36077139114 at 564f8a7, attempt 1: all four cells succeeded; windows-latest used a junction, ubuntu-latest a directory symlink",
+      "local": "Windows 11, Node 24.18.0: the setup, initializer, stage-skill and linked-entry suites, 160 of 160"
+    },
+    "omissions": []
+  }
+}

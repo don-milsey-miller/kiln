@@ -12,5 +12,9 @@
   ],
   "verifies": [
     "REQ-0025"
-  ]
+  ],
+  "evidencedBy": [
+    "EVD-0147"
+  ],
+  "notes": "Evidence recorded 2026-09-24 in EVD-0147, and left not-evaluated for review. The control passed in all four cells of CI run 36077139114. In the earlier red run 36076748293 it failed once on Windows Node 22, at its launch step, from F130 mechanism 2, after its compat assertions had passed."
 }
