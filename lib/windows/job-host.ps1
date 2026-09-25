@@ -17,8 +17,8 @@
 # `exited.json` report the child's start and end. The host exits after `release`, or when its supervisor is gone,
 # returning the child's exit code; closing the job then ends anything still in it (KILL_ON_JOB_CLOSE).
 #
-# ⚠️ CTRL+C IS THE CHILD'S. The host ignores console control events, set only after the child exists, because that
-# setting is inherited by processes created after it.
+# ⚠️ CONSOLE CONTROL EVENTS ARE THE CHILD'S. The host ignores CTRL+C, set only after the child exists because that
+# setting is inherited by processes created after it, and then detaches from the console entirely.
 param([Parameter(Mandatory = $true)][string]$Plan)
 $ErrorActionPreference = 'Stop'
 $clock = [Diagnostics.Stopwatch]::StartNew()
@@ -50,6 +50,7 @@ try {
   Add-Native 'GetExitCodeProcess' ([bool]) @([IntPtr], [IntPtr])
   Add-Native 'CloseHandle' ([bool]) @([IntPtr])
   Add-Native 'SetConsoleCtrlHandler' ([bool]) @([IntPtr], [bool])
+  Add-Native 'FreeConsole' ([bool]) @()
   $n = $t.CreateType()
 } catch { Fail 80 'native-unavailable' }
 $m = [Runtime.InteropServices.Marshal]
@@ -83,6 +84,11 @@ if (-not $n::AssignProcessToJobObject($job, $hProcess)) {
 [void]$n::ResumeThread($hThread)
 [void]$n::CloseHandle($hThread)
 [void]$n::SetConsoleCtrlHandler([IntPtr]::Zero, $true)
+# ⚠️ AND THEN THE HOST LEAVES THE CONSOLE. Ignoring CTRL+C does not cover CTRL+BREAK, which reaches every process on
+# the console and breaks PowerShell into its debugger: measured, a host that got one stopped answering, and its
+# tree could not be observed. The child already holds the console it inherited, so it keeps its terminal and its own
+# CTRL+C; the host never writes to the console, so it has nothing left to receive there.
+[void]$n::FreeConsole()
 Write-Control 'started' ([ordered]@{ pid = $childPid; hostPid = $PID; startedMs = $clock.ElapsedMilliseconds })
 
 function Get-Members {
