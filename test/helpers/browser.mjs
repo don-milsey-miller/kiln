@@ -48,7 +48,13 @@ export async function launchBrowser(browserPath) {
   ];
   // ⚠️ ITS OWN PROCESS GROUP ON POSIX, so this browser's whole tree can be stopped without touching any other.
   // Killing only the main process left its renderers writing into the profile, and removing it failed (F16).
-  const proc = spawn(browserPath, args, { stdio: ["ignore", "ignore", "ignore"], detached: process.platform !== "win32" });
+  const proc = spawn(browserPath, args, { stdio: ["ignore", "ignore", "pipe"], detached: process.platform !== "win32" });
+  // ⚠️ **WHY A START FAILED, BOUNDED.** A page that never appeared used to fail with one line and nothing else (CI run
+  // 36178450744, Windows Node 22). The browser's exit and the tail of its stderr are kept, at most STDERR_TAIL characters.
+  const started = Date.now();
+  const startup = { exit: null, stderrTail: "" };
+  proc.stderr.on("data", (d) => (startup.stderrTail = (startup.stderrTail + d).slice(-STDERR_TAIL)));
+  proc.once("exit", (code, signal) => (startup.exit = { code, signal, afterMs: Date.now() - started }));
   let page = null;
   const close = async () => {
     try {
@@ -82,7 +88,7 @@ export async function launchBrowser(browserPath) {
     rmSync(profile, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
   };
   try {
-    page = await attachToPage(profile);
+    page = await attachToPage(profile, startup);
     return { page, close };
   } catch (e) {
     await close();
@@ -90,17 +96,50 @@ export async function launchBrowser(browserPath) {
   }
 }
 
-async function attachToPage(profile) {
-  const deadline = Date.now() + 30_000;
+/** The most of the browser's stderr kept for a failed start. */
+const STDERR_TAIL = 4000;
+
+/**
+ * Which node, PowerShell and browser processes were running when a start failed: image name and pid only, no command
+ * lines, within ten seconds — so a process an earlier Kiln run left behind can be told from one that is the browser's.
+ */
+function runningProcesses() {
+  const [cmd, args] = process.platform === "win32" ? ["tasklist", ["/fo", "csv", "/nh"]] : ["ps", ["-A", "-o", "pid=,comm="]];
+  const r = spawnSync(cmd, args, { encoding: "utf-8", timeout: 10_000 });
+  if (r.error || r.status !== 0) return { available: false, reason: r.error?.code ?? `${cmd} exited ${r.status}` };
+  const rows = [];
+  for (const line of r.stdout.split(/\r?\n/)) {
+    const m = process.platform === "win32" ? /^"([^"]*)","(\d+)"/.exec(line) : /^\s*(\d+)\s+(.+)$/.exec(line);
+    if (!m) continue;
+    const [name, pid] = process.platform === "win32" ? [m[1], Number(m[2])] : [m[2].trim(), Number(m[1])];
+    if (/^(node|powershell|pwsh|chrome|msedge|chromium|google-chrome)(\.exe)?$/i.test(name)) rows.push({ name, pid });
+  }
+  return { available: true, rows };
+}
+
+async function attachToPage(profile, startup) {
+  const started = Date.now();
+  const deadline = started + 30_000;
+  const probe = { probes: 0, portFileAfterMs: null, port: null, lastError: null, targetTypes: null };
   for (;;) {
-    if (Date.now() > deadline) throw new Error("the browser never exposed a page target");
+    if (Date.now() > deadline) {
+      const diagnostics = { ...startup, ...probe, waitedMs: Date.now() - started, processes: runningProcesses() };
+      console.log(`[browser] start failed: ${JSON.stringify(diagnostics)}`);
+      throw Object.assign(new Error(`the browser never exposed a page target: ${JSON.stringify(diagnostics)}`), { diagnostics });
+    }
+    probe.probes += 1;
     try {
       const port = readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0].trim();
-      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      probe.portFileAfterMs ??= Date.now() - started;
+      probe.port = port;
+      // Bounded, so one probe that never answers cannot carry the wait past its deadline.
+      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2000) })).json();
+      probe.targetTypes = list.map((t) => t.type);
       const target = list.find((t) => t.type === "page" && t.webSocketDebuggerUrl);
       if (target) return await connect(target.webSocketDebuggerUrl);
-    } catch {
-      /* not up yet */
+      probe.lastError = "no page target yet";
+    } catch (e) {
+      probe.lastError = `${e?.code ?? e?.cause?.code ?? e?.name ?? "error"}: ${String(e?.message ?? e).slice(0, 200)}`;
     }
     await sleep(300);
   }
