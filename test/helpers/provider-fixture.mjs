@@ -127,14 +127,16 @@ export async function startProviderFixture({ script = [], key = FIXTURE_KEY } = 
  * the model is available only in a process that carries `KILN_FIXTURE_PROVIDER_KEY`.
  *
  * @param {string} url  the fixture's `url`
+ * @param {{compat?: object}} [options]  a provider-level `compat` block, which Pi merges into the model (TSK-0073)
  */
-export function modelsJson(url) {
+export function modelsJson(url, { compat } = {}) {
   return {
     providers: {
       [FIXTURE_PROVIDER]: {
         baseUrl: url,
         api: "openai-completions",
         apiKey: `$${FIXTURE_KEY_VAR}`,
+        ...(compat ? { compat } : {}),
         models: [{ id: FIXTURE_MODEL, name: "Kiln Fixture", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 }],
       },
     },
