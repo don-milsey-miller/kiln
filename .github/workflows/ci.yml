@@ -92,6 +92,17 @@ jobs:
       - name: Check the generated role definitions
         run: npm run roles:check
 
+      # F11, diagnostic only: Sysinternals handle64, so a directory Windows still holds at a test's cleanup can be
+      # attributed at the first refusal (test/helpers/cleanup.mjs). Best effort: a failed download leaves HANDLE_EXE
+      # unset, and the diagnostic records handle64 as unavailable rather than guessing.
+      - name: Fetch Sysinternals handle (F11 diagnostic)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://live.sysinternals.com/handle64.exe -OutFile "$env:RUNNER_TEMP\handle64.exe" -TimeoutSec 60
+          "HANDLE_EXE=$env:RUNNER_TEMP\handle64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       # `npm test` is `node --test`, which discovers `test/**` itself and exits
       # non-zero on any failing file. A non-zero exit fails the step and the
       # job on both shells — bash and, on Windows, pwsh — so there is nothing
