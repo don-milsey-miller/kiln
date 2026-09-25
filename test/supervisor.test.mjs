@@ -3862,3 +3862,155 @@ test("⚠️ through the real command: a non-interactive model override is refus
   assert.match(o.stderr, /\[kiln\] The one-run override openai gpt-4\.1-mini has to be confirmed before Kiln uses it, and this run cannot ask/);
   noCredentialAccess(o, "non-interactive override");
 });
+
+/* ============================================== F130 mechanism 2: job mode (prototype) ============= */
+
+/** A job whose agent exits after `lifeMs` and leaves the members `after` in the job. */
+function fakeAgentJob({ lifeMs = 30, after = [], startsAs = 4242 } = {}) {
+  const calls = { starts: [], ops: [] };
+  let exitedAt = null;
+  let members = [...after];
+  const starter = async (spec) => {
+    calls.starts.push(spec);
+    const host = { pid: 9999, once: () => {}, on: () => {} };
+    setTimeout(() => (exitedAt = { code: 0 }), lifeMs);
+    return {
+      host,
+      pid: startsAs,
+      startedMs: 5,
+      exited: () => exitedAt,
+      list: async () => (calls.ops.push("list"), { ok: true, pids: exitedAt ? [...members] : [startsAs, ...members] }),
+      terminate: async () => (calls.ops.push("terminate"), (members = []), { ok: true, pids: [] }),
+      release: async () => (calls.ops.push("release"), { ok: true }),
+    };
+  };
+  return { starter, calls };
+}
+
+test("⚠️ F130 job mode: the agent is started by the job host, never by spawn, and its tree is the job's", async () => {
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const calls = [];
+  const { starter, calls: job } = fakeAgentJob({ after: [5151] });
+  const result = await runSupervisor({
+    sessionLister: listNothing,
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: ["--x"] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+    agentJob: starter,
+  });
+  assert.deepEqual(calls.map((c) => c.command), ["L"], "the agent was not spawned directly");
+  assert.equal(job.starts.length, 1);
+  assert.equal(job.starts[0].command, "A");
+  assert.ok(job.starts[0].args.includes("--x"), "the agent's own arguments reach the host");
+  assert.deepEqual(job.ops, ["list", "terminate", "release"], "the survivor was listed, ended, confirmed gone by the terminate answer, and the host released");
+  assert.deepEqual(result.shutdown.agent.descendants, [5151]);
+  assert.equal(result.shutdown.agent.treeStopped, true);
+  assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+});
+
+test("⚠️ F130 job mode: a host that cannot start the agent refuses the launch, and nothing is spawned in its place", async () => {
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const calls = [];
+  const { JobHostRefusal } = await import("../lib/windows-job.mjs");
+  const e = await runSupervisor({
+    sessionLister: listNothing,
+    agentDir: AGENT_DIR,
+    readTrust: APPROVED,
+    projectRoot: dir,
+    launcher: { command: "L", args: [] },
+    agent: { command: "A", args: [] },
+    spawn: recordingSpawn(calls),
+    env: { PORT: String(await freePort()) },
+    randomBytes: () => Buffer.alloc(16, 7),
+    psRun: NO_DESCENDANTS,
+    signalTarget: fakeSignals(),
+    fetchImpl: healthyFetch(),
+    build: null,
+    agentJob: async () => {
+      throw new JobHostRefusal("assign-failed", "The job host could not start the agent inside a job (assign-failed).");
+    },
+  }).catch((x) => x);
+  assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 160)}`);
+  assert.equal(e.reason, REFUSAL.SPAWN_FAILED);
+  assert.match(e.message, /JOB_HOST_ASSIGN_FAILED/);
+  assert.deepEqual(calls.map((c) => c.command), ["L"], "no agent was spawned any other way");
+});
+
+test(
+  "⚠️ F130 JOB MODE a detached survivor of an agent that already exited is named by the real job and ended within the deadline",
+  { skip: process.platform === "win32" ? false : "job mode exists only on Windows" },
+  async () => {
+    const { startInJob } = await import("../lib/windows-job.mjs");
+    const dir = repoProject({ state: true });
+    ignoreAll(dir);
+    const base = mkdtempSync(join(tmpdir(), "kiln-job-mode-agent-"));
+    const standin = join(base, "agent.mjs");
+    const pids = join(base, "pids.json");
+    // The case the process-table tracker cannot observe: the agent starts a detached process and exits at once.
+    writeFileSync(
+      standin,
+      [
+        'import { spawn } from "node:child_process";',
+        'import { writeFileSync } from "node:fs";',
+        'const g = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", detached: true });',
+        `writeFileSync(${JSON.stringify(pids)}, JSON.stringify({ pid: process.pid, survivor: g.pid }));`,
+        "process.exit(0);",
+      ].join(NEWLINE)
+    );
+    const calls = [];
+    const logged = [];
+    try {
+      const result = await runSupervisor({
+        sessionLister: listNothing,
+        agentDir: AGENT_DIR,
+        readTrust: APPROVED,
+        projectRoot: dir,
+        launcher: { command: "L", args: [] },
+        agent: { command: process.execPath, args: [standin] },
+        spawn: recordingSpawn(calls),
+        env: { ...process.env, PORT: String(await freePort()) },
+        randomBytes: () => Buffer.alloc(16, 7),
+        psRun: NO_DESCENDANTS,
+        signalTarget: fakeSignals(),
+        fetchImpl: healthyFetch(),
+        build: null,
+        agentJob: startInJob,
+        log: (l) => logged.push(l),
+      });
+      const { pid, survivor } = JSON.parse(readFileSync(pids, "utf-8"));
+      const agent = result.shutdown.agent;
+      console.log(`[job mode] ${logged.filter((l) => l.includes("inside a job")).join(" | ")}; ${JSON.stringify(agent.job)}; spent ${result.shutdown.budget.spentMs} ms`);
+      assert.deepEqual(calls.map((c) => c.command), ["L"], "the agent was not spawned directly");
+      assert.ok(agent.descendants.includes(survivor), `the job did not name the survivor: ${JSON.stringify(agent)}`);
+      assert.equal(agent.descendants.includes(pid), false, "the agent itself had exited");
+      assert.equal(agent.job.terminated, true);
+      assert.deepEqual(agent.descendantsSurviving, []);
+      assert.equal(agent.treeStopped, true);
+      assert.equal(result.shutdown.budget.withinBudget, true);
+      assert.equal(result.shutdown.complete, true, JSON.stringify(result.shutdown.notObserved));
+      let gone = false;
+      for (let i = 0; i < 40 && !gone; i++) {
+        try {
+          process.kill(survivor, 0);
+          await new Promise((r) => setTimeout(r, 50));
+        } catch {
+          gone = true;
+        }
+      }
+      assert.ok(gone, "the survivor is still running");
+    } finally {
+      rmSync(base, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+    }
+  }
+);
