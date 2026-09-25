@@ -42,6 +42,7 @@ import { REFUSAL, SupervisorRefusal, assertSelfHostOptIn, runSupervisor } from "
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
+import { startInJob } from "../lib/windows-job.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const say = (msg) => console.log(`[kiln] ${msg}`);
@@ -367,6 +368,9 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     interactive,
     // ⚠️ BOTH ENDS, BECAUSE THAT IS PI'S OWN TEST: with either one not a terminal it runs in print mode.
     startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    // F130 mechanism 2, PROTOTYPE and opt-in: on Windows, KILN_WINDOWS_JOB_HOST=1 starts the agent inside a job its host
+    // holds. Unset, nothing changes.
+    agentJob: process.platform === "win32" && process.env.KILN_WINDOWS_JOB_HOST === "1" ? startInJob : null,
     ask,
     askLine,
     log: say,
