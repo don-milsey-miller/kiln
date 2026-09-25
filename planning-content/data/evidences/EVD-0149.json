@@ -1,0 +1,53 @@
+{
+  "id": "EVD-0149",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: both trees stop within the deadline on Windows by default in jobs, and on POSIX, including one Ctrl+C at the keyboard",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-25",
+  "summary": "F130 and the keyboard stop, against ACC-0081 as amended on 2026-09-25 (29f529d: the keyboard stop is the third trigger; eb9df03: on Windows both trees start in jobs, with no fallback and no process-table preflight). WINDOWS, NORMAL CI, THE DEFAULT. CI run 36174640599 at 6353b6b passed all four cells, with every real Windows launch starting both trees in jobs (hosts 196 to 308 ms). CI run 36178450744 at 47a4e3d added the port rebind and clause 6 both ways to the Windows job-mode platform cells. Natural and interrupt passed on windows-latest Node 24 and Node 22: both jobs active and emptied, both hosts exited, each known detached descendant named by its job and gone, the port rebound, exactly this run's file removed and gone, the foreign run-shaped file preserved byte for byte, within the 8,000 ms budget with nothing unfinished or unobserved. The enumeration check passed in every cell. The non-job Windows cells are retired and skipped with their reason. POSIX. In the same run, the POSIX natural and interrupt platform cells passed on ubuntu-latest Node 24 and Node 22. The integrated terminal observation of the keyboard trigger passed on both: the real start-kiln under util-linux script, the start turn held at the provider, one Ctrl+C byte typed into the pseudo-terminal, recorded as stopped by Ctrl+C at the keyboard and stopped (keyboard) with launcher tree stopped: true, exit 1, the port free, 201 ms and 199 ms from the key to the run's end. The same test passed in WSL Ubuntu at 47a4e3d (196 ms). WINDOWS TERMINAL, JOB MODE, KEYBOARD. At 29f529d, one Ctrl+C during a held turn: notice seen 5 ms after the key, Pi gone 0.15 s, every tracked process (both job hosts, start-shell, next start, Pi) 0.87 s, stopped (keyboard) with launcher tree stopped: true, exit 1. With Pi's /settings dialog open: 3 ms, 0.16 s, 0.74 s, same summary, exit 1. The keys were real input events sent to a window verified to be in the foreground, and an outside watcher recorded every process by pid and creation time. CONTROLS IN CI (37d76fe onward): the deadline counts from the key, not the notice; a notice seen after the whole bound is refused as shutdown-not-observed; an unwritten notice makes Pi exit 130 and ends it within 8 s; a Pi exit observed before the notice is still the keyboard stop. Each was mutated out and its test failed. THE RUN WAS RED OVERALL. 36178450744 failed on windows-latest Node 22 in the TSK-0063 journey: after run 1 passed all its checks (stopped (agent-exit) complete, port free, no escalation, the launcher's run directory removed, no earlier run files), the test's own headless Chrome never exposed a page target. The helper then had no diagnostics. With bounded start-up diagnostics added (a873d83), the journey alone ran four times on Windows Node 22 in run 36180776736 on the never-merged branch diag/journey-browser (deleted) and passed all four, so no browser failure was captured and its cause is unknown. Nothing observed ties it to a process or resource Kiln left.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "default-run": "GitHub Actions run 36174640599 at 6353b6b, all four cells green",
+      "evidence-run": "GitHub Actions run 36178450744 at 47a4e3d: Windows job-mode cells passed on Node 24 and Node 22; POSIX cells and the terminal keyboard test passed on Ubuntu Node 24 and Node 22; failed overall on windows-latest Node 22 in the TSK-0063 journey's browser start",
+      "focused-journey": "GitHub Actions run 36180776736 on diag/journey-browser (deleted): the journey alone, four times on windows-latest Node 22, all passed",
+      "windows-terminal": "Windows 11, Windows Terminal, job mode at 29f529d: mid-turn 5 ms / 0.15 s / 0.87 s; /settings dialog 3 ms / 0.16 s / 0.74 s; exit 1 both",
+      "posix-terminal": "util-linux script pseudo-terminal: CI Ubuntu 201 ms and 199 ms key to end; WSL Ubuntu 24.04 196 ms"
+    },
+    "omissions": [
+      {
+        "fact": "physical-keypress",
+        "state": "not-captured",
+        "reason": "The Windows Terminal keys were synthesized input events (SendInput), the same input path as a key but not a person pressing one; the POSIX key was the Ctrl+C byte written into a pseudo-terminal."
+      },
+      {
+        "fact": "windows-terminal-after-deadline-change",
+        "state": "not-captured",
+        "reason": "The Windows Terminal checks ran at 29f529d, before 37d76fe started the deadline at the key; the CI controls cover that change, the terminal checks were not repeated."
+      },
+      {
+        "fact": "browser-failure-cause",
+        "state": "not-captured",
+        "reason": "The headless Chrome start failure in run 36178450744 did not recur in four focused runs, so its diagnostics captured nothing."
+      },
+      {
+        "fact": "macos",
+        "state": "not-captured",
+        "reason": "No macOS host or CI cell; the POSIX observations are Linux."
+      }
+    ]
+  }
+}
