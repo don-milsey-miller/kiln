@@ -1,0 +1,47 @@
+{
+  "id": "EVD-0150",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: an interactive session on Windows and Node 24 quit immediately after a completed tool call exits cleanly through the supervisor",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-25",
+  "summary": "ACC-0088's interactive observation: a real interactive Kiln session on Windows 11 and Node 24.18.0, quit immediately after a completed tool call, at 8fb7fe6 with job mode as the default. HOW: start-kiln's own main() and the real supervisor ran in Windows Terminal, wrapped only to retain the supervisor's returned record and the process's exit status. Pi was interactive (a terminal on both ends) on the loopback fixture provider. One prompt was answered with a kiln_project_status tool call; Pi ran it and sent its result; the provider answered with text. /quit had been typed into Pi's editor during the turn, and Enter was sent when the final answer was sent, so shutdown began inside the window where Node 24 had aborted in RPC mode. RESULT, TWICE: Enter 30 ms (run R2) and 36 ms (run R3) after the final answer was sent. Each run: Pi exited with code 0 (not the libuv abort, 3221226505); the process exited 0; the shutdown record says trigger agent-exit, complete, nothing unobserved or unfinished, both trees stopped through their jobs with both hosts exited, the launcher stopped gracefully without escalation, the port free, exactly the run's own run file removed with none failed, spent 526 ms and 537 ms. Afterwards an outside process watcher found nothing of the run alive, the port refused connections, and the temporary directories and the project's runtime directory were unchanged from before the run. A FIRST ATTEMPT (R1) did not reach Pi: the fixed port 25808 lay in a Windows excluded port range (25761 to 25860, reserved by the host, most likely for Hyper-V or WSL networking), so start-kiln asked to use another port and the typed prompt declined it; it refused with exit 2 before starting anything. Later runs used a free port each.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "host": "Windows 11 Pro 10.0.26200, Windows Terminal, Node 24.18.0, Pi 0.84.4, Kiln at 8fb7fe6",
+      "run-R2": "Enter 30 ms after the final answer; Pi code 0; process exit 0; complete; spent 526 ms; port free; one run file removed",
+      "run-R3": "Enter 36 ms after the final answer; Pi code 0; process exit 0; complete; spent 537 ms; port free; one run file removed",
+      "retained": "records, exit files, key timings, fixture log, process-watcher logs, screenshots and the harness: D:\\work\\kiln-job-manual\\evidence-acc-0088-2026-09-25"
+    },
+    "omissions": [
+      {
+        "fact": "human-keypress",
+        "state": "not-captured",
+        "reason": "The keys were synthesized input events sent to a window verified to be in the foreground, so the quit could be timed within 50 ms of the turn settling; no person pressed them."
+      },
+      {
+        "fact": "retained-in-repository",
+        "state": "not-captured",
+        "reason": "The raw records are retained outside the repository; this record carries their facts."
+      },
+      {
+        "fact": "real-model",
+        "state": "not-captured",
+        "reason": "The provider was the loopback fixture; the criterion concerns the shutdown path, not a model's output."
+      }
+    ]
+  }
+}
