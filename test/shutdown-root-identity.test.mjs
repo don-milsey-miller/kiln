@@ -132,6 +132,28 @@ test("⚠️ F118 control: with the exit callback delayed, a reused pid created 
   await tracker.stop();
 });
 
+test("⚠️ F118 control: a pid reused within milliseconds of the spawn is not the root, so a late table about it stays raced", async () => {
+  // Pi exits 1ms after `spawn()` returns, its pid is reused 2ms later, and the new process has a child. A rule that
+  // took any row created close to the spawn as the root would accept this one; nothing about the late table ties it
+  // to the original process, so it is not attributed. Only an identity captured by a verified look while the root
+  // lived, or one tied to the original process, can make a late table about this pid.
+  const spawnedAt = T0;
+  const agent = root();
+  const p = steps();
+  const only = p.later();
+  const tracker = track(agent, p);
+  agent.exitCode = 0; // exited 1ms after the spawn returned
+  only.release(`100 1 ${filetime(spawnedAt + 3)}`, `260 100 ${filetime(spawnedAt + 4)}`); // pid 100 reused 2ms later
+  await tracker.sample();
+
+  const snap = tracker.snapshot();
+  assert.deepEqual(snap.looks, { clean: 0, raced: 1, failed: 0, unresolved: 0 });
+  assert.deepEqual(snap.pids, [], "the reusing process's child is never tracked");
+  assert.equal(snap.leader, null, "and no identity is taken from it");
+  assert.equal(snap.queries[0].classification, "raced");
+  await tracker.stop();
+});
+
 test("⚠️ F118 after the root exits, a table without its row or its creation time stays raced", async () => {
   for (const [name, rows] of [
     ["the root's row is absent", [CHILD]],
