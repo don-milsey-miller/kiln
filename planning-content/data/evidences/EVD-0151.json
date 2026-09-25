@@ -1,0 +1,48 @@
+{
+  "id": "EVD-0151",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: an interactive session on Windows and Node 24 quit within 50 ms of Pi ending a second turn that completed a tool call exits cleanly through the supervisor",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-25",
+  "summary": "ACC-0088's interactive observation under the condition the Node 24 abort needed: a real interactive Kiln session on Windows 11 and Node 24.18.0 at a3ad951 (job mode default, one shared 8,000 ms budget), quit immediately after a completed tool call on a SECOND turn, timed from Pi's own turn end. HOW: start-kiln's own main() and the real supervisor ran in Windows Terminal, wrapped only to retain the returned record and the exit status. A harness-only extension in the manual project's agent directory appended Pi's turn_end, agent_end and agent_settled events with their times. Turn one was text only. Turn two was answered with a kiln_project_status tool call; Pi ran it, sent its result, and the provider answered with text. /quit had been typed during turn two, and Enter was sent a set delay after the harness saw turn two's agent_end. Keys were real input events sent to a window verified to be in the foreground. RESULT: run R4, Enter 9 ms after agent_end; run R5, Enter 44 ms after agent_end (agent_settled fired in the same millisecond as agent_end in both). Each: Pi exited with code 0, not the abort code 3221226505; the process exited 0; the shutdown record says trigger agent-exit, complete, budget.ms 8000 with 515 ms and 466 ms spent, nothing unobserved or unfinished, both trees stopped through their jobs with both hosts exited, the launcher stopped gracefully without escalation, the port free, exactly the run's own run file removed with none failed. An outside process watcher then found nothing of the run alive, the port refused connections, and the temporary directories and the project's runtime directory were unchanged. Pi's transcript shows the sequence: user, assistant stop; user, assistant toolUse kiln_project_status, toolResult, assistant stop.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "host": "Windows 11 Pro 10.0.26200, Windows Terminal, Node 24.18.0, Pi 0.84.4, Kiln at a3ad951",
+      "run-R4": "turn two: turn_end 1790374176897 and 1790374176907, agent_end 1790374176907; Enter 1790374176916 (9 ms); Pi code 0; exit 0; complete; budget 8000, spent 515 ms",
+      "run-R5": "turn two: turn_end 1790374234063 and 1790374234075, agent_end 1790374234075; Enter 1790374234119 (44 ms); Pi code 0; exit 0; complete; budget 8000, spent 466 ms",
+      "retained": "records, exit files, key timings, turn-event logs, fixture log, process-watcher logs, screenshots and the harness: D:\\work\\kiln-job-manual\\evidence-acc-0088-second-turn-2026-09-25",
+      "sha256 (files in the retained directory)": "record-R4.jsonl 7e8df67b40dcc06ea0ed9e548d2c1590f12c98385f3f61dde0d3cf58f60cb92f; record-R5.jsonl 0504b7cd149bf91909e4ce8dec04f20d00385c17cd8050b9b9f2106aaf97a5db; exit-R4.txt 7dbdeea86cb8ae140fc07aa306b9cde7325d7a184e2679d1bd5de71576244775; exit-R5.txt e152b71198ee6e17b5820adc313fbda28ac909276b3713233e5416168d6f8289; keys88-R4.log 271d1ac06a6bfb1dc745787a06e45f22d77810c78dff08a92504116533bb4e05; keys88-R5.log 90de21b7ab9b0968a941672df58b887e42d547801b11d36d5d82aa73482b5734; turns-R4.log 7215f67c23c488a67116e0def2ce4be444719c399a806beeaa9d26edc76b9747; turns-R5.log 4044c895f9cf5f4da5655c209ece59f4a292282d754b547fd715d62966aa2c96; fixture88.log abace3fcea58ac499da97df04fa19d9fadfc50ee27b19d8304073cde5d787788"
+    },
+    "omissions": [
+      {
+        "fact": "human-keypress",
+        "state": "not-captured",
+        "reason": "The keys were synthesized input events sent to a window verified to be in the foreground; no person pressed them."
+      },
+      {
+        "fact": "turn-events-by-harness-extension",
+        "state": "not-captured",
+        "reason": "Pi's turn events were read by an extension added to the manual project's agent directory for this observation; Kiln does not ship it."
+      },
+      {
+        "fact": "real-model",
+        "state": "not-captured",
+        "reason": "The provider was the loopback fixture; the criterion concerns the shutdown path, not a model's output."
+      }
+    ]
+  }
+}

@@ -24,7 +24,9 @@
       "host": "Windows 11 Pro 10.0.26200, Windows Terminal, Node 24.18.0, Pi 0.84.4, Kiln at 8fb7fe6",
       "run-R2": "Enter 30 ms after the final answer; Pi code 0; process exit 0; complete; spent 526 ms; port free; one run file removed",
       "run-R3": "Enter 36 ms after the final answer; Pi code 0; process exit 0; complete; spent 537 ms; port free; one run file removed",
-      "retained": "records, exit files, key timings, fixture log, process-watcher logs, screenshots and the harness: D:\\work\\kiln-job-manual\\evidence-acc-0088-2026-09-25"
+      "retained": "records, exit files, key timings, fixture log, process-watcher logs, screenshots and the harness: D:\\work\\kiln-job-manual\\evidence-acc-0088-2026-09-25",
+      "scope": "Both runs quit after the FIRST user turn, and Enter was timed from the provider sending its answer, not from Pi's own turn end. The Node 24 abort ACC-0088 guards against followed a second or later turn, so these runs do not observe that condition; EVD-0151 does.",
+      "sha256 (files in the retained directory)": "record-R2.jsonl a292a1bbd8d15d7b7b1f7afa8865d4a5d21c745d63b4b8f3a62f236562e59276; record-R3.jsonl 7cc0f6e7ba260fd7ab80a7ae307dcbbc3f586bc2dec4e71893d022f85fab80f6; exit-R2.txt 37db3aef631bf3af402ae3058151ed9c49cc7cdc87ab4e54ebc4c4e9a49c77fc; exit-R3.txt aea3e0052275bc416718cbae12da46884e7e9bcacdd188a3c8696e30078cd0aa; keys88-R2.log a586ce7315e79e539aaf4e210a7fe38f1282a710e7e81a3e536552e2975f5bfb; keys88-R3.log cff6291f86131918fe3413daee1e33de21f22a276c59347f726d54f2d999b1cb; fixture88.log afc1bc0e360c1450a19f385468654732278fd2f2527bb519877374c75df55ae3"
     },
     "omissions": [
       {
