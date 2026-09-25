@@ -2257,6 +2257,7 @@ test("⚠️ the signal is recorded where it was HANDLED, and a clean exit recor
 });
 
 test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY TREE", async () => {
+  const logged = [];
   // ACC-0081's seventh clause: "a descendant enumeration that fails is recorded as unmade, because
   // an empty list would claim a tree with no children". The lister here fails the way a real one
   // does — a non-zero status — and the run must refuse rather than report a clean shutdown.
@@ -2278,12 +2279,18 @@ test("⚠️ A FAILED DESCENDANT ENUMERATION IS REPORTED, NOT READ AS AN EMPTY T
     signalTarget: fakeSignals(),
     fetchImpl: healthyFetch(),
     build: null,
+    log: (line) => logged.push(line),
   }).catch((x) => x);
 
   assert.ok(e instanceof SupervisorRefusal, `expected a refusal, got ${JSON.stringify(e)?.slice(0, 140)}`);
   assert.equal(e.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED);
   assert.ok(e.detail.shutdown.notObserved.includes("agent-descendants"), "and it names WHICH observation was not made");
   assert.match(e.message, /Not observed/);
+  // F130 mechanism 2: the log says what the looks were, so a failed run in CI carries its own evidence.
+  const looks = logged.find((l) => l.startsWith("agent tree looks: "));
+  assert.ok(looks, logged.join(" | "));
+  assert.match(looks, /"failed":[1-9]/, looks);
+  assert.match(looks, /agent-1 failed \(table-unreadable\) \d+ms alive (true|false)->(true|false) error \S+/, looks);
 });
 
 test("⚠️ the port is proved free by REBINDING it, and a port held at SHUTDOWN fails the run", async () => {
