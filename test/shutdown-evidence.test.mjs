@@ -332,9 +332,9 @@ for (const mode of ["natural", "interrupt"]) {
     `⚠️ PLATFORM EVIDENCE (win32, ${mode}, job mode): both jobs were active, both hosts exited, and each known detached descendant stopped within the deadline`,
     { skip: process.platform === "win32" ? false : "job mode exists only on Windows" },
     async (t) => {
-      // ⚠️ F130, PROTOTYPE: THE FLAG IS NOT THE EVIDENCE. Every claim below is read from the shutdown record the
-      // supervisor wrote, and the descendants are checked against the operating system.
-      const { record, paths, delivery } = await observe(mode);
+      // ⚠️ F130: THE DEFAULT IS NOT THE EVIDENCE. Every claim below is read from the shutdown record the supervisor wrote,
+      // and the descendants, the port and the runtime files are checked against the operating system.
+      const { record, paths, dir, delivery } = await observe(mode);
       if (!record && delivery.refusal) return t.skip(`the Windows interrupt could not be delivered safely here: ${delivery.refusal}`);
       assert.ok(record, "the run must record an observation");
       const aliveAtReturn = Object.fromEntries(
@@ -350,6 +350,8 @@ ${JSON.stringify({ delivery, aliveAtReturn, ...record }, null, 2)}
       }
       assert.equal(record.ok, true, `the shutdown must complete: ${record.refusal ?? ""}`);
       assert.equal(record.trigger, mode === "interrupt" ? "signal" : "agent-exit");
+      if (mode === "interrupt") assert.match(record.shutdown.signal ?? "", /^SIG/, "(1) recorded where it was handled");
+      else assert.equal(record.shutdown.signal, null, "(1) no signal is fabricated for a run that had none");
       const launcherChild = readJson(paths.launcherChild).pid;
       const agentChild = readJson(paths.agentChild).pid;
       for (const [name, tree, known] of [["agent", record.shutdown.agent, agentChild], ["launcher", record.shutdown.launcherTree, launcherChild]]) {
@@ -367,6 +369,19 @@ ${JSON.stringify({ delivery, aliveAtReturn, ...record }, null, 2)}
       assert.deepEqual(record.shutdown.unfinished, []);
       assert.deepEqual(record.shutdown.notObserved, []);
       assert.equal(record.shutdown.complete, true);
+
+      // ⚠️ (5) THE PORT, BY A FRESH EXCLUSIVE BIND, as the retired non-job cells asked it.
+      assert.equal(record.shutdown.portFree, true, "(5) the port accepts a fresh bind");
+      // ⚠️ (6) CLAUSE 6, BOTH WAYS: this run's file is named, removed and gone from the disk, and the file shaped like a run
+      // file that this run did not create is still there, byte for byte.
+      const mine = runFilePath(join(dir, ".pi", "runtime"), record.runId);
+      assert.deepEqual(record.shutdown.files.removed, [mine], "(6) exactly this invocation's file");
+      assert.deepEqual(record.shutdown.files.failed, [], "(6) and nothing it owned was left behind");
+      assert.equal(existsSync(mine), false, "(6) the run's own file is gone from the disk, not only from the record");
+      assert.equal(readFileSync(strangerIn(dir), "utf-8"), "not this run's\n", "(6) a file it did not create survives");
+      // And the descendants against the operating system, a moment later as well as at return.
+      assert.equal(await goneWithin(launcherChild), true, `the launcher's descendant ${launcherChild} is still alive`);
+      assert.equal(await goneWithin(agentChild), true, `the agent's descendant ${agentChild} is still alive`);
     }
   );
 }
