@@ -33,6 +33,7 @@ import { FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJs
 import { findBrowser, launchBrowser, until } from "./helpers/browser.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
+import { removeTestTree } from "./helpers/cleanup.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 /** Setup's locked install and the shell's first production build happen inside this bound. */
@@ -324,7 +325,7 @@ test(
     } finally {
       if (browser) await browser.close();
       await fixture.close();
-      rmSync(base, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+      removeTestTree(base, "TSK-0063 journey");
     }
   }
 );

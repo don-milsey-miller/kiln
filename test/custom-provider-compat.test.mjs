@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { FIXTURE_DONE, FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
 import { blockText } from "../lib/project-gitignore.mjs";
+import { removeTestTree } from "./helpers/cleanup.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const BOUND_MS = 5 * 60_000;
@@ -121,6 +122,6 @@ test("⚠️ ACC-0117 the canary sends the request a custom provider's compat ma
     assert.equal(fixture.requests.length, before, "a launch refused on its proof contacted the provider");
   } finally {
     await fixture.close();
-    rmSync(root, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+    removeTestTree(root, "ACC-0117");
   }
 });

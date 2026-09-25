@@ -25,6 +25,7 @@ import { join } from "node:path";
 import { FIXTURE_DONE, FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
 import { blockText } from "../lib/project-gitignore.mjs";
+import { removeTestTree } from "./helpers/cleanup.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const BOUND_MS = 5 * 60_000;
@@ -147,9 +148,6 @@ test("⚠️ ACC-0116 a custom-provider project starts for real, answers through
     assert.equal(await answers(port), false, `something still answers on port ${port}`);
   } finally {
     await fixture.close();
-    // ⚠️ F11 (EVD-0144): on Windows CI the temporary project has refused removal with EBUSY after a clean shutdown, with
-    // no Kiln process alive and no handle found, and was removable within about 8 s. Node retries EBUSY and EPERM with a
-    // linear backoff of 100 ms more per try, so 17 retries wait at most 15.3 s. A directory still held after that fails.
-    rmSync(root, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+    removeTestTree(root, "ACC-0116");
   }
 });

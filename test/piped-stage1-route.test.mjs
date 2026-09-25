@@ -24,6 +24,7 @@ import { withBuildLock } from "./helpers/build-lock.mjs";
 import { blockText } from "../lib/project-gitignore.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 import { START_PROMPT } from "../lib/supervisor.mjs";
+import { removeTestTree } from "./helpers/cleanup.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 /** The bound on one run: launch checks, the shell, one piped turn, and cleanup. */
@@ -161,7 +162,6 @@ test("⚠️ TSK-0063 without a terminal, piped /kiln-start reaches Stage 1 and 
     });
   } finally {
     await fixture.close();
-    // F11 (EVD-0144): the same bounded wait as ACC-0116's cleanup, at most 15.3 s for a directory Windows still holds.
-    rmSync(root, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+    removeTestTree(root, "TSK-0063 piped route");
   }
 });
