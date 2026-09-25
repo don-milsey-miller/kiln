@@ -58,11 +58,20 @@ test("⚠️ F11 a holder that outlasts the bound is named in the first refusal'
     assert.ok(record, "no record was written");
     assert.ok(["EBUSY", "EPERM", "ENOTEMPTY"].includes(record.error.code), JSON.stringify(record.error));
     assert.ok(thrown && thrown.code === record.error.code, "the original error was not thrown");
-    assert.equal(record.inventory.available, true, JSON.stringify(record.inventory));
-    const named = record.inventory.processes.find((p) => p.pid === holder.pid);
-    assert.ok(named, `the inventory does not name the holder ${holder.pid}`);
-    assert.equal(named.ppid, process.pid, "with its parent");
-    assert.ok(!JSON.stringify(record.inventory).includes("setTimeout"), "the inventory carries no command line");
+    // ⚠️ AN INVENTORY THAT RAN OUT OF TIME IS RECORDED AS UNAVAILABLE, WITH ITS REASON — which is the rule, not a failure.
+    // A loaded Windows runner timed the process table out at 15 s (CI run 36171409254) while handle64 named the holder.
+    // What is required is that the holder is named by at least one diagnostic, and that nothing is silently absent.
+    if (record.inventory.available) {
+      const named = record.inventory.processes.find((p) => p.pid === holder.pid);
+      assert.ok(named, `the inventory does not name the holder ${holder.pid}`);
+      assert.equal(named.ppid, process.pid, "with its parent");
+      assert.ok(!JSON.stringify(record.inventory).includes("setTimeout"), "the inventory carries no command line");
+    } else assert.ok(record.inventory.reason, `an unavailable inventory without a reason: ${JSON.stringify(record.inventory)}`);
+    const holderPid = new RegExp(`\\bpid: ${holder.pid}\\b`);
+    assert.ok(
+      record.inventory.processes?.some((p) => p.pid === holder.pid) || holderPid.test(record.handles.output ?? ""),
+      `no diagnostic names the holder ${holder.pid}: ${JSON.stringify({ handles: record.handles, inventory: record.inventory.available })}`
+    );
     assert.deepEqual(record.remaining.entries, ["inner/", "inner/file.txt"]);
     // handle64's answer is recorded whatever it is; its absence is recorded with the reason.
     if (process.env.HANDLE_EXE) assert.equal(record.handles.available, true, JSON.stringify(record.handles));
