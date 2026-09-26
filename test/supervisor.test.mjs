@@ -4337,6 +4337,7 @@ test("⚠️ F4 ACC-0120 CONTROL: research chosen and granted on this computer l
   const { run, agent } = await keyboardRun({ keyboardStop: false, dir, env: { TAVILY_API_KEY: "kiln-fake-tavily-key-f4" } });
   assert.equal(agent.options.env.TAVILY_API_KEY, "kiln-fake-tavily-key-f4");
   assert.equal(agent.options.env.KILN_PROJECT_ROOT, canonicalPath(dir));
+  assert.equal(agent.options.env.KILN_STATE_MODE, "project", "and where its consent is kept");
   agent.child.exitCode = 0;
   agent.child.onExit(0, null);
   await run;

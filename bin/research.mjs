@@ -32,9 +32,9 @@
 import { createResearchTools } from "../lib/research/tools.mjs";
 import { createTavilyAdapter } from "../lib/research/tavily-adapter.mjs";
 import { createEvidence, linkEvidence } from "../lib/tools/evidence-tools.mjs";
-import { resolveContentRoot } from "../lib/content-root.mjs";
+import { resolveContentRoot, resolveProjectRoot } from "../lib/content-root.mjs";
 import { quoteIsPresent, flatten, extractTitle } from "../lib/research/quote.mjs";
-import { researchPermission } from "../lib/research/permission.mjs";
+import { RESEARCH_REFUSAL, researchPermission } from "../lib/research/permission.mjs";
 import { resolve } from "node:path";
 
 const argv = process.argv.slice(2);
@@ -70,13 +70,15 @@ function permittedTools() {
     console.error("detail      Name the project whose research choice and consent apply: --project-root <dir>.");
     return { tools: null, code: 2 };
   }
-  const gate = researchPermission({ projectRoot: resolve(root) });
+  // Where this project keeps its runtime state, as setup was told with --local-state: the grant is read from there.
+  const stateMode = flag("local-state") ?? "project";
+  const gate = researchPermission({ projectRoot: resolve(root), stateMode });
   if (!gate.permitted) {
     console.error(`REFUSED     ${gate.reason}`);
     console.error(`detail      ${gate.detail}`);
     return { tools: null, code: 1 };
   }
-  return { tools: createResearchTools(createTavilyAdapter()), code: 0 };
+  return { tools: createResearchTools(createTavilyAdapter()), code: 0, projectRoot: resolve(root) };
 }
 
 /** Every path that cannot proceed reports through here, so a refusal always looks like a refusal. */
@@ -97,7 +99,7 @@ async function search() {
   }
   const query = words.join(" ");
   if (!query) {
-    console.error('Usage: npm run research:search -- "your question" --project-root <dir>');
+    console.error('Usage: npm run research:search -- "your question" --project-root <dir> [--local-state project|user]');
     return 2;
   }
   const { tools, code } = permittedTools();
@@ -130,7 +132,7 @@ async function record() {
   }
 
   // ⚠️ RESEARCH MUST BE PERMITTED FIRST (F4): it is the precondition every other one here serves.
-  const { tools, code } = permittedTools();
+  const { tools, code, projectRoot } = permittedTools();
   if (!tools) return code;
 
   // ⚠️ Resolve the content root BEFORE fetching anything. The first version fetched the page and
@@ -139,8 +141,18 @@ async function record() {
   // waste is one HTTP request; the habit is what matters.
   let contentRoot;
   try {
+    // ⚠️ **AND IT MUST BELONG TO THE PROJECT WHOSE CONSENT WAS READ.** The evidence is written where the content-root
+    // rule or PLANNING_CONTENT_DIR points, which is decided apart from --project-root; a destination owned by another
+    // project would record research that project never permitted. A disagreement refuses before anything is fetched.
+    resolveProjectRoot({ expect: projectRoot });
     contentRoot = resolveContentRoot();
   } catch (e) {
+    if (/^Project root disagreement/.test(e?.message ?? "")) {
+      console.error(`REFUSED     ${RESEARCH_REFUSAL.DESTINATION_MISMATCH}`);
+      console.error(e.message);
+      console.error("\nNothing was fetched or recorded.");
+      return 2;
+    }
     console.error(e.message);
     console.error(
       "\nIf this is the Kiln repository itself, it is its own consumer and the sibling rule does not\n" +

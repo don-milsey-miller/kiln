@@ -24,7 +24,9 @@ import { researchPermission } from "../lib/research/permission.mjs";
 // with the key, so it is research like any other: the project must have chosen Tavily and this computer granted it.
 const at = process.argv.indexOf("--project-root");
 const root = at >= 0 ? process.argv[at + 1] : undefined;
-const gate = root ? researchPermission({ projectRoot: resolve(root) }) : null;
+const modeAt = process.argv.indexOf("--local-state");
+const stateMode = modeAt >= 0 ? process.argv[modeAt + 1] : "project";
+const gate = root ? researchPermission({ projectRoot: resolve(root), stateMode }) : null;
 const out = !root || !gate.permitted ? null : await createResearchTools(createTavilyAdapter()).research_capability();
 
 if (!root) {
