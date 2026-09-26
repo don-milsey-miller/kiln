@@ -1,0 +1,16 @@
+{
+  "id": "ACC-0119",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "With a terminal and nothing authenticated, setup hands the terminal to Pi for /login and continues once a provider is connected",
+  "statement": "With stdin and stdout both terminals, the look at this computer allowed, and no usable authentication present, setup opens the pinned Pi interactive TUI for the operator to connect a provider with /login, and before opening it says what Pi itself may do: Pi uses its own agent directory, which setup does not isolate, may download helper programs into it, and /login may change Pi's own default provider and model there. Pi owns the terminal directly: nothing of the session is logged, copied or captured (F13). Pi is opened with no session and no extensions, skills, prompt templates, context files or tools, from a temporary working directory that is removed afterwards, and with the agent directory setup uses. When Pi closes, setup looks at this computer again: with a provider now connected it continues to model selection; with none, it refuses with the authentication exit code and says Pi was closed without one. Observed at a real Windows terminal with the pinned runtime, the operator completing /login, and the resulting authentication and setup outcome recorded.",
+  "evaluates": [
+    "CMP-0039"
+  ],
+  "verifies": [
+    "REQ-0022"
+  ]
+}

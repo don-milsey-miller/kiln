@@ -2,7 +2,7 @@
   "id": "TSK-0068",
   "type": "task",
   "schemaVersion": 2,
-  "reviewStatus": "approved",
+  "reviewStatus": "amended",
   "lifecycle": "active",
   "title": "Implement setup's TTY precondition and its two recovery routes",
   "statement": "Before setup launches the full interactive Pi TUI for `/login`, require both stdin and stdout to be TTYs. If either is not a TTY and no usable authentication is already present, refuse without spawning Pi and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.",
@@ -14,7 +14,8 @@
     "REQ-0022"
   ],
   "acceptedBy": [
-    "ACC-0093"
+    "ACC-0093",
+    "ACC-0119"
   ],
   "notes": "⚠️ SPLIT OUT OF TSK-0065 ON 2026-09-03, because that task's criterion demanded this behaviour while the task itself was sequenced before any setup code existed. ⚠️ THE CHECK IS REQUIRED, NOT A CONVENIENCE: Pi selects print mode when either stream is redirected, so without it setup cannot reach /login at all (F8). TSK-0065 records what Pi does in those cases; it does not decide whether this check is needed. ⚠️ AMENDED 2026-09-21 (F8). Pi selects print mode whenever stdin or stdout is not a TTY, so with either redirected the TUI would never appear, and with stdin an open pipe Pi reads it until it closes. Checking stdin alone would let a redirected stdout through to exactly that. ⚠️ HAND THE TERMINAL TO PI DIRECTLY (F13, EVD-0123). Pi displays a pasted API key in plain text during /login, so setup must give Pi the terminal itself and must not log, tee or capture the /login session.",
   "dependsOn": [
