@@ -1,0 +1,19 @@
+{
+  "id": "TSK-0075",
+  "type": "task",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Refuse research at every entry point without the project's choice and this computer's grant",
+  "statement": "F4: Kiln's Pi extension built the Tavily adapter for research_capability, research_search and research_fetch with no check of the project's research choice or this computer's research grant, and the supervisor passed TAVILY_API_KEY to Pi unchanged, so a Kiln session could reach Tavily with an operator's key when research was disabled or not consented on this computer; bin/research.mjs did the same. Gate every research entry point on the committed choice being tavily and a standing research grant, refusing before the key is read or a request made, including when either record is unreadable; give Pi the project root explicitly; require --project-root for bin/research.mjs; and keep TAVILY_API_KEY out of both children's environments when research is not permitted at launch.",
+  "role": "platform",
+  "implements": [
+    "CMP-0006"
+  ],
+  "fulfils": [
+    "REQ-0023"
+  ],
+  "acceptedBy": [
+    "ACC-0120"
+  ]
+}

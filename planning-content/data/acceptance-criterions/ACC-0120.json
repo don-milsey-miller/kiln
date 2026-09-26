@@ -1,0 +1,17 @@
+{
+  "id": "ACC-0120",
+  "type": "acceptance-criterion",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "outcome": "not-evaluated",
+  "title": "Research is refused at every entry point unless the project chose Tavily and this computer granted it",
+  "statement": "Each research entry point - the research_capability, research_search and research_fetch tools Kiln registers in Pi, and bin/research.mjs - refuses unless the project's committed research choice is tavily AND this computer holds a standing research grant for it. The refusal happens before TAVILY_API_KEY is read and before any request is made, and it names a stable reason: no project context, the project record unreadable, research not chosen, this computer's consent record unreadable, or no standing grant. An unreadable record of either kind refuses; it is never read as permission. The project context is explicit: Pi receives the project root from the supervisor, and bin/research.mjs requires --project-root; neither guesses from the working directory. When research is not permitted at launch, TAVILY_API_KEY is kept out of the environment of both of the supervisor's children. Each refusal reason, and the permitted case, is covered by a test that also shows no key was read and no request was made when refused.",
+  "evaluates": [
+    "CMP-0006",
+    "CMP-0027"
+  ],
+  "verifies": [
+    "REQ-0023"
+  ]
+}
