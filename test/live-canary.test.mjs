@@ -172,7 +172,7 @@ test("⚠️ ACC-0062 the canary offers exactly kiln_preflight, sends no project
   assert.equal(all.includes(KEY), false, "the key appeared in the request body");
 });
 
-test("⚠️ ACC-0061 prose, a malformed or extra argument, a wrong challenge, another tool, or two calls each fail", async () => {
+test("⚠️ ACC-0061 ACC-0089 (9) prose, a malformed or extra argument, a wrong challenge, another tool, or two calls each fail", async () => {
   const cases = [
     ["prose", () => ({ content: "Yes, I support tool calls and would call kiln_preflight." }), LIVE_CANARY_REFUSAL.NO_TOOL_CALL],
     ["wrong challenge", () => ({ tool_calls: [call(PREFLIGHT_TOOL_NAME, { challenge: "f".repeat(32) })] }), LIVE_CANARY_REFUSAL.MALFORMED_CALL],

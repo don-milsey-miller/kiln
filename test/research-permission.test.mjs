@@ -190,7 +190,7 @@ const PROJECT_REFUSALS = [
   ["an unknown local-state mode", { grant: true }, ["--local-state", "shared"], RESEARCH_REFUSAL.UNKNOWN_STATE_MODE],
 ];
 
-test("⚠️ F4 ACC-0120 every project refusal, at each research CLI, comes before the key is read or a request made", async () => {
+test("⚠️ F4 ACC-0120 ACC-0089 (10) (11) every project refusal, at each research CLI, comes before the key is read or a request made", async () => {
   for (const [what, setup, flags, reason] of PROJECT_REFUSALS) {
     const root = await projectWith(setup);
     try {

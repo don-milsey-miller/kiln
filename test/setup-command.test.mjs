@@ -397,7 +397,7 @@ test("⚠️ ACC-0085 every path is printed before anything is mutated, includin
   }
 });
 
-test("⚠️ ACC-0085 a project root that disagrees with the content's owner refuses, printing both, having written nothing", async () => {
+test("⚠️ ACC-0085 ACC-0089 (1) a project root that disagrees with the content's owner refuses, printing both, having written nothing", async () => {
   const p = project({ ignored: true });
   const other = project();
   try {
@@ -1245,7 +1245,7 @@ test("⚠️ a trust child that fails is a refusal, never a decision", async () 
 
 /* ============================================== slice 4 ======================================== */
 
-test("⚠️ ACC-0045 an interrupted run is continued deliberately, and the published mapping says what each code means", async () => {
+test("⚠️ ACC-0045 ACC-0089 (15) an interrupted run is continued deliberately, and the published mapping says what each code means", async () => {
   // The journal's presence is the interruption signal. Every phase is idempotent, so continuing is safe — but the
   // operator has to learn that a run did not finish, so an ordinary rerun says so and prints the command the
   // interrupted run itself recorded, rather than quietly carrying on.
@@ -3372,7 +3372,7 @@ function piStandIn(p, { connects }) {
   };
 }
 
-test("⚠️ ACC-0093 with stdin, stdout or both not a terminal and nothing authenticated, setup refuses before starting Pi and names both routes", async () => {
+test("⚠️ ACC-0093 ACC-0089 (7) with stdin, stdout or both not a terminal and nothing authenticated, setup refuses before starting Pi and names both routes", async () => {
   for (const [label, terminal] of [
     ["stdin", { stdin: false, stdout: true }],
     ["stdout", { stdin: true, stdout: false }],
@@ -3482,6 +3482,53 @@ test("⚠️ ACC-0093 the real command, run with both streams piped and nothing 
     assert.match(out, /stdin and stdout are not a terminal/, out);
     assert.match(out, /^\[kiln\] reason: login-needs-terminal\r?$/m, out);
     assert.equal(/Opening Pi/.test(out), false, "Pi was opened without a terminal");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+/* ================================ ACC-0089 negative controls that run setup (TSK-0064) ======================== */
+
+test("⚠️ ACC-0089 (1) run from an unrelated working directory whose roots agree, setup completes and writes nothing there", async () => {
+  // The working directory is not where Kiln acts: the explicit project root and the resolved content root are, and here
+  // they agree. So the run is valid, and the directory it was started from is left exactly as it was.
+  const p = project({ ignored: true });
+  const elsewhere = mkdtempSync(join(tmpdir(), "kiln-unrelated-cwd-"));
+  const started = process.cwd();
+  try {
+    process.chdir(elsewhere);
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"]);
+    assert.equal(o.code, EXIT.OK, o.printed.concat(o.warned).join("\n"));
+    assert.deepEqual(readdirSync(elsewhere), [], "setup wrote into the working directory");
+  } finally {
+    process.chdir(started);
+    rmSync(p.root, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0089 (1) a content root that does not exist refuses with the paths code, having written nothing", async () => {
+  const p = project({ ignored: true });
+  try {
+    const before = tree(p.dir);
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve"], { env: { PLANNING_CONTENT_DIR: join(p.root, "no-such-content") } });
+    assert.equal(o.code, EXIT.PATHS, o.printed.concat(o.warned).join("\n"));
+    assert.deepEqual(tree(p.dir), before, "the refused run changed the project");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0089 (13) corrupt settings refuse with the setup code and their own reason, and the file is left as it was", async () => {
+  const p = project({ ignored: true });
+  try {
+    mkdirSync(join(p.dir, ".pi"), { recursive: true });
+    const settings = join(p.dir, ".pi", "settings.json");
+    writeFileSync(settings, "{ this is not settings");
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve"]);
+    assert.equal(o.code, EXIT.SETUP, o.printed.concat(o.warned).join("\n"));
+    assert.ok(o.warned.some((l) => /^\[kiln\] reason: /.test(l)), `no reason was printed: ${o.warned.join("\n")}`);
+    assert.equal(readFileSync(settings, "utf-8"), "{ this is not settings", "the corrupt file was rewritten");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

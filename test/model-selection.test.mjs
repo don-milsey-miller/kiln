@@ -577,3 +577,29 @@ test("⚠️ TSK-0063 a rerun naming the committed selection with --model-use ap
     rmSync(p.root, { recursive: true, force: true });
   }
 });
+
+test("⚠️ ACC-0089 (4) a sole available model is not adopted without a confirmation: a run that cannot ask refuses as needs-confirmation", async () => {
+  // One model is what this computer offers and the flags name it, so there is nothing to choose between; it is still
+  // not this project's until someone says yes, and a run with nobody to ask refuses rather than taking it.
+  const single = { inspected: true, providers: [{ provider: "kiln-local", displayName: "Kiln Local", models: ["kiln-latest"] }] };
+  const p = project();
+  try {
+    await assert.rejects(
+      runTransaction({ projectRoot: p.dir, files: [settingsTarget()] }, (transaction) =>
+        selectModel({
+          transaction,
+          thinkingSupport: SUPPORT,
+          location: p.where,
+          inspection: single,
+          settings: { stateMode: "project" },
+          requested: { provider: "kiln-local", model: "kiln-latest", thinking: "high" },
+        })
+      ),
+      (e) => e.reason === SELECTION_REFUSAL.NEEDS_CONFIRMATION
+    );
+    assert.equal(existsSync(settingsPath(p.dir)), false, "the sole model was written without a yes");
+    assert.equal(readConsent(p.where).state, CONSENT_READ.ABSENT, "something was granted without a yes");
+  } finally {
+    rmSync(p.root ?? p.dir, { recursive: true, force: true });
+  }
+});

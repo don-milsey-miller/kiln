@@ -174,7 +174,7 @@ test("⚠️ ACC-0056 a recorded model removed from the registry refuses, names 
   }
 });
 
-test("⚠️ ACC-0056 absent authentication refuses, names the recorded ids, and no other provider is used", async () => {
+test("⚠️ ACC-0056 ACC-0089 (5) absent authentication refuses, names the recorded ids, and no other provider is used", async () => {
   const p = await launchable({ stored: false });
   try {
     const o = await launch(p, { env: {} });
@@ -188,7 +188,7 @@ test("⚠️ ACC-0056 absent authentication refuses, names the recorded ids, and
   }
 });
 
-test("⚠️ ACC-0054 a host without a model-use grant is refused before any credential is touched", async () => {
+test("⚠️ ACC-0054 ACC-0089 (3) a host without a model-use grant is refused before any credential is touched", async () => {
   for (const [label, grant, reason] of [["no grant", false, LAUNCH_REFUSAL.MODEL_USE_NOT_GRANTED], ["declined", "declined", LAUNCH_REFUSAL.MODEL_USE_DECLINED]]) {
     const p = await launchable({ grant });
     try {
@@ -535,6 +535,29 @@ test("⚠️ F2 Pi failing to load at any stage is a specific refusal that repea
       assert.equal(text.includes(KEY_SENTINEL.slice(0, 12)), false, `${stage}: the refusal repeated the error`);
       assert.equal(text.includes("models.json said"), false, `${stage}: the refusal repeated the error message`);
     }
+  } finally {
+    cleanup(p);
+  }
+});
+
+test("⚠️ ACC-0089 (8) a declined live check refuses the launch as live-check-declined, the canary is never run, and nothing is changed", async () => {
+  // At launch a live check is asked only for a model the record does not prove: a one-run override. The override is
+  // confirmed, the live check declined, and the run must refuse without sending the canary or writing anything.
+  const p = await launchable();
+  const bytes = () => ({
+    settings: readFileSync(join(p.stateRoot, "settings.json")),
+    consent: readFileSync(p.location.path),
+    record: readFileSync(join(p.stateRoot, COMPATIBILITY_RECORD)),
+  });
+  const before = bytes();
+  const override = { provider: "openai", model: CATALOGUE.reasoner, thinking: "high" };
+  const target = { provider: "openai", model: CATALOGUE.reasoner };
+  try {
+    const sent = [];
+    const d = await launch(p, { override, ask: (q) => !q.startsWith("Live model check"), canary: async () => (sent.push(1), { passed: true }) });
+    refusedNaming(d, LAUNCH_REFUSAL.LIVE_CHECK_DECLINED, target);
+    assert.equal(sent.length, 0, "the canary ran without its approval");
+    assert.deepEqual(bytes(), before, "settings, consent or the compatibility record changed");
   } finally {
     cleanup(p);
   }

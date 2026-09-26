@@ -93,7 +93,7 @@ test("T1 an unknown provider is refused by name, and the refusal says nothing is
   assert.match(e.message, /never searched|not inferred|No variable name is inferred/i);
 });
 
-test("T1 a real Pi provider with no safe mapping is refused with the reason recorded beside it", () => {
+test("T1 ACC-0089 (6) a real Pi provider with no safe mapping is refused with the reason recorded beside it", () => {
   // ⚠️ AN EXPLICIT DECISION, NOT A GAP. Bedrock authenticates through the AWS credential chain, and
   // `getApiKeyEnvVars("amazon-bedrock")` returns nothing in the pinned package either.
   for (const id of Object.keys(UNSUPPORTED_PROVIDERS)) {

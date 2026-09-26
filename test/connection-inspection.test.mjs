@@ -94,7 +94,7 @@ const noLeak = (result) => {
   assert.equal(/bearer|authorization|api[-_]?key"|"key"|token"/i.test(text), false, "the result carries a header or credential field");
 };
 
-test("⚠️ ACC-0052 a decline reads nothing, contacts nothing, and reports not-inspected rather than nothing configured", async () => {
+test("⚠️ ACC-0052 ACC-0089 (2) a decline reads nothing, contacts nothing, and reports not-inspected rather than nothing configured", async () => {
   const { root, agentDir } = fixture();
   try {
     let sdkLoaded = 0;

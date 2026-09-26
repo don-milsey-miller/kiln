@@ -3468,7 +3468,7 @@ const refusedRun = async (options) => {
   assert.fail("expected a trust refusal, and the run proceeded");
 };
 
-test("⚠️ ACC-0051 an unasked project refuses as trust-missing, and a declined one as trust-denied", async () => {
+test("⚠️ ACC-0051 ACC-0089 (12) an unasked project refuses as trust-missing, and a declined one as trust-denied", async () => {
   for (const [state, reason, remediation] of [
     [TRUST.MISSING, REFUSAL.TRUST_MISSING, /run setup/i],
     [TRUST.DENIED, REFUSAL.TRUST_DENIED, /run setup again and approve/i],
@@ -4341,4 +4341,105 @@ test("⚠️ F4 ACC-0120 CONTROL: research chosen and granted on this computer l
   agent.child.exitCode = 0;
   agent.child.onExit(0, null);
   await run;
+});
+
+/* ================================ ACC-0089 negative controls that run the supervisor (TSK-0064) ================ */
+
+test("⚠️ ACC-0089 (14) an exposed untracked runtime file refuses the launch as state-unprotected, and Pi is never started", async () => {
+  // A real repository that does not ignore Kiln's runtime paths, with a runtime file already sitting in it untracked:
+  // the next commit of the project would carry it. The launch must refuse before the agent writes anything more.
+  const dir = project({ state: true });
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  writeFileSync(join(dir, ".gitignore"), "node_modules/\n", "utf-8");
+  mkdirSync(join(dir, ".pi", "runtime"), { recursive: true });
+  const exposed = join(dir, ".pi", "runtime", "consent.json");
+  const bytes = '{"recordVersion":1,"note":"left behind"}\n';
+  writeFileSync(exposed, bytes);
+  const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: dir, encoding: "utf-8" });
+  assert.match(status, /^\?\? \.pi\/runtime\/consent\.json$/m, `the fixture file is not untracked: ${status}`);
+
+  const calls = [];
+  const freeAt = String(await freePort());
+  await assert.rejects(
+    () =>
+      runSupervisor({
+        sessionLister: listNothing,
+        agentDir: AGENT_DIR,
+        readTrust: APPROVED,
+        projectRoot: dir,
+        launcher: { command: "L", args: [] },
+        agent: { command: "A", args: [] },
+        spawn: recordingSpawn(calls),
+        env: { PORT: freeAt },
+        randomBytes: () => Buffer.alloc(16, 7),
+        psRun: NO_DESCENDANTS,
+        fetchImpl: healthyFetch(),
+        build: null,
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.STATE_UNPROTECTED
+  );
+  assert.equal(calls.some((c) => c.command === "A"), false, "the agent was started");
+  assert.equal(readFileSync(exposed, "utf-8"), bytes, "the exposed file was changed");
+  assert.equal(existsSync(join(dir, ".pi", "sessions")), false, "a session directory was created");
+});
+
+test("⚠️ ACC-0089 (16) an occupied port refuses the launch as port-occupied, and nothing is started", async () => {
+  const held = createServer((_, res) => res.end());
+  const port = await freePort();
+  await new Promise((r) => held.listen(port, HOST, r));
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const calls = [];
+  try {
+    await assert.rejects(
+      () =>
+        runSupervisor({
+          sessionLister: listNothing,
+          agentDir: AGENT_DIR,
+          readTrust: APPROVED,
+          projectRoot: dir,
+          launcher: { command: "L", args: [] },
+          agent: { command: "A", args: [] },
+          spawn: recordingSpawn(calls),
+          env: { PORT: String(port) },
+          randomBytes: () => Buffer.alloc(16, 7),
+          psRun: NO_DESCENDANTS,
+          fetchImpl: healthyFetch(),
+          build: null,
+        }),
+      (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.PORT_OCCUPIED && /PORT=\d+/.test(e.message)
+    );
+    assert.deepEqual(calls, [], "something was started on an occupied port");
+  } finally {
+    held.close();
+  }
+});
+
+test("⚠️ ACC-0089 (17) an unrelated healthy HTTP service on the port refuses readiness as identity-mismatch, and Pi is never started", async () => {
+  // The launcher starts, and whatever answers on its port is up and healthy, but it is not this run's application.
+  const dir = repoProject({ state: true });
+  ignoreAll(dir);
+  const calls = [];
+  const unrelated = async () => ({ status: 200, json: async () => ({ status: "ok", uptime: 41 }) });
+  const freeAt = String(await freePort());
+  await assert.rejects(
+    () =>
+      runSupervisor({
+        sessionLister: listNothing,
+        agentDir: AGENT_DIR,
+        readTrust: APPROVED,
+        projectRoot: dir,
+        launcher: { command: "L", args: [] },
+        agent: { command: "A", args: [] },
+        spawn: recordingSpawn(calls),
+        env: { PORT: freeAt },
+        randomBytes: () => Buffer.alloc(16, 7),
+        psRun: NO_DESCENDANTS,
+        fetchImpl: unrelated,
+        build: null,
+        readyMs: 3000,
+      }),
+    (e) => e instanceof SupervisorRefusal && e.reason === REFUSAL.IDENTITY_MISMATCH
+  );
+  assert.deepEqual(calls.map((c) => c.command), ["L"], "the agent was started against a service that is not this run's");
 });

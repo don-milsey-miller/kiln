@@ -180,7 +180,7 @@ async function refused(faults, code, over = {}) {
 
 /* ============================================================ one row per cause =============== */
 
-test("⚠️ ACC-0075 (1) plausible prose with none of Kiln's tools is refused, and the prose is not used", async () => {
+test("⚠️ ACC-0075 (1) ACC-0089 (19) plausible prose with none of Kiln's tools is refused, and the prose is not used", async () => {
   // ⚠️ **#67's OWN CASE.** The child exits zero, emits a well-formed stream and answers confidently, and
   // holds nothing. Its answer must not be what the delegation returns.
   const result = await refused(["toolless"], CHILD_REFUSED.CAPABILITY_MISSING);
@@ -188,7 +188,7 @@ test("⚠️ ACC-0075 (1) plausible prose with none of Kiln's tools is refused, 
   assert.deepEqual(result.observation.reportedActiveTools, [], "the child claimed tools it did not hold");
 });
 
-test("⚠️ ACC-0075 (2) capability-signature drift is refused", async () => {
+test("⚠️ ACC-0075 (2) ACC-0089 (18) capability-signature drift is refused", async () => {
   await refused(["signature-drift"], CHILD_REFUSED.SIGNATURE_MISMATCH);
 });
 
