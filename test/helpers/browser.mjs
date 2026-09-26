@@ -8,7 +8,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -115,12 +115,16 @@ function runningProcesses() {
   if (r.error || r.status !== 0) return { available: false, reason: r.error?.code ?? `${cmd} exited ${r.status}` };
   // Parent pid and creation time from the supervisor's own WMI-free table, so each process can be tied to this launch.
   const table = new Map();
+  // ⚠️ WHY THE TABLE WAS OR WAS NOT READ, RECORDED: in CI run 36199281598 it returned no rows and said nothing.
+  let tableRead = null;
   if (process.platform === "win32") {
-    const t = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", PROCESS_TABLE_COMMAND.win32[1][3]], { encoding: "utf-8", timeout: 10_000 });
+    const at = Date.now();
+    const t = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", PROCESS_TABLE_COMMAND.win32[1][3]], { encoding: "utf-8", timeout: 20_000 });
     for (const line of t.stdout?.split(/\r?\n/) ?? []) {
       const m = /^(\d+)\s+(\d+)\s+(\S+)$/.exec(line.trim());
       if (m) table.set(Number(m[1]), { ppid: Number(m[2]), created: m[3] });
     }
+    tableRead = { ms: Date.now() - at, status: t.status, signal: t.signal, error: t.error?.code ?? null, rows: table.size, stderrTail: (t.stderr ?? "").slice(-600) };
   }
   const rows = [];
   for (const line of r.stdout.split(/\r?\n/)) {
@@ -129,7 +133,28 @@ function runningProcesses() {
     const [name, pid] = process.platform === "win32" ? [m[1], Number(m[2])] : [m[2].trim(), Number(m[1])];
     if (/^(node|powershell|pwsh|chrome|msedge|chromium|google-chrome)(\.exe)?$/i.test(name)) rows.push({ name, pid, ...(table.get(pid) ?? {}) });
   }
-  return { available: true, rows };
+  return { available: true, tableRead, rows, chrome: chromeProcesses() };
+}
+
+/**
+ * Every Chrome process with its parent, creation date and command line, which names its role (`--type=`) and its
+ * profile, so the processes of a stalled start can be identified. Windows only, through CIM, within twenty seconds;
+ * read only when a start has already failed.
+ */
+function chromeProcesses() {
+  if (process.platform !== "win32") return null;
+  const script =
+    "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | " +
+    "Select-Object ProcessId,ParentProcessId,@{n='Created';e={$_.CreationDate.ToString('o')}},CommandLine | ConvertTo-Json -Compress";
+  const at = Date.now();
+  const r = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf-8", timeout: 20_000 });
+  const read = { ms: Date.now() - at, status: r.status, error: r.error?.code ?? null };
+  try {
+    const parsed = JSON.parse(r.stdout || "[]");
+    return { ...read, processes: (Array.isArray(parsed) ? parsed : [parsed]).map((p) => ({ ...p, CommandLine: String(p.CommandLine ?? "").slice(0, 1500) })) };
+  } catch {
+    return { ...read, processes: null, stdoutTail: (r.stdout ?? "").slice(-600), stderrTail: (r.stderr ?? "").slice(-600) };
+  }
 }
 
 async function attachToPage(profile, startup) {
@@ -140,6 +165,13 @@ async function attachToPage(profile, startup) {
     if (Date.now() > deadline) {
       const diagnostics = { ...startup, ...probe, waitedMs: Date.now() - started, processes: runningProcesses() };
       console.log(`[browser] start failed: ${JSON.stringify(diagnostics)}`);
+      // Preserved whole in a file when one is named (the diagnostic workflow uploads it); the log line carries it too.
+      if (process.env.BROWSER_DIAG_OUT)
+        try {
+          appendFileSync(process.env.BROWSER_DIAG_OUT, JSON.stringify({ at: new Date().toISOString(), ...diagnostics }) + "\n");
+        } catch {
+          /* the printed line still carries it */
+        }
       throw Object.assign(new Error(`the browser never exposed a page target: ${JSON.stringify(diagnostics)}`), { diagnostics });
     }
     probe.probes += 1;

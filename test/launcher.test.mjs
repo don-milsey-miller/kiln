@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { withBuildLock } from "./helpers/build-lock.mjs";
+import { readProcessTable } from "../lib/supervisor.mjs";
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -140,6 +141,7 @@ const SUP_PROJECT = "aabbccddeeff00112233445566778899";
 async function cleanupCheck(t) {
 
   const { proc, log } = await launch({ KILN_RUN_ID: SUP_RUN, KILN_PROJECT_ID: SUP_PROJECT });
+  let childIdentity = null;
   const runDir = runDirFrom(log());
   assert.ok(runDir, "the launcher must report its run directory");
   // ⚠️ The pid comes from the launcher's own run record rather than from its output. The record is
@@ -169,6 +171,10 @@ async function cleanupCheck(t) {
     assert.ok(childPid, "the launcher must record the pid of the child it owns");
     assert.ok(pidAlive(childPid), "the recorded child must actually be running");
     assert.equal(await portFree(PORT), false, "something must be listening while it runs");
+    // F2: the child's identity while it runs — parent and creation time — so a pid alive after shutdown can be told
+    // apart from a different process that was given the same number.
+    const table = await readProcessTable();
+    childIdentity = table.rows?.get(childPid) ?? { unavailable: table.error ?? "not in the table" };
 
     // ---- the identity reached the APPLICATION, which is the only place it can be observed.
     // ⚠️ ASSERTED THROUGH THE HEALTH RESPONSE, not through the launcher's log. The launcher printing
@@ -226,8 +232,19 @@ async function cleanupCheck(t) {
 
   await sleep(1500);
 
-  assert.equal(pidAlive(childPid), false, `the child (${childPid}) survived the launcher`);
-  assert.equal(await portFree(PORT), true, `something is still listening on ${PORT}`);
+  // ⚠️ F2: ALL THREE FACTS ARE TAKEN BEFORE ANY IS ASSERTED. A pid alive after shutdown failed this test once on
+  // Windows (CI run 36197842986) and stopped it there, so the port and the pid's identity were never looked at. Now the
+  // live process's parent and creation time are compared with the child's, and the port is probed, first.
+  const aliveAfter = pidAlive(childPid);
+  const after = aliveAfter ? await readProcessTable() : null;
+  const identityAfter = aliveAfter ? (after.rows?.get(childPid) ?? { unavailable: after.error ?? "not in the table" }) : null;
+  const portFreeAfter = await portFree(PORT);
+  const sameProcess =
+    aliveAfter && childIdentity?.created != null && identityAfter?.created != null ? childIdentity.created === identityAfter.created : null;
+  const facts = JSON.stringify({ childPid, childIdentity, aliveAfter, identityAfter, sameProcess, portFreeAfter });
+  if (aliveAfter) console.log(`[f2] ${facts}`);
+  assert.equal(aliveAfter, false, `the child (${childPid}) survived the launcher: ${facts}`);
+  assert.equal(portFreeAfter, true, `something is still listening on ${PORT}: ${facts}`);
   assert.equal(existsSync(runDir), false, `the launcher's run directory survived: ${runDir}`);
 
   // ⚠️ And no OTHER launcher directory either — a launcher that cleaned up the one it reported while
