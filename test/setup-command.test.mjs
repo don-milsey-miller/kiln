@@ -31,7 +31,7 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { EXIT, SetupCommandRefusal, main, nodeSatisfies, parseArgs, renderChoices, resolvePaths, resumeCommand } from "../bin/setup.mjs";
+import { EXIT, LOGIN_PI_FLAGS, SetupCommandRefusal, main, nodeSatisfies, parseArgs, renderChoices, resolvePaths, resumeCommand } from "../bin/setup.mjs";
 import { IGNORE_RULES, blockText } from "../lib/project-gitignore.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -255,6 +255,8 @@ async function setup(
     canary = passingCanary,
     liveCheck = "approve",
     researchAdapter = null,
+    terminal,
+    loginInPi,
   } = {}
 ) {
   const printed = [];
@@ -302,6 +304,8 @@ async function setup(
       ...(verifyRuntime ? { verifyRuntime } : {}),
       ...(canary ? { canary } : {}),
       ...(researchAdapter ? { researchAdapter } : {}),
+      ...(terminal ? { terminal } : {}),
+      ...(loginInPi ? { loginInPi } : {}),
       install:
         install ??
         (() => {
@@ -3342,5 +3346,133 @@ test("⚠️ TSK-0063 --state-protection fix-ignore answers the coverage questio
     assert.equal(existsSync(join(q.dir, ".pi")), false, "runtime data was written before the refusal");
   } finally {
     rmSync(q.root, { recursive: true, force: true });
+  }
+});
+
+/* ================================ TSK-0068 / ACC-0093: no terminal, no Pi; with one, Pi's /login ================ */
+
+/** A computer with nothing authenticated: no stored key and no custom provider. */
+function unauthenticated() {
+  const p = project();
+  writeFileSync(join(p.agentDir, "auth.json"), "{}");
+  writeFileSync(join(p.agentDir, "models.json"), JSON.stringify({ providers: {} }));
+  return p;
+}
+
+/** A stand-in for Pi that records how it was opened and, when told to, connects the fixture's provider as /login would. */
+function piStandIn(p, { connects }) {
+  const calls = [];
+  return {
+    calls,
+    loginInPi: (launch) => {
+      calls.push({ ...launch, cwdExisted: existsSync(launch.cwd) });
+      if (connects) writeFileSync(join(p.agentDir, "auth.json"), JSON.stringify({ openai: { type: "api_key", key: SENTINEL_KEY } }));
+      return { status: 0, signal: null, error: null };
+    },
+  };
+}
+
+test("⚠️ ACC-0093 with stdin, stdout or both not a terminal and nothing authenticated, setup refuses before starting Pi and names both routes", async () => {
+  for (const [label, terminal] of [
+    ["stdin", { stdin: false, stdout: true }],
+    ["stdout", { stdin: true, stdout: false }],
+    ["stdin and stdout", { stdin: false, stdout: false }],
+  ]) {
+    const p = unauthenticated();
+    try {
+      const pi = piStandIn(p, { connects: true });
+      const o = await setup(p, ["--inspect", "approve"], { terminal, loginInPi: pi.loginInPi });
+      const said = o.warned.join("\n");
+      assert.equal(o.code, EXIT.AUTHENTICATION, `${label}: ${said}`);
+      // ⚠️ THE HALF THAT MATTERS: Pi was never started, not merely a message printed before starting it anyway.
+      assert.equal(pi.calls.length, 0, `${label}: Pi was started without a terminal`);
+      assert.match(said, new RegExp(`${label} (is|are) not a terminal`), said);
+      assert.match(said, /run setup again from a local interactive terminal/, said);
+      assert.match(said, /configure authentication on this host outside Kiln/, said);
+    } finally {
+      rmSync(p.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("⚠️ ACC-0093 --non-interactive with nothing authenticated refuses the same way, terminal or not", async () => {
+  const p = unauthenticated();
+  // A non-interactive run cannot be asked to protect its runtime state, so the repository already ignores it.
+  writeFileSync(join(p.dir, ".gitignore"), blockText());
+  try {
+    const pi = piStandIn(p, { connects: true });
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve"], { terminal: { stdin: true, stdout: true }, loginInPi: pi.loginInPi, pick: [] });
+    assert.equal(o.code, EXIT.AUTHENTICATION, o.warned.join("\n"));
+    assert.equal(pi.calls.length, 0);
+    assert.match(o.warned.join("\n"), /this run is --non-interactive/);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0093 CONTROL: with authentication already present, the same terminal-less run proceeds and Pi is not started", async () => {
+  const p = project({ ignored: true });
+  try {
+    const pi = piStandIn(p, { connects: false });
+    const o = await setup(p, ["--non-interactive", "--inspect", "approve", "--model-use", "approve"], { terminal: { stdin: false, stdout: false }, loginInPi: pi.loginInPi });
+    assert.equal(o.code, EXIT.OK, o.printed.concat(o.warned).join("\n"));
+    assert.equal(pi.calls.length, 0);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ TSK-0068 with a terminal on both ends and nothing authenticated, setup opens the pinned Pi for /login and continues once a provider is connected", async () => {
+  const p = unauthenticated();
+  writeFileSync(join(p.dir, ".gitignore"), blockText());
+  try {
+    const pi = piStandIn(p, { connects: true });
+    const o = await setup(p, ["--inspect", "approve", "--model-use", "approve"], { terminal: { stdin: true, stdout: true }, loginInPi: pi.loginInPi });
+    assert.equal(o.code, EXIT.OK, o.printed.concat(o.warned).join("\n"));
+    assert.equal(pi.calls.length, 1, "Pi was opened once");
+    const [call] = pi.calls;
+    const { resolvePinnedAgent } = await import("../lib/pi-runtime.mjs");
+    const pinned = resolvePinnedAgent(ROOT);
+    assert.equal(call.command, pinned.command, "the pinned runtime");
+    assert.deepEqual(call.args, [...pinned.args, ...LOGIN_PI_FLAGS], "the interactive TUI, with nothing of any project's loaded");
+    assert.equal(call.env.PI_CODING_AGENT_DIR, p.agentDir, "the login lands in the agent directory setup uses");
+    assert.equal(call.cwdExisted, true);
+    assert.equal(existsSync(call.cwd), false, "its own directory is removed afterwards");
+    assert.ok(o.printed.some((l) => /type \/login/.test(l)), o.printed.join("\n"));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ TSK-0068 a Pi closed without connecting anything leaves setup refusing with the authentication code", async () => {
+  const p = unauthenticated();
+  try {
+    const pi = piStandIn(p, { connects: false });
+    const o = await setup(p, ["--inspect", "approve"], { terminal: { stdin: true, stdout: true }, loginInPi: pi.loginInPi });
+    assert.equal(o.code, EXIT.AUTHENTICATION, o.warned.join("\n"));
+    assert.equal(pi.calls.length, 1);
+    assert.match(o.warned.join("\n"), /Pi was closed and still no provider is authenticated/);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ ACC-0093 the real command, run with both streams piped and nothing authenticated, refuses with the authentication code and never opens Pi", () => {
+  // ⚠️ NO SEAM: the command's own terminal detection decides. Had it gone on to open Pi, it would have said so first.
+  const p = unauthenticated();
+  writeFileSync(join(p.dir, ".gitignore"), blockText());
+  try {
+    const r = spawnSync(
+      process.execPath,
+      [join(ROOT, "bin", "setup.mjs"), "--project-root", p.dir, "--name", "Piped", "--trust", "approve", "--inspect", "approve"],
+      { cwd: p.dir, encoding: "utf-8", input: "", timeout: 180_000, env: { ...process.env, PI_CODING_AGENT_DIR: p.agentDir, PLANNING_CONTENT_DIR: p.contentRoot } }
+    );
+    const out = `${r.stdout}${r.stderr}`;
+    assert.equal(r.signal, null, `the command did not end: ${out}`);
+    assert.equal(r.status, EXIT.AUTHENTICATION, out);
+    assert.match(out, /stdin and stdout are not a terminal/, out);
+    assert.equal(/Opening Pi/.test(out), false, "Pi was opened without a terminal");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
   }
 });

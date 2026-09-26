@@ -28,7 +28,8 @@
 
 import { createHash } from "node:crypto";
 import { createInterface } from "node:readline";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -504,7 +505,7 @@ export const shellName = (platform = process.platform) => (platform === "win32" 
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
  * needs is imported dynamically.
  */
-async function runPhases({ paths, args, ask, print, modules, canary: injected = null, researchAdapter = null }) {
+async function runPhases({ paths, args, ask, print, modules, canary: injected = null, researchAdapter = null, terminal = { stdin: false, stdout: false }, loginInPi = runPiForLogin }) {
   const { STATE_MODE, coverageState, createStateRoot, ensureProjectId, projectRecordTarget, stateRootFor } = modules.localState;
   const { randomBytes } = modules.crypto;
 
@@ -713,10 +714,24 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       const location = modules.consent.consentLocation({ projectRoot: paths.projectRoot, stateMode, projectId });
       const asking = interactively(args, ask);
 
-      const inspection = await tx.phase("inspection", () =>
+      let inspection = await tx.phase("inspection", () =>
         modules.inspection.inspectWithConsent({ location, ask: asking.grant, agentDir })
       );
       print(inspection.summary);
+      // ⚠️ **NOTHING AUTHENTICATED, AND THE LOOK WAS ALLOWED: PI'S /login IS THE WAY IN (TSK-0068, ACC-0093).** With a
+      // terminal on both ends, Pi is opened for the operator to connect a provider, and this computer is looked at again
+      // when it closes. Without one, setup refuses before starting Pi and names both routes out.
+      if (inspection.inspected && modules.selection.listChoices(inspection.providers).length === 0) {
+        loginFirst({ args, paths, agentDir, terminal, loginInPi, print, modules });
+        inspection = await modules.inspection.inspectWithConsent({ location, ask: asking.grant, agentDir });
+        print(inspection.summary);
+        if (modules.selection.listChoices(inspection.providers).length === 0)
+          throw new modules.selection.ModelSelectionRefusal(
+            modules.selection.SELECTION_REFUSAL.NO_MODELS,
+            "Pi was closed and still no provider is authenticated on this computer, so there is nothing to choose a model " +
+              "from. Run setup again and connect a provider with /login in Pi before closing it."
+          );
+      }
       if (!inspection.inspected) {
         // ⚠️ A DECLINED INSPECTION IS AN ANSWER, AND IT STOPS THE PHASES THAT DEPEND ON IT. The research choice
         // still runs, because "not-inspected" is a state it knows how to record without looking at anything.
@@ -1119,6 +1134,61 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
 }
 
 /**
+ * The arguments Pi is opened with for /login: the interactive TUI and nothing of any project's.
+ *
+ * ⚠️ **NO SESSION, NO EXTENSIONS, NO SKILLS, NO PROMPT TEMPLATES, NO CONTEXT FILES, NO TOOLS.** Pi has no login-only mode:
+ * `/login` exists only inside its interactive TUI (TSK-0065, F7). What is opened is that TUI with everything a session
+ * would load turned off, in a directory of its own, so connecting a provider is all it can be used for.
+ */
+export const LOGIN_PI_FLAGS = Object.freeze(["--no-session", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-tools"]);
+
+/**
+ * Open Pi for /login, or refuse before starting it when it could not own a terminal.
+ *
+ * ⚠️ **THE TERMINAL IS HANDED TO PI, NEVER CAPTURED (F13).** Pi shows a pasted API key in plain text during /login, so
+ * its input and output are inherited and nothing of the session is logged, copied or kept.
+ *
+ * ⚠️ **NO TERMINAL, NO PI (ACC-0093).** Pi selects print mode when stdin or stdout is not a terminal, so opening it then
+ * would not reach /login at all, and with stdin a pipe it would read that pipe until it closed. The refusal comes first,
+ * carries the authentication code, and names the two ways out.
+ */
+function loginFirst({ args, paths, agentDir, terminal, loginInPi, print, modules }) {
+  const { ModelSelectionRefusal, SELECTION_REFUSAL } = modules.selection;
+  const without = [!terminal?.stdin && "stdin", !terminal?.stdout && "stdout"].filter(Boolean);
+  if (args.nonInteractive || without.length > 0) {
+    const why = args.nonInteractive ? "this run is --non-interactive" : `${without.join(" and ")} ${without.length > 1 ? "are" : "is"} not a terminal`;
+    throw new ModelSelectionRefusal(
+      SELECTION_REFUSAL.NO_MODELS,
+      [
+        `No provider is authenticated on this computer, and Pi's /login needs a terminal on both ends: ${why}. Pi was not started.`,
+        "Either:",
+        "  1. run setup again from a local interactive terminal; it opens Pi so you can connect a provider with /login, or",
+        "  2. configure authentication on this host outside Kiln (in Pi with /login, or the provider's API-key variable), then",
+        "     run setup again with its non-interactive decisions: --non-interactive --inspect approve --provider <id>",
+        "     --model <id> --thinking <level> --model-use approve --live-model-check approve (see --help).",
+      ].join(NEWLINE)
+    );
+  }
+  const agent = modules.runtime.resolvePinnedAgent(paths.toolRoot);
+  print("No provider is authenticated on this computer. Opening Pi so you can connect one:");
+  print("  type /login, choose your provider and follow its steps, then /quit to come back to setup.");
+  print("  Nothing you type in Pi is recorded by setup.");
+  const cwd = mkdtempSync(join(tmpdir(), "kiln-login-"));
+  try {
+    const closed = loginInPi({ command: agent.command, args: [...agent.args, ...LOGIN_PI_FLAGS], cwd, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir } });
+    print(`Pi closed${closed?.status === null || closed?.status === undefined ? "" : ` (exit ${closed.status})`}; looking at this computer again.`);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+/** Pi, on this terminal, until the operator closes it. Its input and output are this process's, uncaptured (F13). */
+function runPiForLogin({ command, args, cwd, env }) {
+  const r = spawnSync(command, args, { cwd, env, stdio: "inherit", shell: false });
+  return { status: r.status, signal: r.signal, error: r.error?.code ?? null };
+}
+
+/**
  * The project's declared identities: what a flag says, else what the project already committed.
  *
  * ⚠️ **A DECLARATION IS COMMITTED CONFIGURATION, SO IT IS A PLANNED WRITE LIKE ANY OTHER.** It goes into
@@ -1388,6 +1458,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     // real adapter is what a real run uses, and a test that wanted an enabled connection would otherwise have to
     // reach the service to get one.
     researchAdapter = null,
+    // ⚠️ TSK-0068: WHETHER PI COULD OWN THIS TERMINAL, AND HOW IT IS OPENED FOR /login. Pi runs interactive only with
+    // both streams a terminal, so both are asked; a test supplies them, and a stand-in for Pi.
+    terminal = { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) },
+    loginInPi = runPiForLogin,
   } = deps;
   const args = parseArgs(argv);
   if (args.error) {
@@ -1494,7 +1568,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
 
       // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the trust decision
       // and the registration.
-      const done = await runPhases({ paths, args, ask, print, modules, canary, researchAdapter });
+      const done = await runPhases({ paths, args, ask, print, modules, canary, researchAdapter, terminal, loginInPi });
 
       // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
       // before this point is valid and stays: the content scaffold, the ignore block, the project identity and
