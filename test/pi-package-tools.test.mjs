@@ -1074,13 +1074,13 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
  * tools over the real adapter, which is asserted separately; what this controls is what a handler
  * returns, so the wrapper's own behaviour - what it passes in and what it hands back - can be seen.
  */
-const withResearch = (researchTools) => {
+const withResearch = (researchTools, researchPermission = () => ({ permitted: true })) => {
   const tools = new Map();
-  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { researchTools });
+  register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { researchTools, researchPermission });
   return tools;
 };
 
-/** Invoke a handler with no project in the environment: research needs none. */
+/** Invoke a handler with the permission gate supplied by the test (F4): permitted unless a case says otherwise. */
 const invokeAnywhere = async (tool, params = {}) => tool.execute("call-1", params);
 
 test("⚠️ ACC-0110 the three research tools register under the contract's names, with its measured schemas", async () => {
@@ -1134,13 +1134,14 @@ test("⚠️ ACC-0110 each research tool hands its parameters to the implementat
 });
 
 test("⚠️ ACC-0110 a capability refusal reaches the caller as the library's own data, not as the wrapper's", async () => {
+  // A permitted project (F4's gate supplied as permitting): what is under test is the library's own refusal after it.
   // ⚠️ **THE REAL LIBRARY, WITH NO CREDENTIAL AND NO NETWORK.** Without the key the adapter refuses
   // before it calls anything, so this exercises the production path offline and deterministically.
   const saved = process.env.TAVILY_API_KEY;
   delete process.env.TAVILY_API_KEY;
 
   try {
-    const probed = (await invokeAnywhere(registered().get("research_capability"))).details;
+    const probed = (await invokeAnywhere(withResearch(undefined).get("research_capability"))).details;
 
     // The library's shape, kept: available/false with a reason a machine can switch on, and the
     // instruction to record a gap rather than answer from memory.
@@ -1155,7 +1156,7 @@ test("⚠️ ACC-0110 a capability refusal reaches the caller as the library's o
     // different facts, and folding them together is what this checks has not happened.
     assert.equal(probed.code, undefined);
 
-    const searched = (await invokeAnywhere(registered().get("research_search"), { query: "anything" })).details;
+    const searched = (await invokeAnywhere(withResearch(undefined).get("research_search"), { query: "anything" })).details;
     assert.equal(searched.ok, false);
     assert.equal(searched.reason, "no-credential");
     assert.match(searched.instruction, /record the gap/i);
@@ -1879,4 +1880,36 @@ test("⚠️ F114 every declared tool was exercised in this file, and each resul
   const totals = [...exercised.values()].reduce((sum, seen) => ({ results: sum.results + seen.results, refusals: sum.refusals + seen.refusals }), { results: 0, refusals: 0 });
   assert.ok(totals.results > 0, "no successful result was checked");
   assert.ok(totals.refusals > 0, "no refusal was checked");
+});
+
+test("⚠️ F4 ACC-0120 a research tool refused by the permission gate never reaches its implementation, and says why", async () => {
+  // The gate runs first; the implementation stands in for the adapter, so a call to it would be a key read and a request.
+  const reached = [];
+  const implementation = (name) => async () => (reached.push(name), { tool: name, ok: true });
+  const tools = withResearch(
+    { research_capability: implementation("research_capability"), research_search: implementation("research_search"), research_fetch: implementation("research_fetch") },
+    () => ({ permitted: false, reason: "research-not-granted", detail: "Web research has not been approved on this computer for this project." })
+  );
+  for (const [name, params] of [["research_capability", {}], ["research_search", { query: "q" }], ["research_fetch", { url: "https://example.invalid/" }]]) {
+    const out = await tools.get(name).execute("call-1", params);
+    assert.match(JSON.stringify(out), /research-not-granted/, `${name}: ${JSON.stringify(out)}`);
+    // For the model this is research being unavailable (DEC-0004): it records the gap rather than answering from memory.
+    assert.equal(out.details?.mustRecordGap, true, `${name}: ${JSON.stringify(out)}`);
+  }
+  assert.deepEqual(reached, [], "no implementation was called");
+});
+
+test("⚠️ F4 ACC-0120 with no project named by the supervisor, the real gate refuses before any research implementation runs", async () => {
+  const saved = process.env.KILN_PROJECT_ROOT;
+  delete process.env.KILN_PROJECT_ROOT;
+  try {
+    const reached = [];
+    const tools = new Map();
+    register({ registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) }, { researchTools: { research_search: async () => (reached.push(1), { ok: true }) } });
+    const out = await tools.get("research_search").execute("call-1", { query: "q" });
+    assert.match(JSON.stringify(out), /research-no-project-context/, JSON.stringify(out));
+    assert.deepEqual(reached, []);
+  } finally {
+    if (saved !== undefined) process.env.KILN_PROJECT_ROOT = saved;
+  }
 });

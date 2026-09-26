@@ -14,13 +14,28 @@
  * was part of choosing this backend (#128).
  */
 
+import { resolve } from "node:path";
+
 import { createResearchTools } from "../lib/research/tools.mjs";
 import { createTavilyAdapter, TAVILY } from "../lib/research/tavily-adapter.mjs";
+import { researchPermission } from "../lib/research/permission.mjs";
 
-const tools = createResearchTools(createTavilyAdapter());
-const out = await tools.research_capability();
+// ⚠️ THE PROJECT IS NAMED, AND ITS RESEARCH MUST BE PERMITTED, BEFORE THE PROBE (F4, ACC-0120). A probe contacts Tavily
+// with the key, so it is research like any other: the project must have chosen Tavily and this computer granted it.
+const at = process.argv.indexOf("--project-root");
+const root = at >= 0 ? process.argv[at + 1] : undefined;
+const gate = root ? researchPermission({ projectRoot: resolve(root) }) : null;
+const out = !root || !gate.permitted ? null : await createResearchTools(createTavilyAdapter()).research_capability();
 
-if (out.available) {
+if (!root) {
+  console.error("REFUSED     research-no-project-context");
+  console.error("detail      Name the project whose research choice and consent apply: npm run research:probe -- --project-root <dir>.");
+  process.exitCode = 2;
+} else if (!gate.permitted) {
+  console.error(`REFUSED     ${gate.reason}`);
+  console.error(`detail      ${gate.detail}`);
+  process.exitCode = 1;
+} else if (out.available) {
   const q = out.quota ?? {};
   const quota =
     q.remaining === null || q.remaining === undefined

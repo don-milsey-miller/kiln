@@ -1289,6 +1289,17 @@ export default function register(pi, deps = {}) {
       description,
       parameters,
       execute: async (_toolCallId, params) => {
+        // ⚠️ **ASKED FIRST, BEFORE ANY KEY IS READ OR ANY ADAPTER BUILT (F4, ACC-0120).** Research runs only when the
+        // project chose Tavily and this computer granted it; the project is the one the supervisor named, and an
+        // unreadable record of either kind refuses rather than permits.
+        const permission = await import("../../lib/research/permission.mjs");
+        let gate;
+        try {
+          gate = (deps.researchPermission ?? permission.researchPermissionFromEnv)();
+        } catch (e) {
+          gate = { permitted: false, reason: permission.RESEARCH_REFUSAL.CONSENT_UNREADABLE, detail: scrub(e?.message ?? String(e), "") };
+        }
+        if (!gate?.permitted) return rendered(permission.refusedResearch(name, gate));
         const tools = deps.researchTools ?? (await defaultResearchTools());
         const handler = tools[name];
         if (typeof handler !== "function")

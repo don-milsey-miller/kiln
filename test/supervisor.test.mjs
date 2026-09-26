@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { delimiter, dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 
@@ -2095,9 +2095,9 @@ test("⚠️ AN INTERRUPT ENDS THE RUN WITHOUT WAITING FOR THE AGENT", async () 
  * `agentExitsOn` lets the agent itself write the notice and exit in one synchronous step: the race the notice's
  * ordering exists for.
  */
-async function keyboardRun({ keyboardStop = true, env = {}, logs = [], budget = { graceMs: 400, hardMs: 200 } } = {}) {
-  const dir = repoProject({ state: true });
-  ignoreAll(dir);
+async function keyboardRun({ keyboardStop = true, env = {}, logs = [], budget = { graceMs: 400, hardMs: 200 }, dir: given = null } = {}) {
+  const dir = given ?? repoProject({ state: true });
+  if (!given) ignoreAll(dir);
   const calls = [];
   const byPid = new Map();
   let nextPid = 5100;
@@ -4310,3 +4310,34 @@ test(
     }
   }
 );
+
+/* ================================ F4: research is permitted, or its key reaches neither child (ACC-0120) ========= */
+
+test("⚠️ F4 ACC-0120 a project that has not chosen research gets no Tavily key in either child, and the agent is told its project root", async () => {
+  const logs = [];
+  const { run, launcher, agent } = await keyboardRun({ keyboardStop: false, logs, env: { TAVILY_API_KEY: "kiln-fake-tavily-key-f4", KILN_PROJECT_ROOT: "elsewhere" } });
+  for (const [name, child] of [["launcher", launcher], ["agent", agent]])
+    assert.deepEqual(Object.keys(child.options.env).filter((k) => k.toUpperCase() === "TAVILY_API_KEY"), [], `the ${name} was given the key`);
+  assert.ok(agent.options.env.KILN_PROJECT_ROOT, "the agent is told its project root");
+  assert.notEqual(agent.options.env.KILN_PROJECT_ROOT, "elsewhere", "an inherited project root is replaced");
+  assert.equal(launcher.options.env.KILN_PROJECT_ROOT, undefined, "the launcher is not told a project root it has no use for");
+  assert.ok(logs.some((l) => /web research is not permitted here \(research-not-chosen\); TAVILY_API_KEY is withheld/.test(l)), logs.join(" | "));
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+  await run;
+});
+
+test("⚠️ F4 ACC-0120 CONTROL: research chosen and granted on this computer lets the key through", async () => {
+  // A real repository that ignores the runtime paths, so the consent record's protection is verifiable.
+  const dir = project({ record: { recordVersion: 1, projectId: PROJECT_ID, research: { provider: "tavily" } }, state: true });
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  ignoreAll(dir);
+  const { consentLocation, recordGrant, GRANT } = await import("../lib/consent-record.mjs");
+  await recordGrant(consentLocation({ projectRoot: dir }), { grant: GRANT.RESEARCH, granted: true, choice: { research: "tavily" } });
+  const { run, agent } = await keyboardRun({ keyboardStop: false, dir, env: { TAVILY_API_KEY: "kiln-fake-tavily-key-f4" } });
+  assert.equal(agent.options.env.TAVILY_API_KEY, "kiln-fake-tavily-key-f4");
+  assert.equal(agent.options.env.KILN_PROJECT_ROOT, canonicalPath(dir));
+  agent.child.exitCode = 0;
+  agent.child.onExit(0, null);
+  await run;
+});

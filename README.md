@@ -175,8 +175,8 @@ For launcher options and shutdown behavior, see
 | `npm run lint:shell` | Check the boundary between the application and the planning engine. |
 | `npm run lint:plan` | Validate the content selected by `PLANNING_CONTENT_DIR`. |
 | `npm run handoff` | Publish a handoff package after all required gates pass. |
-| `npm run research:probe` | Check whether the optional research backend is available. |
-| `npm run research:search -- "question"` | Search for candidate sources without changing project files. |
+| `npm run research:probe -- --project-root <path>` | Check whether the optional research backend is available. Refused unless the project chose web research and this computer approved it. |
+| `npm run research:search -- "question" --project-root <path>` | Search for candidate sources without changing project files. Refused on the same terms. |
 | `npm run migrate:content` | Preview a content-schema migration; add `-- --apply` to write it. |
 | `npm run dev` | Run the older standalone watcher prototype, not the main application. |
 

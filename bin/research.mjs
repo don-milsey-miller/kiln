@@ -2,8 +2,12 @@
 /**
  * 7a steps 3 and 4, as two deliberate commands.
  *
- *   npm run research:search -- "a question"
- *   npm run research:record -- <url> --claim "..." --quote "..." [--assertion AST-0001 --polarity support]
+ *   npm run research:search -- "a question" --project-root <dir>
+ *   npm run research:record -- <url> --claim "..." --quote "..." --project-root <dir> [--assertion AST-0001 --polarity support]
+ *
+ * ⚠️ **THE PROJECT IS NAMED, AND ITS RESEARCH MUST BE PERMITTED, BEFORE ANYTHING ELSE (F4, ACC-0120).** `--project-root` is
+ * required; nothing is guessed from the working directory. The project must have chosen Tavily and this computer must
+ * hold a standing research grant for it, checked before the key is read or any request made.
  *
  * ⚠️ **Two commands, not one, because discovery and evidence are different acts** (#124). Search
  * returns candidates; a human or a specialist then decides which source is authoritative and what it
@@ -30,6 +34,8 @@ import { createTavilyAdapter } from "../lib/research/tavily-adapter.mjs";
 import { createEvidence, linkEvidence } from "../lib/tools/evidence-tools.mjs";
 import { resolveContentRoot } from "../lib/content-root.mjs";
 import { quoteIsPresent, flatten, extractTitle } from "../lib/research/quote.mjs";
+import { researchPermission } from "../lib/research/permission.mjs";
+import { resolve } from "node:path";
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
@@ -51,7 +57,27 @@ const flag = (name) => {
   return parts.length ? parts.join(" ") : undefined;
 };
 
-const tools = createResearchTools(createTavilyAdapter());
+/**
+ * The research tools, once the named project's research is permitted; `null` after printing why it is not.
+ *
+ * ⚠️ **THE ADAPTER IS BUILT ONLY HERE, AFTER THE GATE.** Nothing that could reach Tavily exists until the project and this
+ * computer have both said yes.
+ */
+function permittedTools() {
+  const root = flag("project-root");
+  if (!root) {
+    console.error("REFUSED     research-no-project-context");
+    console.error("detail      Name the project whose research choice and consent apply: --project-root <dir>.");
+    return { tools: null, code: 2 };
+  }
+  const gate = researchPermission({ projectRoot: resolve(root) });
+  if (!gate.permitted) {
+    console.error(`REFUSED     ${gate.reason}`);
+    console.error(`detail      ${gate.detail}`);
+    return { tools: null, code: 1 };
+  }
+  return { tools: createResearchTools(createTavilyAdapter()), code: 0 };
+}
 
 /** Every path that cannot proceed reports through here, so a refusal always looks like a refusal. */
 function refuse(result) {
@@ -63,11 +89,19 @@ function refuse(result) {
 }
 
 async function search() {
-  const query = argv.slice(1).filter((a) => !a.startsWith("--")).join(" ");
+  // The words before the first flag: a flag's value is not part of the question.
+  const words = [];
+  for (const a of argv.slice(1)) {
+    if (a.startsWith("--")) break;
+    words.push(a);
+  }
+  const query = words.join(" ");
   if (!query) {
-    console.error('Usage: npm run research:search -- "your question"');
+    console.error('Usage: npm run research:search -- "your question" --project-root <dir>');
     return 2;
   }
+  const { tools, code } = permittedTools();
+  if (!tools) return code;
   console.error("(one search credit)");
   const out = await tools.research_search({ query, maxResults: Number(flag("max") ?? 5) });
   if (out.ok === false) return refuse(out);
@@ -90,10 +124,14 @@ async function record() {
   const claim = flag("claim");
   const quote = flag("quote");
   if (!url || url.startsWith("--") || !claim || !quote) {
-    console.error('Usage: npm run research:record -- <url> --claim "what it supports" --quote "exact sentence from the page"');
+    console.error('Usage: npm run research:record -- <url> --claim "what it supports" --quote "exact sentence from the page" --project-root <dir>');
     console.error("\n--quote is not optional: it is checked against the retrieved text before anything is written.");
     return 2;
   }
+
+  // ⚠️ RESEARCH MUST BE PERMITTED FIRST (F4): it is the precondition every other one here serves.
+  const { tools, code } = permittedTools();
+  if (!tools) return code;
 
   // ⚠️ Resolve the content root BEFORE fetching anything. The first version fetched the page and
   // THEN discovered it had nowhere to write, which is #125's "refuse before provisioning" ignored in
@@ -158,6 +196,6 @@ async function record() {
 if (cmd === "search") process.exitCode = await search();
 else if (cmd === "record") process.exitCode = await record();
 else {
-  console.error('Usage:\n  npm run research:search -- "a question"\n  npm run research:record -- <url> --claim "..." --quote "..."');
+  console.error('Usage:\n  npm run research:search -- "a question" --project-root <dir>\n  npm run research:record -- <url> --claim "..." --quote "..." --project-root <dir>');
   process.exitCode = 2;
 }
