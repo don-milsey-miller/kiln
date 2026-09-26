@@ -1,0 +1,30 @@
+{
+  "id": "EVD-0155",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: each of ACC-0089's nineteen wrong states has a named control asserting its refusal, and all of them passed in four-cell CI",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-26",
+  "summary": "ACC-0089, TSK-0064 at c740fa3. Two different things are shown, and they are kept apart. WHAT THE INDEX PROVES: test/negative-controls.test.mjs reads every test title in test/ and fails unless each of the nineteen wrong states has at least one test tagged ACC-0089 (n), reading only the numbers that follow ACC-0089 itself, and unless item 1 has its three cases (a valid unrelated working directory, a root that does not exist, and a mismatched one). It proves that no state lacks a named test. It does not prove any test passes. Removing the (18) tag locally made it fail, naming (18) tool signature drift. WHAT THE CI RUN PROVES: GitHub Actions run 36246021430 at c740fa3 passed all four cells (ubuntu-latest and windows-latest, Node 22 and 24), so every named control ran and passed in each. A count by title prefix found 21 passing ACC-0089 tests per cell and none failed or skipped; the 22nd, item 6's test, is titled T1 ACC-0089 (6) and was missed by that prefix, not by the run. THE CONTROLS, each asserting its refusal and its side effect: (1) setup from an unrelated working directory whose roots agree completes and writes nothing there; a content root that does not exist refuses with the paths code and writes nothing; a project root that disagrees with the content's owner refuses, printing both, having written nothing. (2) a declined inspection reads, contacts and loads nothing. (3) launch without a model-use grant refuses before any credential is touched. (4) a sole model with nobody to confirm it refuses needs-confirmation, nothing written or granted. (5) absent authentication refuses auth-absent and uses no other provider. (6) a provider with no safe credential mapping is refused unsupported. (7) no terminal and nothing authenticated refuses login-needs-terminal under exit 18, Pi never started. (8) a declined live check at launch refuses live-check-declined, the canary never run, settings, consent and the compatibility record unchanged. (9) prose, malformed or extra arguments and wrong challenges fail the canary as named refusals. (10, 11) research tavily-chosen without a grant, and every other research refusal, is refused at each research command before the key is read or a request made. (12) trust denied refuses trust-denied. (13) corrupt settings refuse through setup with the setup code and a reason line, the file untouched. (14) an untracked runtime file in a repository that does not ignore it refuses state-unprotected, Pi never started, the file unchanged. (15) an interrupted transaction refuses with the interrupted code, the journal kept. (16) an occupied port refuses port-occupied through the supervisor with nothing started. (17) an unrelated healthy service refuses identity-mismatch through the supervisor, Pi never started. (18) tool signature drift is refused. (19) plausible prose from a child without Kiln's tools is refused and not used.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "commit": "c740fa3",
+      "index": "test/negative-controls.test.mjs: every state has a named test; item 1 has its three cases",
+      "ci-run": "GitHub Actions run 36246021430, four cells green; every ACC-0089 control ran and passed in each"
+    },
+    "omissions": []
+  }
+}
