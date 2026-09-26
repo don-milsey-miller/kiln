@@ -4,7 +4,7 @@
   "schemaVersion": 2,
   "reviewStatus": "draft",
   "lifecycle": "active",
-  "outcome": "not-evaluated",
+  "outcome": "pass",
   "title": "Setup refuses before launching login when there is no terminal, and names the way out",
   "statement": "With stdin, stdout or both not a TTY and no usable authentication already present, setup refuses BEFORE starting the interactive Pi TUI — verified by the Pi process never being spawned, not merely by the message printed — and prints both supported recovery routes: run setup from a local interactive terminal, or configure authentication on the target host outside Kiln and rerun with the required non-interactive decisions. Each of the three non-TTY combinations is checked. With usable authentication already present, the same non-TTY invocation proceeds instead of refusing.",
   "evaluates": [
@@ -13,5 +13,8 @@
   "verifies": [
     "REQ-0022"
   ],
-  "notes": "⚠️ THE PROCESS-NEVER-SPAWNED HALF IS THE ONE THAT MATTERS. A refusal message printed just before launching the TUI anyway would satisfy a text assertion and still hang a CI job, which is the failure this exists to prevent — a hang is indistinguishable from work until a timeout. ⚠️ AND THE SECOND ROW IS A CONTROL: if the non-TTY path refused unconditionally, the refusal would prove nothing about TTY detection. ⚠️ AMENDED 2026-09-21 (F8): stdout is checked as well as stdin, because Pi itself leaves interactive mode when either is not a TTY."
+  "notes": "⚠️ THE PROCESS-NEVER-SPAWNED HALF IS THE ONE THAT MATTERS. A refusal message printed just before launching the TUI anyway would satisfy a text assertion and still hang a CI job, which is the failure this exists to prevent — a hang is indistinguishable from work until a timeout. ⚠️ AND THE SECOND ROW IS A CONTROL: if the non-TTY path refused unconditionally, the refusal would prove nothing about TTY detection. ⚠️ AMENDED 2026-09-21 (F8): stdout is checked as well as stdin, because Pi itself leaves interactive mode when either is not a TTY. ✅ PASS 2026-09-26 on EVD-0153: in each no-terminal case the stand-in launch function was never called and setup exited 18 naming both routes; the real piped command confirmed exit 18 and the recovery text; with authentication present the same run proceeded.",
+  "evidencedBy": [
+    "EVD-0153"
+  ]
 }

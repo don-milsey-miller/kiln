@@ -1,0 +1,37 @@
+{
+  "id": "EVD-0153",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: without a terminal and with nothing authenticated, setup refuses with exit 18 before starting Pi and names both recovery routes",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-26",
+  "summary": "ACC-0093, TSK-0068 at 685f333. What was run: test/setup-command.test.mjs, in CI run 36241431458, all four cells green (ubuntu-latest and windows-latest, Node 22 and 24), each of the cases below passing in every cell. NO TERMINAL, NOTHING AUTHENTICATED, PI NEVER STARTED. Setup's real command logic ran in-process against a computer with no stored key and no custom provider, with the look at this computer allowed. The launch function that opens Pi was replaced by a stand-in that records every call. For each of the three non-terminal combinations (stdin not a terminal, stdout not a terminal, both), setup exited 18 (EXIT.AUTHENTICATION), the stand-in was called zero times, and the message named which stream was not a terminal and both recovery routes: run setup from a local interactive terminal, or configure authentication on the host outside Kiln and rerun with the non-interactive decisions. --non-interactive with both streams a terminal refused the same way, the stand-in again never called. THE REAL COMMAND. bin/setup.mjs run as a child process with stdin and stdout piped and the same unauthenticated computer exited 18, printed that stdin and stdout are not a terminal and both recovery routes, and never printed the line setup prints before opening Pi. That run used the command's own terminal detection, with no seam. THE CONTROL. With authentication present, the same terminal-less, non-interactive run completed (exit 0) and the stand-in was never called, so the refusal is about missing authentication and not an unconditional refusal of terminal-less runs. SINCE: a later commit gives this refusal its own reason, login-needs-terminal, under the same exit 18, printed as its own line; the cases now assert it too. The interactive handoff with a terminal is ACC-0119's, not this criterion's.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "commit": "685f333",
+      "ci-run": "GitHub Actions run 36241431458, four cells green; the six ACC-0093 and TSK-0068 cases passed in each",
+      "pi-never-started": "the injected launch stand-in recorded zero calls in each no-terminal case and under --non-interactive",
+      "real-command": "bin/setup.mjs with piped stdin and stdout: exit 18, the terminal and both recovery routes named, Pi's opening line absent"
+    },
+    "omissions": [
+      {
+        "fact": "process-level-spawn-observation",
+        "state": "not-captured",
+        "reason": "In the real-command case Pi's absence is shown by the command's own output and exit, not by a process watcher; the in-process cases show it by the stand-in's zero calls."
+      }
+    ]
+  }
+}
