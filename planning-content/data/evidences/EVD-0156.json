@@ -1,0 +1,48 @@
+{
+  "id": "EVD-0156",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: at a real Windows terminal, setup discloses what Pi may change, hands the terminal to Pi for /login, and continues or refuses on what Pi leaves",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-26",
+  "summary": "ACC-0119, TSK-0068 at d9383fe (setup's /login handoff from 685f333, its disclosure from e3239e8), observed in Windows Terminal on Windows 11 with Node 24.18.0 and Pi 0.84.4. A fresh project and an agent directory with nothing authenticated; setup run with --trust approve --inspect approve --provider openai --model gpt-4o --thinking off --model-use approve --live-model-check deny --research disabled, so nothing could reach OpenAI. Keys were synthetic input events sent only to the verified foreground window. BEFORE PI OPENED, setup printed that no provider is authenticated, to type /login and then /quit, that nothing typed in Pi is recorded by setup, and that Pi uses its own agent directory, named in full, which setup does not isolate, may download helper programs into it, and /login may change Pi's own default provider and model there, while the project's model is chosen by setup afterwards. Pi then opened interactive, in a temporary kiln-login directory, with the login flags present on its process; it downloaded fd and ripgrep into the agent directory, as disclosed. CONNECTED: /login, Sign in with an API key, OpenAI, a throwaway key. Pi saved it to the agent directory's auth.json (openai: api_key) and set its own default model there. After /quit setup printed Pi closed (exit 0); looking at this computer again, found the provider, confirmed the model by --model-use approve, passed its zero-cost preflight, and stopped at the declined live check: exit 9, partial, nothing sent to the provider. The temporary directory was removed. CLOSED WITHOUT A LOGIN: the same run with nothing authenticated, /quit at once. Setup printed Pi closed (exit 0); looking at this computer again, that Pi was closed and still no provider is authenticated, and reason: no-available-models, and exited 18 (the authentication code). auth.json stayed {}. That Pi's input and output were inherited and nothing of the session captured is the launch code's (stdio inherit, no log), asserted by the TSK-0068 test that also fixes the exact pinned command, flags, agent directory and removed working directory; this observation shows the TUI owning the terminal.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "host": "Windows 11 Pro 10.0.26200, Windows Terminal, Node 24.18.0, Pi 0.84.4, Kiln at d9383fe",
+      "connected": "setup exit 9 after /login with a throwaway OpenAI key; live check declined, nothing sent",
+      "closed-without-login": "setup exit 18, reason no-available-models; auth.json unchanged",
+      "retained": "D:\\work\\kiln-job-manual\\evidence-acc-0119-2026-09-26 (screenshots, key timings, exit files, the terminal script); the throwaway key was deleted",
+      "sha256 (files in the retained directory)": "connected/exit.txt 32b362a0b92bd6b176bac468e8c2b74dff4b1a063bc494de47e571e454fec06f; connected/keys.log 83178a31294e4ba25710ac0c270e68cba69c77692a106f6895db7235277d9418; connected/a0.png 55bc0b1ed3288288fbcf6bdcbd512dbd6449392b7df0f1e6cbb76ea9a375569f; connected/a2.png 701802c6dc62bd53ba24c671ae8bf18f446474ced12edc3fd511121168025888; closed-without-login/exit.txt 3cbfcba9a3d703f6f3bbe91d23e43d144f20e008c002de08f4b947509f4224dc; closed-without-login/keys.log 19f792d2ebd869b32ab6f19fb37778b8afed9a107479c24437d89c69bee729d9; closed-without-login/b1.png 1d81a0de16725db44a956a32c82f613a7a53287c06df56af9759a65458192c89"
+    },
+    "omissions": [
+      {
+        "fact": "human-keypress",
+        "state": "not-captured",
+        "reason": "The keys were synthesized input events sent to a verified foreground window; no person pressed them."
+      },
+      {
+        "fact": "account-sign-in",
+        "state": "not-captured",
+        "reason": "Only the API-key route was taken, with a throwaway key; account (OAuth) sign-in was not observed."
+      },
+      {
+        "fact": "real-provider",
+        "state": "not-captured",
+        "reason": "The live check was declined, so the stored key was never used against OpenAI."
+      }
+    ]
+  }
+}
