@@ -1,0 +1,36 @@
+{
+  "id": "EVD-0154",
+  "type": "evidence",
+  "schemaVersion": 2,
+  "reviewStatus": "draft",
+  "lifecycle": "active",
+  "title": "Measurement: research is refused at every entry point, before the key, unless the project chose Tavily and this computer granted it",
+  "kind": "experiment",
+  "outcome": "success",
+  "observedAt": "2026-09-26",
+  "summary": "ACC-0120, TSK-0075 (F4) at 70c5ba8 (84b0ae5 and the review fixes in c8354d2). CI run 36244920683 passed all four cells, and the 23 ACC-0120 tests ran and passed in each, none skipped: test/research-permission.test.mjs (19), test/supervisor.test.mjs (2), test/pi-package-tools.test.mjs (2). THE GATE, ON REAL RECORDS IN REAL GIT REPOSITORIES: no project named refuses research-no-project-context; no project record, or one that is not JSON, research-project-record-unreadable; research none or undecided, research-not-chosen; tavily chosen with no answer or a declined grant, research-not-granted; a consent record that is not JSON, or a granted record in a place Git does not ignore, research-consent-unreadable; a local-state mode other than project or user, research-state-mode-unknown. Chosen and granted is permitted. A grant kept in the per-user root (setup --local-state user) is found in user mode and not in project mode. EVERY REASON AT EVERY ENTRY POINT, BEFORE THE KEY: research:search, research:record and research:probe, run as real processes with a preload recording every read of TAVILY_API_KEY and every request, refused with no project named (exit 2) and with each project refusal (exit 1), in every case with no key read and no request. Pi's research_capability, research_search and research_fetch, through the real gate with KILN_PROJECT_ROOT and KILN_STATE_MODE set per case, returned each reason with mustRecordGap and never reached an implementation. The permitted cases, project-local (research:search) and per-user (research:probe --local-state user), read the key and made a request only after the gate. research:record refused research-destination-not-this-project, exit 2, with no request, when PLANNING_CONTENT_DIR pointed at another project's content. THE SUPERVISOR: with research not chosen, TAVILY_API_KEY reached neither the launcher nor the agent, an inherited KILN_PROJECT_ROOT was replaced, the agent alone was told its project root, and the log said the key was withheld; with research chosen and granted, the key passed through and the agent was told its project root and state mode.",
+  "environment": {
+    "execution": "host",
+    "isolationBoundary": {
+      "isolates": [],
+      "doesNotClaim": [
+        "containment-of-hostile-code",
+        "host-filesystem-denial",
+        "network-isolation",
+        "process-isolation"
+      ]
+    },
+    "facts": {
+      "commit": "70c5ba8",
+      "ci-run": "GitHub Actions run 36244920683, four cells green; 23 ACC-0120 tests passed per cell, none skipped",
+      "key-and-request-observation": "a --import preload recorded TAVILY_API_KEY reads and fetch calls in each CLI process, and refused the request"
+    },
+    "omissions": [
+      {
+        "fact": "live-tavily",
+        "state": "not-captured",
+        "reason": "No request reached Tavily: the permitted cases stop at a refused fetch, so the gate is shown and the backend is not."
+      }
+    ]
+  }
+}
