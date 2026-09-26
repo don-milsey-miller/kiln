@@ -3439,6 +3439,11 @@ test("⚠️ TSK-0068 with a terminal on both ends and nothing authenticated, se
     assert.equal(call.cwdExisted, true);
     assert.equal(existsSync(call.cwd), false, "its own directory is removed afterwards");
     assert.ok(o.printed.some((l) => /type \/login/.test(l)), o.printed.join("\n"));
+    // F3: before Pi is opened, the operator is told what Pi itself may do to its agent directory during /login.
+    const told = o.printed.join("\n");
+    assert.ok(told.includes(p.agentDir) && /does not isolate/.test(told), told);
+    assert.match(told, /may download helper\s+programs/, told);
+    assert.match(told, /change Pi's own default provider and model/, told);
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }

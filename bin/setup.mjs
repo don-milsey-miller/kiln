@@ -1173,6 +1173,13 @@ function loginFirst({ args, paths, agentDir, terminal, loginInPi, print, modules
   print("No provider is authenticated on this computer. Opening Pi so you can connect one:");
   print("  type /login, choose your provider and follow its steps, then /quit to come back to setup.");
   print("  Nothing you type in Pi is recorded by setup.");
+  // ⚠️ **WHAT PI ITSELF DOES DURING /login, SAID BEFORE IT DOES IT (F3).** Observed on the pinned 0.84.4: at start-up Pi
+  // downloads fd and ripgrep into its agent directory when they are missing, and /login writes Pi's own default
+  // provider and model into that directory's settings. The directory Pi is opened in is temporary; the agent
+  // directory is not, and nothing here isolates it.
+  print(`  Pi uses its own agent directory (${agentDir}), which setup does not isolate: Pi may download helper`);
+  print("  programs into it, and /login may change Pi's own default provider and model there. This project's model is");
+  print("  chosen by setup afterwards and is not affected.");
   const cwd = mkdtempSync(join(tmpdir(), "kiln-login-"));
   try {
     const closed = loginInPi({ command: agent.command, args: [...agent.args, ...LOGIN_PI_FLAGS], cwd, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir } });
