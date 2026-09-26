@@ -173,7 +173,7 @@ const EXIT_BY_REFUSAL = Object.freeze({
  */
 export function exitFor(error) {
   if (typeof error?.name !== "string") return null;
-  if (error.name === "ModelSelectionRefusal" && error.reason === "no-available-models") return EXIT.AUTHENTICATION;
+  if (error.name === "ModelSelectionRefusal" && (error.reason === "no-available-models" || error.reason === "login-needs-terminal")) return EXIT.AUTHENTICATION;
   return Object.hasOwn(EXIT_BY_REFUSAL, error.name) ? EXIT_BY_REFUSAL[error.name] : null;
 }
 
@@ -1158,7 +1158,7 @@ function loginFirst({ args, paths, agentDir, terminal, loginInPi, print, modules
   if (args.nonInteractive || without.length > 0) {
     const why = args.nonInteractive ? "this run is --non-interactive" : `${without.join(" and ")} ${without.length > 1 ? "are" : "is"} not a terminal`;
     throw new ModelSelectionRefusal(
-      SELECTION_REFUSAL.NO_MODELS,
+      SELECTION_REFUSAL.LOGIN_NEEDS_TERMINAL,
       [
         `No provider is authenticated on this computer, and Pi's /login needs a terminal on both ends: ${why}. Pi was not started.`,
         "Either:",
@@ -1657,13 +1657,18 @@ export function reportFailure(e, print = say) {
   // refused under a trace of where, and returning one code for all of them would tell a script that "choose a
   // model" and "this provider needs a credential declaration" are the same situation. A class this table does
   // not name keeps the generic setup code, which is at least honest about "this run refused".
+  // ⚠️ **AND ITS REASON, ON A LINE OF ITS OWN.** One exit code can cover more than one situation (18 is both "nothing is
+  // authenticated" and "nothing is authenticated and there is no terminal for /login"); the reason is the stable name a
+  // script or a test can hold, where the message's wording is for a person and may change.
   const mapped = exitFor(e);
   if (mapped !== null) {
     for (const line of String(e.message).split(NEWLINE)) warn(line);
+    if (typeof e?.reason === "string") warn(`reason: ${e.reason}`);
     return mapped;
   }
   if (typeof e?.reason === "string" && typeof e?.name === "string" && e.name.endsWith("Refusal")) {
     for (const line of String(e.message).split(NEWLINE)) warn(line);
+    warn(`reason: ${e.reason}`);
     return EXIT.SETUP;
   }
   if (e instanceof SetupRefusal || e?.name === "LocalStateRefusal" || e?.name === "LockError") {

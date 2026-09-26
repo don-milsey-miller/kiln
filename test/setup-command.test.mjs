@@ -3386,6 +3386,8 @@ test("⚠️ ACC-0093 with stdin, stdout or both not a terminal and nothing auth
       assert.equal(o.code, EXIT.AUTHENTICATION, `${label}: ${said}`);
       // ⚠️ THE HALF THAT MATTERS: Pi was never started, not merely a message printed before starting it anyway.
       assert.equal(pi.calls.length, 0, `${label}: Pi was started without a terminal`);
+      // Q3: exit 18 is shared with "nothing authenticated"; the stable reason is what tells this refusal apart.
+      assert.ok(o.warned.includes("[kiln] reason: login-needs-terminal"), `${label}: ${said}`);
       assert.match(said, new RegExp(`${label} (is|are) not a terminal`), said);
       assert.match(said, /run setup again from a local interactive terminal/, said);
       assert.match(said, /configure authentication on this host outside Kiln/, said);
@@ -3405,6 +3407,7 @@ test("⚠️ ACC-0093 --non-interactive with nothing authenticated refuses the s
     assert.equal(o.code, EXIT.AUTHENTICATION, o.warned.join("\n"));
     assert.equal(pi.calls.length, 0);
     assert.match(o.warned.join("\n"), /this run is --non-interactive/);
+    assert.ok(o.warned.includes("[kiln] reason: login-needs-terminal"), o.warned.join("\n"));
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
@@ -3457,6 +3460,7 @@ test("⚠️ TSK-0068 a Pi closed without connecting anything leaves setup refus
     assert.equal(o.code, EXIT.AUTHENTICATION, o.warned.join("\n"));
     assert.equal(pi.calls.length, 1);
     assert.match(o.warned.join("\n"), /Pi was closed and still no provider is authenticated/);
+    assert.ok(o.warned.includes("[kiln] reason: no-available-models"), "a closed Pi is the other reason under the same code");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
@@ -3476,6 +3480,7 @@ test("⚠️ ACC-0093 the real command, run with both streams piped and nothing 
     assert.equal(r.signal, null, `the command did not end: ${out}`);
     assert.equal(r.status, EXIT.AUTHENTICATION, out);
     assert.match(out, /stdin and stdout are not a terminal/, out);
+    assert.match(out, /^\[kiln\] reason: login-needs-terminal\r?$/m, out);
     assert.equal(/Opening Pi/.test(out), false, "Pi was opened without a terminal");
   } finally {
     rmSync(p.root, { recursive: true, force: true });
