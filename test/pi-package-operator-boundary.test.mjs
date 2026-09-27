@@ -420,3 +420,210 @@ test("⚠️ ACC-0070 a boundary refusal carries no credential and no machine pa
     assert.equal(/[A-Za-z]:(\\\\|\/)/.test(text), false, `a drive-lettered path survived: ${text.slice(0, 200)}`);
   }
 });
+
+/* ================================= one dialog per act, batch approval, and serialised dialogs ==== */
+
+/** The fixture's decision plus `extra` more, so a batch has something to approve. */
+async function projectWith(extra) {
+  const fx = await project();
+  const ids = [fx.decisionId];
+  for (let i = 0; i < extra; i++) {
+    const made = await createDecision(
+      { title: `Also decided ${i}`, statement: "This was decided too.", rationale: "Because it was." },
+      { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, validators, schemas }
+    );
+    ids.push(made.id);
+  }
+  return { ...fx, ids };
+}
+
+const reviewStatusOf = (contentRoot, id) =>
+  JSON.parse(readFileSync(join(contentRoot, "data", "decisions", `${id}.json`), "utf-8")).reviewStatus;
+
+const withoutAudit = (snap) => {
+  snap.delete(join("state", "operator-boundary-refusals.json"));
+  return snap;
+};
+
+test("approving one artifact takes exactly one operator interaction: the dialog", async () => {
+  const fx = await project();
+  const ui = channel(true);
+  const result = (await invoke(registered().get("kiln_set_review_status"), fx.contentRoot, { type: "decision", id: fx.decisionId, reviewStatus: "approved" }, { ctx: ui.ctx })).details;
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(ui.asked.length, 1);
+  assert.equal(reviewStatusOf(fx.contentRoot, fx.decisionId), "approved");
+});
+
+test("the rule no longer asks for a chat approval before a dialog-gated act", async () => {
+  const { MATERIAL_CHANGE_RULE } = await import("../pi-package/extensions/kiln.js");
+  for (const name of GATED) assert.ok(MATERIAL_CHANGE_RULE.includes(`\`${name}\``), `${name} is not exempted`);
+  assert.ok(MATERIAL_CHANGE_RULE.includes("Call those tools directly without asking in chat first."));
+});
+
+test("declined, cancelled, timed out and lost dialogs write no approval, single or batch", async () => {
+  // Each is how Pi's `confirm` ends when the operator does not say yes.
+  const endings = {
+    declined: () => channel(false),
+    cancelled: () => {
+      const ui = channel(false);
+      ui.ctx.ui.confirm = async (title, message, opts) => {
+        ui.asked.push({ title, message, opts });
+        const controller = new AbortController();
+        const done = new Promise((resolve) => controller.signal.addEventListener("abort", () => resolve(false)));
+        controller.abort();
+        return done;
+      };
+      return ui;
+    },
+    "timed out": () => {
+      const ui = channel(false);
+      ui.ctx.ui.confirm = async (title, message, opts) => {
+        ui.asked.push({ title, message, opts });
+        return new Promise((resolve) => setTimeout(() => resolve(false), Math.min(opts.timeout, 5)));
+      };
+      return ui;
+    },
+    "UI lost": () => channel(true, { throws: true }),
+    "no UI": () => ({ asked: [], ctx: undefined }),
+  };
+
+  for (const [label, make] of Object.entries(endings)) {
+    const fx = await projectWith(2);
+    const tools = registered();
+    const before = withoutAudit(snapshot(fx.contentRoot));
+
+    const single = (await invoke(tools.get("kiln_set_review_status"), fx.contentRoot, { type: "decision", id: fx.ids[0], reviewStatus: "approved" }, { ctx: make().ctx })).details;
+    const batch = (
+      await invoke(
+        tools.get("kiln_set_review_status"),
+        fx.contentRoot,
+        { artifacts: fx.ids.map((id) => ({ type: "decision", id })), reviewStatus: "approved" },
+        { ctx: make().ctx }
+      )
+    ).details;
+
+    for (const [form, result] of [["single", single], ["batch", batch]]) {
+      assert.equal(result.ok, false, `${label}/${form}: it went through`);
+      assert.equal(result.code, NOT_GRANTED, `${label}/${form}: ${result.code}`);
+    }
+    assertUnchanged(before, withoutAudit(snapshot(fx.contentRoot)), label);
+
+    // One audit entry for the single call and one per artifact for the batch.
+    const { refusals } = readBoundaryRefusals(fx.contentRoot);
+    assert.deepEqual(refusals.map((r) => r.target.artifactId), [fx.ids[0], ...fx.ids], `${label}: the refusals were not each recorded`);
+    assert.ok(refusals.every((r) => r.operation === "set-review-status"));
+  }
+});
+
+test("a batch approval opens one dialog that lists every artifact, and approves them all", async () => {
+  const fx = await projectWith(3);
+  const ui = channel(true);
+  const result = (
+    await invoke(registered().get("kiln_set_review_status"), fx.contentRoot, { artifacts: fx.ids.map((id) => ({ type: "decision", id })), reviewStatus: "approved" }, { ctx: ui.ctx })
+  ).details;
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(ui.asked.length, 1, "one dialog for the whole batch");
+  assert.equal(ui.asked[0].title, `Approve these ${fx.ids.length} artifacts?`);
+  for (const id of fx.ids) {
+    assert.ok(ui.asked[0].message.includes(id), `${id} is missing from the dialog`);
+    assert.equal(reviewStatusOf(fx.contentRoot, id), "approved");
+  }
+  assert.deepEqual(result.artifacts.map((a) => a.id), fx.ids);
+  assert.ok(result.artifacts.every((a) => a.changed === true));
+  assert.equal(readBoundaryRefusals(fx.contentRoot).state, "absent");
+});
+
+test("a batch naming a missing artifact changes none of them, even after the operator confirmed", async () => {
+  const fx = await projectWith(2);
+  const before = snapshot(fx.contentRoot);
+  const artifacts = [...fx.ids.map((id) => ({ type: "decision", id })), { type: "decision", id: "DEC-9999" }];
+
+  const result = (await invoke(registered().get("kiln_set_review_status"), fx.contentRoot, { artifacts, reviewStatus: "approved" }, { ctx: channel(true).ctx })).details;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "invalid-artifact");
+  assertUnchanged(before, snapshot(fx.contentRoot), "a batch with a missing artifact");
+});
+
+test("a request naming both forms, or neither, is refused before the operator is asked", async () => {
+  const fx = await project();
+  const tools = registered();
+  for (const params of [
+    { type: "decision", id: fx.decisionId, artifacts: [{ type: "decision", id: fx.decisionId }], reviewStatus: "approved" },
+    { reviewStatus: "approved" },
+    { type: "decision", reviewStatus: "approved" },
+  ]) {
+    const ui = channel(true);
+    const before = snapshot(fx.contentRoot);
+    const result = (await invoke(tools.get("kiln_set_review_status"), fx.contentRoot, params, { ctx: ui.ctx })).details;
+    assert.equal(result.ok, false, JSON.stringify(params));
+    assert.equal(result.code, "invalid-request");
+    assert.equal(ui.asked.length, 0, "the operator was asked about a malformed request");
+    assertUnchanged(before, snapshot(fx.contentRoot), JSON.stringify(params));
+  }
+});
+
+test("a write failing part way through a batch restores what was already written", async () => {
+  const { setReviewStatusBatch } = await import("../lib/tools/review-status.mjs");
+  const { atomicWrite } = await import("../lib/atomic-write.mjs");
+  const fx = await projectWith(2);
+  const before = snapshot(fx.contentRoot);
+
+  let writes = 0;
+  const writeFile = async (path, text) => {
+    if (++writes === 2) throw new Error("the disk filled up");
+    return atomicWrite(path, text);
+  };
+
+  await assert.rejects(
+    setReviewStatusBatch(
+      fx.ids.map((id) => ({ type: "decision", id })),
+      "approved",
+      { contentRoot: fx.contentRoot, schemas, validators, reviewedBy: OPERATOR_ACTOR, writeFile }
+    ),
+    /the disk filled up/
+  );
+  assert.equal(writes, 2, "the first artifact was written before the failure");
+  for (const id of fx.ids) assert.equal(reviewStatusOf(fx.contentRoot, id), "draft", `${id} was left approved`);
+  const after = snapshot(fx.contentRoot);
+  for (const [path, was] of before) assert.deepEqual(after.get(path).bytes, was.bytes, `${path} was not restored byte for byte`);
+});
+
+test("gated tools run sequentially, and concurrent gated calls never show overlapping dialogs", async () => {
+  const tools = registered();
+  for (const name of GATED) assert.equal(tools.get(name).executionMode, "sequential", `${name} may run in parallel`);
+
+  // ⚠️ THE FAILURE THIS REPLACES: ten approvals in one turn, ten dialogs racing for one UI, nine timeouts.
+  const fx = await projectWith(9);
+  let open = 0;
+  let most = 0;
+  const ui = channel(true);
+  ui.ctx.ui.confirm = async (title, message, opts) => {
+    ui.asked.push({ title, message, opts });
+    open++;
+    most = Math.max(most, open);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    open--;
+    return true;
+  };
+
+  // `invoke` restores the environment as each call ends, which would pull it out from under the others here.
+  const saved = process.env.PLANNING_CONTENT_DIR;
+  process.env.PLANNING_CONTENT_DIR = fx.contentRoot;
+  let results;
+  try {
+    results = await Promise.all(
+      fx.ids.map((id, i) => tools.get("kiln_set_review_status").execute(`call-${i}`, { type: "decision", id, reviewStatus: "approved" }, undefined, undefined, ui.ctx))
+    );
+  } finally {
+    if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
+    else process.env.PLANNING_CONTENT_DIR = saved;
+  }
+
+  assert.equal(most, 1, "two dialogs were open at once");
+  assert.equal(ui.asked.length, fx.ids.length);
+  assert.ok(results.every((r) => r.details.ok === true), JSON.stringify(results.map((r) => r.details)));
+  for (const id of fx.ids) assert.equal(reviewStatusOf(fx.contentRoot, id), "approved");
+});

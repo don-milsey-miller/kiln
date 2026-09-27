@@ -459,7 +459,9 @@ const RULE_MUST_SAY = Object.freeze({
   "only after approval": "Make the mutating tool call only after the operator's reply approves it.",
   "no reply is a no": "If the operator\nrejects it, cancels, or does not reply, make no mutating tool call.",
   "answer capture is excluded": "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than\nproposing a change to the project.",
-  "a stage may not relax it": "A stage skill may add to this rule and may not relax it.",
+  "dialog-gated acts are excluded":
+    "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`\nor to `kiln_write_stage_attestation`: each opens Kiln's own confirmation dialog, and the operator's answer\nthere is the approval.",
+  "a stage may not relax it":"A stage skill may add to this rule and may not relax it.",
 });
 
 test("⚠️ ACC-0115 the material-change rule says what the criterion requires, in the frame's own words", () => {

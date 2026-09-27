@@ -219,6 +219,9 @@ const previewValue = (value, max = 100) => {
   return flat.length > max ? `${flat.slice(0, max)}...` : flat;
 };
 
+/** The last dialog asked for. Each new one waits for it to settle. */
+let confirmationQueue = Promise.resolve();
+
 /**
  * Ask the operator, and treat everything that is not a plain yes as a no.
  *
@@ -226,6 +229,14 @@ const previewValue = (value, max = 100) => {
  * @param {AbortSignal|undefined} signal this invocation's own signal, preferred over the context's
  */
 async function operatorConfirmed(ctx, signal, title, lines) {
+  // ⚠️ ONE DIALOG AT A TIME. The gated tools are registered `sequential`, and this queue holds even for a host
+  // that runs them in parallel anyway: overlapping dialogs compete for one UI, and all but one time out.
+  const turn = confirmationQueue.then(() => askOperator(ctx, signal, title, lines));
+  confirmationQueue = turn.catch(() => {});
+  return turn;
+}
+
+async function askOperator(ctx, signal, title, lines) {
   let granted;
   try {
     granted = await ctx?.ui?.confirm?.(title, lines.join("\n"), {
@@ -244,12 +255,13 @@ async function operatorConfirmed(ctx, signal, title, lines) {
   return granted === true;
 }
 
-/** The refusal, recorded if it can be and reported either way (D37). */
+/** The refusal, recorded if it can be and reported either way (D37). A batch records one entry per target. */
 async function refuseUnconfirmed(context, deps, operation, target) {
   let code = CONFIRMATION_NOT_GRANTED;
   try {
     const boundary = deps.operatorBoundary ?? (await import("../../lib/operator-boundary.mjs"));
-    await boundary.recordBoundaryRefusal(context.contentRoot, { operation, target });
+    for (const one of Array.isArray(target) ? target : [target])
+      await boundary.recordBoundaryRefusal(context.contentRoot, { operation, target: one });
   } catch {
     // ⚠️ THE REFUSAL STANDS EITHER WAY. Losing the audit entry must never turn into letting the act
     // through, and the storage error itself never reaches the model: it carries an absolute path.
@@ -519,17 +531,44 @@ const MUTATION_TOOL_TABLE = Object.freeze([
     name: "kiln_set_review_status",
     entry: "setReviewStatus",
     label: "Kiln set review status",
-    description: "Move an artifact through review: draft, in-review, approved or amended.",
+    description:
+      "Move an artifact through review: draft, in-review, approved or amended. Name one artifact with " +
+      "`type` and `id`, or several with `artifacts`; several are changed all or none. Approval opens one " +
+      "operator confirmation dialog for the whole call, so do not ask the operator in chat first.",
     parameters: {
       type: "object",
       properties: {
-        type: { type: "string", description: "The artifact's type." },
-        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+        type: { type: "string", description: "The artifact's type. With `id`, for one artifact." },
+        id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001. With `type`, for one artifact." },
+        artifacts: {
+          type: "array",
+          minItems: 1,
+          maxItems: 50,
+          description: "Several artifacts, in place of `type` and `id`. Every one changes, or none does.",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "The artifact's type." },
+              id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+            },
+            required: ["type", "id"],
+            additionalProperties: false,
+          },
+        },
         reviewStatus: { type: "string", enum: ["draft", "in-review", "approved", "amended"] },
       },
-      required: ["type", "id", "reviewStatus"],
+      required: ["reviewStatus"],
       additionalProperties: false,
     },
+    // Exactly one of the two forms. Checked before the dialog, so the operator is never asked about a malformed request.
+    shape: (p) =>
+      Array.isArray(p?.artifacts)
+        ? p.type === undefined && p.id === undefined
+          ? null
+          : "Name the artifacts with `artifacts` or with `type` and `id`, not both."
+        : typeof p?.type === "string" && typeof p?.id === "string"
+          ? null
+          : "Name one artifact with `type` and `id`, or several with `artifacts`.",
     /**
      * ⚠️ **ONLY `approved` IS THE OPERATOR'S**, because that is the word ACC-0070 uses. `draft`,
      * `in-review` and `amended` pass through, deliberately rather than by omission: moving an artifact
@@ -543,25 +582,45 @@ const MUTATION_TOOL_TABLE = Object.freeze([
     gate: {
       operation: "set-review-status",
       applies: (p) => p?.reviewStatus === "approved",
-      title: "Approve this artifact?",
+      title: (p) => (Array.isArray(p?.artifacts) ? `Approve these ${p.artifacts.length} artifacts?` : "Approve this artifact?"),
       // ⚠️ **IT SAYS THE CONFIRMATION IS REQUIRED, NOT THAT THE APPROVER IS KEPT (F18).** `setReviewStatus`
       // takes `reviewedBy`, reports it back and stores none of it: the artifact envelope has no reviewer
       // field. A dialog promising "recorded as the approver" would have the operator authorise durable
       // attribution that does not exist. Adding one is an artifact-schema and migration decision, and it
       // is not TSK-0050's to make.
-      preview: (p) => [
-        "Kiln wants to approve an artifact.",
-        "",
-        `Artifact:  ${previewValue(p?.id)}`,
-        `Type:      ${previewValue(p?.type)}`,
-        "",
-        "Nothing but this confirmation authorises the change.",
-        "The artifact records the approved status; it does not record an approver.",
-      ],
-      target: (p) => ({ artifactType: p?.type, artifactId: p?.id }),
+      preview: (p) =>
+        Array.isArray(p?.artifacts)
+          ? [
+              `Kiln wants to approve ${p.artifacts.length} artifacts, all or none.`,
+              "",
+              ...p.artifacts.map((a) => `${previewValue(a?.id)}  (${previewValue(a?.type)})`),
+              "",
+              "Nothing but this confirmation authorises the change.",
+              "Each artifact records the approved status; none records an approver.",
+            ]
+          : [
+              "Kiln wants to approve an artifact.",
+              "",
+              `Artifact:  ${previewValue(p?.id)}`,
+              `Type:      ${previewValue(p?.type)}`,
+              "",
+              "Nothing but this confirmation authorises the change.",
+              "The artifact records the approved status; it does not record an approver.",
+            ],
+      target: (p) =>
+        Array.isArray(p?.artifacts)
+          ? p.artifacts.map((a) => ({ artifactType: a?.type, artifactId: a?.id }))
+          : { artifactType: p?.type, artifactId: p?.id },
       grant: () => ({ reviewedBy: OPERATOR_ACTOR }),
     },
     call: (fn, p, options) => fn(p.type, p.id, p.reviewStatus, options),
+    // ⚠️ THE BATCH IS THE SAME OPERATION, NOT A NINTH ONE. Stages permit `setReviewStatus`, and the batch is that
+    // operation applied atomically to several artifacts, so it has no registry entry or wire name of its own.
+    batch: {
+      applies: (p) => Array.isArray(p?.artifacts),
+      load: async (deps) => deps.setReviewStatusBatch ?? (await import("../../lib/tools/review-status.mjs")).setReviewStatusBatch,
+      call: (fn, p, options) => fn(p.artifacts, p.reviewStatus, options),
+    },
   },
 ]);
 
@@ -678,6 +737,7 @@ const VALIDATION_TOOL_TABLE = Object.freeze([
 const REFUSAL_CODES = Object.freeze({
   ValidationError: "invalid-artifact",
   ArtifactExistsError: "artifact-exists",
+  ReviewBatchRollbackError: "batch-rollback-incomplete",
 });
 
 /**
@@ -1102,6 +1162,10 @@ export const MATERIAL_CHANGE_RULE = [
   "rejects it, cancels, or does not reply, make no mutating tool call.",
   "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
   "proposing a change to the project.",
+  "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`",
+  "or to `kiln_write_stage_attestation`: each opens Kiln's own confirmation dialog, and the operator's answer",
+  "there is the approval. Call those tools directly without asking in chat first. To approve several artifacts,",
+  "name them all in one `kiln_set_review_status` call so the operator confirms them in one dialog.",
   "A stage skill may add to this rule and may not relax it.",
 ].join("\n");
 
@@ -1220,12 +1284,14 @@ export default function register(pi, deps = {}) {
     });
 
   // ⚠️ THE SAME SHAPE AGAIN: resolve, delegate, render. What differs per row is the call line above.
-  for (const { name, entry, label, description, parameters, call, gate } of MUTATION_TOOL_TABLE)
+  for (const { name, entry, label, description, parameters, call, gate, shape, batch } of MUTATION_TOOL_TABLE)
     pi?.registerTool?.({
       name,
       label,
       description,
       parameters,
+      // ⚠️ A GATED TOOL RUNS ALONE. Pi runs a whole turn's tool calls one at a time when any of them is sequential.
+      ...(gate ? { executionMode: "sequential" } : {}),
       execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
         let context;
         try {
@@ -1241,11 +1307,31 @@ export default function register(pi, deps = {}) {
 
         // ⚠️ THE GATE RUNS BEFORE THE LIBRARY IS TOUCHED. A boundary a caller can step around by making
         // the request invalid enough to fail first is not a boundary.
+        const problem = shape?.(params ?? {});
+        if (problem) return rendered(refusal("invalid-request", problem));
+
         let options = context.options;
         if (gate && gate.applies(params ?? {})) {
-          if (!(await operatorConfirmed(ctx, signal, gate.title, gate.preview(params ?? {}))))
+          const title = typeof gate.title === "function" ? gate.title(params ?? {}) : gate.title;
+          if (!(await operatorConfirmed(ctx, signal, title, gate.preview(params ?? {}))))
             return refuseUnconfirmed(context, deps, gate.operation, gate.target(params ?? {}));
           options = { ...context.options, ...gate.grant() };
+        }
+
+        if (batch?.applies(params ?? {})) {
+          const run = await batch.load(deps);
+          try {
+            const result = await batch.call(run, params ?? {}, options);
+            return rendered({
+              ok: true,
+              reviewStatus: result?.to ?? params?.reviewStatus ?? null,
+              artifacts: Array.isArray(result?.results)
+                ? result.results.map((r) => ({ id: r?.id ?? null, type: r?.type ?? null, from: r?.from ?? null, changed: r?.changed === true }))
+                : [],
+            });
+          } catch (e) {
+            return rendered(refusal(REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
+          }
         }
 
         try {
@@ -1639,6 +1725,7 @@ export default function register(pi, deps = {}) {
    */
   pi?.registerTool?.({
     name: "kiln_set_type_activation",
+    executionMode: "sequential",
     label: "Kiln set type activation",
     description:
       "Activate or deactivate an artifact type for this project. Activation is a PM approval and " +
@@ -1760,6 +1847,7 @@ export default function register(pi, deps = {}) {
 
   pi?.registerTool?.({
     name: "kiln_write_stage_attestation",
+    executionMode: "sequential",
     label: "Kiln write stage attestation",
     description:
       "Record one human evaluation of a stage exit criterion: satisfied, not-satisfied, or n/a with a " +
