@@ -216,6 +216,13 @@
                     "null"
                   ]
                 },
+                "supportsMidConvoSystemMessages": {
+                  "type": [
+                    "boolean",
+                    "string",
+                    "null"
+                  ]
+                },
                 "supportsOpenAIGrammarTools": {
                   "type": [
                     "boolean",

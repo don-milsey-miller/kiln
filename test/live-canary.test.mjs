@@ -149,6 +149,7 @@ test("⚠️ ACC-0062 the canary offers exactly kiln_preflight, sends no project
   assert.equal(o.refusal, null, o.refusal?.message);
   const first = o.requests[0];
   assert.deepEqual((first.tools ?? []).map((t) => t.function?.name).sort(), [PREFLIGHT_TOOL_NAME], "another tool was offered to the model");
+  assert.equal(first.tool_choice, "required", "the canary left tool use optional");
   const offered = first.tools[0].function;
   assert.deepEqual(offered.parameters.required, ["challenge"]);
   assert.equal(offered.parameters.additionalProperties, false);

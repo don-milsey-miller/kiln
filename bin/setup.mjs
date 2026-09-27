@@ -1110,7 +1110,7 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
   // ⚠️ THE SELECTION'S WRITE CARRIES THE SAME SKILL ENTRY REGISTRATION WROTE, derived from the content root
   // rather than spelled again here: two writers of one key that disagree would leave the file with both.
   const { skillsEntry } = modules.settings.skillOverrideEntry({ projectRoot: paths.projectRoot, contentRoot: paths.contentRoot });
-  return modules.selection.selectModel({
+  const selected = await modules.selection.selectModel({
     transaction: tx,
     location,
     inspection,
@@ -1131,6 +1131,21 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
         ? undefined
         : (args.credentialVar ?? modules.consent.declaredCredentialVar(location, s, { validators })),
   });
+
+  // Endpoint and request identities describe the selected model's resolved request. They cannot survive a
+  // model change: doing so can redirect the compatibility canary to the old model's endpoint or attach a label
+  // to configuration it does not describe. Explicit identity flags, if any, are committed later for the new
+  // selection by the declared-identities phase.
+  if (selected.settingsChanged)
+    await tx.merge(modules.localState.PROJECT_RECORD_KEY, (current) => {
+      if (current === null) return null;
+      const record = JSON.parse(current);
+      if (!Object.hasOwn(record, "declaredIdentities")) return current;
+      delete record.declaredIdentities;
+      return JSON.stringify(record, null, 2) + "\n";
+    });
+
+  return selected;
 }
 
 /**

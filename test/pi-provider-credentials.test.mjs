@@ -399,6 +399,7 @@ const EXACT_DECLARED_NAMES = Object.freeze({
     "moonshotai-cn": ["MOONSHOT_API_KEY"],
     nvidia: ["NVIDIA_API_KEY"],
     openai: ["OPENAI_API_KEY"],
+    "openai-codex": [],
     opencode: ["OPENCODE_API_KEY"],
     "opencode-go": ["OPENCODE_API_KEY"],
     openrouter: ["OPENROUTER_API_KEY"],
@@ -432,6 +433,8 @@ test("⚠️ the declared names are exactly these, for exactly these providers",
     [...PROVIDER_CREDENTIALS["azure-openai-responses"].anyOf[0]],
     ["AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_RESOURCE_NAME"]
   );
+  assert.deepEqual([...PROVIDER_CREDENTIALS["openai-codex"].authSources], [AUTH_SOURCE.STORED]);
+  assert.equal(PROVIDER_CREDENTIALS["openai-codex"].piMapped, false);
 });
 
 test("⚠️ google-vertex declares the API-key branch and nothing from the ADC branch", () => {
@@ -550,6 +553,7 @@ test("⚠️ T6 the table agrees with the pinned Pi package, or this fails on th
   }
 
   assert.equal(PROVIDER_CREDENTIALS["llama.cpp"].piMapped, false, "the extension provider is not in the map");
+  assert.equal(PROVIDER_CREDENTIALS["openai-codex"].piMapped, false, "the OAuth-only provider is not in the map");
 });
 
 

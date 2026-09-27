@@ -418,6 +418,12 @@ test("samplingParams is a determinant, and auth headers are not", () => {
   );
 });
 
+test("the OpenAI Codex mid-conversation system-message capability is a persisted scalar", () => {
+  const profile = projectRequestProfile({ compat: { supportsMidConvoSystemMessages: true } }, null);
+  assert.equal(profile.compat.supportsMidConvoSystemMessages, true);
+  ok("model-compatibility", { ...COMPAT, key: { ...COMPAT_KEY, effectiveRequestProfile: profile } });
+});
+
 test("the safely typed structures are persisted by value, and refuse unknown keys at depth", () => {
   const model = {
     reasoning: true,

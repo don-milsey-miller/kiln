@@ -48,7 +48,7 @@ const SENTINEL_KEY = "kiln-setup-STORED-SENTINEL-8ac3";
  * privilege, and a directory symlink elsewhere; `canonicalPath` resolves both, which is why the proof holds
  * through it.
  */
-function project({ ignored = false, models = true } = {}) {
+function project({ ignored = false, models = true, storedAuth = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), "kiln-setup-"));
   const dir = join(root, "project");
   const agentDir = join(root, "agent");
@@ -67,7 +67,10 @@ function project({ ignored = false, models = true } = {}) {
   // it lists the provider's catalogue models whose authentication is configured, which is a question about this
   // directory rather than about the network, and the registry is built with its network disabled. The key is an
   // obvious sentinel; no request is made by setup, whose slices here stop before any inference.
-  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(models ? { openai: { type: "api_key", key: SENTINEL_KEY } } : {}));
+  writeFileSync(
+    join(agentDir, "auth.json"),
+    JSON.stringify(storedAuth ?? (models ? { openai: { type: "api_key", key: SENTINEL_KEY } } : {}))
+  );
   // ⚠️ A CUSTOM PROVIDER ALONGSIDE IT, pointed at a closed loopback port: setup has no credential declaration to
   // supply for one, so it is the case that must refuse rather than the case that must work (D25).
   writeFileSync(
@@ -1009,6 +1012,57 @@ test("⚠️ a complete run commits the confirmed selection and grants its use o
 
     // The credential contract for what was selected was resolved from Kiln's own table.
     assert.ok(o.printed.some((l) => l.startsWith("credential contract openai:")), o.printed.join(" | "));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ a ChatGPT subscription model uses the stored openai-codex OAuth contract", async () => {
+  const p = project({
+    ignored: true,
+    storedAuth: {
+      "openai-codex": {
+        type: "oauth",
+        access: "setup-test-access-not-real",
+        refresh: "setup-test-refresh-not-real",
+        expires: Date.now() + 3_600_000,
+      },
+    },
+  });
+  try {
+    // This proves setup's local selection and credential-contract path. The injected canary sends
+    // nothing, so it does not claim that a fabricated OAuth record authenticates with OpenAI.
+    const o = await setup(p, [], {
+      pick: ["--provider", "openai-codex", "--model", "gpt-5.5", "--thinking", "medium"],
+    });
+    assert.equal(o.code, EXIT.OK, [...o.printed, ...o.warned].join("\n"));
+    assert.ok(o.printed.includes("credential contract openai-codex: stored"), o.printed.join(" | "));
+    const settings = settingsOf(p);
+    assert.equal(settings.defaultProvider, "openai-codex");
+    assert.equal(settings.defaultModel, "gpt-5.5");
+    assert.equal(settings.defaultThinkingLevel, "medium");
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ changing models clears endpoint and request identities belonging to the previous selection", async () => {
+  const p = project({ ignored: true });
+  try {
+    assert.equal((await setup(p)).code, EXIT.OK);
+    const recordPath = join(p.dir, ".pi", "kiln.json");
+    const record = JSON.parse(readFileSync(recordPath, "utf-8"));
+    record.declaredIdentities = {
+      endpoint: { scheme: "http", hostname: "127.0.0.1", port: 8081, pathname: "/v1" },
+      request: "previous-model-profile-v1",
+    };
+    writeFileSync(recordPath, JSON.stringify(record, null, 2) + "\n");
+
+    const changed = await setup(p, [], {
+      pick: ["--provider", "openai", "--model", "gpt-4o-mini", "--thinking", "off"],
+    });
+    assert.equal(changed.code, EXIT.OK, [...changed.printed, ...changed.warned].join("\n"));
+    assert.equal(Object.hasOwn(JSON.parse(readFileSync(recordPath, "utf-8")), "declaredIdentities"), false);
   } finally {
     rmSync(p.root, { recursive: true, force: true });
   }
