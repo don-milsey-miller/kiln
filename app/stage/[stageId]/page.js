@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import CriteriaPanel from "./criteria-panel.js";
 import DocumentPanel from "./document-panel.js";
 import ReviewPanel from "./review-panel.js";
+import ProjectIdentity from "../../project-identity.js";
 
 /**
  * The stage view — `/stage/[stageId]`.
@@ -36,7 +37,9 @@ export default async function StagePage({ params, searchParams }) {
       <header style={{ borderBottom: "1px solid #ddd", paddingBottom: "12px", marginBottom: "26px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: ".85rem", color: "#666", flexWrap: "wrap" }}>
           <a href="/" style={{ color: "#1a4f8a" }}>
-            visual-project-workflow
+            <Suspense fallback={<>Kiln project</>}>
+              <ProjectIdentity compact />
+            </Suspense>
           </a>
           <span>/</span>
           <code style={{ background: "#f6f6f6", padding: "0 .25rem", borderRadius: "3px", overflowWrap: "anywhere" }}>

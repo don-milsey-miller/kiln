@@ -116,6 +116,9 @@ async function runSmokeCheck(t) {
   // A COPY, so the regression can run on every commit without touching the project's own content.
   const contentCopy = reapLater(mkdtempSync(join(tmpdir(), "vpw-smoke-")));
   cpSync(join(ROOT, "planning-content"), join(contentCopy, "planning-content"), { recursive: true });
+  const consumerName = "Kiln smoke-test consumer";
+  const manifest = join(contentCopy, "planning-content", "project.yaml");
+  writeFileSync(manifest, readFileSync(manifest, "utf-8").replace(/^name: .*$/m, `name: "${consumerName}"`));
 
   let server = null;
   try {
@@ -150,6 +153,8 @@ async function runSmokeCheck(t) {
           `configurations, and both prior failures of this kind produced a clean build.\n` +
           `build output was:\n${buildOut.slice(-800)}`
       );
+      assert.ok(html.includes(`data-vpw-project-name="${consumerName}"`), `${path} did not display the active consumer project's name`);
+      assert.equal(html.includes("visual-project-workflow"), false, `${path} displayed the tool repository's internal project name`);
     }
     /* ------------------------------------ a change under stages/ reaches the change stream (TSK-0063) */
 

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import StagesPanel from "./stages-panel.js";
 import DiagnosticsPanel from "./diagnostics-panel.js";
+import ProjectIdentity from "./project-identity.js";
 
 /**
  * The project view — `/`.
@@ -19,7 +20,9 @@ export default function Page() {
   return (
     <main data-vpw-route="/" style={{ maxWidth: "60rem", margin: "2rem auto", padding: "0 1.5rem" }}>
       <header style={{ borderBottom: "1px solid #ddd", paddingBottom: "14px", marginBottom: "28px" }}>
-        <div style={{ fontSize: "1.15rem", fontWeight: 600 }}>visual-project-workflow</div>
+        <Suspense fallback={<div style={{ color: "#666" }}>Reading project identity…</div>}>
+          <ProjectIdentity />
+        </Suspense>
         <div style={{ color: "#666", fontSize: ".85rem" }}>
           Stage position is derived on every read. Nothing about it is stored.
         </div>

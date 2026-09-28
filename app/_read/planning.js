@@ -7,6 +7,7 @@ import {
   createValidators,
   readActivatedTypes,
   lintProject,
+  readProjectIdentity as readManifestIdentity,
 } from "../server/content.js";
 import {
   loadStageDefinitions,
@@ -92,6 +93,13 @@ function context(projectRoot, contentRoot) {
     validators: createValidators(`${projectRoot}/schemas`),
     activated: readActivatedTypes(contentRoot),
   };
+}
+
+/** The active project's manifest identity, read from the same resolved root as every panel. */
+export async function readProjectIdentity() {
+  await connection();
+  const { contentRoot } = planningRoots();
+  return readManifestIdentity(contentRoot);
 }
 
 /**

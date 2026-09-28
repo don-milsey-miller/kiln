@@ -1,8 +1,8 @@
 import StreamWatchdog from "./_stream/watchdog.js";
 
 export const metadata = {
-  title: "visual-project-workflow",
-  description: "Local-first planning system",
+  title: "Kiln",
+  description: "Local planning workspace",
 };
 
 /**
