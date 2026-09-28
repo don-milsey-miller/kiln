@@ -376,21 +376,34 @@ test("#103: materiality comes from #84's effective schema, not a field-name list
 });
 
 test("#93: attestations can be written through a typed path, and refuse a non-verdict", async () => {
-  const { writeStageAttestation, loadStageAttestations } = await import("../lib/attestations.mjs");
+  const { writeStageAttestation, removeStageAttestation, loadStageAttestations, stageAttestationsPath } = await import("../lib/attestations.mjs");
   const { base, contentRoot } = fresh();
   try {
-    const w = (criterion, body) => writeStageAttestation(contentRoot, "04-requirement-gaps", criterion, body);
+    const w = (criterion, body) => writeStageAttestation(contentRoot, "03-discovery", criterion, body, { toolRoot: ROOT });
 
-    await w("c1", { result: "satisfied", decidedBy: "pm", reason: "checked" });
-    await w("c2", { result: "not-satisfied", decidedBy: "pm", reason: "two blocking gaps undecided" });
-    const all = loadStageAttestations(contentRoot, "04-requirement-gaps");
-    assert.equal(all.c1.result, "satisfied");
-    assert.equal(all.c2.result, "not-satisfied", "not-satisfied is a first-class outcome, not an absence");
+    await w("unknowns-resolved", { result: "satisfied", decidedBy: "pm", reason: "checked" });
+    await w("sources-reconciled", { result: "not-satisfied", decidedBy: "pm", reason: "two sources still conflict" });
+    const all = loadStageAttestations(contentRoot, "03-discovery");
+    assert.equal(all["unknowns-resolved"].result, "satisfied");
+    assert.equal(all["sources-reconciled"].result, "not-satisfied", "not-satisfied is a first-class outcome, not an absence");
 
     // Seeing a criterion is not a verdict on it.
-    await assert.rejects(() => w("c3", { result: "acknowledged", decidedBy: "pm" }), /result must be one of/);
-    await assert.rejects(() => w("c3", { result: "satisfied" }), /who evaluated it/);
-    await assert.rejects(() => w("c3", { result: "n/a", decidedBy: "pm" }), /requires a reason/);
+    await assert.rejects(() => w("unknowns-resolved", { result: "acknowledged", decidedBy: "pm" }), /result must be one of/);
+    await assert.rejects(() => w("unknowns-resolved", { result: "satisfied" }), /who evaluated it/);
+    await assert.rejects(() => w("unknowns-resolved", { result: "n/a", decidedBy: "pm" }), /requires a reason/);
+
+    const before = readFileSync(stageAttestationsPath(contentRoot, "03-discovery"), "utf8");
+    await assert.rejects(
+      () => w("plausible-but-undeclared", { result: "satisfied", decidedBy: "pm" }),
+      (error) => error.name === "ValidationError" && error.validCriterionIds.includes("unknowns-resolved")
+    );
+    assert.equal(readFileSync(stageAttestationsPath(contentRoot, "03-discovery"), "utf8"), before, "an undeclared key changes nothing");
+
+    const planted = JSON.parse(before);
+    planted.attestations["legacy-orphan"] = { result: "satisfied", decidedBy: "old Kiln" };
+    writeFileSync(stageAttestationsPath(contentRoot, "03-discovery"), JSON.stringify(planted, null, 2) + "\n");
+    await removeStageAttestation(contentRoot, "03-discovery", "legacy-orphan", { toolRoot: ROOT });
+    assert.equal("legacy-orphan" in loadStageAttestations(contentRoot, "03-discovery"), false, "the typed repair removes an orphan");
 
     assert.ok(!existsSync(join(contentRoot, LOCK_FILE)), "lock released");
   } finally {

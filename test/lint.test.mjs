@@ -508,6 +508,29 @@ test("#93: a human-only criterion is ATTESTED, not acknowledged", async () => {
   }
 });
 
+test("undeclared stage-attestation keys are lint errors with a typed repair path", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    mkdirSync(join(contentRoot, "state", "stage-attestations"), { recursive: true });
+    write(contentRoot, "state/stage-attestations/08-implementation-plan.json", {
+      stageId: "08-implementation-plan",
+      attestations: {
+        "every-task-developer-sized": { result: "satisfied", decidedBy: "old Kiln" },
+      },
+    });
+
+    const hit = lintProject(ctx).findings.find((finding) => finding.ruleId === "gate/attestation-criterion-undeclared");
+    assert.ok(hit, "the orphan attestation is visible to lint");
+    assert.equal(hit.severity, SEVERITY.ERROR);
+    assert.equal(hit.details.stageId, "08-implementation-plan");
+    assert.equal(hit.details.criterion, "every-task-developer-sized");
+    assert.deepEqual(hit.details.validCriterionIds, ["tasks-developer-sized", "tasks-trace-to-requirement"]);
+    assert.match(hit.message, /action "remove"/);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("#92: stage definitions enforce only what the source table NAMES", () => {
   const defs = JSON.parse(JSON.stringify(STAGE_DEFS)); // unused; read the real files instead
   const real = loadStageDefinitions(ROOT);

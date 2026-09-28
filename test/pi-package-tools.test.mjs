@@ -925,6 +925,18 @@ test("⚠️ ACC-0065 an attestation is written and read back, one stage at a ti
     ]
   );
 
+  // An older version could write an undeclared key. The same typed tool repairs it without
+  // requiring a hand edit or pretending the orphan is a current criterion.
+  const attestationPath = join(contentRoot, "state", "stage-attestations", "03-discovery.json");
+  const legacy = JSON.parse(readFileSync(attestationPath, "utf-8"));
+  legacy.attestations["legacy-orphan"] = { result: "satisfied", decidedBy: "old Kiln" };
+  writeFileSync(attestationPath, JSON.stringify(legacy, null, 2) + "\n");
+  const removed = (await write({ stage: "03-discovery", criterion: "legacy-orphan", action: "remove" })).details;
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  assert.equal(removed.action, "remove");
+  assert.equal(removed.removed, true);
+  assert.equal("legacy-orphan" in JSON.parse(readFileSync(attestationPath, "utf-8")).attestations, false);
+
   // And another stage's file is its own.
   const other = (await read("04-requirement-gaps")).details;
   assert.equal(other.count, 0, "one stage's evaluations do not appear under another's");
