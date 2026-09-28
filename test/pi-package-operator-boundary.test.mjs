@@ -127,7 +127,7 @@ async function invoke(tool, contentRoot, params, { ctx, signal } = {}) {
 }
 
 const requests = (contentRoot, decisionId) => ({
-  kiln_write_stage_attestation: { stage: "01-intake", criterion: "request-understood", result: "satisfied" },
+  kiln_write_stage_attestation: { stage: "01-intake", criterion: "ask-without-solution", result: "satisfied" },
   kiln_set_type_activation: { type: "component", action: "activate" },
   kiln_set_review_status: { type: "decision", id: decisionId, reviewStatus: "approved" },
 });
@@ -157,7 +157,7 @@ test("⚠️ ACC-0070 with no dialog channel at all, every gated act is refused 
   assert.deepEqual(refusals.map((r) => r.operation).sort(), ["set-review-status", "set-type-activation", "write-stage-attestation"]);
   assert.deepEqual(refusals.find((r) => r.operation === "write-stage-attestation").target, {
     stageId: "01-intake",
-    criterion: "request-understood",
+    criterion: "ask-without-solution",
   });
   assert.deepEqual(refusals.find((r) => r.operation === "set-type-activation").target, { type: "component", action: "activate" });
   assert.deepEqual(refusals.find((r) => r.operation === "set-review-status").target, { artifactType: "decision", artifactId: fx.decisionId });
@@ -183,6 +183,28 @@ test("⚠️ ACC-0070 only a literal `true` is an approval", async () => {
     before.delete(join("state", "operator-boundary-refusals.json"));
     assertUnchanged(before, after, `answer ${JSON.stringify(answer)}`);
   }
+});
+
+test("an undeclared attestation criterion is refused before the operator is asked", async () => {
+  const fx = await project();
+  const tools = registered();
+  const before = snapshot(fx.contentRoot);
+  const ui = channel(true);
+
+  const result = (
+    await invoke(
+      tools.get("kiln_write_stage_attestation"),
+      fx.contentRoot,
+      { stage: "01-intake", criterion: "request-understood", result: "satisfied" },
+      { ctx: ui.ctx }
+    )
+  ).details;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "invalid-request");
+  assert.deepEqual(result.validCriterionIds, ["ask-without-solution", "constraints-recorded", "objective-understood", "stage-set-determinable"]);
+  assert.equal(ui.asked.length, 0, "an invalid target must not reach the confirmation dialog");
+  assertUnchanged(before, snapshot(fx.contentRoot), "undeclared criterion");
 });
 
 test("⚠️ ACC-0070 a dialog that throws is a refusal, and its message never leaves", async () => {
@@ -309,7 +331,7 @@ test("⚠️ ACC-0070 D35 a reason is bounded by the schema and shown to the ope
   assert.equal(reason.length, 500);
 
   const ui = channel(false);
-  await invoke(tools.get("kiln_write_stage_attestation"), fx.contentRoot, { stage: "01-intake", criterion: "request-understood", result: "n/a", reason }, { ctx: ui.ctx });
+  await invoke(tools.get("kiln_write_stage_attestation"), fx.contentRoot, { stage: "01-intake", criterion: "ask-without-solution", result: "n/a", reason }, { ctx: ui.ctx });
 
   assert.ok(ui.asked[0].message.includes(reason), "the operator was shown a shortened reason and would have approved text they never saw");
 });
@@ -326,7 +348,7 @@ test("⚠️ ACC-0070 F18 all three receive Kiln's actor; two persist it and app
   assert.equal(attested.ok, true, JSON.stringify(attested));
   assert.equal(attested.decidedBy, OPERATOR_ACTOR);
   const onDisk = JSON.parse(readFileSync(join(fx.contentRoot, "state", "stage-attestations", "01-intake.json"), "utf-8"));
-  assert.equal(onDisk.attestations["request-understood"].decidedBy, OPERATOR_ACTOR, "a model cannot name the attester");
+  assert.equal(onDisk.attestations["ask-without-solution"].decidedBy, OPERATOR_ACTOR, "a model cannot name the attester");
 
   // ---- activation: the actor is persisted, in the manifest
   const activated = (await invoke(tools.get("kiln_set_type_activation"), fx.contentRoot, reqs.kiln_set_type_activation, { ctx: channel(true).ctx })).details;

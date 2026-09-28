@@ -1918,18 +1918,19 @@ export default function register(pi, deps = {}) {
     executionMode: "sequential",
     label: "Kiln write stage attestation",
     description:
-      "Record one human evaluation of a stage exit criterion: satisfied, not-satisfied, or n/a with a " +
-      "reason. It must say who decided it.",
+      "Record one human evaluation of a declared stage exit criterion, or remove a recorded attestation " +
+      "during repair. A recorded result is satisfied, not-satisfied, or n/a with a reason.",
     parameters: {
       type: "object",
       properties: {
         stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 03-discovery." },
         criterion: { type: "string", pattern: "^[a-z0-9-]+$", description: "The exit criterion's id, such as unknowns-resolved." },
-        result: { type: "string", enum: ["satisfied", "not-satisfied", "n/a"] },
+        action: { type: "string", enum: ["set", "remove"], description: "Set an evaluation (the default) or remove a recorded key during repair." },
+        result: { type: "string", enum: ["satisfied", "not-satisfied", "n/a"], description: "Required when action is set; omitted when removing." },
         // ⚠️ D35: BOUNDED BY THE SCHEMA, NOT TRUNCATED BY THE PREVIEW (see the activation tool).
         reason: { type: "string", maxLength: 500, description: "Why. Required when the result is n/a. Shown to the operator in full." },
       },
-      required: ["stage", "criterion", "result"],
+      required: ["stage", "criterion"],
       additionalProperties: false,
     },
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
@@ -1941,35 +1942,78 @@ export default function register(pi, deps = {}) {
       }
 
       const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
+      const action = params?.action ?? "set";
 
-      const confirmation = await operatorConfirmed(ctx, signal, "Record this stage attestation?", [
-        "Kiln wants to record your evaluation of a stage exit criterion.",
+      // Resolve references and validate the verdict before asking the operator. A confirmation is
+      // for an action Kiln can perform, not for a request that will be rejected afterwards.
+      try {
+        if (action === "remove") {
+          attestations.validateStageCriterion(params?.stage, params?.criterion, {
+            toolRoot: context.toolRoot,
+            allowUndeclaredCriterion: true,
+          });
+          const recorded = attestations.loadStageAttestations(context.contentRoot, params?.stage);
+          if (!(params?.criterion in recorded))
+            throw new attestations.AttestationValidationError(
+              `Criterion ${JSON.stringify(params?.criterion)} has no recorded attestation to remove. ` +
+                `Recorded ids: ${Object.keys(recorded).sort().join(", ") || "none"}.`
+            );
+        } else {
+          attestations.validateStageAttestation(
+            params?.stage,
+            params?.criterion,
+            { result: params?.result, decidedBy: OPERATOR_ACTOR, reason: params?.reason },
+            { toolRoot: context.toolRoot }
+          );
+        }
+      } catch (e) {
+        return rendered({
+          ...refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)),
+          ...(Array.isArray(e?.validStageIds) && e.validStageIds.length ? { validStageIds: e.validStageIds } : {}),
+          ...(Array.isArray(e?.validCriterionIds) && e.validCriterionIds.length ? { validCriterionIds: e.validCriterionIds } : {}),
+        });
+      }
+
+      const confirmation = await operatorConfirmed(ctx, signal, action === "remove" ? "Remove this stage attestation?" : "Record this stage attestation?", [
+        action === "remove"
+          ? "Kiln wants to remove a recorded stage attestation during repair."
+          : "Kiln wants to record your evaluation of a stage exit criterion.",
         "",
         `Stage:      ${previewValue(params?.stage)}`,
         `Criterion:  ${previewValue(params?.criterion)}`,
-        `Result:     ${previewValue(params?.result)}`,
-        "",
-        "Reason, as Kiln would record it:",
-        typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
-        "",
-        "This will be recorded as decided by you.",
+        ...(action === "remove"
+          ? ["", "The recorded value for this key will be removed."]
+          : [
+              `Result:     ${previewValue(params?.result)}`,
+              "",
+              "Reason, as Kiln would record it:",
+              typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
+              "",
+              "This will be recorded as decided by you.",
+            ]),
       ], deps.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS);
       if (confirmation !== "granted")
         return refuseUnconfirmed(context, deps, "write-stage-attestation", { stageId: params?.stage, criterion: params?.criterion }, confirmation);
 
       try {
-        const written = await attestations.writeStageAttestation(context.contentRoot, params?.stage, params?.criterion, {
-          result: params?.result,
-          decidedBy: OPERATOR_ACTOR,
-          reason: params?.reason,
-        });
+        const written = action === "remove"
+          ? await attestations.removeStageAttestation(context.contentRoot, params?.stage, params?.criterion, { toolRoot: context.toolRoot })
+          : await attestations.writeStageAttestation(
+              context.contentRoot,
+              params?.stage,
+              params?.criterion,
+              { result: params?.result, decidedBy: OPERATOR_ACTOR, reason: params?.reason },
+              { toolRoot: context.toolRoot }
+            );
         return rendered({
           ok: true,
+          action,
           stage: params?.stage ?? null,
           criterion: params?.criterion ?? null,
-          result: written?.result ?? null,
-          decidedBy: written?.decidedBy ?? null,
-          reason: typeof written?.reason === "string" ? scrub(written.reason, context.contentRoot) : null,
+          result: action === "remove" ? null : (written?.result ?? null),
+          decidedBy: action === "remove" ? null : (written?.decidedBy ?? null),
+          reason: action === "remove" ? null : (typeof written?.reason === "string" ? scrub(written.reason, context.contentRoot) : null),
+          removed: action === "remove",
           path: relativeTo(context.contentRoot, attestations.stageAttestationsPath(context.contentRoot, params?.stage)),
         });
       } catch (e) {
