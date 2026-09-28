@@ -25,6 +25,7 @@
  */
 
 import declaration from "../signature.json" with { type: "json" };
+import artifactAuthoringSchemas from "../artifact-authoring-schemas.json" with { type: "json" };
 
 /**
  * The signature version this entry point was written against.
@@ -1270,8 +1271,8 @@ export default function register(pi, deps = {}) {
         type: "object",
         properties: {
           artifact: {
-            type: "object",
-            description: `The ${noun}'s own fields, as the ${type} schema defines them.`,
+            ...artifactAuthoringSchemas[type],
+            description: `The ${noun}'s caller-owned fields. Kiln assigns the artifact envelope fields.`,
           },
         },
         required: ["artifact"],

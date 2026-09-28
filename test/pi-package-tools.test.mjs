@@ -21,6 +21,7 @@ import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs";
 import { createValidators } from "../lib/validate.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
+import { ARTIFACT_AUTHORING, buildArtifactAuthoringSchemas } from "../lib/tools/artifact-authoring.mjs";
 import * as stageDocuments from "../lib/stage-documents.mjs";
 import { intakeSection, parseIntakeSection } from "../lib/stage-documents.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
@@ -436,6 +437,36 @@ const CREATED_TYPE = {
 };
 
 const creationTools = () => [...registered().keys()].filter((n) => n.startsWith("kiln_create_")).sort();
+
+test("issue #17: every creation tool publishes its complete caller-owned authoring schema", () => {
+  const expected = buildArtifactAuthoringSchemas(schemas);
+  const tools = registered();
+
+  for (const [name, type] of Object.entries(CREATED_TYPE)) {
+    const artifactSchema = tools.get(name).parameters.properties.artifact;
+    const { description, ...structuralSchema } = artifactSchema;
+    assert.deepEqual(structuralSchema, expected[type], `${name} drifted from the canonical ${type} authoring schema`);
+    assert.match(description, /caller-owned fields/i);
+    assert.deepEqual(Object.keys(artifactSchema.properties).sort(), [...ARTIFACT_AUTHORING[type].fields].sort());
+    for (const owned of ["id", "type", "schemaVersion", "reviewStatus", "lifecycle", "supersededBy"])
+      assert.equal(owned in artifactSchema.properties, false, `${name} exposes Kiln-owned field ${owned}`);
+  }
+
+  const acceptance = tools.get("kiln_create_acceptance_criterion").parameters.properties.artifact;
+  assert.deepEqual(acceptance.required, ["evaluates", "statement", "title", "verifies"]);
+  assert.equal(acceptance.properties.outcome.default, "not-evaluated");
+  assert.match(acceptance.properties.evaluates.description, /Valid trace target type: component/);
+  assert.match(acceptance.properties.verifies.description, /Valid trace target type: requirement/);
+
+  const task = tools.get("kiln_create_task").parameters.properties.artifact;
+  assert.deepEqual(task.required, ["fulfils", "implements", "role", "statement", "title"]);
+  assert.match(task.properties.implements.description, /Valid trace target type: component/);
+  assert.match(task.properties.fulfils.description, /Valid trace target type: requirement/);
+
+  const serialized = JSON.stringify(expected);
+  assert.equal(serialized.includes('\"$ref\"'), false, "provider schemas must not contain file references");
+  assert.equal(serialized.includes('\"x-traceTarget\"'), false, "provider schemas must translate internal annotations");
+});
 
 test("⚠️ ACC-0065 every creation tool creates its own artifact type, through the typed registry", async () => {
   const { contentRoot } = await project();

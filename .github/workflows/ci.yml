@@ -84,6 +84,9 @@ jobs:
       - name: Check the generated stage skills
         run: npm run skills:check
 
+      - name: Check the generated artifact authoring schemas
+        run: npm run authoring-schemas:check
+
       # ⚠️ THE ROLE DEFINITIONS MUST MATCH THE SPECIALIST CONTRACT, AND EVERY CELL SAYS SO. `specialists/`
       # is generated from lib/specialists/roles.mjs merged with contractFor(role); a contract edited
       # without regenerating would leave a child's declared tool list disagreeing with its real write
