@@ -171,6 +171,44 @@ test("LAYER 2 (detect): whitespace-only and placeholder content the schema canno
   }
 });
 
+test("LAYER 2 (detect): placeholder markers are editorial tokens, not identifier or path segments", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    const placeholders = [
+      "TODO: describe the work",
+      "Status TBD",
+      "fixme before approval",
+      "Replace XXX.",
+      "LOREM IPSUM",
+      "Replace <placeholder> before approval",
+    ];
+    const identifiers = [
+      "Use kiln-demo-todo:v1 for storage.",
+      "Render the todo-item component.",
+      "Read my_todo_key from configuration.",
+      "Open docs/todo/README.md.",
+      "Visit https://example.test/todo.",
+      "Store urn:todo:v1 as the namespace.",
+    ];
+
+    for (const [index, statement] of [...placeholders, ...identifiers].entries()) {
+      const id = `REQ-${String(index + 1).padStart(4, "0")}`;
+      write(contentRoot, `data/requirements/${id}.json`, {
+        id, type: "requirement", schemaVersion: 1, reviewStatus: "draft",
+        lifecycle: "active", title: `Marker case ${index + 1}`, statement,
+      });
+    }
+
+    const findings = lintProject(ctx).findings.filter((finding) => finding.ruleId === "content/placeholder-marker");
+    assert.deepEqual(
+      findings.map((finding) => finding.artifactId),
+      placeholders.map((_, index) => `REQ-${String(index + 1).padStart(4, "0")}`)
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("LAYER 2 (detect): a wrapper whose canonical payload is missing", () => {
   const { base, contentRoot, ctx } = fresh();
   try {
