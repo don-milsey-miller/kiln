@@ -19,9 +19,7 @@ Research agent
 
 Findings doc, source inventory with citations, feasibility notes, prior art, hypotheses requiring validation.
 
-Typed artifacts this stage produces:
-
-- `research-finding`
+This stage produces no typed artifact.
 
 Outputs the definition names that have no artifact type yet:
 
@@ -36,14 +34,15 @@ Outputs the definition names that have no artifact type yet:
 
 ## Method
 
-Retrieve, record each finding against the source it came from, and resolve or surface contradictions.
+Retrieve evidence, record the claims it supports, and resolve or surface contradictions.
 
 1. Read the requirement set and the unknowns the earlier stages left flagged.
 2. Delegate retrieval to the research specialist, one question per task.
-3. Record each finding with the source that was fetched for it, and link the evidence to what it bears on.
-4. Where sources disagree, resolve the contradiction or surface it as an unresolved one.
-5. Classify each unsettled unknown for resolution in Stage 4 or validation in Stage 6, and name that destination in the completion summary.
-6. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+3. Record each retrieved source as evidence, record each claim as an assertion, and link the evidence to what it bears on.
+4. Do not create a typed `research-finding` or substitute another type for one; QST-0002 keeps it deactivated unless an irreconcilable same-configuration conflict or an independent downstream consumer appears.
+5. Where sources disagree, resolve the contradiction by scoping the claims when the sources describe different environments; otherwise surface the conflict as a question.
+6. Classify each unsettled unknown for resolution in Stage 4 or validation in Stage 6, and name that destination in the completion summary.
+7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 

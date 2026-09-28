@@ -327,11 +327,12 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   assert.ok(declared.length >= 12, "the stage set should still declare the criteria this is checking");
   assert.deepEqual(c.blockers.filter((b) => b.reason === BLOCKED.PENDING), [], "no criterion is merely unattested");
 
-  // ⚠️ `research-finding` is DEACTIVATED, not implemented, so stage 3 produces nothing this project has
-  // activated and its gate rests on two human attestations — deliberate, and recorded in project.yaml.
-  // Asserting it here stops the empty intersection going silent (#107).
+  // ⚠️ `research-finding` is DEACTIVATED and deferred by QST-0002, so stage 3 promises no typed
+  // artifact and its gate rests on two human attestations. The candidate preserves the reopening
+  // condition without telling a fresh project's agent to create an unavailable type.
   assert.equal(ctx.activated.includes("research-finding"), false);
-  assert.deepEqual(defs["03-discovery"].produces, ["research-finding"]);
+  assert.deepEqual(defs["03-discovery"].produces, []);
+  assert.ok(defs["03-discovery"].producesCandidates.some((candidate) => candidate.type === "research-finding"));
   const attested = loadStageAttestations(contentRoot, "03-discovery");
   assert.deepEqual(Object.keys(attested).sort(), ["sources-reconciled", "unknowns-resolved"]);
   for (const a of Object.values(attested)) assert.equal(a.result, "satisfied");

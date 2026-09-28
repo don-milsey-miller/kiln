@@ -462,6 +462,8 @@ test("#92: stage definitions enforce only what the source table NAMES", () => {
   // "explicit non-goals" is an output; scope-boundary is a catalogue type someone inferred.
   assert.deepEqual(real["02-intent-decomposition"].produces, ["requirement"]);
   assert.ok(real["02-intent-decomposition"].producesCandidates.some((c) => c.type === "scope-boundary"));
+  assert.deepEqual(real["03-discovery"].produces, []);
+  assert.ok(real["03-discovery"].producesCandidates.some((c) => c.type === "research-finding"));
   assert.deepEqual(real["08-implementation-plan"].produces, ["task"]);
   assert.ok(real["08-implementation-plan"].producesCandidates.some((c) => c.type === "role-assignment"));
   // Every candidate carries where it came from, so the inference is visible.
