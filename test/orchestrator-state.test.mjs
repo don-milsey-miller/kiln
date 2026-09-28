@@ -210,10 +210,11 @@ test("⚠️ ACC-0068 an unevaluated criterion recommends working toward it, and
   }
 });
 
-test("⚠️ ACC-0068 an activated type nothing can author is a capability gap, recommended before any criterion", () => {
+test("⚠️ ACC-0068 an activated type missing from the supplied tool contract is a capability gap, recommended before any criterion", () => {
   const attestations = Object.fromEntries(["01-intake", "02-intent-decomposition", "03-discovery", "04-requirement-gaps"].map((s) => [s, allNa(s)]));
   const f = project({ activated: ["api-spec"], attestations });
   try {
+    f.ctx.typedTools = Object.keys(schemas.types).filter((type) => type !== "api-spec");
     const state = derive(f);
     const byGate = firstNotReadyByGate(f);
     assert.equal(state.currentStage.id, byGate.id);

@@ -42,7 +42,7 @@ Decompose the intake into testable requirements, name the non-goals, and get art
 2. Ask the operator about any ambiguity the intake leaves in what is in and out of scope.
 3. Author one requirement per distinct testable obligation, and record the non-goals as the scope boundary.
 4. Delegate to the planning specialist when the decomposition needs work larger than this conversation.
-5. Propose the artifact types this project needs and record the operator's activation decision (#39).
+5. Propose the artifact types this project needs and record the operator's activation decision (#39). Activate `schema` when the project needs a persistent data model or storage contract, `api-spec` when it exposes or consumes an HTTP API contract, and `wireframe` when screen layout or interaction must be designed. Do not activate them merely because Stage 5 can produce them.
 6. Revise any requirement the operator corrects, then set the confirmed requirement set to approved.
 7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 

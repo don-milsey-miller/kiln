@@ -785,6 +785,17 @@ test("PLAN.md keeps retired artifacts out of the plan and names them in their ow
   assert.match(plan, /REQ-0002.*retired/);
 });
 
+test("PLAN.md incorporates activated Stage 5 visual artifacts", () => {
+  const byType = new Map([
+    ["schema", [env("SCH-0001", "schema", { summary: "Accounts", payload: { format: "dbml", path: "payloads/accounts.dbml" }, storageTarget: "PostgreSQL" })]],
+    ["api-spec", [env("API-0001", "api-spec", { summary: "Public API", payload: { format: "openapi-3.1", path: "payloads/openapi.json" }, implements: ["REQ-0001"] })]],
+    ["wireframe", [env("WIR-0001", "wireframe", { summary: "Dashboard", viewport: { width: 1440, height: 900 }, regions: [{ id: "main" }], annotations: [{ id: "a1" }], implements: ["REQ-0002"] })]],
+  ]);
+  const plan = renderPlanMarkdown(byType, new Map());
+  for (const expected of ["## Data-model schemas", "payloads/accounts.dbml", "## API specifications", "payloads/openapi.json", "## Wireframes", "1440 × 900", "REQ-0002"])
+    assert.ok(plan.includes(expected), expected);
+});
+
 test("DEC-0015: unapproved executable content blocks the publish", () => {
   const f = completeFixture();
   try {

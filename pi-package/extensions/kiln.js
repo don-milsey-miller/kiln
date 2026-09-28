@@ -381,6 +381,9 @@ const CREATION_TOOLS = Object.freeze([
   { name: "kiln_create_question", type: "question", noun: "open question" },
   { name: "kiln_create_decision", type: "decision", noun: "decision" },
   { name: "kiln_create_component", type: "component", noun: "component" },
+  { name: "kiln_create_schema", type: "schema", noun: "data-model schema" },
+  { name: "kiln_create_api_spec", type: "api-spec", noun: "API specification" },
+  { name: "kiln_create_wireframe", type: "wireframe", noun: "wireframe" },
   { name: "kiln_create_acceptance_criterion", type: "acceptance-criterion", noun: "acceptance criterion" },
   { name: "kiln_create_task", type: "task", noun: "task" },
 ]);
@@ -1232,8 +1235,8 @@ export default function register(pi, deps = {}) {
     return { systemPrompt: `${base}${framedStageContext(block)}` };
   });
 
-  // ⚠️ ONE SHAPE, NINE ROWS. Each tool differs only in which registry entry it delegates to, so the
-  // adapter is written once: a per-tool copy is nine places for one rule to drift.
+  // ⚠️ ONE SHAPE, TWELVE ROWS. Each tool differs only in which registry entry it delegates to, so the
+  // adapter is written once: a per-tool copy is twelve places for one rule to drift.
   for (const { name, type, noun } of CREATION_TOOLS)
     pi?.registerTool?.({
       name,

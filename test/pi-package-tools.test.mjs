@@ -67,6 +67,9 @@ async function project() {
   mkdirSync(contentRoot, { recursive: true });
   // `kiln_project_status` supplies the Stage 1 document and refuses without it (D19), as a real project has it.
   mkdirSync(join(contentRoot, "stages"), { recursive: true });
+  mkdirSync(join(contentRoot, "payloads"), { recursive: true });
+  writeFileSync(join(contentRoot, "payloads", "model.schema.json"), "{}\n");
+  writeFileSync(join(contentRoot, "payloads", "openapi.json"), "{}\n");
   writeFileSync(
     join(contentRoot, "stages", "01-intake.md"),
     `# Stage 01 - Intake\n\n${intakeSection()}\n## Working notes\n\n_Nothing yet._\n`
@@ -159,6 +162,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
     [
       "kiln_capability",
       "kiln_create_acceptance_criterion",
+      "kiln_create_api_spec",
       "kiln_create_assertion",
       "kiln_create_component",
       "kiln_create_decision",
@@ -166,7 +170,9 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_create_question",
       "kiln_create_requirement",
       "kiln_create_runbook_step",
+      "kiln_create_schema",
       "kiln_create_task",
+      "kiln_create_wireframe",
       "kiln_delegate",
       "kiln_link_evidence",
       "kiln_link_trace",
@@ -188,7 +194,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "validation_capability",
       "validation_run",
     ],
-    "every tool this package declares: nine creations, eight mutations, two reads, activation, the two attestations, the stage-document writer and delegation"
+    "every tool this package declares: twelve creations, eight mutations, two reads, activation, the two attestations, the stage-document writer and delegation"
   );
 
   for (const tool of tools.values()) {
@@ -362,6 +368,23 @@ const MINIMAL = {
   kiln_create_question: { title: "A question", statement: "Does it hold?", resolution: "unanswered" },
   kiln_create_decision: { title: "A decision", statement: "We will do it this way." },
   kiln_create_component: { title: "A component", responsibility: "Own one thing.", satisfies: ["REQ-0001"] },
+  kiln_create_schema: {
+    title: "A data model",
+    payload: { format: "json-schema", path: "payloads/model.schema.json" },
+    storageTarget: "PostgreSQL",
+    implements: ["REQ-0001"],
+  },
+  kiln_create_api_spec: {
+    title: "An API",
+    payload: { format: "openapi-3.1", path: "payloads/openapi.json" },
+    implements: ["REQ-0001"],
+  },
+  kiln_create_wireframe: {
+    title: "A screen",
+    viewport: { width: 1440, height: 900 },
+    regions: [{ id: "main", kind: "content", label: "Main", bounds: { x: 0, y: 0, width: 1440, height: 900 } }],
+    implements: ["REQ-0001"],
+  },
   kiln_create_acceptance_criterion: {
     title: "A criterion",
     statement: "It is so.",
@@ -386,6 +409,9 @@ const CREATED_TYPE = {
   kiln_create_question: "question",
   kiln_create_decision: "decision",
   kiln_create_component: "component",
+  kiln_create_schema: "schema",
+  kiln_create_api_spec: "api-spec",
+  kiln_create_wireframe: "wireframe",
   kiln_create_acceptance_criterion: "acceptance-criterion",
   kiln_create_task: "task",
 };
@@ -394,7 +420,7 @@ const creationTools = () => [...registered().keys()].filter((n) => n.startsWith(
 
 test("⚠️ ACC-0065 every creation tool creates its own artifact type, through the typed registry", async () => {
   const { contentRoot } = await project();
-  assert.deepEqual(creationTools(), Object.keys(CREATED_TYPE).sort(), "all nine are registered, and only those");
+  assert.deepEqual(creationTools(), Object.keys(CREATED_TYPE).sort(), "all twelve are registered, and only those");
 
   for (const name of creationTools()) {
     const tools = registered();
@@ -447,6 +473,9 @@ test("⚠️ ACC-0065 every creation tool refuses an invalid value, and says whi
     kiln_create_question: { title: "x", statement: "x", resolution: "whenever" },
     kiln_create_decision: { title: "x", statement: [] },
     kiln_create_component: { title: "x", responsibility: "x", satisfies: "not a list" },
+    kiln_create_schema: { title: "x", payload: { format: "invented", path: "payloads/model.schema.json" } },
+    kiln_create_api_spec: { title: "x", payload: { format: "openapi-2.0", path: "payloads/openapi.json" } },
+    kiln_create_wireframe: { title: "x", viewport: { width: 0, height: 900 }, regions: [], implements: [] },
     kiln_create_acceptance_criterion: { title: "x", statement: "x", evaluates: ["CMP-0001"], verifies: ["REQ-0001"], outcome: "maybe" },
     kiln_create_task: { title: "x", statement: "x", role: 7, implements: ["CMP-0001"], fulfils: ["REQ-0001"] },
   };
@@ -457,6 +486,16 @@ test("⚠️ ACC-0065 every creation tool refuses an invalid value, and says whi
     assert.equal(result.details.code, "invalid-artifact", `${name}: ${JSON.stringify(result.details)}`);
     assert.ok(result.details.message.length > 0, `${name}: the refusal says something`);
   }
+});
+
+test("⚠️ ACC-0065 wrapper creation refuses a payload path that does not name a file", async () => {
+  const { contentRoot } = await project();
+  const result = await invoke(registered().get("kiln_create_api_spec"), contentRoot, {
+    artifact: { title: "Missing", payload: { format: "openapi-3.1", path: "payloads/missing.json" } },
+  });
+  assert.equal(result.details.ok, false);
+  assert.equal(result.details.code, "invalid-artifact");
+  assert.match(result.details.message, /does not exist as a file/);
 });
 
 test("⚠️ ACC-0065 a creation result and a creation refusal carry no credential and no machine path", async () => {
@@ -518,9 +557,9 @@ test("⚠️ ACC-0065 the wire names map to the registry entries they claim, one
   assert.deepEqual(
     Object.values(CREATED_TYPE).sort(),
     Object.keys(TYPED_TOOLS).sort(),
-    "the nine tools and the registry's types are the same set"
+    "the twelve tools and the registry's types are the same set"
   );
-  assert.equal(new Set(Object.values(CREATED_TYPE)).size, 9, "and no two tools claim the same type");
+  assert.equal(new Set(Object.values(CREATED_TYPE)).size, 12, "and no two tools claim the same type");
 });
 
 

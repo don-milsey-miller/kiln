@@ -171,6 +171,22 @@ test("LAYER 2 (detect): whitespace-only and placeholder content the schema canno
   }
 });
 
+test("LAYER 2 (detect): a wrapper whose canonical payload is missing", () => {
+  const { base, contentRoot, ctx } = fresh();
+  try {
+    mkdirSync(join(contentRoot, artifactDir("api-spec")), { recursive: true });
+    write(contentRoot, "data/api-specs/API-0001.json", {
+      id: "API-0001", type: "api-spec", schemaVersion: 2, reviewStatus: "draft",
+      lifecycle: "active", title: "Missing API", payload: { format: "openapi-3.1", path: "payloads/missing.json" },
+    });
+    const missing = lintProject(ctx).findings.find((f) => f.ruleId === "payload/missing");
+    assert.ok(missing, "the absent canonical payload was not reported");
+    assert.equal(missing.severity, SEVERITY.ERROR);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("LAYER 2 (detect): an active artifact tracing to a retired one", () => {
   const { base, contentRoot, ctx } = fresh();
   try {
@@ -226,14 +242,12 @@ test("LAYER 3 (gate): valid artifacts can still fail a stage gate", async () => 
       ["api-spec", "schema"],
       "the collection is not ready to advance"
     );
-    // ⚠️ Both have schemas but no typed tool, so #94 classifies them as capability gaps rather
-    // than as unfinished planning. The point of the layer-3 test survives — every artifact is
-    // valid and the stage still cannot advance — and the REASON is now stated accurately.
+    // Both are implemented capabilities, so their absence is unfinished planning rather than a
+    // product capability gap.
     assert.ok(
-      gate.gateFindings.every((f) => f.ruleId === "gate/type-not-implemented"),
+      gate.gateFindings.every((f) => f.ruleId === "gate/no-artifacts-for-stage-type"),
       gate.gateFindings.map((f) => f.ruleId).join(", ")
     );
-    assert.ok(gate.gateFindings.every((f) => f.details.missing.includes("typed tool")));
 
     // Stage 2 produces `requirement`, and one exists.
     const stage2 = evaluateStageGate(ctx, "02-intent-decomposition", { stageDefinitions: STAGE_DEFS });
@@ -366,7 +380,7 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
     const right = {
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
       "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision", "question"] },
-      "05-solution-design": { id: "05-solution-design", produces: ["component", "schema", "api-spec"] },
+      "05-solution-design": { id: "05-solution-design", produces: ["component", "schema", "api-spec", "wireframe"] },
       "07-acceptance-criteria": { id: "07-acceptance-criteria", produces: ["acceptance-criterion"] },
       "08-implementation-plan": { id: "08-implementation-plan", produces: ["task"] },
       // assertion and evidence are cross-cutting (#25) and carry no x-stage, so no stage
