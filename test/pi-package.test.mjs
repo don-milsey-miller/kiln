@@ -62,6 +62,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_set_type_activation",
   "kiln_unlink_evidence",
   "kiln_unlink_trace",
+  "kiln_write_payload",
   "kiln_write_stage_attestation",
   "kiln_write_stage_document",
   "research_capability",

@@ -186,6 +186,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_set_type_activation",
       "kiln_unlink_evidence",
       "kiln_unlink_trace",
+      "kiln_write_payload",
       "kiln_write_stage_attestation",
       "kiln_write_stage_document",
       "research_capability",
@@ -194,7 +195,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "validation_capability",
       "validation_run",
     ],
-    "every tool this package declares: twelve creations, eight mutations, two reads, activation, the two attestations, the stage-document writer and delegation"
+    "every tool this package declares"
   );
 
   for (const tool of tools.values()) {
@@ -204,6 +205,24 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
     // ⚠️ CLOSED: a model cannot smuggle a parameter the wrapper never validated.
     assert.equal(tool.parameters.additionalProperties, false, `${tool.name} accepts unknown parameters`);
   }
+});
+
+test("kiln_write_payload creates a canonical schema and refuses overwrite", async () => {
+  const fx = await project();
+  const tool = registered().get("kiln_write_payload");
+  const params = {
+    format: "json-schema",
+    path: "payloads/todo.schema.json",
+    content: { $schema: "https://json-schema.org/draft/2020-12/schema", type: "object", properties: { done: { type: "boolean" } } },
+  };
+
+  const created = (await invoke(tool, fx.contentRoot, params)).details;
+  assert.deepEqual(created, { ok: true, format: "json-schema", path: "payloads/todo.schema.json" });
+  assert.deepEqual(JSON.parse(readFileSync(join(fx.contentRoot, created.path), "utf-8")), params.content);
+
+  const refused = (await invoke(tool, fx.contentRoot, params)).details;
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "payload-exists");
 });
 
 /* ============================================ what they return ================================= */
