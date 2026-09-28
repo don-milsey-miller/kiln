@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { publishHandoff, HandoffRefused, swapIntoPlace, validatePackage } from "../lib/handoff/publish.mjs";
+import { publishHandoff, HandoffRefused, swapIntoPlace, validatePackage, readStageDocs } from "../lib/handoff/publish.mjs";
 import { handoffCompleteness, BLOCKED } from "../lib/handoff/completeness.mjs";
 import { canonicalJson, roleSlices, slugify, taskStatus, renderPlanMarkdown, renderPackage, verifySnapshot, hashFiles, SNAPSHOT_PLACEHOLDER } from "../lib/handoff/render.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
@@ -27,6 +27,7 @@ import { evaluateStageGate } from "../lib/lint.mjs";
 import { loadStageAttestations } from "../lib/attestations.mjs";
 import { withLock } from "../lib/lock.mjs";
 import { LOCK_FILE } from "../lib/tools/create-artifact.mjs";
+import { buildScaffold } from "../lib/project-scaffold.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const schemas = loadSchemaSet(join(ROOT, "schemas"));
@@ -355,6 +356,55 @@ test("a complete project publishes, with only the approved surfaces", async () =
     assert.equal(files.some((f) => f.startsWith("site/")), false, "DEC-0010: no site");
     assert.equal(files.includes("data/runbooks.json"), false, "DEC-0011: no aggregate runbook");
     assert.equal(files.some((f) => /role|slice/i.test(f)), false, "role slices wait for stage 8");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("a completed stage with no narrative publishes no stale starter state or authoring instructions", async () => {
+  const f = completeFixture();
+  try {
+    const defs = loadStageDefinitions(ROOT);
+    const scaffold = buildScaffold({ name: "Fixture", stageDefinitions: defs, schemaVersion: 2 });
+    writeFileSync(join(f.contentRoot, "stages", "09-handoff.md"), scaffold.get("stages/09-handoff.md"));
+
+    await publish(f);
+    const published = readFileSync(join(f.outDir, "docs", "09-handoff.md"), "utf-8");
+    assert.equal(/nothing here is attested|gate is closed/i.test(published), false);
+    assert.equal(/starter document|replace each section|delete this quote block|write this stage's material here/i.test(published), false);
+    assert.match(published, /current gate status is derived from artifacts and attestations/i);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("the shared UI and publisher reader removes only exact legacy-generated starter blocks", async () => {
+  const f = completeFixture();
+  try {
+    const legacy = `# Stage 9 — Handoff
+
+> **Starter document.** Kiln generated this from its stage definition set. Nothing
+> below is a finding, a decision, or a claim about this project — replace each
+> section with your own material, and delete this quote block once you have.
+
+## Working notes
+
+Authored material survives.
+
+> Write this stage's material here. Prose belongs in this document; structured artifacts
+> belong in \`../data/\` and are created by the typed tools, never by hand-editing JSON.
+
+Nothing here is attested yet, so this stage's gate is closed. That is the correct
+starting position: seeing a criterion is not a verdict on it.
+`;
+    writeFileSync(join(f.contentRoot, "stages", "09-handoff.md"), legacy);
+
+    const live = readStageDocs(f.contentRoot).get("09-handoff.md");
+    assert.match(live, /Authored material survives\./);
+    assert.equal(/starter document|replace each section|write this stage's material|gate is closed/i.test(live), false);
+
+    await publish(f);
+    assert.equal(readFileSync(join(f.outDir, "docs", "09-handoff.md"), "utf-8"), live, "handoff publishes the same cleaned view the UI reads");
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
