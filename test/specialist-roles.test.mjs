@@ -29,7 +29,7 @@ import {
   renderRoles,
   specialistName,
 } from "../lib/specialists/render.mjs";
-import { CREATE_TOOL_NAMES, MUTATION_TOOL_NAMES } from "../lib/tool-wire-names.mjs";
+import { CREATE_TOOL_NAMES, MUTATION_TOOL_NAMES, OTHER_WRITE_OPERATIONS } from "../lib/tool-wire-names.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const onDisk = (role) => readFileSync(join(ROOT, SPECIALISTS_DIR, `${role}.md`), "utf8");
@@ -77,6 +77,7 @@ test("⚠️ ACC-0072 each role's tools are its capabilities and its write bound
       ...[...c.requiredCapabilities].sort(),
       ...c.writeBoundary.create.map((t) => CREATE_TOOL_NAMES[t]).sort(),
       ...c.writeBoundary.mutate.map((m) => MUTATION_TOOL_NAMES[m]).sort(),
+      ...c.writeBoundary.write.map((w) => OTHER_WRITE_OPERATIONS[w]).sort(),
     ];
     assert.deepEqual([...c.tools], expected, `${role}: the derived list is not the contract's own`);
     assert.equal(new Set(c.tools).size, c.tools.length, `${role}: a tool is listed twice`);

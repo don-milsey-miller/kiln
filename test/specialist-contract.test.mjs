@@ -155,6 +155,7 @@ test("a contract reports writes it cannot perform rather than hiding them", () =
     const c = contractFor(role);
     assert.deepEqual(c.unimplemented, [], `${role} claims a create it has no typed tool for`);
     assert.deepEqual(c.unknownMutations, [], `${role} claims a mutation that does not exist`);
+    assert.deepEqual(c.unknownWrites, [], `${role} claims a write that does not exist`);
   }
 });
 
@@ -505,6 +506,8 @@ test("each role may write only within its boundary", () => {
 
   assert.equal(mayWrite(planning, { create: "requirement" }), true);
   assert.equal(mayWrite(planning, { create: "evidence" }), false, "planning does not manufacture observations");
+  assert.equal(mayWrite(planning, { write: "writePayload" }), true);
+  assert.equal(mayWrite(research, { write: "writePayload" }), false);
 });
 
 test("the forbidden list names the failure each role is most likely to commit", () => {

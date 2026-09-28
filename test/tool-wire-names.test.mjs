@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { CREATE_TOOL_NAMES, KNOWN_TOOL_NAMES, MUTATION_TOOL_NAMES, TYPE_ACTIVATION_TOOL_NAME, UnknownOperationError, createToolName, mutationToolName, toolOperation } from "../lib/tool-wire-names.mjs";
+import { CREATE_TOOL_NAMES, KNOWN_TOOL_NAMES, MUTATION_TOOL_NAMES, OTHER_WRITE_OPERATIONS, TYPE_ACTIVATION_TOOL_NAME, UnknownOperationError, createToolName, mutationToolName, toolOperation, writeToolName } from "../lib/tool-wire-names.mjs";
 import { MUTATION_TOOLS, TYPED_TOOLS } from "../lib/tools/registry.mjs";
 import register from "../pi-package/extensions/kiln.js";
 
@@ -29,13 +29,14 @@ test("⚠️ every wire name this library claims is a tool the package really re
   for (const [entry, name] of Object.entries(MUTATION_TOOL_NAMES))
     assert.ok(names.has(name), `${entry}: the package registers no ${name}`);
   assert.ok(names.has(TYPE_ACTIVATION_TOOL_NAME));
+  for (const name of Object.values(OTHER_WRITE_OPERATIONS)) assert.ok(names.has(name));
 });
 
 test("⚠️ and every tool the package registers for an operation is claimed here", () => {
   // The other direction. A tool added to the package and not to this map would be invisible to a role's
   // derived allowlist, so a specialist would silently never be offered it.
   const names = registered();
-  const claimed = new Set([...Object.values(CREATE_TOOL_NAMES), ...Object.values(MUTATION_TOOL_NAMES), TYPE_ACTIVATION_TOOL_NAME]);
+  const claimed = new Set([...Object.values(CREATE_TOOL_NAMES), ...Object.values(MUTATION_TOOL_NAMES), ...Object.values(OTHER_WRITE_OPERATIONS)]);
   const operational = [...names].filter((n) => /^kiln_(create_|link_|unlink_|revise_|set_|resolve_)/.test(n) && n !== "kiln_write_stage_attestation");
   assert.deepEqual(
     operational.filter((n) => !claimed.has(n)),
@@ -55,6 +56,7 @@ test("⚠️ an operation with no tool is refused, never given a constructed nam
   for (const [fn, kind, bad] of [
     [createToolName, "create", "sprint"],
     [mutationToolName, "mutation", "deleteEverything"],
+    [writeToolName, "write", "eraseProject"],
   ]) {
     assert.throws(
       () => fn(bad),
@@ -95,7 +97,8 @@ test("⚠️ F40 a create and a mutation resolve to the operation `mayWrite` jud
   // one of those and not merely to "a write".
   assert.deepEqual(toolOperation("kiln_create_evidence"), { kind: "create", create: "evidence" });
   assert.deepEqual(toolOperation("kiln_set_review_status"), { kind: "mutate", mutate: "setReviewStatus" });
-  assert.deepEqual(toolOperation("kiln_write_stage_attestation"), { kind: "write" });
-  assert.deepEqual(toolOperation(TYPE_ACTIVATION_TOOL_NAME), { kind: "write" });
+  assert.deepEqual(toolOperation("kiln_write_payload"), { kind: "write", write: "writePayload" });
+  assert.deepEqual(toolOperation("kiln_write_stage_attestation"), { kind: "write", write: "writeStageAttestation" });
+  assert.deepEqual(toolOperation(TYPE_ACTIVATION_TOOL_NAME), { kind: "write", write: "setTypeActivation" });
   assert.deepEqual(toolOperation("research_search"), { kind: "read" });
 });

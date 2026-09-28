@@ -37,6 +37,7 @@ const schemas = loadSchemaSet(SCHEMAS);
 const validators = createValidators(SCHEMAS);
 
 const NOT_GRANTED = "operator-confirmation-not-granted";
+const EXPIRED = "operator-confirmation-expired";
 const UNRECORDED = "operator-boundary-refusal-unrecorded";
 const GATED = ["kiln_write_stage_attestation", "kiln_set_type_activation", "kiln_set_review_status"];
 
@@ -209,7 +210,7 @@ test("⚠️ ACC-0070 a dialog that throws is a refusal, and its message never l
 
 /* ============================================================ what the confirmation is asked ==== */
 
-test("⚠️ ACC-0070 the dialog is bounded at thirty seconds and carries this invocation's signal", async () => {
+test("⚠️ ACC-0070 the dialog is bounded at five minutes and carries a Kiln-owned abort signal", async () => {
   const fx = await project();
   const tools = registered();
   const mine = new AbortController();
@@ -227,8 +228,55 @@ test("⚠️ ACC-0070 the dialog is bounded at thirty seconds and carries this i
   // ⚠️ WITHOUT THE TIMEOUT AN RPC CLIENT THAT NEVER ANSWERS WOULD HANG THE TOOL CALL rather than refuse
   // it: `confirm` has no bound of its own there.
   assert.deepEqual(Object.keys(ui.asked[0].opts).sort(), ["signal", "timeout"]);
-  assert.equal(ui.asked[0].opts.timeout, 30_000);
-  assert.equal(ui.asked[0].opts.signal, mine.signal, "the invocation's own signal, not the agent's");
+  assert.equal(ui.asked[0].opts.timeout, 300_000);
+  assert.ok(ui.asked[0].opts.signal instanceof AbortSignal);
+  assert.notEqual(ui.asked[0].opts.signal, agents.signal, "the agent's signal was passed directly");
+});
+
+test("an expired confirmation is retryable and remains fail-closed", async () => {
+  const fx = await project();
+  let observedSignal;
+  const ui = channel(false);
+  ui.ctx.ui.confirm = async (_title, _message, opts) => {
+    observedSignal = opts.signal;
+    return new Promise((resolve) => opts.signal.addEventListener("abort", () => resolve(false), { once: true }));
+  };
+  const tools = registered({ confirmTimeoutMs: 5 });
+  const before = snapshot(fx.contentRoot);
+  const result = (await invoke(
+    tools.get("kiln_set_review_status"),
+    fx.contentRoot,
+    { type: "decision", id: fx.decisionId, reviewStatus: "approved" },
+    { ctx: ui.ctx }
+  )).details;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, EXPIRED);
+  assert.match(result.message, /Retry the exact action/);
+  assert.equal(observedSignal.aborted, true, "the expired dialog was left open");
+  const after = snapshot(fx.contentRoot);
+  after.delete(join("state", "operator-boundary-refusals.json"));
+  before.delete(join("state", "operator-boundary-refusals.json"));
+  assertUnchanged(before, after, "expired confirmation");
+});
+
+test("abandoning an invocation closes its dialog without waiting for expiry", async () => {
+  const fx = await project();
+  const controller = new AbortController();
+  const ui = channel(false);
+  ui.ctx.ui.confirm = async (_title, _message, opts) =>
+    new Promise((resolve) => opts.signal.addEventListener("abort", () => resolve(false), { once: true }));
+  const pending = invoke(
+    registered().get("kiln_set_review_status"),
+    fx.contentRoot,
+    { type: "decision", id: fx.decisionId, reviewStatus: "approved" },
+    { ctx: ui.ctx, signal: controller.signal }
+  );
+  controller.abort();
+
+  const result = (await pending).details;
+  assert.equal(result.ok, false);
+  assert.equal(result.code, NOT_GRANTED);
 });
 
 test("⚠️ ACC-0070 a model cannot forge the preview the operator reads", async () => {

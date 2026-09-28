@@ -184,18 +184,16 @@ function toolContentRefused(error, ctx) {
  * cannot forge one, and cannot carry a granted confirmation into a later call: the boolean is read and
  * discarded inside the invocation that asked for it.
  *
- * ⚠️ **THE 30-SECOND BOUND IS NOT OPTIONAL.** In RPC mode `confirm` emits a request to the client and
+ * ⚠️ **THE FIVE-MINUTE BOUND IS NOT OPTIONAL.** In RPC mode `confirm` emits a request to the client and
  * waits, with no bound of its own. Without a timeout a client that never answers would hang the tool
  * call rather than refuse it, which is a worse failure than the one this gate exists to prevent.
  *
- * ⚠️ **ONE CODE FOR EVERY WAY IT WAS NOT GRANTED.** No UI, rejection, cancellation, timeout, abort and an
- * unexpected UI error are indistinguishable at this seam: Pi returns the same `false` for all of them,
- * and its own timed-confirm example labels the outcome "Cancelled or timed out". A second code would be
- * a distinction Kiln invented rather than observed.
+ * Kiln owns the timer so expiry is observable and retryable. Every other non-approval still fails closed.
  */
-const CONFIRM_TIMEOUT_MS = 30_000;
+const CONFIRM_TIMEOUT_MS = 300_000;
 const OPERATOR_ACTOR = "operator via Pi UI";
 const CONFIRMATION_NOT_GRANTED = "operator-confirmation-not-granted";
+const CONFIRMATION_EXPIRED = "operator-confirmation-expired";
 const REFUSAL_UNRECORDED = "operator-boundary-refusal-unrecorded";
 
 /**
@@ -228,36 +226,57 @@ let confirmationQueue = Promise.resolve();
  * @param {object} ctx the extension context
  * @param {AbortSignal|undefined} signal this invocation's own signal, preferred over the context's
  */
-async function operatorConfirmed(ctx, signal, title, lines) {
+async function operatorConfirmed(ctx, signal, title, lines, timeoutMs = CONFIRM_TIMEOUT_MS) {
   // ⚠️ ONE DIALOG AT A TIME. The gated tools are registered `sequential`, and this queue holds even for a host
   // that runs them in parallel anyway: overlapping dialogs compete for one UI, and all but one time out.
-  const turn = confirmationQueue.then(() => askOperator(ctx, signal, title, lines));
+  const turn = confirmationQueue.then(() => askOperator(ctx, signal, title, lines, timeoutMs));
   confirmationQueue = turn.catch(() => {});
   return turn;
 }
 
-async function askOperator(ctx, signal, title, lines) {
-  let granted;
+async function askOperator(ctx, signal, title, lines, timeoutMs) {
+  if (typeof ctx?.ui?.confirm !== "function") return "not-granted";
+  const controller = new AbortController();
+  const source = signal ?? ctx?.signal;
+  let settleAbandoned;
+  const abandoned = new Promise((resolve) => {
+    settleAbandoned = resolve;
+  });
+  const abort = () => {
+    controller.abort(source?.reason);
+    settleAbandoned("not-granted");
+  };
+  if (source?.aborted) abort();
+  else source?.addEventListener?.("abort", abort, { once: true });
+
+  let timer;
   try {
-    granted = await ctx?.ui?.confirm?.(title, lines.join("\n"), {
-      // D36: the invocation's signal is the one that means THIS call was abandoned. `ctx.signal` is the
-      // agent's and is only a fallback.
-      signal: signal ?? ctx?.signal,
-      timeout: CONFIRM_TIMEOUT_MS,
+    const expired = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        resolve("expired");
+        controller.abort(new Error("Kiln operator confirmation expired."));
+      }, timeoutMs);
     });
+    const asked = Promise.resolve(
+      ctx.ui.confirm(title, lines.join("\n"), {
+        signal: controller.signal,
+        timeout: timeoutMs,
+      })
+    ).then((granted) => (granted === true ? "granted" : "not-granted"), () => "not-granted");
+    return await Promise.race([asked, expired, abandoned]);
   } catch {
     // ⚠️ THE RAW ERROR NEVER LEAVES. A UI defect can carry a path or a stack, and it is not a message for
     // a model. It is one more way the operator did not grant the action.
-    return false;
+    return "not-granted";
+  } finally {
+    clearTimeout(timer);
+    source?.removeEventListener?.("abort", abort);
   }
-  // ⚠️ LITERAL `true` ONLY. `undefined` from a missing UI, `"yes"` from a confused client and `1` from a
-  // loose one are none of them an approval.
-  return granted === true;
 }
 
 /** The refusal, recorded if it can be and reported either way (D37). A batch records one entry per target. */
-async function refuseUnconfirmed(context, deps, operation, target) {
-  let code = CONFIRMATION_NOT_GRANTED;
+async function refuseUnconfirmed(context, deps, operation, target, outcome = "not-granted") {
+  let code = outcome === "expired" ? CONFIRMATION_EXPIRED : CONFIRMATION_NOT_GRANTED;
   try {
     const boundary = deps.operatorBoundary ?? (await import("../../lib/operator-boundary.mjs"));
     for (const one of Array.isArray(target) ? target : [target])
@@ -270,7 +289,9 @@ async function refuseUnconfirmed(context, deps, operation, target) {
   return rendered(
     refusal(
       code,
-      code === CONFIRMATION_NOT_GRANTED
+      code === CONFIRMATION_EXPIRED
+        ? "The confirmation expired after five minutes, so nothing was changed. Retry the exact action when the operator is ready."
+        : code === CONFIRMATION_NOT_GRANTED
         ? "The operator did not confirm this action, so nothing was changed. Ask the operator directly; do not retry."
         : "The operator did not confirm this action, so nothing was changed, and the refusal could not be recorded. Ask the operator directly; do not retry."
     )
@@ -1159,7 +1180,7 @@ const failClosedStageContext = (code) =>
  */
 export const MATERIAL_CHANGE_RULE = [
   "Kiln rule, for every turn of this session, and nothing below replaces it:",
-  "Before you call any tool that creates or changes a typed artifact in this project, say in a turn of its",
+  "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say in a turn of its",
   "own which artifact you propose to create or change and what the change would be, then stop and wait for",
   "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
   "rejects it, cancels, or does not reply, make no mutating tool call.",
@@ -1286,6 +1307,49 @@ export default function register(pi, deps = {}) {
       },
     });
 
+  pi?.registerTool?.({
+    name: "kiln_write_payload",
+    label: "Kiln write canonical payload",
+    description:
+      "Create a canonical JSON Schema payload beneath this project's planning content. The path must end " +
+      "with .schema.json. Parent directories are created, and an existing file is never overwritten.",
+    parameters: {
+      type: "object",
+      properties: {
+        format: { type: "string", enum: ["json-schema"] },
+        path: {
+          type: "string",
+          pattern: "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+\\.schema\\.json$",
+          description: "Path relative to planning-content, such as payloads/task.schema.json.",
+        },
+        content: { type: "object", description: "The complete JSON Schema document." },
+      },
+      required: ["format", "path", "content"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      try {
+        const writer = deps.payloadWriter ?? (await import("../../lib/payload-write.mjs"));
+        const result = await writer.writePayload(params ?? {}, { contentRoot: context.contentRoot });
+        return rendered({ ok: true, format: result.format, path: result.path });
+      } catch (e) {
+        const code = {
+          PayloadValidationError: "invalid-payload",
+          PayloadExistsError: "payload-exists",
+          PathEscapeError: "payload-path-outside-content-root",
+        }[e?.name] ?? "refused";
+        return rendered(refusal(code, scrub(e?.message ?? String(e), context.contentRoot)));
+      }
+    },
+  });
+
   // ⚠️ THE SAME SHAPE AGAIN: resolve, delegate, render. What differs per row is the call line above.
   for (const { name, entry, label, description, parameters, call, gate, shape, batch } of MUTATION_TOOL_TABLE)
     pi?.registerTool?.({
@@ -1316,8 +1380,9 @@ export default function register(pi, deps = {}) {
         let options = context.options;
         if (gate && gate.applies(params ?? {})) {
           const title = typeof gate.title === "function" ? gate.title(params ?? {}) : gate.title;
-          if (!(await operatorConfirmed(ctx, signal, title, gate.preview(params ?? {}))))
-            return refuseUnconfirmed(context, deps, gate.operation, gate.target(params ?? {}));
+          const confirmation = await operatorConfirmed(ctx, signal, title, gate.preview(params ?? {}), deps.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS);
+          if (confirmation !== "granted")
+            return refuseUnconfirmed(context, deps, gate.operation, gate.target(params ?? {}), confirmation);
           options = { ...context.options, ...gate.grant() };
         }
 
@@ -1759,7 +1824,7 @@ export default function register(pi, deps = {}) {
       if (typeof setTypeActivation !== "function")
         return rendered(refusal("unknown-operation", "This project has no setTypeActivation operation."));
 
-      const confirmed = await operatorConfirmed(ctx, signal, "Change this project's artifact types?", [
+      const confirmation = await operatorConfirmed(ctx, signal, "Change this project's artifact types?", [
         `Kiln wants to ${params?.action === "deactivate" ? "deactivate" : "activate"} an artifact type.`,
         "",
         `Type:    ${previewValue(params?.type)}`,
@@ -1767,9 +1832,9 @@ export default function register(pi, deps = {}) {
         "",
         "Reason, as Kiln would record it:",
         typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
-      ]);
-      if (!confirmed)
-        return refuseUnconfirmed(context, deps, "set-type-activation", { type: params?.type, action: params?.action });
+      ], deps.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS);
+      if (confirmation !== "granted")
+        return refuseUnconfirmed(context, deps, "set-type-activation", { type: params?.type, action: params?.action }, confirmation);
 
       try {
         const result = await setTypeActivation(params?.type, params?.action, {
@@ -1877,7 +1942,7 @@ export default function register(pi, deps = {}) {
 
       const attestations = deps.attestations ?? (await import("../../lib/attestations.mjs"));
 
-      const confirmed = await operatorConfirmed(ctx, signal, "Record this stage attestation?", [
+      const confirmation = await operatorConfirmed(ctx, signal, "Record this stage attestation?", [
         "Kiln wants to record your evaluation of a stage exit criterion.",
         "",
         `Stage:      ${previewValue(params?.stage)}`,
@@ -1888,9 +1953,9 @@ export default function register(pi, deps = {}) {
         typeof params?.reason === "string" && params.reason.length > 0 ? params.reason : "(none given)",
         "",
         "This will be recorded as decided by you.",
-      ]);
-      if (!confirmed)
-        return refuseUnconfirmed(context, deps, "write-stage-attestation", { stageId: params?.stage, criterion: params?.criterion });
+      ], deps.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS);
+      if (confirmation !== "granted")
+        return refuseUnconfirmed(context, deps, "write-stage-attestation", { stageId: params?.stage, criterion: params?.criterion }, confirmation);
 
       try {
         const written = await attestations.writeStageAttestation(context.contentRoot, params?.stage, params?.criterion, {
