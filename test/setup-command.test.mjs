@@ -3493,6 +3493,7 @@ test("⚠️ TSK-0068 with a terminal on both ends and nothing authenticated, se
     assert.equal(call.command, pinned.command, "the pinned runtime");
     assert.deepEqual(call.args, [...pinned.args, ...LOGIN_PI_FLAGS], "the interactive TUI, with nothing of any project's loaded");
     assert.equal(call.env.PI_CODING_AGENT_DIR, p.agentDir, "the login lands in the agent directory setup uses");
+    assert.equal(call.env.PI_SKIP_VERSION_CHECK, "1", "Pi's startup update notice is silenced");
     assert.equal(call.cwdExisted, true);
     assert.equal(existsSync(call.cwd), false, "its own directory is removed afterwards");
     assert.ok(o.printed.some((l) => /type \/login/.test(l)), o.printed.join("\n"));

@@ -1197,7 +1197,7 @@ function loginFirst({ args, paths, agentDir, terminal, loginInPi, print, modules
   print("  chosen by setup afterwards and is not affected.");
   const cwd = mkdtempSync(join(tmpdir(), "kiln-login-"));
   try {
-    const closed = loginInPi({ command: agent.command, args: [...agent.args, ...LOGIN_PI_FLAGS], cwd, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir } });
+    const closed = loginInPi({ command: agent.command, args: [...agent.args, ...LOGIN_PI_FLAGS], cwd, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_SKIP_VERSION_CHECK: "1" } });
     print(`Pi closed${closed?.status === null || closed?.status === undefined ? "" : ` (exit ${closed.status})`}; looking at this computer again.`);
   } finally {
     rmSync(cwd, { recursive: true, force: true });

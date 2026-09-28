@@ -2151,9 +2151,10 @@ async function keyboardRun({ keyboardStop = true, env = {}, logs = [], budget = 
 test("⚠️ F130 ONE CTRL+C AT THE KEYBOARD STARTS THE SHUTDOWN WITHOUT WAITING FOR PI, AND IS RECORDED AS `keyboard`", async () => {
   // This agent never exits on its own: Pi's own shutdown waits until it is idle, so only the supervisor's teardown,
   // started from the notice, can end the run.
-  const { run, launcher, file } = await keyboardRun();
+  const { run, launcher, agent, file } = await keyboardRun();
   assert.ok(file, "the interactive agent is told where the notice goes");
   assert.equal(launcher.options.env[KEYBOARD_STOP_ENV], undefined, "the launcher is not");
+  assert.equal(agent.options.env.PI_SKIP_VERSION_CHECK, "1", "Pi's startup update notice is silenced");
   writeFileSync(file, JSON.stringify({ at: Date.now() }), { flag: "wx" });
 
   const result = await run;
