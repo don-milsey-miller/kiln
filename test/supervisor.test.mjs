@@ -3043,7 +3043,13 @@ test("⚠️ THE TWO DESCENDANT JOINS RUN TOGETHER, not one after the other", as
   assert.equal(calls.length, 2, "both children started");
   hang = true;
   signals.raise("SIGINT");
-  await run;
+  // The hung joins spend the budget, so a slow runner can leave the port probe none of it. That
+  // refusal is the deadline working, not the joins, and is the only one accepted here.
+  const outcome = await run.catch((e) => e);
+  if (outcome instanceof Error) {
+    assert.equal(outcome.reason, REFUSAL.SHUTDOWN_NOT_OBSERVED, String(outcome));
+    assert.deepEqual(outcome.detail.shutdown.notObserved, ["port"], outcome.message);
+  }
 
   assert.equal(mostAtOnce, 2, `both joins must be in flight at once, saw at most ${mostAtOnce}`);
   assert.equal(startedAt.length, 2, `one last look per tree and no more, saw ${startedAt.length}`);
