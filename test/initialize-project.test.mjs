@@ -221,6 +221,9 @@ test("there is one starter document per canonical stage, and no extras", async (
     for (const c of def.exitCriteria ?? [])
       assert.ok(text.includes(c.id), `${id}: states exit criterion ${c.id} as guidance`);
     assert.ok(!/^\s*- \[[ xX]\]/m.test(text), `${id}: criteria are guidance, not checkboxes to tick`);
+    assert.equal(/nothing here is attested|gate is closed/i.test(text), false, `${id}: durable prose must not claim a current gate state`);
+    assert.equal(/starter document|replace each section|delete this quote block|write this stage's material here/i.test(text), false, `${id}: handoff content must not retain authoring instructions`);
+    assert.match(text, /current gate status is derived from artifacts and attestations/i, `${id}: state ownership is explicit`);
   }
 });
 
