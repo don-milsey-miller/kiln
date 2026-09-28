@@ -110,6 +110,11 @@ test("⚠️ ACC-0066 each skill carries its definition's decision owner, output
     assert.ok(body.includes(`# Stage ${skill.stageId.slice(0, 2)} — ${def.name}`), `${skill.name}: title`);
 
     if (def.produces.length === 0) assert.ok(body.includes("This stage produces no typed artifact."), `${skill.name}: no outputs`);
+    else
+      assert.ok(
+        body.includes("Typed artifact capability envelope for this stage (author only the types activated for this project):"),
+        `${skill.name}: activation-aware output envelope`
+      );
     for (const type of def.produces) assert.ok(body.includes(`- \`${type}\``), `${skill.name}: output ${type}`);
     for (const output of def.outputsNotYetTyped ?? []) assert.ok(body.includes(`- ${output}`), `${skill.name}: untyped output ${output}`);
 

@@ -462,14 +462,37 @@ test("#92: stage definitions enforce only what the source table NAMES", () => {
   // "explicit non-goals" is an output; scope-boundary is a catalogue type someone inferred.
   assert.deepEqual(real["02-intent-decomposition"].produces, ["requirement"]);
   assert.ok(real["02-intent-decomposition"].producesCandidates.some((c) => c.type === "scope-boundary"));
+  assert.deepEqual(real["03-discovery"].produces, []);
+  assert.ok(real["03-discovery"].producesCandidates.some((c) => c.type === "research-finding"));
   assert.deepEqual(real["08-implementation-plan"].produces, ["task"]);
   assert.ok(real["08-implementation-plan"].producesCandidates.some((c) => c.type === "role-assignment"));
+  assert.deepEqual(real["09-handoff"].produces, ["runbook-step"]);
+  assert.ok(real["09-handoff"].producesCandidates.some((c) => c.type === "runbook"));
   // Every candidate carries where it came from, so the inference is visible.
   for (const d of Object.values(real))
     for (const c of d.producesCandidates) {
       assert.ok(c.from, `${d.id}: candidate ${c.type} has no provenance`);
       assert.ok(c.note, `${d.id}: candidate ${c.type} has no note`);
     }
+});
+
+test("empty-scope confidence criteria require n/a rather than a vacuous pass", () => {
+  const real = loadStageDefinitions(ROOT);
+  const cases = [
+    ["06-risk-feasibility", "load-bearing-assertions-at-rung"],
+    ["09-handoff", "runbook-steps-above-threshold"],
+  ];
+
+  for (const [stageId, criterionId] of cases) {
+    const def = real[stageId];
+    const criterion = def.exitCriteria.find((candidate) => candidate.id === criterionId);
+    assert.match(criterion.describe, /empty|no operational actions/i, `${stageId}: criterion does not name the empty scope`);
+    assert.match(criterion.describe, /n\/a with a reason, not satisfied/i, `${stageId}: criterion permits a vacuous pass`);
+    assert.ok(
+      def.method.steps.some((step) => step.includes(`\`${criterionId}\``) && /record n\/a with the reason instead of satisfied/i.test(step)),
+      `${stageId}: method does not say how to attest the empty scope`
+    );
+  }
 });
 
 test("#94 (constructed): every branch of the capability check — all four", () => {

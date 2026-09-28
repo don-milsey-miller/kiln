@@ -19,20 +19,20 @@ Hand each assigned person a slice they can start from without coming back to ask
 
 The exported package, sliced per role, including the runbook and its evidence.
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
-- `runbook`
 - `runbook-step`
 
 Outputs the definition names that have no artifact type yet:
 
 - the exported package
 - sliced per role
+- runbook aggregate, projected from runbook steps
 
 ## Exit criteria
 
 - `role-slice-self-sufficient` — Each assigned team member can start their part without coming back to ask a question. (evaluated by a person and recorded as an attestation)
-- `runbook-steps-above-threshold` — Every runbook step rests on an assertion at or above the threshold (#57). (evaluated by a person and recorded as an attestation)
+- `runbook-steps-above-threshold` — The handoff's operational actions are enumerated and every runbook step rests on an assertion at or above the threshold; no operational actions is n/a with a reason, not satisfied (#57). (evaluated by a person and recorded as an attestation)
 - `no-unresolved-critical-questions` — No unresolved critical questions remain. CRITICAL, per DEC-0014: the question blocks active handoff content, or makes a handoff criterion unevaluable. (evaluated by a person and recorded as an attestation)
 
 ## Method
@@ -40,12 +40,15 @@ Outputs the definition names that have no artifact type yet:
 Slice per role, rest every runbook step on an assertion at or above threshold, and clear the critical questions.
 
 1. Read the task set, the acceptance criteria and the evidence behind them.
-2. Author the runbook and one step per action, each resting on an assertion at or above the threshold (#57).
-3. Delegate to the planning specialist where a slice needs its steps written for a role.
-4. Slice the package per assigned role and check that each slice stands on its own.
-5. Resolve every critical question, or ask the operator to settle it (DEC-0014).
-6. Link each step's evidence to the step it supports.
-7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+2. Enumerate the handoff's operational actions; if there are none, state why before proposing n/a for `runbook-steps-above-threshold`.
+3. Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).
+4. Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.
+5. Delegate to the planning specialist where a slice needs its steps written for a role.
+6. Slice the package per assigned role and check that each slice stands on its own.
+7. Resolve every critical question, or ask the operator to settle it (DEC-0014).
+8. Link each step's evidence to the step it supports.
+9. In the `runbook-steps-above-threshold` attestation, name each active runbook step and the derived rung beneath it; if there are no operational actions, record n/a with the reason instead of satisfied.
+10. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
@@ -62,6 +65,8 @@ Activities this stage may choose between, in order:
 Always:
 
 - A step resting on an assertion below the threshold does not ship (#57).
+- An empty operational-action set is recorded n/a with a reason; it never satisfies a universal claim vacuously.
+- Runbook membership and order are derived from runbook-step links and ordinals; they are not copied into an aggregate artifact (DEC-0011).
 - A question that blocks active handoff content, or makes a handoff criterion unevaluable, is critical (DEC-0014).
 
 ## Delegations

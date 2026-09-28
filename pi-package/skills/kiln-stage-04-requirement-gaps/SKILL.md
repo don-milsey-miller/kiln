@@ -19,7 +19,7 @@ User
 
 Open-decisions register with options and tradeoffs per gap, question backlog.
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
 - `decision`
 - `question`
