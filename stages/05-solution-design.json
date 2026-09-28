@@ -33,7 +33,7 @@
       "Read the approved requirements, the decisions Stage 4 recorded, and the project's activated artifact types from `kiln_project_status`.",
       "Delegate design work to the planning specialist where the structure is larger than this conversation.",
       "Author components and only the data-model, API-spec and wireframe types that are activated for this project and that the requirements need.",
-      "If the requirements need a type that is inactive or has no typed create tool, report the capability gap; do not substitute another artifact type or attest past it.",
+      "If the requirements need an inactive type, ask the operator to approve activation before authoring it. If a required type has no typed create tool, report the product capability gap; do not substitute another artifact type or attest past it.",
       "Choose the storage target and record why.",
       "Trace every requirement to the component that carries it, and check that none is left untraced.",
       "Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.",
@@ -86,6 +86,7 @@
     "includes": [
       "The components and how they fit together.",
       "The data model and the storage target chosen.",
+      "Every activated schema, API specification and wireframe, including its canonical machine-readable source or payload reference.",
       "The requirement-to-component trace."
     ]
   },

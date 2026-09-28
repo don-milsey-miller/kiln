@@ -137,18 +137,11 @@ test("a catalogue type with no schema or tool is refused — that is a capabilit
   }
 });
 
-test("a type with a schema but NO typed tool is refused", async () => {
+test("schema, api-spec and wireframe can be activated when a project needs them", async () => {
   const { base, o } = fresh();
   try {
-    // ⚠️ This test exists because falsification found nothing covering it: removing the typed-tool
-    // guard broke no test, since every type exercised above had both a schema and a tool. `api-spec`
-    // is the real case — a step-3 convention testbed with a schema and no way to author one — so
-    // activating it would make it required and unauthorable, which is #94's gap created on purpose.
-    await assert.rejects(() => setTypeActivation("api-spec", "activate", o), (e) => {
-      assert.match(e.message, /no typed tool/);
-      assert.match(e.message, /#88/);
-      return true;
-    });
+    for (const type of ["schema", "api-spec", "wireframe"])
+      assert.equal((await setTypeActivation(type, "activate", o)).activated.includes(type), true, type);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

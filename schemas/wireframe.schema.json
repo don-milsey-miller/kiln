@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/wireframe.schema.json",
+  "title": "Wireframe",
+  "description": "A machine-readable layout tree rendered as a pan/zoom wireframe. Regions, components and requirement-linked annotations are the source; the visual is derived from them.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
+  "$defs": {
+    "bounds": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false
+    },
+    "component": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "kind": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "label": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "content": { "type": "string" },
+        "bounds": { "$ref": "#/$defs/bounds" }
+      },
+      "required": ["id", "kind", "label", "bounds"],
+      "additionalProperties": false
+    },
+    "region": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "kind": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "label": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" },
+          "default": []
+        },
+        "regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region" },
+          "default": []
+        }
+      },
+      "required": ["id", "kind", "label", "bounds"],
+      "additionalProperties": false
+    },
+    "annotation": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "target": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "note": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+        "requirements": {
+          "$ref": "common.schema.json#/$defs/traceLinks"
+        }
+      },
+      "required": ["id", "target", "note", "requirements"],
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^WIR-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "wireframe"
+    },
+    "summary": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "x-materiality": "semantic"
+    },
+    "regions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/region" },
+      "minItems": 1,
+      "x-materiality": "semantic"
+    },
+    "annotations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/annotation" },
+      "uniqueItems": true,
+      "default": [],
+      "x-materiality": "structural"
+    },
+    "implements": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "description": "Requirements represented by this wireframe.",
+      "x-materiality": "structural",
+      "x-traceTarget": ["requirement"]
+    },
+    "decidedBy": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "x-materiality": "structural",
+      "x-traceTarget": ["decision"]
+    },
+    "openQuestions": {
+      "$ref": "common.schema.json#/$defs/traceLinks",
+      "x-materiality": "structural",
+      "x-traceTarget": ["question"]
+    },
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "x-amendsApproval": false
+    },
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    }
+  },
+  "required": ["viewport", "regions", "implements"],
+  "unevaluatedProperties": false,
+  "x-artifactType": "wireframe",
+  "x-stage": "05-solution-design",
+  "x-unresolvableTraceTargets": {
+    "description": "Questions may be recorded later than the wireframe that raises them.",
+    "targets": ["question"]
+  }
+}

@@ -51,6 +51,18 @@ test("⚠️ F130 an empty job needs nothing ended, and the tree is stopped", as
   assert.equal(r.treeStopped, true);
 });
 
+test("⚠️ F130 a delayed first list is retried within the shutdown deadline", async () => {
+  const job = fakeJob({ lists: [{ ok: false, error: "host-timeout" }, { ok: true, pids: [] }] });
+  const r = await stopJobTree(leader(), job, { graceMs: 1000, hardMs: 1000 });
+  assert.deepEqual(job.asked, ["list", "list", "release"]);
+  assert.equal(r.descendantsEnumerated, true);
+  assert.equal(r.treeStopped, true);
+  assert.deepEqual(
+    r.timeline.entries.map((e) => e.kind),
+    ["job-list", "job-list-retry", "job-release"]
+  );
+});
+
 test("⚠️ F130 a job whose list cannot be read is an unmade observation, never an empty tree", async () => {
   const job = fakeJob({ lists: [{ ok: false, error: "host-timeout" }] });
   const r = await stopJobTree(leader(), job, { graceMs: 1000, hardMs: 1000 });

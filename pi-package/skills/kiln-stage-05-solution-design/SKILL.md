@@ -39,7 +39,7 @@ Design the components and the data model, then trace every requirement to a comp
 1. Read the approved requirements, the decisions Stage 4 recorded, and the project's activated artifact types from `kiln_project_status`.
 2. Delegate design work to the planning specialist where the structure is larger than this conversation.
 3. Author components and only the data-model, API-spec and wireframe types that are activated for this project and that the requirements need.
-4. If the requirements need a type that is inactive or has no typed create tool, report the capability gap; do not substitute another artifact type or attest past it.
+4. If the requirements need an inactive type, ask the operator to approve activation before authoring it. If a required type has no typed create tool, report the product capability gap; do not substitute another artifact type or attest past it.
 5. Choose the storage target and record why.
 6. Trace every requirement to the component that carries it, and check that none is left untraced.
 7. Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.
@@ -97,4 +97,5 @@ It states:
 
 - The components and how they fit together.
 - The data model and the storage target chosen.
+- Every activated schema, API specification and wireframe, including its canonical machine-readable source or payload reference.
 - The requirement-to-component trace.

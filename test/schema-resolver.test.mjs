@@ -108,6 +108,13 @@ test("#86: wrapper types declare the format they wrap and model none of it", () 
   }
 });
 
+test("wireframes expose the decided machine-readable layout tree", () => {
+  const eff = effectiveSchema(set, "wireframe");
+  for (const field of ["viewport", "regions", "annotations", "implements"])
+    assert.ok(eff.properties[field], `wireframe.${field} missing`);
+  assert.equal(eff.wrapsExternalFormat, null, "wireframes are authored layout data, not opaque image payloads");
+});
+
 test("an unsupported $ref throws rather than resolving to nothing", () => {
   const broken = structuredClone(set);
   broken.types.requirement.properties.statement = { $ref: "https://example.com/other.json#/$defs/x" };

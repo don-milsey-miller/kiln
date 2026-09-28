@@ -46,6 +46,9 @@ const FIXTURES = join(ROOT, "test", "fixtures", "supervisor");
 const PROJECT_ID = "abcdef0123456789abcdef0123456789";
 const execFileAsync = promisify(execFile);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// ctrl-break.ps1 has 120 seconds to start the observed process or report why it could not. The observer must not
+// fail halfway through that bound on a loaded Windows runner; the extra ten seconds cover its atomic result write.
+const WINDOWS_INTERRUPT_RESULT_MS = 130_000;
 
 /**
  * A project the supervisor will accept: a repository, a committed record, the ignore block, and the
@@ -198,7 +201,7 @@ async function viaConsoleEvent({ dir, out, argv, paths, env = process.env }) {
   const finished = new Promise((resolve) => ps.once("exit", (code) => resolve(code)));
 
   // Either both trees come up — and then the event is sent — or the harness reports it could not.
-  const first = await untilAny([paths.agentChild, result]);
+  const first = await untilAny([paths.agentChild, result], WINDOWS_INTERRUPT_RESULT_MS);
   if (first !== result) {
     await until(paths.launcherChild);
     // O9: long enough for a first process-table look to finish while both trees live, however slow the table is.
