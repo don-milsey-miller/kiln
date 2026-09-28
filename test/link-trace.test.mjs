@@ -229,7 +229,7 @@ test("adding is unaffected: the target must exist and be of a declared type", as
 
     await assert.rejects(
       () => linkTrace("question", q.id, "blocks", [c.id], o),
-      (e) => e instanceof ValidationError && /may target/.test(e.message),
+      (e) => e instanceof ValidationError && /expects/.test(e.message),
       "a wrong-type target must still be refused on the way IN"
     );
     await assert.rejects(

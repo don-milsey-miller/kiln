@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createQuestion, reviseArtifact } from "../lib/tools/evidence-tools.mjs";
+import { createQuestion, createDecision, reviseArtifact } from "../lib/tools/evidence-tools.mjs";
 import { createValidators, ValidationError } from "../lib/validate.mjs";
 import { loadSchemaSet, effectiveSchema } from "../lib/schema-resolver.mjs";
 
@@ -55,8 +55,9 @@ test("an answered question must record the answer or what settled it", async () 
     const withAnswer = await createQuestion({ ...Q, resolution: "answered", answer: "Because of X." }, o);
     assert.equal(withAnswer.artifact.resolution, "answered");
 
-    const withLink = await createQuestion({ ...Q, resolution: "answered", answeredBy: ["DEC-0001"] }, o);
-    assert.deepEqual(withLink.artifact.answeredBy, ["DEC-0001"]);
+    const decision = await createDecision({ title: "The answer", statement: "This decision settles the question." }, o);
+    const withLink = await createQuestion({ ...Q, resolution: "answered", answeredBy: [decision.id] }, o);
+    assert.deepEqual(withLink.artifact.answeredBy, [decision.id]);
 
     // deferred and moot need neither — they are not claims that something was settled.
     for (const r of ["deferred", "moot"]) {

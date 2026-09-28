@@ -18,8 +18,10 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
-import { createAssertion, createEvidence } from "../lib/tools/evidence-tools.mjs";
+import { createAssertion, createEvidence, createComponent } from "../lib/tools/evidence-tools.mjs";
+import { createRequirement } from "../lib/tools/create-requirement.mjs";
 import { createValidators } from "../lib/validate.mjs";
+import { readHighWaterMarks } from "../lib/id-allocator.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import * as stageDocuments from "../lib/stage-documents.mjs";
 import { intakeSection, parseIntakeSection } from "../lib/stage-documents.mjs";
@@ -61,7 +63,7 @@ const registered = () => {
 };
 
 /** A small project with one supported assertion, enough for the lint and the handoff gate to read. */
-async function project() {
+async function project({ traceTargets = false } = {}) {
   const base = reapLater(mkdtempSync(join(tmpdir(), "kiln-tools-")));
   const contentRoot = join(base, "planning-content");
   mkdirSync(contentRoot, { recursive: true });
@@ -91,7 +93,28 @@ async function project() {
     },
     o
   );
-  return { base, contentRoot, ids: { claim: claim.id, evidence: ran.id } };
+  const requirement = traceTargets
+    ? await createRequirement(
+        { title: "The seeded requirement", statement: "The project must provide a valid trace target." },
+        o
+      )
+    : null;
+  const component = traceTargets
+    ? await createComponent(
+        { title: "The seeded component", responsibility: "Provide a valid component target.", satisfies: [requirement.id] },
+        o
+      )
+    : null;
+  return {
+    base,
+    contentRoot,
+    ids: {
+      claim: claim.id,
+      evidence: ran.id,
+      requirement: requirement?.id ?? null,
+      component: component?.id ?? null,
+    },
+  };
 }
 
 /** Every file under a root, with its bytes and modification time. */
@@ -438,7 +461,7 @@ const CREATED_TYPE = {
 const creationTools = () => [...registered().keys()].filter((n) => n.startsWith("kiln_create_")).sort();
 
 test("⚠️ ACC-0065 every creation tool creates its own artifact type, through the typed registry", async () => {
-  const { contentRoot } = await project();
+  const { contentRoot } = await project({ traceTargets: true });
   assert.deepEqual(creationTools(), Object.keys(CREATED_TYPE).sort(), "all twelve are registered, and only those");
 
   for (const name of creationTools()) {
@@ -459,6 +482,49 @@ test("⚠️ ACC-0065 every creation tool creates its own artifact type, through
     assert.equal(onDisk.schemaVersion, 2);
     assert.equal(onDisk.reviewStatus, "draft");
     assert.equal(onDisk.lifecycle, "active");
+  }
+});
+
+test("issue #16: creation refuses every caller-writable trace field with a wrong-type or missing target", async () => {
+  const CASES = [
+    ["kiln_create_requirement", { field: "derivedFrom", wrong: "AST-0001", missing: "REQ-9999" }],
+    ["kiln_create_assertion", { field: "arisesFrom", wrong: "CMP-0001", missing: "REQ-9999" }],
+    ["kiln_create_runbook_step", { field: "restsOn", wrong: "REQ-0001", missing: "AST-9999" }],
+    ["kiln_create_question", { field: "blocks", wrong: "CMP-0001", missing: "REQ-9999" }],
+    ["kiln_create_decision", { field: "addresses", wrong: "CMP-0001", missing: "REQ-9999" }],
+    ["kiln_create_component", { field: "satisfies", wrong: "AST-0001", missing: "REQ-9999" }],
+    ["kiln_create_schema", { field: "implements", wrong: "AST-0001", missing: "REQ-9999" }],
+    ["kiln_create_api_spec", { field: "implements", wrong: "AST-0001", missing: "REQ-9999" }],
+    ["kiln_create_wireframe", { field: "implements", wrong: "AST-0001", missing: "REQ-9999" }],
+    ["kiln_create_acceptance_criterion", { field: "evaluates", wrong: "REQ-0001", missing: "CMP-9999" }],
+    ["kiln_create_acceptance_criterion", { field: "verifies", wrong: "CMP-0001", missing: "REQ-9999" }],
+    ["kiln_create_task", { field: "implements", wrong: "REQ-0001", missing: "CMP-9999" }],
+    ["kiln_create_task", { field: "fulfils", wrong: "CMP-0001", missing: "REQ-9999" }],
+  ];
+
+  for (const [name, { field, wrong, missing }] of CASES) {
+    for (const [kind, ref] of [["wrong type", wrong], ["missing", missing]]) {
+      const { contentRoot } = await project({ traceTargets: true });
+      const before = readdirSync(join(contentRoot, "data"), { recursive: true }).length;
+      const marksBefore = readHighWaterMarks(contentRoot);
+      const result = await invoke(registered().get(name), contentRoot, {
+        artifact: { ...MINIMAL[name], [field]: [ref] },
+      });
+
+      assert.equal(result.details.ok, false, `${name} accepted ${kind} ${field} target ${ref}`);
+      assert.equal(result.details.code, "invalid-artifact", `${name}: ${JSON.stringify(result.details)}`);
+      assert.match(result.details.message, kind === "wrong type" ? /expects.*but/i : /does not exist/i);
+      assert.equal(
+        readdirSync(join(contentRoot, "data"), { recursive: true }).length,
+        before,
+        `${name}: refusing ${kind} ${field} must not write an artifact`
+      );
+      assert.deepEqual(
+        readHighWaterMarks(contentRoot),
+        marksBefore,
+        `${name}: refusing ${kind} ${field} must not consume an ID`
+      );
+    }
   }
 });
 
@@ -600,7 +666,7 @@ const artifact = (contentRoot, path) => JSON.parse(readFileSync(join(contentRoot
 
 /** A project with the artifacts these operations need, created through the tools themselves. */
 async function mutableProject() {
-  const made = await project();
+  const made = await project({ traceTargets: true });
   const tools = registered();
   const create = async (name, fields) => (await invoke(tools.get(name), made.contentRoot, { artifact: fields })).details;
 
