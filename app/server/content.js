@@ -19,3 +19,4 @@ export { loadSchemaSet } from "../../lib/schema-resolver.mjs";
 export { createValidators } from "../../lib/validate.mjs";
 export { readActivatedTypes } from "../../lib/activation.mjs";
 export { lintProject, SEVERITY } from "../../lib/lint.mjs";
+export { readProjectIdentity } from "../../lib/project-status.mjs";

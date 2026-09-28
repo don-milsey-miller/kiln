@@ -330,6 +330,17 @@ test("⚠️ a second run changes no bytes", async () => {
   assert.deepEqual(hashTree(dir), before, "a rerun of a completed initialization must be a no-op on disk");
 });
 
+test("⚠️ an initialized project does not require its committed identity to be repeated", async () => {
+  const dir = project();
+  const first = await init(dir, { name: "Committed identity", description: "Already in project.yaml" });
+  const before = hashTree(dir);
+
+  const resumed = await initializeProject({ projectRoot: dir });
+  assert.equal(resumed.status, STATUS.ALREADY_INITIALIZED);
+  assert.equal(resumed.contentRoot, first.contentRoot);
+  assert.deepEqual(hashTree(dir), before, "reading committed identity during recovery must not rewrite it");
+});
+
 test("⚠️ authored files are never overwritten, and the changes are reported as drift", async () => {
   const dir = asGitRepository(project());
   const content = (await init(dir)).contentRoot;

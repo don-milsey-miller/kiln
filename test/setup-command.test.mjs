@@ -2988,7 +2988,9 @@ test("⚠️ ACC-0045 a run killed after its journal began records where it stop
         ...process.env,
         PLANNING_CONTENT_DIR: p.contentRoot,
         PI_CODING_AGENT_DIR: p.agentDir,
-        KILN_CAPTURE_SETUP: JSON.stringify({ ...spec, argv: [...argv, "--name", "Interrupted", "--trust", "approve", "--live-model-check", "approve", ...PICKED] }),
+        // The recovery command is sufficient once initialization completed. Name and description
+        // are already committed in project.yaml and must not be repeated from a second source.
+        KILN_CAPTURE_SETUP: JSON.stringify({ ...spec, argv: [...argv, "--trust", "approve", "--live-model-check", "approve", ...PICKED] }),
       },
     });
     assert.equal(resumed.status, EXIT.OK, `${resumed.stdout}${resumed.stderr}`);
