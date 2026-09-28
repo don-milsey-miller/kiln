@@ -19,7 +19,7 @@ Agent → user confirms
 
 Structured requirements list, glossary, explicit non-goals, activated artifact types (#39).
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
 - `requirement`
 

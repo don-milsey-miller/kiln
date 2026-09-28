@@ -30,9 +30,10 @@
   "method": {
     "summary": "Design the components and the data model, then trace every requirement to a component.",
     "steps": [
-      "Read the approved requirements and the decisions Stage 4 recorded.",
+      "Read the approved requirements, the decisions Stage 4 recorded, and the project's activated artifact types from `kiln_project_status`.",
       "Delegate design work to the planning specialist where the structure is larger than this conversation.",
-      "Author the components, the data model, the API specs and the wireframes the requirements need.",
+      "Author components and only the data-model, API-spec and wireframe types that are activated for this project and that the requirements need.",
+      "If the requirements need a type that is inactive or has no typed create tool, report the capability gap; do not substitute another artifact type or attest past it.",
       "Choose the storage target and record why.",
       "Trace every requirement to the component that carries it, and check that none is left untraced.",
       "Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.",
@@ -50,6 +51,7 @@
     ],
     "constraints": [
       "A requirement with no component behind it is not designed for.",
+      "An inactive or unauthorable output the requirements need is a product capability gap, not optional planning work.",
       "The storage target is chosen here, not deferred to implementation."
     ]
   },

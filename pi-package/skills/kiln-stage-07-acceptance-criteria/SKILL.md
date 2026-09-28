@@ -19,7 +19,7 @@ User
 
 Testable criteria per requirement, definition of done.
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
 - `acceptance-criterion`
 

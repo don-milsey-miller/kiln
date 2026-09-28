@@ -19,7 +19,7 @@ Hand each assigned person a slice they can start from without coming back to ask
 
 The exported package, sliced per role, including the runbook and its evidence.
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
 - `runbook-step`
 

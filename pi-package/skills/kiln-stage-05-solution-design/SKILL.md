@@ -19,7 +19,7 @@ Planning agent → user approves
 
 Architecture doc, data model / schema designs, API specs, wireframes, job and storage design.
 
-Typed artifacts this stage produces:
+Typed artifact capability envelope for this stage (author only the types activated for this project):
 
 - `component`
 - `schema`
@@ -36,13 +36,14 @@ Typed artifacts this stage produces:
 
 Design the components and the data model, then trace every requirement to a component.
 
-1. Read the approved requirements and the decisions Stage 4 recorded.
+1. Read the approved requirements, the decisions Stage 4 recorded, and the project's activated artifact types from `kiln_project_status`.
 2. Delegate design work to the planning specialist where the structure is larger than this conversation.
-3. Author the components, the data model, the API specs and the wireframes the requirements need.
-4. Choose the storage target and record why.
-5. Trace every requirement to the component that carries it, and check that none is left untraced.
-6. Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.
-7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+3. Author components and only the data-model, API-spec and wireframe types that are activated for this project and that the requirements need.
+4. If the requirements need a type that is inactive or has no typed create tool, report the capability gap; do not substitute another artifact type or attest past it.
+5. Choose the storage target and record why.
+6. Trace every requirement to the component that carries it, and check that none is left untraced.
+7. Obtain the operator's approval of the data model and the design, then set the approved artifacts to approved.
+8. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
@@ -59,6 +60,7 @@ Activities this stage may choose between, in order:
 Always:
 
 - A requirement with no component behind it is not designed for.
+- An inactive or unauthorable output the requirements need is a product capability gap, not optional planning work.
 - The storage target is chosen here, not deferred to implementation.
 
 ## Delegations
