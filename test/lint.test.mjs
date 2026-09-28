@@ -466,6 +466,8 @@ test("#92: stage definitions enforce only what the source table NAMES", () => {
   assert.ok(real["03-discovery"].producesCandidates.some((c) => c.type === "research-finding"));
   assert.deepEqual(real["08-implementation-plan"].produces, ["task"]);
   assert.ok(real["08-implementation-plan"].producesCandidates.some((c) => c.type === "role-assignment"));
+  assert.deepEqual(real["09-handoff"].produces, ["runbook-step"]);
+  assert.ok(real["09-handoff"].producesCandidates.some((c) => c.type === "runbook"));
   // Every candidate carries where it came from, so the inference is visible.
   for (const d of Object.values(real))
     for (const c of d.producesCandidates) {

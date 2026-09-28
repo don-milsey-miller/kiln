@@ -21,13 +21,13 @@ The exported package, sliced per role, including the runbook and its evidence.
 
 Typed artifacts this stage produces:
 
-- `runbook`
 - `runbook-step`
 
 Outputs the definition names that have no artifact type yet:
 
 - the exported package
 - sliced per role
+- runbook aggregate, projected from runbook steps
 
 ## Exit criteria
 
@@ -40,12 +40,13 @@ Outputs the definition names that have no artifact type yet:
 Slice per role, rest every runbook step on an assertion at or above threshold, and clear the critical questions.
 
 1. Read the task set, the acceptance criteria and the evidence behind them.
-2. Author the runbook and one step per action, each resting on an assertion at or above the threshold (#57).
-3. Delegate to the planning specialist where a slice needs its steps written for a role.
-4. Slice the package per assigned role and check that each slice stands on its own.
-5. Resolve every critical question, or ask the operator to settle it (DEC-0014).
-6. Link each step's evidence to the step it supports.
-7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+2. Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).
+3. Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.
+4. Delegate to the planning specialist where a slice needs its steps written for a role.
+5. Slice the package per assigned role and check that each slice stands on its own.
+6. Resolve every critical question, or ask the operator to settle it (DEC-0014).
+7. Link each step's evidence to the step it supports.
+8. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
@@ -62,6 +63,7 @@ Activities this stage may choose between, in order:
 Always:
 
 - A step resting on an assertion below the threshold does not ship (#57).
+- Runbook membership and order are derived from runbook-step links and ordinals; they are not copied into an aggregate artifact (DEC-0011).
 - A question that blocks active handoff content, or makes a handoff criterion unevaluable, is critical (DEC-0014).
 
 ## Delegations

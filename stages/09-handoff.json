@@ -3,7 +3,6 @@
   "name": "Developer Handoff",
   "decidedBy": "—",
   "produces": [
-    "runbook",
     "runbook-step"
   ],
   "producesProse": "The exported package, sliced per role, including the runbook and its evidence.",
@@ -29,7 +28,8 @@
     "summary": "Slice per role, rest every runbook step on an assertion at or above threshold, and clear the critical questions.",
     "steps": [
       "Read the task set, the acceptance criteria and the evidence behind them.",
-      "Author the runbook and one step per action, each resting on an assertion at or above the threshold (#57).",
+      "Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).",
+      "Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.",
       "Delegate to the planning specialist where a slice needs its steps written for a role.",
       "Slice the package per assigned role and check that each slice stands on its own.",
       "Resolve every critical question, or ask the operator to settle it (DEC-0014).",
@@ -48,6 +48,7 @@
     ],
     "constraints": [
       "A step resting on an assertion below the threshold does not ship (#57).",
+      "Runbook membership and order are derived from runbook-step links and ordinals; they are not copied into an aggregate artifact (DEC-0011).",
       "A question that blocks active handoff content, or makes a handoff criterion unevaluable, is critical (DEC-0014)."
     ]
   },
@@ -92,7 +93,7 @@
     "source": "notes.md — 'What each stage actually emits', transcribed 2026-08-18",
     "status": "DRAFT — that table is marked '(draft — argue with every row)' and nobody has argued with it yet.",
     "note": "Materialising it here makes it AUTHORITATIVE per #34/#90, not correct. #76 step 4 is where it gets argued with, by being used.",
-    "transcriptionNote": "produces[] lists ONLY artifact types the source table names. Anything a reader would infer is in producesCandidates and is NOT enforced by the gate — see #92.",
+    "transcriptionNote": "The source table's Produces cell names `runbook`. It is held in producesCandidates rather than produces[] because DEC-0011 keeps the aggregate unbuilt and derives it from runbook-step membership and ordering.",
     "promotions": [
       {
         "type": "runbook-step",
@@ -103,6 +104,11 @@
   },
   "producesCandidates": [
     {
+      "type": "runbook",
+      "from": "\"including the runbook\"",
+      "note": "DEC-0011: build only when a handoff has a multi-step destructive procedure with rollback state that spans steps. Until then the aggregate is a projection over runbook-step."
+    },
+    {
       "type": "evidence",
       "from": "\"and its evidence\"",
       "note": "Evidence is cross-cutting (#25); whether stage 9 PRODUCES it or merely ships it is unsettled."
@@ -110,6 +116,7 @@
   ],
   "outputsNotYetTyped": [
     "the exported package",
-    "sliced per role"
+    "sliced per role",
+    "runbook aggregate, projected from runbook steps"
   ]
 }
