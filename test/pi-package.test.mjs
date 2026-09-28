@@ -499,5 +499,9 @@ test("⚠️ ACC-0063 the entry point reads no environment and imports nothing o
   assert.ok(!/process\s*\.\s*env/.test(source), "the entry point reads the environment");
   assert.ok(!/node:fs|node:child_process|node:http|fetch\s*\(/.test(source), "the entry point reaches the filesystem or network");
   const imports = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(imports, ["../signature.json"], "the only import is the package's own declaration");
+  assert.deepEqual(
+    imports,
+    ["../signature.json", "../artifact-authoring-schemas.json"],
+    "registration imports only immutable data shipped inside the package"
+  );
 });
