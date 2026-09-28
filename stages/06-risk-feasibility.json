@@ -12,7 +12,7 @@
     },
     {
       "id": "load-bearing-assertions-at-rung",
-      "describe": "Every load-bearing assertion has reached its required confidence rung (#25, #42).",
+      "describe": "The design's load-bearing assertions are enumerated and each has reached its required confidence rung; an empty enumeration is n/a with a reason, not satisfied (#25, #42).",
       "mechanised": false
     }
   ],
@@ -21,12 +21,14 @@
     "summary": "Agree the risk register with the operator, and raise each load-bearing assertion to its required rung.",
     "steps": [
       "Read the design and the assertions the plan rests on.",
+      "Enumerate the design claims whose failure would change the plan, and ensure each is represented by a load-bearing assertion; if there are none, state why before proposing n/a.",
       "Draft the risk register in chat: one row per credible failure, with its category, its severity, and its mitigation or a proposed accepted-risk signoff.",
       "Do not create a typed artifact for a risk or substitute another type for one; `risk` has no schema or tool (DEC-0013), and the register is prose.",
       "Ask the operator to review the register, and record their reply with `writeStageDocument`.",
       "Delegate to the validation specialist to run the declared check behind any assertion below its required rung.",
       "Link the returned evidence to the assertion it bears on.",
       "In the `high-severity-risks-mitigated` attestation, name each high-severity risk and the mitigation or the operator's accepted-risk signoff behind it.",
+      "In the `load-bearing-assertions-at-rung` attestation, name each load-bearing assertion and its derived rung; if the enumeration is empty, record n/a with the reason instead of satisfied.",
       "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
     ]
   },
@@ -41,6 +43,7 @@
     ],
     "constraints": [
       "An assertion below its required rung is not treated as settled (#25, #42).",
+      "An empty load-bearing-assertion set is recorded n/a with a reason; it never satisfies a universal claim vacuously.",
       "A high-severity risk is mitigated or has an accepted-risk signoff; it is not carried silently.",
       "The risk register is the one the operator reviewed; a risk the operator has not seen is not attested."
     ]

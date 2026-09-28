@@ -14,7 +14,7 @@
     },
     {
       "id": "runbook-steps-above-threshold",
-      "describe": "Every runbook step rests on an assertion at or above the threshold (#57).",
+      "describe": "The handoff's operational actions are enumerated and every runbook step rests on an assertion at or above the threshold; no operational actions is n/a with a reason, not satisfied (#57).",
       "mechanised": false
     },
     {
@@ -28,12 +28,14 @@
     "summary": "Slice per role, rest every runbook step on an assertion at or above threshold, and clear the critical questions.",
     "steps": [
       "Read the task set, the acceptance criteria and the evidence behind them.",
+      "Enumerate the handoff's operational actions; if there are none, state why before proposing n/a for `runbook-steps-above-threshold`.",
       "Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).",
       "Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.",
       "Delegate to the planning specialist where a slice needs its steps written for a role.",
       "Slice the package per assigned role and check that each slice stands on its own.",
       "Resolve every critical question, or ask the operator to settle it (DEC-0014).",
       "Link each step's evidence to the step it supports.",
+      "In the `runbook-steps-above-threshold` attestation, name each active runbook step and the derived rung beneath it; if there are no operational actions, record n/a with the reason instead of satisfied.",
       "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
     ]
   },
@@ -48,6 +50,7 @@
     ],
     "constraints": [
       "A step resting on an assertion below the threshold does not ship (#57).",
+      "An empty operational-action set is recorded n/a with a reason; it never satisfies a universal claim vacuously.",
       "Runbook membership and order are derived from runbook-step links and ordinals; they are not copied into an aggregate artifact (DEC-0011).",
       "A question that blocks active handoff content, or makes a handoff criterion unevaluable, is critical (DEC-0014)."
     ]
