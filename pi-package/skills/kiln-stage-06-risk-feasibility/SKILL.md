@@ -19,9 +19,11 @@ Both
 
 Risk register (technical / legal / privacy / operational / cost), mitigations.
 
-Typed artifacts this stage produces:
+This stage produces no typed artifact.
 
-- `risk`
+Outputs the definition names that have no artifact type yet:
+
+- risk register, as reviewed by the operator
 
 ## Exit criteria
 
@@ -30,15 +32,16 @@ Typed artifacts this stage produces:
 
 ## Method
 
-Register the risks with their mitigations, and raise each load-bearing assertion to its required rung.
+Agree the risk register with the operator, and raise each load-bearing assertion to its required rung.
 
 1. Read the design and the assertions the plan rests on.
-2. Author one risk per credible failure, with its severity and its mitigation.
-3. Delegate to the validation specialist to run the declared check behind any assertion below its required rung.
-4. Link the returned evidence to the assertion it bears on.
-5. For each high-severity risk, record either a mitigation or the operator's accepted-risk signoff as an attestation.
-6. Retire a risk that no longer applies with `setLifecycle` rather than deleting it.
-7. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+2. Draft the risk register in chat: one row per credible failure, with its category, its severity, and its mitigation or a proposed accepted-risk signoff.
+3. Do not create a typed artifact for a risk or substitute another type for one; `risk` has no schema or tool (DEC-0013), and the register is prose.
+4. Ask the operator to review the register, and record their reply with `writeStageDocument`.
+5. Delegate to the validation specialist to run the declared check behind any assertion below its required rung.
+6. Link the returned evidence to the assertion it bears on.
+7. In the `high-severity-risks-mitigated` attestation, name each high-severity risk and the mitigation or the operator's accepted-risk signoff behind it.
+8. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
@@ -56,6 +59,7 @@ Always:
 
 - An assertion below its required rung is not treated as settled (#25, #42).
 - A high-severity risk is mitigated or has an accepted-risk signoff; it is not carried silently.
+- The risk register is the one the operator reviewed; a risk the operator has not seen is not attested.
 
 ## Delegations
 
