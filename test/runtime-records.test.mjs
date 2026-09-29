@@ -424,6 +424,19 @@ test("the OpenAI Codex mid-conversation system-message capability is a persisted
   ok("model-compatibility", { ...COMPAT, key: { ...COMPAT_KEY, effectiveRequestProfile: profile } });
 });
 
+test("Pi 0.87 request-shape capabilities are persisted as bounded scalars", () => {
+  const added = {
+    supportsMaxOutputTokens: false,
+    supportsMidConvoEffort: true,
+    supportsMidConvoToolAdditions: true,
+    supportsMidConvoToolChanges: false,
+    vllmPriority: -10,
+  };
+  const profile = projectRequestProfile({ compat: added }, null);
+  assert.deepEqual(profile.compat, added);
+  ok("model-compatibility", { ...COMPAT, key: { ...COMPAT_KEY, effectiveRequestProfile: profile } });
+});
+
 test("the safely typed structures are persisted by value, and refuse unknown keys at depth", () => {
   const model = {
     reasoning: true,
