@@ -27,6 +27,7 @@
       "Enumerate the design claims whose failure would change the plan, and ensure each is represented by a load-bearing assertion; if there are none, state why before proposing n/a.",
       "Draft the risk register in chat: one row per credible failure, with its category, its severity, and its mitigation or a proposed accepted-risk signoff.",
       "Do not create a typed artifact for a risk or substitute another type for one; `risk` has no schema or tool (DEC-0013), and the register is prose.",
+      "Read the stage Working notes to obtain its revision, then append or replace the named `risk-register` subsection with the complete Markdown register before requesting review.",
       "Ask the operator to review the register, and record their reply with `writeStageDocument`.",
       "Delegate to the validation specialist to run the declared check behind any assertion below its required rung.",
       "Link the returned evidence to the assertion it bears on.",

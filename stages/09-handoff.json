@@ -31,6 +31,7 @@
       "Enumerate the handoff's operational actions; if there are none, state why before proposing n/a for `runbook-steps-above-threshold`.",
       "Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).",
       "Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.",
+      "Read the stage Working notes to obtain its revision, then append or replace the named `developer-runbook` subsection with the rendered Markdown runbook and role-slice instructions.",
       "Delegate to the planning specialist where a slice needs its steps written for a role.",
       "Slice the package per assigned role and check that each slice stands on its own.",
       "Resolve every critical question, or ask the operator to settle it (DEC-0014).",

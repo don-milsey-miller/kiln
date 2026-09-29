@@ -169,7 +169,7 @@ test("⚠️ ACC-0113 a document the stage-document writer has filled still comp
   const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const { intakeSection, writeStageDocumentEntry } = await import("../lib/stage-documents.mjs");
+  const { intakeSection, readWorkingNotes, writeStageDocumentEntry, writeWorkingNotes } = await import("../lib/stage-documents.mjs");
 
   const base = mkdtempSync(join(tmpdir(), "kiln-mdx-intake-"));
   const contentRoot = join(base, "planning-content");
@@ -181,7 +181,7 @@ test("⚠️ ACC-0113 a document the stage-document writer has filled still comp
 ${intakeSection()}
 ## Working notes
 
-Nothing yet.
+_Nothing yet._
 `);
 
     // ⚠️ EVERY ONE OF THESE IS FORBIDDEN JAVASCRIPT WHEN IT IS DOCUMENT TEXT, and an ordinary answer when
@@ -193,6 +193,15 @@ Nothing yet.
       ["1 < 2 && 3 > 2", "An inequality, not markup"],
     ])
       await writeStageDocumentEntry(contentRoot, "01-intake", { verbatim, interpretation });
+
+    const notes = readWorkingNotes(contentRoot, "01-intake");
+    await writeWorkingNotes(contentRoot, "01-intake", {
+      action: "append-working-note",
+      subsection: "risk-register",
+      title: "Risk register",
+      content: "| Risk | Mitigation |\n|---|---|\n| Render drift | Compile the authored document |\n\n- Source: [MDX](https://mdxjs.com/)",
+      expectedRevision: notes.revision,
+    });
 
     await build(readFileSync(path, "utf-8"));
   } finally {

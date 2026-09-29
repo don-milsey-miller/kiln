@@ -43,12 +43,13 @@ Slice per role, rest every runbook step on an assertion at or above threshold, a
 2. Enumerate the handoff's operational actions; if there are none, state why before proposing n/a for `runbook-steps-above-threshold`.
 3. Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).
 4. Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.
-5. Delegate to the planning specialist where a slice needs its steps written for a role.
-6. Slice the package per assigned role and check that each slice stands on its own.
-7. Resolve every critical question, or ask the operator to settle it (DEC-0014).
-8. Link each step's evidence to the step it supports.
-9. In the `runbook-steps-above-threshold` attestation, name each active runbook step and the derived rung beneath it; if there are no operational actions, record n/a with the reason instead of satisfied.
-10. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+5. Read the stage Working notes to obtain its revision, then append or replace the named `developer-runbook` subsection with the rendered Markdown runbook and role-slice instructions.
+6. Delegate to the planning specialist where a slice needs its steps written for a role.
+7. Slice the package per assigned role and check that each slice stands on its own.
+8. Resolve every critical question, or ask the operator to settle it (DEC-0014).
+9. Link each step's evidence to the step it supports.
+10. In the `runbook-steps-above-threshold` attestation, name each active runbook step and the derived rung beneath it; if there are no operational actions, record n/a with the reason instead of satisfied.
+11. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
