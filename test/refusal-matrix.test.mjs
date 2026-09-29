@@ -72,6 +72,7 @@ function child({ faults = [], exitCode = 0 } = {}) {
     const fd3 = new EventEmitter();
     proc.stdio = [null, proc.stdout, proc.stderr, fd3];
     proc.kill = () => {};
+    proc.pid = 4242;
     calls.push({ args, options });
 
     // ⚠️ A CHILD THAT NEVER EXITS, INCLUDING WHEN ITS TREE IS STOPPED. Only the timeout ends the run.
@@ -89,6 +90,8 @@ function child({ faults = [], exitCode = 0 } = {}) {
     const line = (event) => proc.stdout.emit("data", `${JSON.stringify(event)}\n`);
 
     queueMicrotask(() => {
+      proc.emit("spawn");
+      queueMicrotask(() => {
       // Every run emits a well-formed stream carrying confident prose. That is the #67 shape.
       line({ type: "session", version: 3, id: "s-1", cwd: options.cwd });
       if (has("out-of-role")) line({ type: "tool_execution_start", toolName: "kiln_set_review_status" });
@@ -135,6 +138,7 @@ function child({ faults = [], exitCode = 0 } = {}) {
       }
 
       proc.emit("exit", has("nonzero-exit") ? 1 : exitCode, null);
+      });
     });
     return proc;
   };
