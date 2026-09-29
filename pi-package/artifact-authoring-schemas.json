@@ -459,9 +459,21 @@
         "description": "The raw capture — commands, output, logs. #86 in force: this artifact does not re-model a transcript, it points at one.",
         "properties": {
           "format": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Narrowed to an enum by each artifact type.",
             "enum": [
               "text-log",
               "json-lines"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the content root (#70) — never absolute, never escaping it. One resolver, so a path here means the same thing to the app, the lint and the typed tools.",
+            "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+            "examples": [
+              "data/openapi.json",
+              "data/schema.yaml"
             ]
           }
         },
@@ -909,13 +921,24 @@
         "description": "The definition file. #8: 'a schema is a definition file, rendered as an ER diagram — not a diagram that happens to look like a schema.' The format is DECLARED, not invented: this artifact deliberately does not model tables, columns, types, keys or relations, because doing so would be a second schema language written for no reason other than that the artifact is called `schema`.",
         "properties": {
           "format": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Adding a format is a decision, not a convenience: each one needs a parser for the ER rendering and for the handoff. A format nothing renders is a payload nobody sees.",
             "enum": [
               "json-schema",
               "sql-ddl",
               "dbml",
               "prisma"
-            ],
-            "description": "Adding a format is a decision, not a convenience: each one needs a parser for the ER rendering and for the handoff. A format nothing renders is a payload nobody sees."
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the content root (#70) — never absolute, never escaping it. One resolver, so a path here means the same thing to the app, the lint and the typed tools.",
+            "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+            "examples": [
+              "data/openapi.json",
+              "data/schema.yaml"
+            ]
           }
         },
         "required": [
@@ -1075,9 +1098,21 @@
         "description": "The OpenAPI document. This IS the artifact's content — everything else here is metadata about it.",
         "properties": {
           "format": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Narrowed to an enum by each artifact type.",
             "enum": [
               "openapi-3.0",
               "openapi-3.1"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the content root (#70) — never absolute, never escaping it. One resolver, so a path here means the same thing to the app, the lint and the typed tools.",
+            "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+            "examples": [
+              "data/openapi.json",
+              "data/schema.yaml"
             ]
           }
         },

@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import Ajv2020 from "ajv/dist/2020.js";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { createAssertion, createEvidence, createComponent } from "../lib/tools/evidence-tools.mjs";
@@ -272,6 +273,40 @@ test("kiln_list_artifacts and kiln_read_artifact return current typed records wi
   assertUnchanged(before, snapshot(fx.contentRoot), "artifact reads");
 });
 
+test("issue #31: provider validation and typed creation accept complete schema and API payload references", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  const schemaRef = { format: "json-schema", path: "payloads/fresh-model.schema.json" };
+  const apiRef = { format: "openapi-3.1", path: "payloads/fresh-openapi.json" };
+
+  const payload = (await invoke(tools.get("kiln_write_payload"), contentRoot, {
+    ...schemaRef,
+    content: { $schema: "https://json-schema.org/draft/2020-12/schema", type: "object", properties: { id: { type: "string" } } },
+  })).details;
+  assert.equal(payload.ok, true, JSON.stringify(payload));
+  writeFileSync(
+    join(contentRoot, "payloads", "fresh-openapi.json"),
+    `${JSON.stringify({ openapi: "3.1.0", info: { title: "Fresh API", version: "1.0.0" }, paths: {} }, null, 2)}\n`
+  );
+
+  const cases = [
+    ["kiln_create_schema", { title: "Fresh model", payload: schemaRef, storageTarget: "PostgreSQL" }, "schema"],
+    ["kiln_create_api_spec", { title: "Fresh API", payload: apiRef }, "api-spec"],
+  ];
+  for (const [name, artifact, type] of cases) {
+    const tool = tools.get(name);
+    const acceptsProviderInput = new Ajv2020({ strict: false }).compile(tool.parameters);
+    assert.equal(acceptsProviderInput({ artifact }), true, `${name}: ${JSON.stringify(acceptsProviderInput.errors)}`);
+
+    const result = (await invoke(tool, contentRoot, { artifact })).details;
+    assert.equal(result.ok, true, `${name}: ${JSON.stringify(result)}`);
+    assert.equal(result.type, type);
+    assert.match(result.id, type === "schema" ? /^SCH-\d{4}$/ : /^API-\d{4}$/);
+    const stored = JSON.parse(readFileSync(join(contentRoot, result.path), "utf8"));
+    assert.deepEqual(stored.payload, artifact.payload);
+  }
+});
+
 /* ============================================ what they return ================================= */
 
 test("⚠️ ACC-0065 kiln_project_status reports readiness, count and blockers, and changes nothing", async () => {
@@ -508,6 +543,15 @@ test("issue #17: every creation tool publishes its complete caller-owned authori
   assert.deepEqual(task.required, ["fulfils", "implements", "role", "statement", "title"]);
   assert.match(task.properties.implements.description, /Valid trace target type: component/);
   assert.match(task.properties.fulfils.description, /Valid trace target type: requirement/);
+
+  for (const name of ["kiln_create_schema", "kiln_create_api_spec"]) {
+    const payload = tools.get(name).parameters.properties.artifact.properties.payload;
+    assert.deepEqual(Object.keys(payload.properties).sort(), ["format", "path"], `${name} lost a payloadRef member while narrowing format`);
+    assert.deepEqual(payload.required, ["format", "path"]);
+    assert.equal(payload.additionalProperties, false);
+  }
+  const capture = tools.get("kiln_create_evidence").parameters.properties.artifact.properties.capture;
+  assert.deepEqual(Object.keys(capture.properties).sort(), ["format", "path"], "the shared payloadRef fix must preserve evidence capture paths too");
 
   const serialized = JSON.stringify(expected);
   assert.equal(serialized.includes('\"$ref\"'), false, "provider schemas must not contain file references");
