@@ -104,11 +104,11 @@ test("the installed production graph is the patched graph declared by the manife
   assert.equal(installed("@earendil-works/pi-coding-agent/node_modules/undici"), "8.10.2");
 });
 
-test("every CI matrix cell audits the locked production graph before running tests", () => {
+test("#51 CI audits the locked production graph once on its deliberately clean install", () => {
   const workflow = readFileSync(join(ROOT, ".github", "workflows", "ci.yml"), "utf8").replace(/\r\n/g, "\n");
-  const installAt = workflow.indexOf("run: npm ci");
-  const auditAt = workflow.indexOf("run: npm run audit:production");
-  const testsAt = workflow.indexOf("run: npm test");
-  assert.ok(installAt !== -1 && installAt < auditAt && auditAt < testsAt, "CI does not audit the installed production graph before tests");
+  const validate = workflow.slice(workflow.indexOf("  validate:"), workflow.indexOf("  core:"));
+  const installAt = validate.indexOf("run: npm ci");
+  const auditAt = validate.indexOf("run: npm run audit:production");
+  assert.ok(installAt !== -1 && installAt < auditAt, "CI does not audit the clean installed production graph");
   assert.equal((workflow.match(/run: npm run audit:production/g) ?? []).length, 1, "the audit step is conditional or duplicated");
 });

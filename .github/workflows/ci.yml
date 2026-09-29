@@ -1,145 +1,179 @@
-# --- Continuous integration -------------------------------------------------
-#
-# The clean-machine half of this project's verification. Everything below runs
-# on a runner that has never seen this repository before, which is the one
-# thing a development machine cannot honestly simulate.
-#
-# ⚠️ IT EXISTS BECAUSE A WARM MACHINE PROVES THE WRONG THING. `EVD-0073` marked
-# `ACC-0033` a pass on runs where `node_modules` was already present, so the
-# launcher printed `skipping install` every time and half the criterion was
-# claimed on evidence that disclaimed it. `EVD-0074` re-ran it cold by hand —
-# and a hand-made cold run is a thing someone has to remember to do. This does
-# it on every push, and a regression that only appears when dependencies have
-# not been installed yet fails a job instead of waiting for the next audit.
-#
-# ⚠️ IT ALSO CHECKS WHAT IS IN GIT, not what is on the author's disk. The
-# runner has only the checked-out commit plus what `npm ci` fetches, so a file
-# that exists locally and was never committed takes the build down here rather
-# than on a stranger's first clone.
-#
-# ⚠️ AND UBUNTU IS NOT DECORATION. `TSK-0013` recorded the POSIX shutdown
-# branch as UNEXERCISED — "no Linux or macOS host" — while the Windows-specific
-# process semantics in `launcher.test.mjs` and `reap.test.mjs` were the only
-# ones ever observed. Two platforms in the matrix is what closes that gap: the
-# Windows jobs keep measuring the signal behaviour this project actually runs
-# on, and the Ubuntu jobs run the branch nobody here has a host for.
-
 name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
-  # A manual "Run workflow" button, for re-checking a green commit against a
-  # runner image or a Node release that has moved since it last ran.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 1
+
 jobs:
-  test:
-    name: ${{ matrix.os }} · node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
+  validate:
+    name: Repository invariants · ubuntu · node 24 · clean install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+      # No setup-node cache here: this is the deliberately cold dependency path.
+      - name: Install dependencies without a restored cache
+        run: npm ci
+      - name: Audit the production dependency graph
+        run: npm run audit:production
+      - name: Check generated stage skills
+        run: npm run skills:check
+      - name: Check generated artifact authoring schemas
+        run: npm run authoring-schemas:check
+      - name: Check generated role definitions
+        run: npm run roles:check
 
-    # ⚠️ NOT A PERFORMANCE BUDGET — A LEASH ON A WEDGED CHILD. The suite is 407
-    # tests in about eighty seconds on a warm developer machine, and a cold
-    # runner adds a full `npm ci` and an uncached production `next build` on
-    # top of that. What the ceiling is sized against is the failure mode, not
-    # the runtime: `launcher.test.mjs` and `shell-smoke.test.mjs` start real
-    # servers behind a shared `.next` lock that itself waits fifteen minutes,
-    # so a child that never dies HANGS rather than fails. Forty-five minutes
-    # sits far above any honest run and far below the six-hour default.
-    timeout-minutes: 45
+  core:
+    name: Core · ubuntu · node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ci:core
 
+  node-compat:
+    name: Node compatibility · ubuntu · node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
-      # ⚠️ Every combination reports for itself. With fail-fast the first
-      # failure would cancel the other three, and "did this break on Windows,
-      # on 24, or on both" is precisely the question the matrix is here to
-      # answer.
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js ${{ matrix.node }}
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ci:node
+
+  platform:
+    name: Platform behavior · ${{ matrix.os }} · node 24
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: ["22", "24"]
-
     steps:
       - name: Check out the commit
-        uses: actions/checkout@v5
-
-      # `package.json` sets `engines.node` to >=22; the matrix is that range's
-      # current LTS and current release, tested rather than assumed.
-      - name: Install Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: ${{ matrix.node }}
-
-      # ⚠️ NO DEPENDENCY CACHE HERE, DELIBERATELY. `setup-node` will restore
-      # the npm cache across runs for a step or two of wall-clock, and a warm
-      # cache is exactly the state `EVD-0074` had to disclaim. On a public
-      # repository the minutes are free; the cold install is the measurement.
-      - name: Install dependencies
-        run: npm ci
-
-      # High and critical production advisories fail closed. A temporary exception must identify one
-      # exact GHSA, link its approving issue, and expire within 30 days; malformed, stale, or unused
-      # exceptions fail too. See docs/dependency-security.md.
-      - name: Audit production dependencies
-        run: npm run audit:production
-
-      # ⚠️ THE PACKAGED STAGE SKILLS MUST MATCH stages/, AND EVERY CELL SAYS SO. They are generated, never
-      # hand-maintained, and a definition edited without regenerating is the drift CMP-0033 exists to
-      # prevent: an agent working to exit criteria the application is not checking. The check writes
-      # nothing and exits non-zero naming each stale, missing or orphaned skill. Every cell, because line
-      # endings and path separators are exactly what differs between Windows and Ubuntu.
-      - name: Check the generated stage skills
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      # Check generation once per OS, not once per Node/OS product cell. That preserves the
+      # line-ending and path-separator control without four identical executions.
+      - name: Check generated stage skills on Windows
+        if: matrix.os == 'windows-latest'
         run: npm run skills:check
-
-      - name: Check the generated artifact authoring schemas
+      - name: Check generated artifact authoring schemas on Windows
+        if: matrix.os == 'windows-latest'
         run: npm run authoring-schemas:check
-
-      # ⚠️ THE ROLE DEFINITIONS MUST MATCH THE SPECIALIST CONTRACT, AND EVERY CELL SAYS SO. `specialists/`
-      # is generated from lib/specialists/roles.mjs merged with contractFor(role); a contract edited
-      # without regenerating would leave a child's declared tool list disagreeing with its real write
-      # boundary, and an absent `tools:` line does not narrow a child, it hands it a shell. The check
-      # writes nothing and exits non-zero naming each stale, missing or orphaned definition.
-      - name: Check the generated role definitions
+      - name: Check generated role definitions on Windows
+        if: matrix.os == 'windows-latest'
         run: npm run roles:check
-
-      # F11, diagnostic only: Sysinternals handle64, so a directory Windows still holds at a test's cleanup can be
-      # attributed at the first refusal (test/helpers/cleanup.mjs). Best effort: a failed download leaves HANDLE_EXE
-      # unset, and the diagnostic records handle64 as unavailable rather than guessing.
-      - name: Fetch Sysinternals handle (F11 diagnostic)
+      - name: Fetch Sysinternals handle for cleanup diagnostics
         if: matrix.os == 'windows-latest'
         continue-on-error: true
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri https://live.sysinternals.com/handle64.exe -OutFile "$env:RUNNER_TEMP\handle64.exe" -TimeoutSec 60
           "HANDLE_EXE=$env:RUNNER_TEMP\handle64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - run: npm run test:ci:platform
 
-      # `npm test` is `node --test`, which discovers `test/**` itself and exits
-      # non-zero on any failing file. A non-zero exit fails the step and the
-      # job on both shells — bash and, on Windows, pwsh — so there is nothing
-      # to parse and nothing to interpret.
-      - name: Run the test suite
-        run: npm test
+  setup:
+    name: Setup and recovery · ${{ matrix.os }} · node 24
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ci:setup
 
-      # ⚠️ THE PI CONTRACT, RE-PROVED RATHER THAN INHERITED. The default suite asserts over the
-      # results retained in `tools/pi-compat/runs/`; this step re-runs the spike itself against a
-      # real consumer install — a temporary project, `npm install` inside its `.planning`, and Pi
-      # resolved from that tree. It is what makes a pinned-version bump have to earn its evidence
-      # instead of carrying somebody's afternoon forward (TSK-0023, CMP-0041).
-      #
-      # ⚠️ ONE CELL, NOT ONE NODE VERSION. `matrix.node == '24'` alone still selects TWO cells —
-      # ubuntu and windows — because the matrix is the product of both axes. The contract is a
-      # property of the pinned Pi runtime and the platform, and this step spends a second full
-      # `npm install`, so it runs on exactly one: Ubuntu at Node 24.
-      #
-      # ⚠️ THE PLATFORM AXIS IS COVERED BY THE RETAINED EVIDENCE, not by running this twice. Both
-      # platforms' results are committed under `tools/pi-compat/runs/` and the default suite asserts
-      # the whole contract against each on every cell. What this step adds is a live re-proof, and
-      # one live re-proof is enough to catch a runtime that has changed under the pin.
-      #
-      # It cannot reach a paid provider: the runner has no provider credentials, the spike passes a
-      # sanitized allowlisted environment rather than inheriting one, and every run that can reach
-      # inference is pinned to a loopback fake model.
-      - name: Re-prove the Pi compatibility contract
-        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
-        run: npm test -- test/pi-compat.test.mjs
+  consumer:
+    name: Clean consumer · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: "24"
+          - os: windows-latest
+            node: "22"
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js ${{ matrix.node }}
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Fetch Sysinternals handle for cleanup diagnostics
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://live.sysinternals.com/handle64.exe -OutFile "$env:RUNNER_TEMP\handle64.exe" -TimeoutSec 60
+          "HANDLE_EXE=$env:RUNNER_TEMP\handle64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - run: npm run test:ci:consumer
+
+  pi-compat-live:
+    name: Live Pi compatibility · ubuntu · node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:pi-compat
         env:
           KILN_PI_COMPAT: live

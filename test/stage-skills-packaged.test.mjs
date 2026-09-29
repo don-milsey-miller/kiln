@@ -57,29 +57,12 @@ test("⚠️ ACC-0066 the package scripts run the generator and its check", () =
   assert.equal(scripts["skills:check"], "node bin/generate-stage-skills.mjs --check");
 });
 
-test("⚠️ ACC-0066 every CI cell runs the skills check, unconditionally, after npm ci and before the suite", () => {
+test("⚠️ ACC-0066 #51 checks generated skills once per operating system", () => {
   const workflow = readFileSync(join(ROOT, ".github", "workflows", "ci.yml"), "utf8").replace(/\r\n/g, "\n");
-
-  // The matrix job's steps, as the ordered list of `- name:` blocks.
-  const steps = workflow
-    .split(/\n(?=      - name: )/)
-    .slice(1)
-    .map((block) => ({
-      name: (block.match(/^      - name: (.+)$/m) ?? [])[1],
-      run: (block.match(/^        run: (.+)$/m) ?? [])[1] ?? null,
-      conditional: /^        if: /m.test(block),
-    }));
-
-  const at = (run) => steps.findIndex((s) => s.run === run);
-  const install = at("npm ci");
-  const check = at("npm run skills:check");
-  const suite = at("npm test");
-
-  assert.ok(check !== -1, "no CI step runs npm run skills:check");
-  assert.ok(install !== -1 && suite !== -1, "the install and suite steps were not found");
-  assert.ok(install < check && check < suite, `the check must sit between npm ci and npm test: ${JSON.stringify(steps.map((s) => s.run))}`);
-  // ⚠️ EVERY CELL. A step with an `if:` would run on some of the matrix, and line endings and path
-  // separators are exactly what differs between the cells it would skip.
-  assert.equal(steps[check].conditional, false, "the skills check is conditional, so some cells would not run it");
-  assert.match(workflow, /matrix:\n\s+os: \[ubuntu-latest, windows-latest\]\n\s+node: \["22", "24"\]/, "the matrix is no longer both platforms by both Node versions");
+  assert.equal((workflow.match(/run: npm run skills:check/g) ?? []).length, 2);
+  const validate = workflow.slice(workflow.indexOf("  validate:"), workflow.indexOf("  core:"));
+  assert.match(validate, /run: npm ci[\s\S]*run: npm run skills:check/);
+  const platform = workflow.slice(workflow.indexOf("  platform:"), workflow.indexOf("  setup:"));
+  assert.match(platform, /os: \[ubuntu-latest, windows-latest\]/);
+  assert.match(platform, /if: matrix\.os == 'windows-latest'[\s\S]*run: npm run skills:check/);
 });
