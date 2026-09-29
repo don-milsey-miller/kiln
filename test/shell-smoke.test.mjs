@@ -168,6 +168,11 @@ async function runSmokeCheck(t) {
         }
       }
     }
+
+    const chooser = await (await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}`, { signal: AbortSignal.timeout(15_000) })).text();
+    assert.ok(chooser.includes('data-vpw-review="chooser"'), "the no-selection state must offer project-derived review choices");
+    assert.ok(chooser.includes('<select name="artifact"'), "the review chooser must submit a real artifact id");
+    assert.equal(chooser.includes("?artifact=AST-0021"), false, "the no-selection state must not invent a fixed artifact id");
     /* ------------------------------------ a change under stages/ reaches the change stream (TSK-0063) */
 
     // ⚠️ ONLY A STAGE DOCUMENT IS TOUCHED, NOTHING UNDER data/. The route used to watch data/ alone, so the Stage 1
