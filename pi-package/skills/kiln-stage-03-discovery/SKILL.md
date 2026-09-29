@@ -19,7 +19,10 @@ Research agent
 
 Findings doc, source inventory with citations, feasibility notes, prior art, hypotheses requiring validation.
 
-This stage produces no typed artifact.
+Typed artifact capability envelope for this stage (author only the types activated for this project):
+
+- `assertion`
+- `evidence`
 
 Outputs the definition names that have no artifact type yet:
 

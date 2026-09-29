@@ -2,7 +2,10 @@
   "id": "03-discovery",
   "name": "Discovery / Research",
   "decidedBy": "Research agent",
-  "produces": [],
+  "produces": [
+    "assertion",
+    "evidence"
+  ],
   "producesProse": "Findings doc, source inventory with citations, feasibility notes, prior art, hypotheses requiring validation.",
   "exitCriteria": [
     {
@@ -90,11 +93,6 @@
       "type": "research-finding",
       "from": "\"Findings doc\"",
       "note": "QST-0002: reactivate and build only for an irreconcilable same-configuration conflict between authorities, or an independent downstream consumer requiring state not carried by assertion, evidence or question."
-    },
-    {
-      "type": "assertion",
-      "from": "\"hypotheses requiring validation\"",
-      "note": "A hypothesis is plausibly an assertion at rung 1 (#42, #85), but the table does not say so."
     }
   ],
   "outputsNotYetTyped": [

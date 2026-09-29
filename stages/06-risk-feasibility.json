@@ -2,7 +2,10 @@
   "id": "06-risk-feasibility",
   "name": "Risk + Feasibility",
   "decidedBy": "Both",
-  "produces": [],
+  "produces": [
+    "assertion",
+    "evidence"
+  ],
   "producesProse": "Risk register (technical / legal / privacy / operational / cost), mitigations.",
   "exitCriteria": [
     {

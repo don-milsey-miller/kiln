@@ -417,12 +417,14 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
     // And with defs that agree, nothing fires.
     const right = {
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
+      "03-discovery": { id: "03-discovery", produces: ["assertion", "evidence"] },
       "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision", "question"] },
       "05-solution-design": { id: "05-solution-design", produces: ["component", "schema", "api-spec", "wireframe"] },
+      "06-risk-feasibility": { id: "06-risk-feasibility", produces: ["assertion", "evidence"] },
       "07-acceptance-criteria": { id: "07-acceptance-criteria", produces: ["acceptance-criterion"] },
       "08-implementation-plan": { id: "08-implementation-plan", produces: ["task"] },
-      // assertion and evidence are cross-cutting (#25) and carry no x-stage, so no stage
-      // claims them and none may. runbook-step is stage 9's, promoted when it was built.
+      // assertion and evidence are cross-cutting (#25), so both producer stages may claim them
+      // without either becoming a singular x-stage owner.
       "09-handoff": { id: "09-handoff", produces: ["runbook", "runbook-step"] },
     };
     const ok = lintProject({ ...ctx, stageDefinitions: right }).findings;
@@ -531,13 +533,13 @@ test("undeclared stage-attestation keys are lint errors with a typed repair path
   }
 });
 
-test("#92: stage definitions enforce only what the source table NAMES", () => {
+test("#92: stage definitions keep inferred candidates separate from promoted cross-cutting outputs", () => {
   const defs = JSON.parse(JSON.stringify(STAGE_DEFS)); // unused; read the real files instead
   const real = loadStageDefinitions(ROOT);
   // "explicit non-goals" is an output; scope-boundary is a catalogue type someone inferred.
   assert.deepEqual(real["02-intent-decomposition"].produces, ["requirement"]);
   assert.ok(real["02-intent-decomposition"].producesCandidates.some((c) => c.type === "scope-boundary"));
-  assert.deepEqual(real["03-discovery"].produces, []);
+  assert.deepEqual(real["03-discovery"].produces, ["assertion", "evidence"]);
   assert.ok(real["03-discovery"].producesCandidates.some((c) => c.type === "research-finding"));
   assert.deepEqual(real["08-implementation-plan"].produces, ["task"]);
   assert.ok(real["08-implementation-plan"].producesCandidates.some((c) => c.type === "role-assignment"));

@@ -19,7 +19,10 @@ Both
 
 Risk register (technical / legal / privacy / operational / cost), mitigations.
 
-This stage produces no typed artifact.
+Typed artifact capability envelope for this stage (author only the types activated for this project):
+
+- `assertion`
+- `evidence`
 
 Outputs the definition names that have no artifact type yet:
 

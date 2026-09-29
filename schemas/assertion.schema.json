@@ -159,7 +159,7 @@
     "confidence": "derived — unverified | source-supported | experimentally-validated | environment-matched"
   },
   "x-crossCutting": {
-    "description": "#25: validation is cross-cutting, so no stage in stages/ claims assertion and there is no x-stage. stages/03-discovery lists it as a producesCandidate (#92), which is a claim nobody has settled and which the gate does not enforce."
+    "description": "#25: assertions are cross-cutting rather than owned by one stage. Discovery records sourced claims and Risk + Feasibility records load-bearing claims, so both declare the type in produces while no singular x-stage is present."
   },
   "x-unresolvableTraceTargets": {
     "description": "#75: research-finding and question are activated on this project but not yet implemented; scope for links to dangle until they are.",

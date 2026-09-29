@@ -31,7 +31,7 @@
       "Ask the operator about any ambiguity the intake leaves in what is in and out of scope.",
       "Author one requirement per distinct testable obligation, and record the non-goals as the scope boundary.",
       "Delegate to the planning specialist when the decomposition needs work larger than this conversation.",
-      "Propose the artifact types this project needs and record the operator's activation decision (#39). Activate `schema` when the project needs a persistent data model or storage contract, `api-spec` when it exposes or consumes an HTTP API contract, and `wireframe` when screen layout or interaction must be designed. Do not activate them merely because Stage 5 can produce them.",
+      "Propose the artifact types this project needs and record the operator's activation decision (#39). Activate `assertion` and `evidence` when research, validation, or an operational handoff must carry a typed evidence trail. Activate `schema` when the project needs a persistent data model or storage contract, `api-spec` when it exposes or consumes an HTTP API contract, and `wireframe` when screen layout or interaction must be designed. Do not activate a type merely because a later stage can produce it.",
       "Revise any requirement the operator corrects, then set the confirmed requirement set to approved.",
       "Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit."
     ]
