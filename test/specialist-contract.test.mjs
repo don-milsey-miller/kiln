@@ -183,6 +183,9 @@ test("⚠️ TSK-0052 the refusal codes are a wire contract, pinned to their lit
       // ⚠️ TSK-0054 EXTENDED THIS TABLE AND CHANGED NOTHING IN IT. The five above are the wire
       // contract as it shipped; these three are new facts, not renamings.
       NONZERO_EXIT: "child-exited-nonzero",
+      IMMEDIATE_EXIT: "child-exited-immediately",
+      AUTHENTICATION: "child-authentication-failed",
+      PROVIDER: "child-provider-unavailable",
       EVENTS_MALFORMED: "child-events-malformed",
       SELECTION_MISMATCH: "child-selection-mismatch",
     }

@@ -54,7 +54,7 @@ const workspaces = () => [...created].filter((path) => existsSync(path));
  * A scripted child. ⚠️ IT EMITS BOTH FD-3 LINES: the binding attestation, unchanged, and the typed
  * child report the gate now reads. `report` scripts the second one; `"none"` omits it entirely.
  */
-function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, stdout = null, hang = false, report = "matching", reportOver = {} } = {}) {
+function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, stdout = null, hang = false, report = "matching", reportOver = {}, silentExit = false } = {}) {
   const calls = [];
   const spawn = (command, args, options) => {
     const child = new EventEmitter();
@@ -65,6 +65,7 @@ function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, st
     child.kill = () => {
       child.killed = true;
     };
+    child.pid = 4242;
 
     // The prompt file the runtime wrote, read back before it is removed.
     const promptDir = args[args.indexOf("--prompt-template") + 1];
@@ -78,6 +79,12 @@ function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, st
     const task = body.slice(body.indexOf(">>>\n") + 4, body.indexOf(`\n<<<KILN-TASK-END nonce=${nonce}>>>`));
 
     queueMicrotask(() => {
+      child.emit("spawn");
+      queueMicrotask(() => {
+      if (silentExit) {
+        child.emit("exit", exitCode, null);
+        return;
+      }
       // Pi's real events: a session line with no tools, and an assistant message naming the selection.
       child.stdout.emit("data", `${JSON.stringify({ type: "session", version: 3, id: "x", cwd: options.cwd })}\n`);
       child.stdout.emit(
@@ -112,6 +119,7 @@ function scriptedChild({ attest = "bound", exitCode = 0, sessionTools = null, st
       // attest === "silent" emits nothing at all.
 
       if (!hang) child.emit("exit", exitCode, null);
+      });
     });
     return child;
   };
@@ -227,6 +235,64 @@ test("⚠️ ACC-0076 the child is launched with closed stdin, the intersected a
 
   assert.equal(result.observation.taskBindingObserved, true);
   assert.deepEqual(result.observation.droppedFromAllowlist, []);
+});
+
+test("#28 launch failures have stable actionable classes and leak no host diagnostics", async () => {
+  const hostile = `C:\\Users\\operator\\secret sk-ant-PLANTED`;
+  const failing = (error, async = false) => ({
+    ...deps(scriptedChild()),
+    spawn: async
+      ? () => {
+          const child = new EventEmitter();
+          child.once = child.once.bind(child);
+          queueMicrotask(() => child.emit("error", error));
+          return child;
+        }
+      : () => { throw error; },
+  });
+  const cases = [
+    [Object.assign(new Error(hostile), { code: "ENOENT" }), DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND, false],
+    [Object.assign(new Error(hostile), { code: "EACCES" }), DELEGATION_REFUSED.EXECUTABLE_NOT_RUNNABLE, false],
+    [Object.assign(new Error(hostile), { code: "EINVAL" }), DELEGATION_REFUSED.INVALID_ARGUMENTS, false],
+    [Object.assign(new Error(hostile), { code: "ENOENT", kilnLaunchStage: "cwd" }), DELEGATION_REFUSED.WORKING_DIRECTORY, false],
+    [Object.assign(new Error(hostile), { code: "ENOENT" }), DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND, true],
+  ];
+  for (const [error, code, async] of cases) {
+    const result = await delegateToSpecialist(request(), failing(error, async));
+    assert.equal(result.code, code);
+    const text = JSON.stringify(result);
+    assert.equal(text.includes("operator"), false);
+    assert.equal(text.includes("sk-ant-PLANTED"), false);
+    assert.equal(/[A-Za-z]:(\\\\|\/)/.test(text), false);
+  }
+});
+
+test("#28 child startup, authentication, provider, timeout, and later exits remain distinguishable", async () => {
+  const exit = async ({ stderr, exitCode = 1, elapsed = 10 }) => {
+    const script = scriptedChild({ exitCode });
+    const original = script.spawn;
+    script.spawn = (command, args, options) => {
+      const child = original(command, args, options);
+      if (stderr) queueMicrotask(() => child.stderr.emit("data", stderr));
+      return child;
+    };
+    let now = 0;
+    return delegateToSpecialist(request(), deps(script, { now: () => (now += elapsed) }));
+  };
+
+  assert.equal((await exit({ stderr: "401 unauthorized: secret sk-ant-PLANTED" })).code, "child-authentication-failed");
+  assert.equal((await exit({ stderr: "provider model is unavailable" })).code, "child-provider-unavailable");
+  const silent = scriptedChild({ exitCode: 1, silentExit: true });
+  let immediateNow = 0;
+  assert.equal((await delegateToSpecialist(request(), deps(silent, { now: () => (immediateNow += 10) }))).code, "child-exited-immediately");
+  assert.equal((await exit({ stderr: "runtime failure", elapsed: 3000 })).code, "child-exited-nonzero");
+  const timed = await delegateToSpecialist(request({ timeoutMs: 20 }), deps(scriptedChild({ hang: true })));
+  assert.equal(timed.code, "timed-out");
+  for (const result of [await exit({ stderr: "401 unauthorized: secret sk-ant-PLANTED" }), await exit({ stderr: "provider model is unavailable" })]) {
+    const text = JSON.stringify(result);
+    assert.equal(text.includes("sk-ant-PLANTED"), false);
+    assert.equal(text.includes("401"), false);
+  }
 });
 
 test("⚠️ REQ-0024 no credential reaches the child's environment or the result", async () => {
