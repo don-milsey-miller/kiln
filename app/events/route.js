@@ -20,9 +20,11 @@ import { resolveContentRoot } from "../server/paths.js";
  * `stages/01-intake.md`. Watching `data/` alone left an open stage page showing the answer only when
  * something else reloaded it. Lock and temporary files are ignored by the stream itself.
  *
- * ⚠️ EVERY FRAME IS A NAMED EVENT. A comment keepalive is ignored by the client parser (AST-0036), so
- * it would keep the socket warm and fire nothing — leaving a page that cannot tell a healthy stream
- * from a dead one, which is exactly REQ-0018's second clause.
+ * ⚠️ EVERY FRAME IS A NAMED EVENT. `ready` means chokidar finished its initial scan; a heartbeat only
+ * proves the SSE connection is alive. Keeping those states distinct prevents a client or smoke test
+ * from writing during the watcher's startup window. A comment keepalive is ignored by the client
+ * parser (AST-0036), so it would keep the socket warm and fire nothing — leaving a page that cannot
+ * tell a healthy stream from a dead one, which is exactly REQ-0018's second clause.
  *
  * ⚠️ THE SUBSCRIBER IS REMOVED WHEN THE REQUEST ABORTS, not when the process notices later. Its
  * heartbeat timer goes with it; the shared watcher does not, so one closed tab cannot stop another

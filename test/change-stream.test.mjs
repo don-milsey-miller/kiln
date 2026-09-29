@@ -130,6 +130,57 @@ test("a heartbeat is a NAMED event carrying data", async () => {
   assert.deepEqual(beat.data, { ok: true }, "with data, so a listener receives something");
 });
 
+test("watcher readiness is observable and is not implied by an earlier heartbeat", async () => {
+  const h = harness();
+  const c = h.client();
+  await h.stream.subscribe(c.handlers);
+
+  h.timers.tick();
+  assert.ok(c.events.some((e) => e.event === EVENTS.HEARTBEAT));
+  assert.ok(!c.events.some((e) => e.event === EVENTS.READY), "a live SSE connection is not a ready watcher");
+
+  h.watcher.fire("ready");
+  assert.deepEqual(c.events.at(-1), { event: EVENTS.READY, data: { watching: true } });
+});
+
+test("a subscriber joining after delayed watcher readiness receives its own ready event", async () => {
+  const h = harness();
+  const first = h.client();
+  await h.stream.subscribe(first.handlers);
+  h.watcher.fire("ready");
+
+  const late = h.client();
+  await h.stream.subscribe(late.handlers);
+  assert.deepEqual(late.events, [{ event: EVENTS.READY, data: { watching: true } }]);
+});
+
+test("a readiness signal racing subscription completion is delivered only once", async () => {
+  const watcher = fakeWatcher();
+  const originalOn = watcher.on;
+  watcher.on = (event, fn) => {
+    originalOn.call(watcher, event, fn);
+    if (event === "ready") fn();
+    return watcher;
+  };
+  const stream = createChangeStream({ watchDir: "/nowhere", createWatcher: async () => watcher });
+  const events = [];
+  const drop = await stream.subscribe({ send: (event) => events.push(event), close: () => {} });
+
+  assert.deepEqual(events, [EVENTS.READY]);
+  drop();
+});
+
+test("a change delivered after readiness remains distinct from the ready signal", async () => {
+  const h = harness();
+  const c = h.client();
+  await h.stream.subscribe(c.handlers);
+
+  h.watcher.fire("ready");
+  assert.equal(c.events.filter((e) => e.event === EVENTS.CHANGE).length, 0);
+  h.watcher.fire("all");
+  assert.deepEqual(c.events.map((e) => e.event), [EVENTS.READY, EVENTS.CHANGE]);
+});
+
 /* ------------------------------------------------------------------ several subscribers */
 
 test("⚠️ one subscriber leaving does not stop the others", async () => {
@@ -179,10 +230,10 @@ test("a change hint reaches every subscriber, with no id and no replay", async (
     assert.ok(!("id" in hint.data), "hints carry no id — they are hints, not deltas (#73)");
   }
 
-  // A late subscriber gets NOTHING replayed: reconnecting and reloading is what catches it up.
+  // A late subscriber gets no CHANGE replayed: reconnecting and reloading is what catches it up.
   const late = h.client();
   await h.stream.subscribe(late.handlers);
-  assert.deepEqual(late.events, [], "no replay buffer");
+  assert.ok(!late.events.some((e) => e.event === EVENTS.CHANGE), "no replay buffer");
 });
 
 /* ------------------------------------------------------------------ failure */
