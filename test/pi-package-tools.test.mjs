@@ -244,7 +244,13 @@ test("kiln_write_payload creates a canonical schema and refuses overwrite", asyn
   };
 
   const created = (await invoke(tool, fx.contentRoot, params)).details;
-  assert.deepEqual(created, { ok: true, format: "json-schema", path: "payloads/todo.schema.json" });
+  assert.deepEqual(created, {
+    ok: true,
+    format: "json-schema",
+    path: "payloads/todo.schema.json",
+    reference: { format: "json-schema", path: "payloads/todo.schema.json" },
+    writeMode: "create-only",
+  });
   assert.deepEqual(JSON.parse(readFileSync(join(fx.contentRoot, created.path), "utf-8")), params.content);
 
   const refused = (await invoke(tool, fx.contentRoot, params)).details;
@@ -305,6 +311,32 @@ test("issue #31: provider validation and typed creation accept complete schema a
     const stored = JSON.parse(readFileSync(join(contentRoot, result.path), "utf8"));
     assert.deepEqual(stored.payload, artifact.payload);
   }
+});
+
+test("issue #32: an OpenAPI payload result flows directly into kiln_create_api_spec", async () => {
+  const { contentRoot } = await project();
+  const tools = registered();
+  const written = (await invoke(tools.get("kiln_write_payload"), contentRoot, {
+    format: "openapi-3.1",
+    path: "payloads/dock.openapi.json",
+    content: { openapi: "3.1.0", info: { title: "Dock API", version: "1.0.0" }, paths: {} },
+  })).details;
+  assert.equal(written.ok, true, JSON.stringify(written));
+  assert.equal(written.writeMode, "create-only");
+
+  const created = (await invoke(tools.get("kiln_create_api_spec"), contentRoot, {
+    artifact: { title: "Dock API", payload: written.reference },
+  })).details;
+  assert.equal(created.ok, true, JSON.stringify(created));
+  const stored = JSON.parse(readFileSync(join(contentRoot, created.path), "utf8"));
+  assert.deepEqual(stored.payload, written.reference);
+
+  const overwrite = (await invoke(tools.get("kiln_write_payload"), contentRoot, {
+    format: "openapi-3.1",
+    path: "payloads/dock.openapi.json",
+    content: { openapi: "3.1.0", info: { title: "Changed", version: "2.0.0" }, paths: {} },
+  })).details;
+  assert.equal(overwrite.code, "payload-exists", "create-only semantics were not explicit at the boundary");
 });
 
 /* ============================================ what they return ================================= */
