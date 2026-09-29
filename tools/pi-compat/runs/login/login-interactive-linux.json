@@ -2,9 +2,9 @@
   "meta": {
     "platform": "linux",
     "node": "v24.11.0",
-    "pinned": "0.84.4",
-    "piVersion": "0.84.4",
-    "ranAt": "2026-09-21T15:51:18.342Z",
+    "pinned": "0.87.1",
+    "piVersion": "0.87.1",
+    "ranAt": "2026-09-29T23:38:25.730Z",
     "launchArgs": [
       "--no-session",
       "--no-extensions",
@@ -28,7 +28,7 @@
   "interactive": {
     "piExit": 0,
     "scriptExit": 0,
-    "piElapsedMs": 36810,
+    "piElapsedMs": 49150,
     "signals": {
       "bracketedPasteEnabled": true,
       "cursorHidden": true,
@@ -36,7 +36,7 @@
     },
     "tuiObserved": true,
     "loginTyped": true,
-    "keyOccurrencesRedacted": 3
+    "keyOccurrencesRedacted": 2
   },
   "authBefore": {
     "exit": 1,

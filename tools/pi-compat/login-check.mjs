@@ -8,7 +8,7 @@
  * ⚠️ **LINUX ONLY.** Every run goes through `script(1)`, which gives Pi a pseudo-terminal and keeps a
  * byte transcript. Nothing here says how Pi behaves in a Windows terminal.
  *
- * ⚠️ **PI 0.84.4 HAS NO AUTHENTICATION-ONLY LAUNCH (F7).** `/login` exists only inside the full
+ * ⚠️ **THE PINNED PI HAS NO AUTHENTICATION-ONLY LAUNCH (F7).** `/login` exists only inside the full
  * interactive TUI, so that is what the interactive run launches. Whether auth is configured afterwards
  * is asked separately with `pi auth check --no-refresh`, which confirms locally configured auth and
  * does not show that a key works against a provider.

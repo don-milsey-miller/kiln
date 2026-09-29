@@ -4,8 +4,8 @@
 ────────────────────────────────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────────────────────────────────
-<TMP>/kiln-login-AJ4rGc/project
-0.0%/0 (auto)                                                            unknown pi v0.84.4
+<TMP>/kiln-login-it5cnD/project
+0.0%/0 (auto)                                                            unknown pi v0.87.1
  escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o
  more
  Press ctrl+o to show full startup help and loaded resources.
@@ -20,19 +20,20 @@
 ────────────────────────────────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────────────────────────────────
-<TMP>/kiln-login-AJ4rGc/project
+<TMP>/kiln-login-it5cnD/project
 0.0%/0 (auto)                                                            unknown Warning: No models available. Use /login to log into a provider via OAuth or
  API key. See:
 
- <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/providers.
- md
+ <CWD>/node_modules/@ear
+ endil-works/pi-coding-agent/docs/providers.md
 
- <CWD>/node_modules/@earendil-works/pi-coding-agent/docs/models.md
+ <CWD>/node_modules/@ear
+ endil-works/pi-coding-agent/docs/models.md
 
 ────────────────────────────────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────────────────────────────────
-<TMP>/kiln-login-AJ4rGc/project
+<TMP>/kiln-login-it5cnD/project
 0.0%/0 (auto)                                                            unknown
 
 

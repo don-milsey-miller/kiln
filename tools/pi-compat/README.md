@@ -22,9 +22,11 @@ the mechanism that makes an upgrade re-prove the contract instead of inheriting 
 whole of `TSK-0023`.
 
 The core Windows and Linux records were re-proved against 0.87.1 during the production dependency
-remediation in #34. The interactive `/login` and subscription OAuth records remain explicitly
-historical observations of 0.84.4: they require a person, a real terminal, and account-bound auth,
-so they were not relabelled as newer evidence. #37 tracks rerunning those two manual protocols.
+remediation in #34. Issue #37 re-proved the interactive `/login` and subscription OAuth protocols
+against that same exact pin. Those records still require a person, a real terminal, and—only for
+OAuth—account-bound authentication, so CI validates the retained sanitized observations rather than
+performing either login. [`runs/HISTORY.md`](runs/HISTORY.md) identifies the superseded 0.84.4 evidence
+without relabelling it as a newer observation.
 
 ## What it establishes
 
@@ -57,7 +59,7 @@ it actually verifies — and each has an acceptance criterion there:
 
 | Not proved | Why | Now owned by |
 | --- | --- | --- |
-| Pi's interactive `/login` in the full TUI, and what the same launch does with no TTY (Pi 0.84.4 has no authentication-only launch) | The suite does not perform the manual login, because it needs a real terminal. The Linux observation is recorded (`EVD-0123`, `ACC-0090`), and `test/pi-compat-login.test.mjs` checks that record in every run | `TSK-0065` → `CMP-0027` |
+| Pi's interactive `/login` in the full TUI, and what the same launch does with no TTY (the pinned Pi has no authentication-only launch) | The suite does not perform the manual login, because it needs a real terminal. The Linux observation is recorded (`EVD-0123`, `ACC-0090`), and `test/pi-compat-login.test.mjs` checks that record against the exact package pin in every run | `TSK-0065` → `CMP-0027` |
 | OAuth for a built-in provider | The suite does not perform the account-bound login. One manual Windows run has verified discovery after a real `/login` and its loss after removal (`EVD-0124`, `ACC-0091`), and `test/pi-compat-oauth.test.mjs` checks that record in every run. No model request or token refresh was tested, and a fabricated credential would prove a storage shape and nothing else (`DEC-0032`) | `TSK-0066` → `CMP-0027`, manual and outside CI |
 
 ⚠️ **Kiln's own no-TTY refusal is a third thing, and it is not here either.** It was split out of the

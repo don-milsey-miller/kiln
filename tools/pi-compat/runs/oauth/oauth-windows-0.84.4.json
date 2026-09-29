@@ -3,9 +3,9 @@
     "label": "manual, account-bound, single-instance; not a suite result",
     "platform": "win32",
     "node": "v24.18.0",
-    "pinned": "0.87.1",
-    "piVersion": "0.87.1",
-    "ranAt": "2026-09-29T23:44:31.674Z",
+    "pinned": "0.84.4",
+    "piVersion": "0.84.4",
+    "ranAt": "2026-09-21T19:13:03.300Z",
     "provider": "openai-codex",
     "model": "gpt-5.5",
     "launchArgs": [

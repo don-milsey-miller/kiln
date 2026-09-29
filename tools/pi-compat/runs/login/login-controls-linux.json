@@ -2,9 +2,9 @@
   "meta": {
     "platform": "linux",
     "node": "v24.11.0",
-    "pinned": "0.84.4",
-    "piVersion": "0.84.4",
-    "ranAt": "2026-09-21T14:26:46.690Z",
+    "pinned": "0.87.1",
+    "piVersion": "0.87.1",
+    "ranAt": "2026-09-29T23:25:01.268Z",
     "launchArgs": [
       "--no-session",
       "--no-extensions",
@@ -32,21 +32,21 @@
       "streams": "stdin TTY, stdout TTY",
       "piExit": 124,
       "timedOut": true,
-      "piElapsedMs": 20124,
+      "piElapsedMs": 20081,
       "signals": {
         "bracketedPasteEnabled": true,
         "cursorHidden": true,
         "alternateScreen": false
       },
       "tuiObserved": true,
-      "firstText": "────────────────────────────────────────────────────────────────────────────────\n                                                                                \n────────────────────────────────────────────────────────────────────────────────\n<TMP>/kiln-login-AJ4rGc/project\n0.0%/0 (auto)                                                            unknown pi v0.84.4                                                                     \n escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o     \n more                                                                           \n Pr"
+      "firstText": "────────────────────────────────────────────────────────────────────────────────\n\n────────────────────────────────────────────────────────────────────────────────\n<TMP>/kiln-login-it5cnD/project\n0.0%/0 (auto)                                                            unknown pi v0.87.1\n escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o\n more\n Press ctrl+o to show full startup help and loaded resources.\n\n Pi can explain its own features and look up its docs. Ask it how to use or\n extend Pi.\n\n\n Warning: fd not found. Offline mode enabled, skipping download.\n Warning: ripg"
     },
     {
       "label": "stdin-closed",
       "streams": "stdin /dev/null, stdout TTY",
       "piExit": 0,
       "timedOut": false,
-      "piElapsedMs": 322,
+      "piElapsedMs": 847,
       "signals": {
         "bracketedPasteEnabled": false,
         "cursorHidden": false,
@@ -60,7 +60,7 @@
       "streams": "stdin an open pipe, stdout TTY",
       "piExit": 124,
       "timedOut": true,
-      "piElapsedMs": 19312,
+      "piElapsedMs": 18124,
       "signals": {
         "bracketedPasteEnabled": false,
         "cursorHidden": false,
@@ -74,7 +74,7 @@
       "streams": "stdin TTY, stdout a pipe",
       "piExit": 0,
       "timedOut": false,
-      "piElapsedMs": 244,
+      "piElapsedMs": 808,
       "signals": {
         "bracketedPasteEnabled": false,
         "cursorHidden": false,
@@ -88,7 +88,7 @@
       "streams": "stdin an open pipe, stdout a pipe",
       "piExit": 124,
       "timedOut": true,
-      "piElapsedMs": 20017,
+      "piElapsedMs": 20059,
       "signals": {
         "bracketedPasteEnabled": false,
         "cursorHidden": false,
