@@ -15,6 +15,7 @@ import {
   evaluateStageGate,
   readStageDocs,
 } from "../server/stages.js";
+import { artifactReviewChoices } from "../_review/artifact-review-choices.js";
 
 /**
  * The single application reader — CMP-0012, TSK-0005.
@@ -254,4 +255,12 @@ export async function readArtifactSummary(id) {
     reviewStatus: doc.reviewStatus ?? "draft",
     lifecycle: doc.lifecycle ?? "active",
   };
+}
+
+/** Reviewable artifacts for the no-selection state; inactive and retired records stay absent. */
+export async function readArtifactSummaries() {
+  await connection();
+  const { projectRoot, contentRoot } = planningRoots();
+  const ctx = context(projectRoot, contentRoot);
+  return artifactReviewChoices(lintProject(ctx).records, ctx.activated);
 }

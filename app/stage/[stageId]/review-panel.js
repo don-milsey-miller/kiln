@@ -1,4 +1,4 @@
-import { readArtifactSummary } from "../../_read/planning.js";
+import { readArtifactSummaries, readArtifactSummary } from "../../_read/planning.js";
 import { submitReviewStatus } from "../../_write/review-action.js";
 import { REVIEW_MESSAGE } from "../../_write/review-logic.js";
 
@@ -35,12 +35,36 @@ const STATUS_TONE = {
 export default async function ReviewPanel({ artifactId, stageId, reviewError }) {
   const artifact = artifactId ? await readArtifactSummary(artifactId) : null;
 
-  if (!artifactId)
+  if (!artifactId) {
+    const artifacts = await readArtifactSummaries();
+    if (artifacts.length === 0)
+      return (
+        <section data-vpw-review="empty" style={{ color: "#666", fontSize: ".85rem" }}>
+          This project has no active artifacts available for review yet.
+        </section>
+      );
+
     return (
-      <section data-vpw-review="none" style={{ color: "#888", fontSize: ".85rem" }}>
-        No artifact selected. Add <code>?artifact=AST-0021</code> to review one.
+      <section data-vpw-review="chooser" style={{ borderTop: "1px solid #eee", paddingTop: "14px" }}>
+        <form method="get" action={`/stage/${stageId}`} style={{ display: "flex", alignItems: "end", gap: "10px", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: "min(28rem, 100%)", fontSize: ".82rem" }}>
+            <span style={{ color: "#666" }}>Select an artifact to review</span>
+            <select name="artifact" defaultValue="" required style={{ padding: ".35rem .45rem", fontSize: ".82rem", maxWidth: "100%" }}>
+              <option value="" disabled>Choose an active artifact…</option>
+              {artifacts.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {`${candidate.id} · ${candidate.type} · ${candidate.title || "Untitled"} · ${candidate.reviewStatus}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" style={{ padding: ".35rem .8rem", fontSize: ".82rem", cursor: "pointer" }}>
+            Review artifact
+          </button>
+        </form>
       </section>
     );
+  }
 
   if (!artifact)
     return (
