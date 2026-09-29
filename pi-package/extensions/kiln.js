@@ -1194,6 +1194,11 @@ export const MATERIAL_CHANGE_RULE = [
   "A stage skill may add to this rule and may not relax it.",
 ].join("\n");
 
+// A single frame preserves visible feedback without Pi's 80 ms animation timer. Animated
+// indicators cause every frame to repaint the interactive transcript; PTY recorders then
+// retain each full repaint and can accumulate megabytes while an operator is deciding.
+export const KILN_WORKING_INDICATOR = Object.freeze({ frames: ["●"] });
+
 async function stageContextBlock(event, deps) {
   let stageContext;
   try {
@@ -1238,7 +1243,14 @@ export default function register(pi, deps = {}) {
   // loaded without Kiln's `lib/` beside it has no supervisor to tell, and leaves Ctrl+C to Pi.
   let unsubscribeKeyboardStop = null;
   pi?.on?.("session_start", async (_event, ctx) => {
-    if (!ctx?.hasUI || typeof ctx.ui?.onTerminalInput !== "function") return;
+    if (!ctx?.hasUI) return;
+
+    // Pi's Loader only installs an interval when it has more than one frame. Keep this
+    // before the keyboard-stop setup so every interactive Kiln session is bounded, even
+    // when it was launched without the optional supervisor notice file.
+    ctx.ui?.setWorkingIndicator?.(KILN_WORKING_INDICATOR);
+
+    if (typeof ctx.ui?.onTerminalInput !== "function") return;
     let listener = null;
     try {
       listener = (deps.keyboardStop ?? (await import("../../lib/keyboard-stop.mjs"))).keyboardStopFor(ctx);
