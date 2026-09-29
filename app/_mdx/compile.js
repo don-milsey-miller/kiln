@@ -1,5 +1,6 @@
 import "server-only";
 import { compile, run } from "@mdx-js/mdx";
+import remarkGfm from "remark-gfm";
 import * as runtime from "react/jsx-runtime";
 
 import remarkRejectJs from "./reject-js.js";
@@ -13,8 +14,8 @@ import { PERMITTED, components } from "./components.js";
  * stage document changed nothing a running server served. `next.config.mjs` carries the same note,
  * because the absence of an MDX integration there is the other half of this decision.
  *
- * ⚠️ THE COMPILER AND ITS PLUGIN CHAIN ARE PINNED (`@mdx-js/mdx` at an exact version, one remark
- * plugin, no rehype or recma stage). DEC-0020's first obligation: changing the version or adding a
+ * ⚠️ THE COMPILER AND ITS PLUGIN CHAIN ARE PINNED (`@mdx-js/mdx` and `remark-gfm` at exact versions,
+ * the GFM syntax plugin followed by the rejection plugin, no rehype or recma stage). DEC-0020's first obligation: changing the version or adding a
  * plugin reopens security validation BEFORE it ships. The rejection was measured at the remark stage
  * only, and a later stage could reintroduce what it refused.
  *
@@ -72,7 +73,9 @@ export async function compileStageDocument({ name, text }) {
         format: "mdx",
         outputFormat: "function-body",
         development: false,
-        remarkPlugins: [[remarkRejectJs, { allow: PERMITTED }]],
+        // GFM contributes syntax only. The rejecting security plugin still sees the complete tree
+        // after parsing and remains the final remark transform before code generation.
+        remarkPlugins: [remarkGfm, [remarkRejectJs, { allow: PERMITTED }]],
         // ⚠️ No rehype or recma plugins. The pinning obligation is about the CHAIN, not the version.
       }
     );
