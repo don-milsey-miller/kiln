@@ -201,7 +201,9 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_link_evidence",
       "kiln_link_trace",
       "kiln_lint",
+      "kiln_list_artifacts",
       "kiln_project_status",
+      "kiln_read_artifact",
       "kiln_read_stage_attestations",
       "kiln_resolve_question",
       "kiln_revise_artifact",
@@ -247,6 +249,27 @@ test("kiln_write_payload creates a canonical schema and refuses overwrite", asyn
   const refused = (await invoke(tool, fx.contentRoot, params)).details;
   assert.equal(refused.ok, false);
   assert.equal(refused.code, "payload-exists");
+});
+
+test("kiln_list_artifacts and kiln_read_artifact return current typed records without changing the project", async () => {
+  const fx = await project({ traceTargets: true });
+  const tools = registered();
+  writeFileSync(join(fx.contentRoot, "project.yaml"), "capabilities:\n  artifactTypes:\n    activated: [requirement]\n");
+  const before = snapshot(fx.contentRoot);
+
+  const listed = (await invoke(tools.get("kiln_list_artifacts"), fx.contentRoot, { type: "requirement", limit: 1 })).details;
+  assert.equal(listed.ok, true, JSON.stringify(listed));
+  assert.deepEqual(listed.records.map((record) => record.artifact.id), [fx.ids.requirement]);
+  assert.match(listed.records[0].hash, /^sha256:(?:[0-9a-f]{8}-){7}[0-9a-f]{8}$/);
+
+  const read = (await invoke(tools.get("kiln_read_artifact"), fx.contentRoot, { id: fx.ids.requirement })).details;
+  assert.equal(read.ok, true, JSON.stringify(read));
+  assert.equal(read.artifact.id, fx.ids.requirement);
+  assert.equal(read.hash, listed.records[0].hash);
+
+  const missing = (await invoke(tools.get("kiln_read_artifact"), fx.contentRoot, { id: "REQ-9999" })).details;
+  assert.equal(missing.code, "unknown-id");
+  assertUnchanged(before, snapshot(fx.contentRoot), "artifact reads");
 });
 
 /* ============================================ what they return ================================= */

@@ -1540,6 +1540,69 @@ export default function register(pi, deps = {}) {
   });
 
   pi?.registerTool?.({
+    name: "kiln_list_artifacts",
+    label: "Kiln list artifacts",
+    description:
+      "List current, typed artifacts of one activated type. Results may be filtered by review status and " +
+      "are returned in stable pages with a content hash. Reads only; accepts no filesystem path.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: CREATION_TOOLS.map((entry) => entry.type) },
+        reviewStatus: { type: "string", enum: ["draft", "in-review", "approved", "amended"] },
+        cursor: { type: "string", minLength: 1, maxLength: 2048 },
+        limit: { type: "integer", minimum: 1, maximum: 50 },
+      },
+      required: ["type"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+      try {
+        const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
+        return rendered(await renderForModel(reader.listArtifacts(params ?? {}, context.ctx), context));
+      } catch (e) {
+        const code = e?.name === "ArtifactReadRefusal" ? e.code : "refused";
+        return rendered(await renderForModel(refusal(code, scrub(e?.message ?? String(e), context.contentRoot)), context));
+      }
+    },
+  });
+
+  pi?.registerTool?.({
+    name: "kiln_read_artifact",
+    label: "Kiln read artifact",
+    description:
+      "Read the current typed artifact with this id and return its validated record and content hash. " +
+      "Reads only; accepts no filesystem path.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+      try {
+        const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
+        return rendered(await renderForModel(reader.readArtifact(params ?? {}, context.ctx), context));
+      } catch (e) {
+        const code = e?.name === "ArtifactReadRefusal" ? e.code : "refused";
+        return rendered(await renderForModel(refusal(code, scrub(e?.message ?? String(e), context.contentRoot)), context));
+      }
+    },
+  });
+
+  pi?.registerTool?.({
     name: "kiln_project_status",
     label: "Kiln project status",
     description:
@@ -1721,6 +1784,7 @@ export default function register(pi, deps = {}) {
           {
             role: params?.role,
             task: params?.task,
+            contentRoot: context.contentRoot,
             toolRoot: context.toolRoot,
             agentDir,
             provider: selection.provider,

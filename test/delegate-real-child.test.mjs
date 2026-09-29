@@ -193,7 +193,7 @@ test("⚠️ ACC-0076 one real specialist child: the role, its tools, its report
 
     /* ---- 2. the provider receives exactly the expected intersection -------------------------- */
     assert.deepEqual(toolNames(request), EXPECTED_TOOLS, "the model was offered something other than the intersection");
-    assert.equal(toolNames(request).length, 8);
+    assert.equal(toolNames(request).length, EXPECTED_TOOLS.length);
     for (const builtin of ["bash", "read", "write", "edit", "ls", "grep"])
       assert.equal(toolNames(request).includes(builtin), false, `a built-in tool survived --no-builtin-tools: ${builtin}`);
 

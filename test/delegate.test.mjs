@@ -168,6 +168,7 @@ const deps = (script, extra = {}) => {
 const request = (over = {}) => ({
   role: "research",
   task: TASK,
+  contentRoot: join(tmpdir(), "kiln-delegate-content-fixture"),
   toolRoot: REPO,
   agentDir: join(tmpdir(), "kiln-delegate-agent-fixture"),
   provider: "openai-codex",
@@ -230,6 +231,8 @@ test("⚠️ ACC-0076 the child is launched with closed stdin, the intersected a
   // ⚠️ THE TASK IS IN THE FILE AND NOWHERE ELSE.
   assert.equal(args.join(" ").includes(TASK), false, "the task reached argv");
   assert.equal(JSON.stringify(options.env).includes(TASK), false, "the task reached the environment");
+  assert.equal(options.env.PLANNING_CONTENT_DIR, request().contentRoot, "the child was not pointed at the trusted project");
+  assert.equal(options.env.KILN_ARTIFACT_READ_TYPES, contractFor("research").readBoundary.types.join(","));
   assert.ok(script.calls[0].promptBody.includes(TASK), "the task did not reach the prompt file");
   if (process.platform !== "win32") assert.equal(script.calls[0].promptMode, 0o600, "the prompt file was world-readable");
 
