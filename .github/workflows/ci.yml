@@ -76,6 +76,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # High and critical production advisories fail closed. A temporary exception must identify one
+      # exact GHSA, link its approving issue, and expire within 30 days; malformed, stale, or unused
+      # exceptions fail too. See docs/dependency-security.md.
+      - name: Audit production dependencies
+        run: npm run audit:production
+
       # ⚠️ THE PACKAGED STAGE SKILLS MUST MATCH stages/, AND EVERY CELL SAYS SO. They are generated, never
       # hand-maintained, and a definition edited without regenerating is the drift CMP-0033 exists to
       # prevent: an agent working to exit criteria the application is not checking. The check writes

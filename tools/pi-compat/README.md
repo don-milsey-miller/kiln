@@ -1,4 +1,4 @@
-# Pi compatibility spike — `@earendil-works/pi-coding-agent` 0.84.4
+# Pi compatibility spike — `@earendil-works/pi-coding-agent` 0.87.1
 
 The runnable evidence behind section 21 of
 [`docs/agent-delivery-technical-proposal.md`](../../docs/agent-delivery-technical-proposal.md), and
@@ -20,6 +20,11 @@ rests on has quietly rotted.
 the pin recorded in each result file and refuses a mismatch, naming the command to re-run. That is
 the mechanism that makes an upgrade re-prove the contract instead of inheriting it — which is the
 whole of `TSK-0023`.
+
+The core Windows and Linux records were re-proved against 0.87.1 during the production dependency
+remediation in #34. The interactive `/login` and subscription OAuth records remain explicitly
+historical observations of 0.84.4: they require a person, a real terminal, and account-bound auth,
+so they were not relabelled as newer evidence. #37 tracks rerunning those two manual protocols.
 
 ## What it establishes
 

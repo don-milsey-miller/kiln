@@ -26,7 +26,8 @@ import { redactionViolations } from "../tools/pi-compat/lib/redact.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FILE = join(ROOT, "tools", "pi-compat", "runs", "oauth", "oauth-windows.json");
-const PINNED = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).dependencies["@earendil-works/pi-coding-agent"];
+// Historical evidence, deliberately not relabelled after the security upgrade (#37).
+const RECORDED_PIN = "0.84.4";
 const text = readFileSync(FILE, "utf8");
 const r = JSON.parse(text);
 
@@ -38,11 +39,11 @@ const LAUNCH_ARGS = [
   "--no-context-files", "--no-approve", "--offline",
 ];
 
-test("the OAuth record is labelled manual and account-bound, and names its target and pin", () => {
+test("the historical OAuth record is labelled manual and account-bound, and names its actual target and pin", () => {
   assert.match(r.meta.label, /manual, account-bound, single-instance; not a suite result/);
   assert.equal(r.meta.platform, "win32");
-  assert.equal(r.meta.pinned, PINNED, `the record was taken against pin ${r.meta.pinned}`);
-  assert.equal(r.meta.piVersion, PINNED);
+  assert.equal(r.meta.pinned, RECORDED_PIN, `the historical pin was rewritten from ${r.meta.pinned}`);
+  assert.equal(r.meta.piVersion, RECORDED_PIN);
   assert.equal(r.meta.provider, PROVIDER);
   assert.equal(r.meta.model, MODEL);
   assert.deepEqual(r.meta.launchArgs, LAUNCH_ARGS);
