@@ -176,8 +176,8 @@ async function runSmokeCheck(t) {
     /* ------------------------------------ a change under stages/ reaches the change stream (TSK-0063) */
 
     // ⚠️ ONLY A STAGE DOCUMENT IS TOUCHED, NOTHING UNDER data/. The route used to watch data/ alone, so the Stage 1
-    // answer an agent writes to stages/ never reached an open page. The watcher starts on the first subscriber and
-    // is not awaited, so the file is touched every 2 s until a change arrives, within a bound.
+    // answer an agent writes to stages/ never reached an open page. Wait for the explicit watcher-ready frame before
+    // making one real write; a heartbeat proves only that SSE is alive, not that chokidar completed its initial scan.
     {
       const controller = new AbortController();
       const res = await fetch(`http://127.0.0.1:${PORT}/events`, { signal: controller.signal });
@@ -188,21 +188,31 @@ async function runSmokeCheck(t) {
       const original = readFileSync(stageFile, "utf-8");
       let received = "";
       let changed = false;
+      let wrote = false;
+      const timeline = [];
       const reading = (async () => {
         for (;;) {
           const { value, done } = await reader.read();
           if (done) return;
           received += decoder.decode(value, { stream: true });
+          if (!wrote && /^event: ready$/m.test(received)) {
+            wrote = true;
+            timeline.push("watcher-ready-received", "file-write-started");
+            writeFileSync(stageFile, `${original}\n<!-- watcher-ready smoke write -->\n`);
+          }
           if (/^event: change$/m.test(received)) return (changed = true);
         }
       })().catch(() => {});
       const deadline = Date.now() + 30_000;
-      for (let n = 1; !changed && Date.now() < deadline; n++) {
-        writeFileSync(stageFile, `${original}\n<!-- touched ${n} -->\n`);
+      while (!changed && Date.now() < deadline) {
         await Promise.race([reading, sleep(2000)]);
       }
+      if (changed) timeline.push("change-delivered-over-sse");
       controller.abort();
-      assert.ok(changed, `a write under stages/ never reached /events within 30 s; received:\n${received.slice(-400)}`);
+      assert.ok(
+        changed,
+        `a write under stages/ never reached /events within 30 s; timeline=${timeline.join(" -> ") || "no-ready-frame"}; received:\n${received.slice(-400)}`
+      );
     }
 
     /* ---------------------------------------------------- the health endpoint, over real HTTP */
@@ -313,7 +323,7 @@ async function runSmokeCheck(t) {
     // ⚠️ READ INCREMENTALLY, NEVER `await res.text()`. An event stream does not finish; awaiting
     // the body would hang until the timeout and report a stream that was working perfectly as a
     // failure. The reader is released as soon as both frames have been seen.
-    const streamFrames = async (afterOpen) => {
+    const streamFrames = async (afterReady) => {
       const controller = new AbortController();
       const res = await fetch(`http://127.0.0.1:${PORT}/events`, {
         signal: controller.signal,
@@ -325,15 +335,23 @@ async function runSmokeCheck(t) {
       const decoder = new TextDecoder();
       let text = "";
       let fired = false;
+      const timeline = [];
       const deadline = Date.now() + 20_000;
 
       while (Date.now() < deadline) {
-        if (!fired && /event: heartbeat/.test(text)) {
+        if (!fired && /event: ready/.test(text)) {
           fired = true;
-          await afterOpen();
+          timeline.push("watcher-ready-received", "file-write-started");
+          await afterReady();
         }
-        if (/event: heartbeat/.test(text) && /event: change/.test(text)) break;
-        const { value, done } = await reader.read();
+        if (/event: heartbeat/.test(text) && /event: ready/.test(text) && /event: change/.test(text)) {
+          timeline.push("change-delivered-over-sse");
+          break;
+        }
+        const remaining = Math.max(1, deadline - Date.now());
+        const result = await Promise.race([reader.read(), sleep(remaining).then(() => ({ timedOut: true }))]);
+        if (result.timedOut) break;
+        const { value, done } = result;
         if (done) break;
         text += decoder.decode(value, { stream: true });
       }
@@ -343,18 +361,24 @@ async function runSmokeCheck(t) {
       } catch {
         /* the abort already tore it down */
       }
-      return text;
+      return { text, timeline };
     };
 
     const watched = join(contentCopy, "planning-content", "data", "assertions", "AST-0001.json");
-    const frames = await streamFrames(async () => {
+    const capture = await streamFrames(async () => {
       await sleep(300);
       writeFileSync(watched, readFileSync(watched, "utf-8"));
     });
+    const frames = capture.text;
 
     assert.match(frames, /event: heartbeat/, "a NAMED heartbeat, not a comment frame — a comment fires no listener");
     assert.match(frames, /data: \{"ok":true\}/, "carrying data, so a client listener receives something");
-    assert.match(frames, /event: change/, "and a change hint after a real file was written");
+    assert.match(frames, /event: ready/, "watcher readiness must be explicit rather than inferred from a heartbeat");
+    assert.match(
+      frames,
+      /event: change/,
+      `and a change hint after a real file was written; timeline=${capture.timeline.join(" -> ") || "no-ready-frame"}`
+    );
     assert.ok(!/^id:/m.test(frames), "no event ids: hints are not deltas, so there is nothing to resume");
 
     /* ------------------------------------------------- the client half actually SHIPS (CMP-0017) */
