@@ -1324,20 +1324,26 @@ export default function register(pi, deps = {}) {
     name: "kiln_write_payload",
     label: "Kiln write canonical payload",
     description:
-      "Create a canonical JSON Schema payload beneath this project's planning content. The path must end " +
-      "with .schema.json. Parent directories are created, and an existing file is never overwritten.",
+      "Create a validated JSON Schema or OpenAPI 3.0/3.1 JSON payload beneath this project's planning " +
+      "content. Parent directories are created. This is create-only: an existing file is never overwritten.",
     parameters: {
       type: "object",
       properties: {
-        format: { type: "string", enum: ["json-schema"] },
+        format: { type: "string", enum: ["json-schema", "openapi-3.0", "openapi-3.1"] },
         path: {
           type: "string",
-          pattern: "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+\\.schema\\.json$",
-          description: "Path relative to planning-content, such as payloads/task.schema.json.",
+          pattern: "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+\\.json$",
+          description: "Path relative to planning-content. JSON Schema names end in .schema.json; OpenAPI names end in .json.",
         },
-        content: { type: "object", description: "The complete JSON Schema document." },
+        content: { type: "object", description: "The complete JSON Schema or OpenAPI document." },
       },
       required: ["format", "path", "content"],
+      allOf: [
+        {
+          if: { properties: { format: { const: "json-schema" } }, required: ["format"] },
+          then: { properties: { path: { pattern: "\\.schema\\.json$" } } },
+        },
+      ],
       additionalProperties: false,
     },
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
@@ -1351,7 +1357,7 @@ export default function register(pi, deps = {}) {
       try {
         const writer = deps.payloadWriter ?? (await import("../../lib/payload-write.mjs"));
         const result = await writer.writePayload(params ?? {}, { contentRoot: context.contentRoot });
-        return rendered({ ok: true, format: result.format, path: result.path });
+        return rendered({ ok: true, format: result.format, path: result.path, reference: result.reference, writeMode: result.writeMode });
       } catch (e) {
         const code = {
           PayloadValidationError: "invalid-payload",
