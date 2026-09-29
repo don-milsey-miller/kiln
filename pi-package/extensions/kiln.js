@@ -2106,7 +2106,7 @@ export default function register(pi, deps = {}) {
   });
 
   /**
-   * The operator's answer, written into the stage's document (ACC-0113).
+   * The operator's answer or Kiln-owned Working notes, written into the stage's document (ACC-0113).
    *
    * ⚠️ **THE ONLY WAY A STAGE DOCUMENT IS WRITTEN.** Editing the file directly is what this replaces: a
    * model with a file editor can rewrite a person's words while claiming to record them, and nothing in
@@ -2120,12 +2120,17 @@ export default function register(pi, deps = {}) {
     name: "kiln_write_stage_document",
     label: "Kiln write stage document",
     description:
-      "Record one operator answer in a stage's document: their own words exactly as they gave them, and, " +
-      "separately, what Kiln took from them. Appends one entry; never rewrites what is already there.",
+      "Record an operator answer, inspect agent-owned Working notes, or append/replace one named Working-notes " +
+      "subsection. Notes writes require the full-document revision returned by read-working-notes.",
     parameters: {
       type: "object",
       properties: {
         stage: { type: "string", pattern: "^[0-9]{2}-[a-z0-9-]+$", description: "A stage id, such as 01-intake." },
+        action: {
+          type: "string",
+          enum: ["read-working-notes", "append-working-note", "replace-working-note"],
+          description: "Omit to record an operator answer; otherwise inspect or update Working notes.",
+        },
         verbatim: {
           type: "string",
           description:
@@ -2136,8 +2141,32 @@ export default function register(pi, deps = {}) {
           type: "string",
           description: "One line: what Kiln takes this answer to mean. Kiln's words, kept separate from theirs.",
         },
+        subsection: { type: "string", pattern: "^[a-z0-9][a-z0-9-]{0,63}$", description: "Stable subsection name." },
+        title: { type: "string", minLength: 1, maxLength: 120, pattern: "^[^\\r\\n]+$", description: "Rendered level-three heading." },
+        content: { type: "string", minLength: 1, description: "Markdown body; tables, lists, links and source citations are supported." },
+        expectedRevision: {
+          type: "string",
+          pattern: "^sha256:[a-f0-9]{64}$",
+          description: "Full-document revision returned by read-working-notes. Required for append and replace.",
+        },
       },
-      required: ["stage", "verbatim", "interpretation"],
+      required: ["stage"],
+      oneOf: [
+        {
+          required: ["verbatim", "interpretation"],
+          not: { anyOf: ["action", "subsection", "title", "content", "expectedRevision"].map((name) => ({ required: [name] })) },
+        },
+        {
+          properties: { action: { const: "read-working-notes" } },
+          required: ["action"],
+          not: { anyOf: ["verbatim", "interpretation", "subsection", "title", "content", "expectedRevision"].map((name) => ({ required: [name] })) },
+        },
+        {
+          properties: { action: { enum: ["append-working-note", "replace-working-note"] } },
+          required: ["action", "subsection", "title", "content", "expectedRevision"],
+          not: { anyOf: ["verbatim", "interpretation"].map((name) => ({ required: [name] })) },
+        },
+      ],
       additionalProperties: false,
     },
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
@@ -2150,6 +2179,29 @@ export default function register(pi, deps = {}) {
 
       const documents = deps.stageDocuments ?? (await import("../../lib/stage-documents.mjs"));
       try {
+        if (params?.action === "read-working-notes") {
+          const notes = documents.readWorkingNotes(context.contentRoot, params?.stage);
+          return rendered({
+            ok: true,
+            action: params.action,
+            stage: notes.stageId,
+            path: relativeTo(context.contentRoot, notes.path),
+            revision: notes.revision,
+            subsections: notes.subsections,
+          });
+        }
+        if (params?.action === "append-working-note" || params?.action === "replace-working-note") {
+          const written = await documents.writeWorkingNotes(context.contentRoot, params?.stage, params);
+          return rendered({
+            ok: true,
+            action: written.action,
+            stage: written.stageId,
+            path: relativeTo(context.contentRoot, written.path),
+            subsection: written.subsection,
+            subsectionRevision: written.subsectionRevision,
+            revision: written.revision,
+          });
+        }
         const written = await documents.writeStageDocumentEntry(context.contentRoot, params?.stage, {
           verbatim: params?.verbatim,
           interpretation: params?.interpretation,

@@ -41,12 +41,13 @@ Agree the risk register with the operator, and raise each load-bearing assertion
 2. Enumerate the design claims whose failure would change the plan, and ensure each is represented by a load-bearing assertion; if there are none, state why before proposing n/a.
 3. Draft the risk register in chat: one row per credible failure, with its category, its severity, and its mitigation or a proposed accepted-risk signoff.
 4. Do not create a typed artifact for a risk or substitute another type for one; `risk` has no schema or tool (DEC-0013), and the register is prose.
-5. Ask the operator to review the register, and record their reply with `writeStageDocument`.
-6. Delegate to the validation specialist to run the declared check behind any assertion below its required rung.
-7. Link the returned evidence to the assertion it bears on.
-8. In the `high-severity-risks-mitigated` attestation, name each high-severity risk and the mitigation or the operator's accepted-risk signoff behind it.
-9. In the `load-bearing-assertions-at-rung` attestation, name each load-bearing assertion and its derived rung; if the enumeration is empty, record n/a with the reason instead of satisfied.
-10. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+5. Read the stage Working notes to obtain its revision, then append or replace the named `risk-register` subsection with the complete Markdown register before requesting review.
+6. Ask the operator to review the register, and record their reply with `writeStageDocument`.
+7. Delegate to the validation specialist to run the declared check behind any assertion below its required rung.
+8. Link the returned evidence to the assertion it bears on.
+9. In the `high-severity-risks-mitigated` attestation, name each high-severity risk and the mitigation or the operator's accepted-risk signoff behind it.
+10. In the `load-bearing-assertions-at-rung` attestation, name each load-bearing assertion and its derived rung; if the enumeration is empty, record n/a with the reason instead of satisfied.
+11. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 

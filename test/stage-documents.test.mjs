@@ -8,9 +8,14 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { compile, run } from "@mdx-js/mdx";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import * as runtime from "react/jsx-runtime";
 
 import { buildScaffold } from "../lib/project-scaffold.mjs";
 import {
@@ -21,6 +26,9 @@ import {
   StageDocumentRefusal,
   intakeSection,
   parseIntakeSection,
+  parseWorkingNotes,
+  readWorkingNotes,
+  writeWorkingNotes,
   writeStageDocumentEntry,
 } from "../lib/stage-documents.mjs";
 
@@ -362,6 +370,108 @@ test("⚠️ ACC-0113 concurrent writes serialise, keep both entries, and leave 
     assert.deepEqual(parsed.readings.map((r) => r.text).sort(), ["from the left", "from the right"]);
 
     assert.deepEqual(readdirSync(join(f.contentRoot, "stages")), ["01-intake.md"], "the write left a temporary file behind");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+/* ============================================================================ working notes */
+
+test("issue #33: named Working-notes subsections append and replace as renderable Markdown", async () => {
+  const f = project();
+  try {
+    const initial = readWorkingNotes(f.contentRoot, "01-intake");
+    assert.deepEqual(initial.subsections, []);
+    assert.match(initial.revision, /^sha256:[a-f0-9]{64}$/);
+
+    const content = [
+      "| Risk | Mitigation |",
+      "|---|---|",
+      "| Stale data | Revalidate before publish |",
+      "",
+      "- Owner: platform",
+      "- Source: [OpenAPI specification](https://spec.openapis.org/oas/latest.html)",
+    ].join("\n");
+    const appended = await writeWorkingNotes(f.contentRoot, "01-intake", {
+      action: "append-working-note",
+      subsection: "risk-register",
+      title: "Risk register",
+      content,
+      expectedRevision: initial.revision,
+    });
+    assert.equal(appended.subsectionRevision, 1);
+    assert.notEqual(appended.revision, initial.revision);
+    assert.deepEqual(readWorkingNotes(f.contentRoot, "01-intake").subsections, [
+      { name: "risk-register", title: "Risk register", revision: 1, content },
+    ]);
+    await compile(read(f), { format: "mdx" });
+
+    const replacement = "1. Verify the release.\n2. Roll back on a failed health check.";
+    const replaced = await writeWorkingNotes(f.contentRoot, "01-intake", {
+      action: "replace-working-note",
+      subsection: "risk-register",
+      title: "Release runbook",
+      content: replacement,
+      expectedRevision: appended.revision,
+    });
+    assert.equal(replaced.subsectionRevision, 2);
+    assert.deepEqual(readWorkingNotes(f.contentRoot, "01-intake").subsections, [
+      { name: "risk-register", title: "Release runbook", revision: 2, content: replacement },
+    ]);
+
+    const cited = "See [the source](https://example.test/source).\n";
+    await writeWorkingNotes(f.contentRoot, "01-intake", {
+      action: "append-working-note",
+      subsection: "source-notes",
+      title: "Source notes",
+      content: cited,
+      expectedRevision: replaced.revision,
+    });
+    assert.equal(readWorkingNotes(f.contentRoot, "01-intake").subsections[1].content, cited, "authored Markdown was normalised");
+    const compiled = await compile(read(f), { format: "mdx", outputFormat: "function-body", development: false });
+    const rendered = renderToStaticMarkup(createElement((await run(String(compiled), { ...runtime, baseUrl: import.meta.url })).default));
+    assert.equal(rendered.includes("kiln-working-note"), false, `audit framing leaked into the rendered document: ${rendered}`);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("issue #33: stale, ambiguous, and out-of-region Working-notes writes are actionable refusals and atomic", async () => {
+  const f = project();
+  try {
+    const initial = readWorkingNotes(f.contentRoot, "01-intake");
+    const first = await writeWorkingNotes(f.contentRoot, "01-intake", {
+      action: "append-working-note",
+      subsection: "first-note",
+      title: "First note",
+      content: "- safely framed",
+      expectedRevision: initial.revision,
+    });
+
+    for (const [code, request] of [
+      [STAGE_DOCUMENT_REFUSAL.REVISION_CONFLICT, { action: "append-working-note", subsection: "second-note", title: "Second", content: "stale", expectedRevision: initial.revision }],
+      [STAGE_DOCUMENT_REFUSAL.SUBSECTION_EXISTS, { action: "append-working-note", subsection: "first-note", title: "First", content: "duplicate", expectedRevision: first.revision }],
+      [STAGE_DOCUMENT_REFUSAL.SUBSECTION_MISSING, { action: "replace-working-note", subsection: "missing-note", title: "Missing", content: "absent", expectedRevision: first.revision }],
+      [STAGE_DOCUMENT_REFUSAL.INVALID_REQUEST, { action: "append-working-note", subsection: "escape", title: "Escape", content: "## Outside\nNo.", expectedRevision: first.revision }],
+    ]) {
+      const before = read(f);
+      await assert.rejects(writeWorkingNotes(f.contentRoot, "01-intake", request), refuses(code));
+      assert.equal(read(f), before, code);
+    }
+
+    const damaged = read(f).replace("[kiln-working-note", "unowned prose\n[kiln-working-note");
+    writeFileSync(f.path, damaged);
+    await assert.rejects(
+      writeWorkingNotes(f.contentRoot, "01-intake", {
+        action: "replace-working-note",
+        subsection: "first-note",
+        title: "First",
+        content: "replacement",
+        expectedRevision: `sha256:${createHash("sha256").update(damaged, "utf8").digest("hex")}`,
+      }),
+      refuses(STAGE_DOCUMENT_REFUSAL.WORKING_NOTES_INVALID)
+    );
+    assert.throws(() => parseWorkingNotes(damaged), refuses(STAGE_DOCUMENT_REFUSAL.WORKING_NOTES_INVALID));
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }

@@ -1992,6 +1992,80 @@ test("⚠️ ACC-0113 an answer is written into the stage document, wording apar
   assert.ok(document().endsWith("## Working notes\n\n_Nothing yet._\n"), "the document's own material was rewritten");
 });
 
+test("issue #33: Stage 6 risk registers and Stage 9 runbooks round-trip through revision-safe Working notes", async () => {
+  const { contentRoot } = await project();
+  const tool = registered().get("kiln_write_stage_document");
+  const stagePath = (stage) => join(contentRoot, "stages", `${stage}.md`);
+  for (const stage of ["06-risk-feasibility", "09-handoff"])
+    writeFileSync(stagePath(stage), `# ${stage}\n\n## Working notes\n\n_No stage-specific narrative has been recorded._\n\n## Exit criteria\n\nPending.\n`);
+
+  const cases = [
+    {
+      stage: "06-risk-feasibility",
+      subsection: "risk-register",
+      title: "Risk register",
+      content: "| Risk | Severity | Mitigation |\n|---|---|---|\n| Stale revision | High | Re-read before retry |\n\nSource: [Git documentation](https://git-scm.com/docs)",
+    },
+    {
+      stage: "09-handoff",
+      subsection: "developer-runbook",
+      title: "Developer runbook",
+      content: "1. Install dependencies.\n2. Run the test suite.\n3. Verify the health check.",
+    },
+  ];
+
+  for (const fixture of cases) {
+    const beforeRead = snapshot(contentRoot);
+    const read = (await invoke(tool, contentRoot, { stage: fixture.stage, action: "read-working-notes" })).details;
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.deepEqual(read.subsections, []);
+    assert.match(read.revision, /^sha256:[a-f0-9]{64}$/);
+    assertUnchanged(beforeRead, snapshot(contentRoot), `${fixture.stage} read`);
+
+    const appended = (
+      await invoke(tool, contentRoot, {
+        stage: fixture.stage,
+        action: "append-working-note",
+        subsection: fixture.subsection,
+        title: fixture.title,
+        content: fixture.content,
+        expectedRevision: read.revision,
+      })
+    ).details;
+    assert.equal(appended.ok, true, JSON.stringify(appended));
+    assert.equal(appended.subsectionRevision, 1);
+
+    const staleBefore = snapshot(contentRoot);
+    const stale = (
+      await invoke(tool, contentRoot, {
+        stage: fixture.stage,
+        action: "replace-working-note",
+        subsection: fixture.subsection,
+        title: fixture.title,
+        content: "This stale replacement must not land.",
+        expectedRevision: read.revision,
+      })
+    ).details;
+    assert.equal(stale.code, "stage-document-revision-conflict", JSON.stringify(stale));
+    assert.match(stale.message, /Read working notes again/i);
+    assertUnchanged(staleBefore, snapshot(contentRoot), `${fixture.stage} stale replace`);
+
+    const refreshed = (await invoke(tool, contentRoot, { stage: fixture.stage, action: "read-working-notes" })).details;
+    assert.deepEqual(refreshed.subsections, [{ name: fixture.subsection, title: fixture.title, revision: 1, content: fixture.content }]);
+    const replaced = (
+      await invoke(tool, contentRoot, {
+        stage: fixture.stage,
+        action: "replace-working-note",
+        subsection: fixture.subsection,
+        title: fixture.title,
+        content: `${fixture.content}\n\n- Reviewed for handoff.`,
+        expectedRevision: refreshed.revision,
+      })
+    ).details;
+    assert.equal(replaced.subsectionRevision, 2);
+  }
+});
+
 test("⚠️ ACC-0113 every stage-document refusal leaves every byte and modification time alone", async () => {
   const { contentRoot } = await project();
   const tools = registered();
