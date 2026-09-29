@@ -216,10 +216,34 @@
                     "null"
                   ]
                 },
+                "supportsMaxOutputTokens": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "supportsMidConvoEffort": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
                 "supportsMidConvoSystemMessages": {
                   "type": [
                     "boolean",
                     "string",
+                    "null"
+                  ]
+                },
+                "supportsMidConvoToolAdditions": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "supportsMidConvoToolChanges": {
+                  "type": [
+                    "boolean",
                     "null"
                   ]
                 },
@@ -304,6 +328,12 @@
                   "type": [
                     "boolean",
                     "string",
+                    "null"
+                  ]
+                },
+                "vllmPriority": {
+                  "type": [
+                    "number",
                     "null"
                   ]
                 },

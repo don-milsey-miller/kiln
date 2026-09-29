@@ -392,6 +392,7 @@ const EXACT_DECLARED_NAMES = Object.freeze({
     huggingface: ["HF_TOKEN"],
     "kimi-coding": ["KIMI_API_KEY"],
     "llama.cpp": ["LLAMA_BASE_URL", "LLAMA_API_KEY"],
+    meta: ["META_API_KEY"],
     minimax: ["MINIMAX_API_KEY"],
     "minimax-cn": ["MINIMAX_CN_API_KEY"],
     mistral: ["MISTRAL_API_KEY"],
