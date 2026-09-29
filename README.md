@@ -171,6 +171,12 @@ For launcher options and shutdown behavior, see
 | `npm run init:project -- --project-root <path> --name <name>` | Create a new project's `planning-content/`. |
 | `npm start` | Install if needed, build the production app, and start it on loopback. |
 | `npm test` | Run the full Node.js test suite. |
+| `npm run test:ci:core` | Run deterministic core tests and print per-file timing. |
+| `npm run test:ci:node` | Run the Node-version compatibility group and print per-file timing. |
+| `npm run test:ci:platform` | Run process, filesystem, and shutdown tests and print per-file timing. |
+| `npm run test:ci:setup` | Run setup, recovery, and transaction tests and print per-file timing. |
+| `npm run test:ci:consumer` | Run clean-consumer and production-shell journeys and print per-file timing. |
+| `npm run test:pi-compat` | Run retained Pi compatibility evidence; set `KILN_PI_COMPAT=live` for the live proof. |
 | `npm run shell:build` | Build the Next.js application without starting it. |
 | `npm run lint:shell` | Check the boundary between the application and the planning engine. |
 | `npm run lint:plan` | Validate the content selected by `PLANNING_CONTENT_DIR`. |
@@ -179,6 +185,9 @@ For launcher options and shutdown behavior, see
 | `npm run research:search -- "question" --project-root <path>` | Search for candidate sources without changing project files. Refused on the same terms. |
 | `npm run migrate:content` | Preview a content-schema migration; add `-- --apply` to write it. |
 | `npm run dev` | Run the older standalone watcher prototype, not the main application. |
+
+The CI grouping contract and environment rationale are documented in
+[`docs/continuous-integration.md`](docs/continuous-integration.md).
 
 When working with this repository's own plan, set the content path explicitly for commands that use
 the shared content resolver:
