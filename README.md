@@ -1,97 +1,137 @@
 # Kiln
 
-Kiln is a local planning workspace for turning an early project idea into a plan that can survive
-implementation. It keeps requirements, decisions, evidence, tasks, and stage approvals in structured
-files, then presents the same material through a browser-based workspace.
+Kiln is a local-first project-planning system that turns an early idea into a structured,
+reviewable implementation handoff. It combines a Pi-powered planning agent with a browser workspace
+and keeps requirements, decisions, evidence, tasks, and approvals in version-controlled files.
 
-The repository also plans itself. The content in `planning-content/` is Kiln's own project history,
-and `docs/plan/` is the handoff package generated from it. That makes this checkout both the tool and
-a working example of its output.
+> **Status:** Kiln is pre-1.0 (`0.0.0`) and under active development. Its setup, planning-agent
+> package, browser workspace, validation, research, and handoff workflows are implemented and tested,
+> but the default branch is not a versioned release. Review tool changes before updating an active
+> project.
 
-## Project status
+## Prerequisites
 
-Kiln is pre-1.0 (`0.0.0`). The application, schemas, validation rules, research tools, project
-initializer, and handoff publisher are implemented and tested. One piece of the intended product is
-still missing:
+- Git.
+- Node.js 22.19.0 or newer. CI tests Node.js 22 and 24.
+- npm, which is included with Node.js.
+- An interactive terminal for first-time trust and provider authentication.
+- Internet access for cloning, dependency installation, and cloud-model authentication. A local
+  model is also supported when you configure and operate its server through Pi.
 
-- The packaged planning-agent roster has not been built yet. The specialist contracts in
-  `lib/specialists/` are present, but they are not a runnable agent package.
+Kiln runs on the local computer and needs no database or hosted application service. Using a cloud
+model can consume paid tokens or provider quota; setup asks before running a live model check.
 
-You can start a new planning workspace, run and develop Kiln, and inspect its own completed plan.
-What you cannot do yet is hand the planning work to a packaged agent roster.
+## Quick start
 
-## Start a new project
-
-From an empty project directory, in a terminal:
+Run these commands from an empty project directory:
 
 ```sh
 git init
 git clone https://github.com/don-milsey-miller/kiln.git .planning
-
-node .planning/bin/setup.mjs \
-  --name "My Project" \
-  --description "What this project is intended to accomplish"
-
+node .planning/bin/setup.mjs --name "My Project" --description "What this project should accomplish"
 node .planning/bin/start-kiln.mjs
 ```
 
-Setup installs Kiln's locked dependencies inside `.planning/` and creates your project's
-`planning-content/` beside it. It asks before each decision it needs from you: how to keep Kiln's
-local state out of your repository (adding `.planning/`, `.pi/sessions/` and `.pi/runtime/` to your
-`.gitignore`), whether to trust the project in Pi, whether Kiln may look at the models this computer
-has configured, which model to use, whether that model's use is confirmed, whether to enable web
-research, and whether to run the one live check that sends a model request. Each question has a flag
-for answering it in advance, such as `--state-protection fix-ignore` for the first;
-`node .planning/bin/setup.mjs --help` lists them. Running setup again with the same answers leaves a
-completed project's files unchanged.
+Setup installs the locked dependencies, creates `planning-content/`, protects Kiln's local state
+from Git, registers the bundled Pi package, and guides you through trust, model, and optional web
+research choices. It does not silently inspect provider credentials or send a model request.
 
-`start-kiln.mjs` checks the recorded model, starts the workspace on loopback and prints its address,
-then gives the terminal to Pi. A new session opens with `/kiln-start`, which begins Stage 1 by asking
-one question about your project. Answer in the terminal and follow the workspace in the browser. Quit
-Pi with `/quit`; Kiln stops the workspace with it. Running `start-kiln.mjs` again resumes the same
-session.
+When startup completes, Kiln prints a loopback URL such as <http://127.0.0.1:3000> and opens Pi in
+the terminal. A new session begins with `/kiln-start`; answer its project question, then follow the
+plan in the browser. Enter `/quit` in Pi to stop both processes. Run the same start command later to
+resume the project.
 
-To create only the planning content and browse it without an agent, see
-[`docs/initializing-a-project.md`](docs/initializing-a-project.md).
+Use `node .planning/bin/setup.mjs --help` to see every setup option and its refusal-safe exit code.
+Rerunning completed setup with the same choices does not rewrite the project.
 
-## Requirements
+## What Kiln creates
 
-- Git
-- Node.js 22 or newer (Node 22 and 24 are tested in CI)
-- npm, which is included with Node.js
+The tool and the project's planning records remain separate:
 
-Kiln runs locally and does not need a database or hosted service. Research is optional and may
-require credentials for the configured search provider.
+```text
+your-project/
+├── .planning/          # Kiln itself; ignored by the project repository
+├── planning-content/   # authored planning records; commit these
+└── docs/plan/          # generated handoff package after all gates pass
+```
 
-## First-run assumptions and current boundaries
+`planning-content/` moves through nine gated stages, from intake through handoff. Structured JSON
+files are the source of truth; stage documents and the browser are readable views of those records.
+Kiln refuses invalid writes and does not infer approval from prose or unchecked boxes.
 
-Kiln's content initializer needs only Node's built-in modules. The Pi agent-delivery setup described
-in [`docs/agent-delivery-technical-proposal.md`](docs/agent-delivery-technical-proposal.md) has
-additional operating assumptions:
+The repository is also its own working example: [`planning-content/`](planning-content/) contains
+Kiln's project history, and [`docs/plan/`](docs/plan/) is its generated handoff package.
 
-- **Internet connectivity is assumed.** A normal first run must be able to clone Kiln from GitHub,
-  install its locked npm dependencies, complete any provider authentication that requires a network,
-  and reach the selected cloud model service. Kiln does not currently promise an offline bootstrap,
-  proxy-specific setup, private-registry support, or custom-certificate setup. Tavily remains optional.
-- **Kiln itself is not version-pinned yet.** Before 1.0, the documented clone follows the repository's
-  current default branch. This remains intentional until a complete end-to-end project has been run
-  and the project manager is satisfied with the resulting project state. Kiln will then establish a
-  pinned release/version workflow for new projects; until that point, tool updates may change behavior.
-- **Local model servers are managed by the project manager.** When Pi uses llama.cpp, vLLM, Ollama,
-  LM Studio, or another local inference engine, the project manager owns its installation, model
-  files, configuration, startup, health, hardware resources, updates, and shutdown. Kiln may discover
-  and validate the Pi configuration, but it does not provision or operate the server. Managed local
-  inference is a possible later Kiln capability and is out of scope for the first agent-delivery
-  implementation.
-- **Model-provider usage may cost money.** The agent-delivery capability may be configured to use
-  services such as OpenAI or other paid model providers. Intake turns and delegated specialist work
-  can therefore consume billable tokens or provider quota. The project manager is responsible for the
-  selected account, pricing plan, limits, and charges; Kiln must disclose a potentially billable live
-  check before running one.
+## Common tasks
 
-## Work on Kiln itself
+### Resume the planning agent
 
-Clone the repository and install the locked dependency versions:
+From the containing project directory:
+
+```sh
+node .planning/bin/start-kiln.mjs
+```
+
+The launcher verifies the recorded model and project identity before starting the browser workspace
+and Pi. It refuses instead of silently changing providers, models, or planning content.
+
+### Open the browser without the agent
+
+Use browser-only mode when you want to inspect the workspace without starting Pi:
+
+```sh
+npm --prefix .planning start
+```
+
+Open <http://127.0.0.1:3000>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it. This command is not a
+substitute for `start-kiln.mjs` when you want the planning agent.
+
+### Update Kiln
+
+Review upstream changes, then update the ignored tool clone:
+
+```sh
+git -C .planning pull --ff-only
+```
+
+The next setup or start checks the locked dependency tree. Before 1.0, updates follow the current
+default branch rather than a compatibility-pinned release.
+
+### Publish the handoff
+
+After every required stage attestation and executable-artifact review passes:
+
+```sh
+npm --prefix .planning run handoff
+```
+
+The command validates the plan and writes a deterministic package to `docs/plan/`. See the
+[handoff contract](docs/handoff-contract.md) for gates, contents, and integrity rules.
+
+## Configuration
+
+Setup records non-secret project choices and machine-local approvals separately. Provider secrets
+remain in Pi's authentication store or the host environment; do not place them in
+`planning-content/`.
+
+| Setting | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `PORT` | No | `3000` | Loopback port for the browser workspace. The host remains `127.0.0.1`. |
+| `PLANNING_CONTENT_DIR` | No | Sibling `planning-content/` | Opens an explicit existing content directory. Kiln prints the resolved absolute path and refuses a missing path. |
+| `VPW_SHUTDOWN_GRACE_MS` | No | `8000` | Milliseconds the browser process may exit gracefully before termination escalates. |
+| `TAVILY_API_KEY` | Only for Tavily research | — | Enables the optional public-web research adapter after the project and this computer approve research. Treat it as a secret. |
+
+`setup.mjs` also accepts explicit non-interactive answers for automation, including `--trust`,
+`--provider`, `--model`, `--thinking`, `--research`, and `--live-model-check`. Omitted decisions are
+prompted in an interactive terminal or refused in `--non-interactive` mode; they are never guessed.
+
+To open content that is not beside the tool clone, set `PLANNING_CONTENT_DIR` before starting. See
+[Running the shell](docs/running-the-shell.md) for PowerShell and POSIX examples, launcher behavior,
+and shutdown guarantees.
+
+## Develop Kiln
+
+Clone the repository and install exactly what the lockfile declares:
 
 ```sh
 git clone https://github.com/don-milsey-miller/kiln.git
@@ -99,16 +139,8 @@ cd kiln
 npm ci
 ```
 
-Run the test suite once to confirm the checkout works on your machine:
-
-```sh
-npm test
-```
-
-Kiln finds a project's content at `.planning/../planning-content` — the sibling of the tool
-directory. **This repository is its own consumer**, so its content is *inside* the checkout rather
-than beside it, and the rule does not reach it. Development commands therefore name the content
-directory explicitly.
+Kiln's own planning content lives inside the checkout rather than beside it. Set its path explicitly
+before running content-aware development commands.
 
 PowerShell:
 
@@ -123,107 +155,106 @@ macOS or Linux:
 PLANNING_CONTENT_DIR="$PWD/planning-content" npm start
 ```
 
-Open <http://127.0.0.1:3000>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop the server.
+This is the browser-only production build. Open <http://127.0.0.1:3000> and press
+<kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.
 
-`npm start` builds and runs the production application, installing dependencies first if
-`node_modules/` is missing or older than `package-lock.json`. It prints the absolute path of the
-planning content it opened, and it refuses to start rather than guessing at one — running it here
-without the variable set will tell you exactly this and exit.
+## Test
 
-## Open a different planning workspace
-
-Set `PLANNING_CONTENT_DIR` to an existing Kiln content directory before starting the app. The path
-must exist; Kiln will stop with an error instead of silently opening different content.
-
-PowerShell:
-
-```powershell
-$env:PLANNING_CONTENT_DIR = "C:\path\to\your-project\planning-content"
-npm start
-```
-
-macOS or Linux:
+Run the complete suite:
 
 ```sh
-PLANNING_CONTENT_DIR=/path/to/your-project/planning-content npm start
+npm test
 ```
 
-The intended layout for a consuming project is:
+CI uses explicit, locally reproducible groups:
 
-```text
-your-project/
-├── .planning/          # a clone of this repository; ignored by your project
-└── planning-content/   # your project's files; committed to your project
-```
-
-This keeps tool updates separate from project documents. Update the tool with `git pull` inside
-`.planning/`; commit `planning-content/` in the containing project. In that layout Kiln finds the
-content directory on its own — `PLANNING_CONTENT_DIR` is only needed to open a workspace that is not
-the tool's sibling, such as this repository's own.
-
-For launcher options and shutdown behavior, see
-[`docs/running-the-shell.md`](docs/running-the-shell.md).
-
-## Useful commands
-
-| Command | Purpose |
+| Command | Contract |
 | --- | --- |
-| `npm run init:project -- --project-root <path> --name <name>` | Create a new project's `planning-content/`. |
-| `npm start` | Install if needed, build the production app, and start it on loopback. |
-| `npm test` | Run the full Node.js test suite. |
-| `npm run test:ci:core` | Run deterministic core tests and print per-file timing. |
-| `npm run test:ci:node` | Run the Node-version compatibility group and print per-file timing. |
-| `npm run test:ci:platform` | Run process, filesystem, and shutdown tests and print per-file timing. |
-| `npm run test:ci:setup` | Run setup, recovery, and transaction tests and print per-file timing. |
-| `npm run test:ci:consumer` | Run clean-consumer and production-shell journeys and print per-file timing. |
-| `npm run test:pi-compat` | Run retained Pi compatibility evidence; set `KILN_PI_COMPAT=live` for the live proof. |
-| `npm run shell:build` | Build the Next.js application without starting it. |
-| `npm run lint:shell` | Check the boundary between the application and the planning engine. |
-| `npm run lint:plan` | Validate the content selected by `PLANNING_CONTENT_DIR`. |
-| `npm run handoff` | Publish a handoff package after all required gates pass. |
-| `npm run research:probe -- --project-root <path>` | Check whether the optional research backend is available. Refused unless the project chose web research and this computer approved it. |
-| `npm run research:search -- "question" --project-root <path>` | Search for candidate sources without changing project files. Refused on the same terms. |
-| `npm run migrate:content` | Preview a content-schema migration; add `-- --apply` to write it. |
-| `npm run dev` | Run the older standalone watcher prototype, not the main application. |
+| `npm run test:ci:core` | Deterministic planning, schema, state, and adapter behavior. |
+| `npm run test:ci:node` | Node.js runtime, module-loading, and package integration. |
+| `npm run test:ci:platform` | Process, terminal, filesystem, and shutdown behavior. |
+| `npm run test:ci:setup` | Setup, recovery, state protection, and transactions. |
+| `npm run test:ci:consumer` | Clean-project and production-shell journeys. |
+| `npm run test:pi-compat` | Retained Pi compatibility evidence; CI enables its live tier. |
 
-The CI grouping contract and environment rationale are documented in
-[`docs/continuous-integration.md`](docs/continuous-integration.md).
+Additional validation commands include `npm run lint:shell`, `npm run lint:plan`,
+`npm run audit:production`, `npm run skills:check`, `npm run authoring-schemas:check`, and
+`npm run roles:check`. The [CI guide](docs/continuous-integration.md) explains why each group runs in
+its selected operating systems and Node.js versions.
 
-When working with this repository's own plan, set the content path explicitly for commands that use
-the shared content resolver:
+## Architecture
 
-PowerShell:
+| Path | Responsibility |
+| --- | --- |
+| [`app/`](app/) | Next.js browser workspace and server-side adapters. |
+| [`bin/`](bin/) | Setup, startup, validation, research, migration, and handoff commands. |
+| [`lib/`](lib/) | Planning rules, gates, locking, runtime checks, and typed tools. |
+| [`pi-package/`](pi-package/) | Bundled Pi extension, prompt, and planning-stage skills. |
+| [`schemas/`](schemas/) | Machine-enforced planning and runtime record contracts. |
+| [`stages/`](stages/) | Definitions and exit criteria for the nine planning stages. |
+| [`specialists/`](specialists/) | Specialist roles used by delegated planning work. |
+| [`test/`](test/) | Unit, integration, compatibility, and end-to-end tests. |
 
-```powershell
-$env:PLANNING_CONTENT_DIR = (Resolve-Path .\planning-content).Path
-npm run lint:plan
-```
+The application accesses planning behavior through `app/server/`; structured content remains behind
+that boundary. For design details, read the [agent-delivery technical proposal](docs/agent-delivery-technical-proposal.md),
+[project initialization guide](docs/initializing-a-project.md), and [generated plan](docs/plan/README.md).
 
-macOS or Linux:
+## Troubleshooting
+
+### Setup was interrupted
+
+Run the recovery command printed by setup. From the project root, it is normally:
 
 ```sh
-PLANNING_CONTENT_DIR="$PWD/planning-content" npm run lint:plan
+node .planning/bin/setup.mjs --resume
 ```
 
-## Repository layout
+Setup refuses to continue when recovery evidence is ambiguous; follow the named corrective action
+rather than deleting project records.
 
-| Path | Contents |
-| --- | --- |
-| `app/` | Next.js application and its server-side adapters. |
-| `bin/` | Command-line entry points. |
-| `lib/` | Validation, stage gates, research, locking, migrations, and handoff logic. |
-| `schemas/` | JSON schemas for planning artifacts. |
-| `stages/` | Definitions for the nine planning stages. |
-| `planning-content/` | Kiln's own planning data and stage documents. |
-| `docs/plan/` | Generated handoff package for Kiln itself. |
-| `references/` | Project research and the original decision record. |
-| `test/` | Automated tests. |
+### No model is available
 
-The application imports planning behavior through `app/server/`; it does not reach directly into
-`lib/`. Structured files under `planning-content/data/` are the source of truth, while stage pages
-and handoff documents are readable views of that data.
+Run setup in an interactive terminal and follow its Pi authentication prompt:
+
+```sh
+node .planning/bin/setup.mjs
+```
+
+Kiln accepts only an authenticated model you explicitly inspect, select, and approve. It does not
+fall back to another provider or copy credentials into the project.
+
+### The browser opened the wrong content or did not start
+
+Read the absolute content path and URL printed at startup. A missing explicit path or occupied port
+is a refusal, not a silent fallback. Set `PLANNING_CONTENT_DIR` or `PORT` deliberately and retry;
+[Running the shell](docs/running-the-shell.md) contains platform-specific examples.
+
+### You only need an empty content scaffold
+
+Use the dependency-free initializer described in
+[Initializing a project](docs/initializing-a-project.md). It creates `planning-content/` without
+installing or configuring the planning agent.
+
+## Contributing and support
+
+Use [GitHub issues](https://github.com/don-milsey-miller/kiln/issues) for reproducible bugs and
+focused feature requests. Before opening a pull request, run `npm test` and the validation commands
+that cover your change. Include tests for behavior changes and update the relevant documentation in
+the same pull request.
+
+Kiln is pre-1.0 and has no separate support SLA. Search existing issues before filing a new one.
+
+## Security
+
+Never commit provider credentials, tokens, Pi authentication data, `.pi/` runtime state, or local
+environment files. Use unmistakable placeholders in examples and keep secrets in the provider's
+supported authentication store or environment variable.
+
+Do not post vulnerability details publicly. Open a
+[GitHub issue](https://github.com/don-milsey-miller/kiln/issues) requesting a private maintainer
+contact channel without including exploit details or secrets.
 
 ## License
 
-Kiln is available under the [MIT License](LICENSE). Your own `planning-content/` files remain your
-work.
+Kiln is available under the [MIT License](LICENSE). Planning content created for your own project
+remains your work.

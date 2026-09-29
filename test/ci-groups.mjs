@@ -48,6 +48,7 @@ export const CI_GROUPS = Object.freeze({
     "project-status.test.mjs",
     "question.test.mjs",
     "reader-discipline.test.mjs",
+    "readme.test.mjs",
     "refusal-matrix.test.mjs",
     "research-enablement.test.mjs",
     "research-permission.test.mjs",
