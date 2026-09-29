@@ -15,6 +15,9 @@ test("#51 every test file has exactly one explicit CI group", () => {
   const classified = Object.values(CI_GROUPS).flat().sort();
   assert.deepEqual(classified, discovered);
   assert.equal(new Set(classified).size, classified.length, "a test file belongs to more than one group");
+  for (const [group, files] of Object.entries(CI_GROUPS)) {
+    assert.deepEqual(files, [...files].sort(), `${group} must stay sorted so classification changes review cleanly`);
+  }
 });
 
 test("#51 each group declares the environments that prove its contract", () => {
