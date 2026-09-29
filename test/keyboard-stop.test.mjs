@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { KEYBOARD_STOP_ENV, UNNOTIFIED_STOP_EXIT_CODE, ctrlCInput, keyboardStopFor, keyboardStopListener, watchKeyboardStop } from "../lib/keyboard-stop.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
-import register from "../pi-package/extensions/kiln.js";
+import register, { KILN_WORKING_INDICATOR } from "../pi-package/extensions/kiln.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const piTui = await import(pathToFileURL(createRequire(resolvePinnedSdk(ROOT).url).resolve("@earendil-works/pi-tui")).href);
@@ -195,4 +195,30 @@ test("⚠️ F130 the extension subscribes at each session start, only with a te
   } finally {
     if (saved !== undefined) process.env[KEYBOARD_STOP_ENV] = saved;
   }
+});
+
+test("#27 interactive Kiln sessions use a static working indicator with a bounded PTY byte budget", async () => {
+  const hooks = new Map();
+  const indicators = [];
+  register({ registerTool: () => {}, on: (event, handler) => hooks.set(event, handler) }, { keyboardStop: { keyboardStopFor: () => null } });
+
+  await hooks.get("session_start")({}, {
+    hasUI: true,
+    ui: { setWorkingIndicator: (indicator) => indicators.push(indicator) },
+  });
+  assert.deepEqual(indicators, [KILN_WORKING_INDICATOR]);
+  assert.equal(KILN_WORKING_INDICATOR.frames.length, 1, "Pi must not install an animation interval");
+
+  const loaderPath = createRequire(resolvePinnedSdk(ROOT).url).resolve("@earendil-works/pi-tui/dist/components/loader.js");
+  const { Loader } = await import(pathToFileURL(loaderPath).href);
+  let renderedBytes = 0;
+  const ui = { requestRender: () => { renderedBytes += 4096; } };
+  const loader = new Loader(ui, (s) => s, (s) => s, "Working", KILN_WORKING_INDICATOR);
+  loader.start();
+  const bytesAfterStart = renderedBytes;
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  loader.stop();
+
+  assert.equal(renderedBytes, bytesAfterStart, "the pinned Pi loader emitted no recurring repaint frames");
+  assert.ok(renderedBytes <= 8192, `startup emitted ${renderedBytes} simulated terminal bytes`);
 });
