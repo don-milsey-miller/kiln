@@ -26,10 +26,13 @@ import { redactionViolations } from "../tools/pi-compat/lib/redact.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FILE = join(ROOT, "tools", "pi-compat", "runs", "oauth", "oauth-windows.json");
-// Historical evidence, deliberately not relabelled after the security upgrade (#37).
-const RECORDED_PIN = "0.84.4";
+const HISTORICAL_FILE = join(ROOT, "tools", "pi-compat", "runs", "oauth", "oauth-windows-0.84.4.json");
+const CURRENT_PIN = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
+  .dependencies["@earendil-works/pi-coding-agent"];
 const text = readFileSync(FILE, "utf8");
 const r = JSON.parse(text);
+const historicalText = readFileSync(HISTORICAL_FILE, "utf8");
+const historical = JSON.parse(historicalText);
 
 /** Written out rather than imported, so the harness and this assertion are two statements. */
 const PROVIDER = "openai-codex";
@@ -39,11 +42,11 @@ const LAUNCH_ARGS = [
   "--no-context-files", "--no-approve", "--offline",
 ];
 
-test("the historical OAuth record is labelled manual and account-bound, and names its actual target and pin", () => {
+test("the current OAuth record is labelled manual and account-bound, and matches the exact package pin", () => {
   assert.match(r.meta.label, /manual, account-bound, single-instance; not a suite result/);
   assert.equal(r.meta.platform, "win32");
-  assert.equal(r.meta.pinned, RECORDED_PIN, `the historical pin was rewritten from ${r.meta.pinned}`);
-  assert.equal(r.meta.piVersion, RECORDED_PIN);
+  assert.equal(r.meta.pinned, CURRENT_PIN, "rerun the manual OAuth protocol for the current package pin");
+  assert.equal(r.meta.piVersion, CURRENT_PIN);
   assert.equal(r.meta.provider, PROVIDER);
   assert.equal(r.meta.model, MODEL);
   assert.deepEqual(r.meta.launchArgs, LAUNCH_ARGS);
@@ -51,6 +54,14 @@ test("the historical OAuth record is labelled manual and account-bound, and name
   assert.ok(r.meta.environmentNames.includes("PI_CODING_AGENT_DIR"));
   for (const name of r.meta.environmentNames)
     assert.equal(/(API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|_AUTH)/i.test(name), false, `${name} reached a child`);
+});
+
+test("the superseded OAuth record remains an honestly labelled, sanitized 0.84.4 observation", () => {
+  assert.equal(historical.meta.pinned, "0.84.4");
+  assert.equal(historical.meta.piVersion, "0.84.4");
+  assert.equal(historical.meta.provider, PROVIDER);
+  assert.equal(historical.meta.model, MODEL);
+  assert.deepEqual(redactionViolations(historicalText), []);
 });
 
 test("three fresh readings: unavailable, available after the login, unavailable after removal", () => {
