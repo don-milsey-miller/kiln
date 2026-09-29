@@ -43,10 +43,8 @@ function completeFixture() {
   mkdirSync(join(contentRoot, "data", "components"), { recursive: true });
   mkdirSync(join(contentRoot, "data", "evidences"), { recursive: true });
   mkdirSync(join(contentRoot, "stages"), { recursive: true });
-  // ⚠️ `evidence` is activated and NO stage produces it. That combination is load-bearing here: it is
-  // the only way to reach "an activated type with zero artifacts" now that the handoff composes every
-  // stage gate — for a type a stage DOES produce, zero artifacts is a gate failure rather than a
-  // rendering case. See the stale-file test below.
+  // Evidence is a cross-cutting output of Stages 3 and 6. The fixture keeps at least one evidence
+  // record present because an activated, produced type with zero artifacts is a gate failure.
   writeFileSync(join(contentRoot, "project.yaml"), "capabilities:\n  artifactTypes:\n    activated: [requirement, component, evidence]\n");
 
   writeFileSync(
@@ -332,7 +330,7 @@ test("the REAL project's handoff verdict IS the conjunction of its stage gates",
   // artifact and its gate rests on two human attestations. The candidate preserves the reopening
   // condition without telling a fresh project's agent to create an unavailable type.
   assert.equal(ctx.activated.includes("research-finding"), false);
-  assert.deepEqual(defs["03-discovery"].produces, []);
+  assert.deepEqual(defs["03-discovery"].produces, ["assertion", "evidence"]);
   assert.ok(defs["03-discovery"].producesCandidates.some((candidate) => candidate.type === "research-finding"));
   const attested = loadStageAttestations(contentRoot, "03-discovery");
   assert.deepEqual(Object.keys(attested).sort(), ["sources-reconciled", "unknowns-resolved"]);
@@ -481,20 +479,20 @@ test("the package carries an identity and no wall-clock time", async () => {
 test("removed source material does not survive as a stale file", async () => {
   const f = completeFixture();
   try {
+    writeFileSync(
+      join(f.contentRoot, "data", "evidences", "EVD-0002.json"),
+      canonicalJson(env("EVD-0002", "evidence", { kind: "source", summary: "A retained observation.", sources: [{ title: "Fixture", locator: "https://example.test" }] }))
+    );
     await publish(f);
     assert.ok(readFileSync(join(f.outDir, "data", "evidences.json"), "utf-8").includes("EVD-0001"));
 
     rmSync(join(f.contentRoot, "data", "evidences", "EVD-0001.json"));
-    // ⚠️ The subject is `evidence` rather than `component` BECAUSE no stage produces evidence. This
-    // test used to delete the fixture's only component and passed only because the handoff gate did
-    // not compose stage 5. Deleting that component now leaves stage 05-solution-design producing an
-    // activated type with no artifacts, which is a refusal and not a rendering question.
+    // Keep EVD-0002 so this remains a rendering/stale-file test rather than the distinct stage-gate
+    // refusal for deleting the last artifact of an activated produced type.
     await publish(f);
     const evidences = readFileSync(join(f.outDir, "data", "evidences.json"), "utf-8");
     assert.equal(evidences.includes("EVD-0001"), false, "a deleted artifact must not survive in the package");
-    // ⚠️ The file is PRESENT and empty, not absent. An activated type with no artifacts is a
-    // different fact from a type that does not apply here, and the package must not collapse them.
-    assert.deepEqual(JSON.parse(evidences), []);
+    assert.ok(evidences.includes("EVD-0002"), "the retained evidence disappeared with the deleted one");
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }

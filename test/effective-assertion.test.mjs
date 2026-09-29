@@ -51,7 +51,7 @@ test("the three 5a schemas accept well-formed artifacts and reject a stored conf
   assert.equal(validators.assertion({ ...AST(), verdict: "supported" }), false);
 });
 
-test("#25: assertion and evidence are cross-cutting and claim no stage", () => {
+test("#25: assertion and evidence are cross-cutting and claim no single owning stage", () => {
   for (const t of ["assertion", "evidence"]) {
     const s = JSON.parse(readFileSync(join(SCHEMAS, `${t}.schema.json`), "utf-8"));
     assert.equal(s["x-stage"], undefined, `${t} must not claim a stage`);

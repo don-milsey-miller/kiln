@@ -269,7 +269,7 @@
   "unevaluatedProperties": false,
   "x-artifactType": "evidence",
   "x-crossCutting": {
-    "description": "#25: validation is cross-cutting, not a tenth stage. Evidence is therefore produced by validation whenever a load-bearing assertion needs it, and no stage in stages/ claims it. That is why there is no x-stage here, and why #90's agreement check passes with none."
+    "description": "#25: evidence is cross-cutting rather than owned by one stage. Discovery records retrieved sources and Risk + Feasibility records validation observations, so both declare the type in produces while no singular x-stage is present."
   },
   "x-unresolvableTraceTargets": {
     "targets": []

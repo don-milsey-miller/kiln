@@ -147,6 +147,16 @@ test("schema, api-spec and wireframe can be activated when a project needs them"
   }
 });
 
+test("#29 cross-cutting assertion and evidence types can be activated from their declared producers", async () => {
+  const { base, o } = fresh();
+  try {
+    for (const type of ["assertion", "evidence"])
+      assert.equal((await setTypeActivation(type, "activate", o)).activated.includes(type), true, type);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("deactivating refuses while artifacts of that type exist", async () => {
   const { base, contentRoot, o } = fresh(["requirement", "decision", "component"]);
   try {
