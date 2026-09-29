@@ -34,8 +34,58 @@ export function Callout({ children }) {
   );
 }
 
+/**
+ * GFM tables stay semantic while remaining usable in the narrow stage-document column. The
+ * wrapper is presentation only: screen readers still encounter the native table, row and cell
+ * structure, while an unusually wide table can scroll instead of widening the whole page.
+ */
+export function Table({ children }) {
+  return createElement(
+    "div",
+    { style: { maxWidth: "100%", overflowX: "auto", margin: "12px 0" } },
+    createElement(
+      "table",
+      { style: { borderCollapse: "collapse", tableLayout: "fixed", width: "100%" } },
+      children
+    )
+  );
+}
+
+export function TableHead({ children }) {
+  return createElement(
+    "th",
+    {
+      scope: "col",
+      style: {
+        border: "1px solid #d7d7d7",
+        background: "#f5f5f5",
+        padding: "7px 9px",
+        textAlign: "left",
+        verticalAlign: "top",
+        overflowWrap: "anywhere",
+      },
+    },
+    children
+  );
+}
+
+export function TableCell({ children }) {
+  return createElement(
+    "td",
+    {
+      style: {
+        border: "1px solid #d7d7d7",
+        padding: "7px 9px",
+        verticalAlign: "top",
+        overflowWrap: "anywhere",
+      },
+    },
+    children
+  );
+}
+
 /** The permitted set, as names. The plugin refuses every capitalised element outside it. */
 export const PERMITTED = ["Callout"];
 
 /** What `run()` is handed as the document's component scope. */
-export const components = { Callout };
+export const components = { Callout, table: Table, th: TableHead, td: TableCell };

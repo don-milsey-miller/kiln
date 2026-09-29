@@ -18,6 +18,7 @@ import { compile, run } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import remarkGfm from "remark-gfm";
 import remarkRejectJs from "../app/_mdx/reject-js.js";
 import { PERMITTED, components } from "../app/_mdx/components.js";
 
@@ -37,7 +38,7 @@ const build = (text) =>
       format: "mdx",
       outputFormat: "function-body",
       development: false,
-      remarkPlugins: [[remarkRejectJs, { allow: PERMITTED }]],
+      remarkPlugins: [remarkGfm, [remarkRejectJs, { allow: PERMITTED }]],
     }
   );
 
@@ -97,11 +98,30 @@ test("a permitted document compiles and its mapped component renders", async () 
   assert.match(html, /the mapped component rendered/);
 });
 
+test("GFM tables render as wrapped semantic tables instead of pipe-delimited paragraphs", async () => {
+  const text = `# Handoff
+
+| Role | First deliverable |
+|---|---|
+| Frontend | Responsive loading, stale and offline states |
+| Backend | Contract tests for the public API |
+`;
+  const compiled = await build(text);
+  const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
+  const html = renderToStaticMarkup(createElement(mod.default, { components }));
+
+  assert.match(html, /<table style="[^"]*table-layout:fixed/, "the document must contain a semantic table with bounded layout");
+  assert.match(html, /<thead>/, "column headings must retain their native table structure");
+  assert.match(html, /<th scope="col"/, "headers must be exposed as column headers");
+  assert.match(html, /<td style="[^"]*overflow-wrap:anywhere/, "long cell content must wrap");
+  assert.equal(html.includes("|---|---|"), false, "the GFM delimiter row must not render as text");
+});
+
 test("the permitted set is the only vocabulary, and it is small", () => {
   // ⚠️ Pinned deliberately. Widening the set widens what agent-authored content can invoke, and this
   // line is what makes that a visible act rather than an edit nobody reviews.
   assert.deepEqual(PERMITTED, ["Callout"]);
-  assert.deepEqual(Object.keys(components).sort(), ["Callout"]);
+  assert.deepEqual(Object.keys(components).sort(), ["Callout", "table", "td", "th"]);
 });
 
 test("⚠️ a stripping plugin would pass a render check — which is why this suite asserts refusals", async () => {
