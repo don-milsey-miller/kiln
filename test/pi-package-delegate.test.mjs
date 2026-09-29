@@ -60,7 +60,7 @@ function project() {
 }
 
 /** Every tool name the role may hold, as a measured host would report them. */
-const HOST_TOOLS = ["research_capability", "research_search", "research_fetch", "kiln_create_evidence", "kiln_create_assertion", "kiln_create_question", "kiln_link_evidence", "kiln_unlink_evidence"];
+const HOST_TOOLS = ["research_capability", "research_search", "research_fetch", "kiln_create_evidence", "kiln_create_assertion", "kiln_create_question", "kiln_list_artifacts", "kiln_read_artifact", "kiln_link_evidence", "kiln_unlink_evidence"];
 
 const tool = (deps, { measured = HOST_TOOLS } = {}) => {
   const tools = new Map();
@@ -158,6 +158,7 @@ test("⚠️ ACC-0111 the wrapper calls the runtime exactly once, with everythin
     assert.equal(request.model, "gpt-5.6-sol");
     assert.equal(request.thinkingLevel, "medium");
     assert.equal(request.agentDir, "/an/isolated/agent/dir");
+    assert.equal(request.contentRoot, f.contentRoot);
     assert.equal(request.toolRoot, ROOT);
     assert.ok(Array.isArray(request.hostRegistry) && request.hostRegistry.length > 0);
     // ⚠️ THE TIMEOUT IS THE RUNTIME'S. A wrapper that named one would own a rule that is not its.

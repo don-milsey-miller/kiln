@@ -29,7 +29,7 @@ import {
   renderRoles,
   specialistName,
 } from "../lib/specialists/render.mjs";
-import { CREATE_TOOL_NAMES, MUTATION_TOOL_NAMES, OTHER_WRITE_OPERATIONS } from "../lib/tool-wire-names.mjs";
+import { ARTIFACT_READ_TOOL_NAMES, CREATE_TOOL_NAMES, MUTATION_TOOL_NAMES, OTHER_WRITE_OPERATIONS } from "../lib/tool-wire-names.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const onDisk = (role) => readFileSync(join(ROOT, SPECIALISTS_DIR, `${role}.md`), "utf8");
@@ -76,6 +76,7 @@ test("⚠️ ACC-0072 each role's tools are its capabilities and its write bound
     const expected = [
       ...[...c.requiredCapabilities].sort(),
       ...c.writeBoundary.create.map((t) => CREATE_TOOL_NAMES[t]).sort(),
+      ...ARTIFACT_READ_TOOL_NAMES,
       ...c.writeBoundary.mutate.map((m) => MUTATION_TOOL_NAMES[m]).sort(),
       ...c.writeBoundary.write.map((w) => OTHER_WRITE_OPERATIONS[w]).sort(),
     ];
@@ -85,13 +86,14 @@ test("⚠️ ACC-0072 each role's tools are its capabilities and its write bound
   }
 });
 
-test("⚠️ ACC-0072 no role is offered a read-only tool", () => {
-  // ⚠️ THE SPECIALIST SEES A TASK PAYLOAD, NOT THE PROJECT. If one of these ever appears, it is because
-  // somebody added it to the contract, and that is a decision this test forces into the open.
-  const readOnly = ["kiln_project_status", "kiln_lint", "kiln_read_stage_attestations", "kiln_capability", "kiln_read_artifact"];
-  for (const role of ROLES)
-    for (const name of readOnly)
-      assert.equal(contractFor(role).tools.includes(name), false, `${role} is offered ${name}`);
+test("⚠️ ACC-0072 roles receive only the constrained artifact reads", () => {
+  const broadReads = ["kiln_project_status", "kiln_lint", "kiln_read_stage_attestations", "kiln_capability"];
+  for (const role of ROLES) {
+    const contract = contractFor(role);
+    for (const name of ARTIFACT_READ_TOOL_NAMES) assert.equal(contract.tools.includes(name), true, `${role} lacks ${name}`);
+    for (const name of broadReads) assert.equal(contract.tools.includes(name), false, `${role} is offered ${name}`);
+    assert.ok(contract.readBoundary.types.length > 0, `${role} has no readable artifact types`);
+  }
 });
 
 test("⚠️ ACC-0072 an unsound contract derives no tools rather than a name nothing registers", () => {

@@ -10,6 +10,8 @@ tools:
   - "kiln_create_assertion"
   - "kiln_create_evidence"
   - "kiln_create_question"
+  - "kiln_list_artifacts"
+  - "kiln_read_artifact"
   - "kiln_link_evidence"
   - "kiln_unlink_evidence"
 ---
@@ -20,7 +22,7 @@ Finds and records what is externally true, with a retrievable source behind ever
 
 ## Input contract
 
-- You receive one task payload and nothing else. You do not see the planning conversation, the project's other stages, or any artifact you were not given.
+- You receive one task payload and no planning conversation. You may read current project artifacts only through the typed artifact read tools and only for the artifact types permitted to this role.
 - The payload names the question to answer, the artifact ids you may reference, and the moment the answer is needed by.
 - If the payload does not contain what you need, say so and stop. Do not infer the missing part.
 
