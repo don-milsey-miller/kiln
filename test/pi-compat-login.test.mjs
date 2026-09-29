@@ -3,8 +3,9 @@
  *
  * ⚠️ **THIS READS WHAT `tools/pi-compat/login-check.mjs` SAVED; IT RUNS NOTHING.** The interactive half
  * needs a person at a real terminal, and every half needs `script(1)` on Linux, so neither belongs in
- * the default suite. What this holds is the record: that it was taken against the pin, in the isolated
- * environment it claims, and that each control's mode and bounded outcome are what the evidence says.
+ * the default suite. What this holds is the record: that it identifies the exact runtime it measured,
+ * the isolated environment it claims, and each control's mode and bounded outcome. It is deliberately
+ * historical after the production pin moved; #37 tracks a fresh manual capture.
  *
  * ⚠️ **IT CANNOT PROVE THE THROWAWAY KEY IS ABSENT, AND DOES NOT CLAIM TO.** The key was generated at
  * capture time and never retained, so nothing here knows it. That claim rests on the capture-time
@@ -25,7 +26,8 @@ import { redactionViolations } from "../tools/pi-compat/lib/redact.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RUNS = join(ROOT, "tools", "pi-compat", "runs", "login");
-const PINNED = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).dependencies["@earendil-works/pi-coding-agent"];
+// Historical evidence, deliberately not relabelled after the security upgrade (#37).
+const RECORDED_PIN = "0.84.4";
 
 const text = (name) => readFileSync(join(RUNS, name), "utf8");
 const controls = JSON.parse(text("login-controls-linux.json"));
@@ -39,11 +41,11 @@ const LAUNCH_ARGS = [
 const ENVIRONMENT_NAMES = ["HOME", "LANG", "PATH", "PI_CODING_AGENT_DIR", "TERM"];
 const REDACTION_MARKER = "[THROWAWAY-KEY-REDACTED]";
 
-test("both login records were taken on Linux against the pin, with the same launch and environment", () => {
+test("both historical login records identify the runtime they actually measured, with the same launch and environment", () => {
   for (const [name, r] of [["controls", controls], ["interactive", interactive]]) {
     assert.equal(r.meta.platform, "linux", `${name}: not a Linux record`);
-    assert.equal(r.meta.pinned, PINNED, `${name} was taken against pin ${r.meta.pinned}; re-run login-check.mjs`);
-    assert.equal(r.meta.piVersion, PINNED, `${name}: the installed Pi was not the pinned one`);
+    assert.equal(r.meta.pinned, RECORDED_PIN, `${name}: the historical pin was rewritten`);
+    assert.equal(r.meta.piVersion, RECORDED_PIN, `${name}: the installed Pi did not match the recorded pin`);
     assert.deepEqual(r.meta.launchArgs, LAUNCH_ARGS, `${name}: the launch arguments differ`);
     // ⚠️ THE WHOLE ENVIRONMENT BY NAME. A credential name, or the operator's own configuration, would show here.
     assert.deepEqual(r.meta.environmentNames, ENVIRONMENT_NAMES, `${name}: Pi received other environment names`);

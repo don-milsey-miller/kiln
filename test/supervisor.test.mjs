@@ -550,7 +550,7 @@ test("the agent is the package's own declared bin entry, not a guessed path", ()
   const declared = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf-8")).bin.pi;
   assert.equal(agent.entry, join(pkgDir, ...declared.split("/")), "it must BE the installed bin entry");
   assert.equal(agent.command, process.execPath, "run with this Node, never a PATH lookup");
-  assert.equal(agent.version, "0.84.4");
+  assert.equal(agent.version, "0.87.1");
 });
 
 test("a missing, mispinned or escaping agent entry is refused", () => {
@@ -648,7 +648,7 @@ test("⚠️ ACC-0041: a different `pi` earlier on PATH is never what starts", (
 
   assert.equal(started.status, 0, `the pinned agent must run: ${started.stderr}`);
   const said = `${started.stdout}`.trim();
-  assert.match(said, /0\.84\.4/, `the started process must report the pinned version, said: ${said}`);
+  assert.match(said, /0\.87\.1/, `the started process must report the pinned version, said: ${said}`);
   assert.ok(!said.includes(SHADOW_VERSION), `the shadow must not be what ran: ${said}`);
   assert.equal(agent.version, readOwnPin(ROOT).version, "and the resolver's report agrees with the pin");
 });
@@ -659,8 +659,8 @@ test("⚠️ ACC-0041: the pin and the Node floor are exactly what DEC-0026 deci
   // would let a machine resolve a runtime nothing in this repository was measured against, and the
   // compatibility suite would go on passing against whatever happened to be installed.
   const own = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
-  assert.equal(own.dependencies[PINNED_AGENT_NAME], "0.84.4", "the pin is an exact version");
-  // ⚠️ AND THE FLOOR IS NOT A PREFERENCE: 0.84.4 declares engines.node >=22.19.0, and a >=22 floor
+  assert.equal(own.dependencies[PINNED_AGENT_NAME], "0.87.1", "the pin is an exact version");
+  // ⚠️ AND THE FLOOR IS NOT A PREFERENCE: 0.87.1 declares engines.node >=22.19.0, and a >=22 floor
   // would let a 22.0 install resolve a runtime that cannot start.
   assert.equal(own.engines.node, ">=22.19.0", "the Node floor matches what the pinned runtime requires");
 });
