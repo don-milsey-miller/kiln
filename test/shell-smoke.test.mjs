@@ -50,6 +50,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * ⚠️ Extend this as routes land — `/stage/[stageId]` joins it with TSK-0009.
  */
 const STAGE = "06-risk-feasibility";
+const STAGE_IDS = readdirSync(join(ROOT, "stages"))
+  .filter((name) => /^[0-9]{2}-[a-z0-9-]+\.json$/.test(name))
+  .map((name) => name.replace(/\.json$/, ""))
+  .sort();
 
 const ROUTES = [
   {
@@ -155,6 +159,14 @@ async function runSmokeCheck(t) {
       );
       assert.ok(html.includes(`data-vpw-project-name="${consumerName}"`), `${path} did not display the active consumer project's name`);
       assert.equal(html.includes("visual-project-workflow"), false, `${path} displayed the tool repository's internal project name`);
+      if (path === "/") {
+        for (const stageId of STAGE_IDS) {
+          assert.ok(
+            html.includes(`href="/stage/${stageId}" data-vpw-stage="${stageId}"`),
+            `the ${stageId} stage card is not mapped to its own route`
+          );
+        }
+      }
     }
     /* ------------------------------------ a change under stages/ reaches the change stream (TSK-0063) */
 
