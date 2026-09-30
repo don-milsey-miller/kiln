@@ -4,9 +4,9 @@ Kiln is a local-first project-planning system that turns an early idea into a st
 reviewable implementation handoff. It combines a Pi-powered planning agent with a browser workspace
 and keeps requirements, decisions, evidence, tasks, and approvals in version-controlled files.
 
-> **Status:** Kiln is pre-1.0 (`0.0.0`) and under active development. Its setup, planning-agent
-> package, browser workspace, validation, research, and handoff workflows are implemented and tested,
-> but the default branch is not a versioned release. Review tool changes before updating an active
+> **Current release:** `v26.9.0`, the first official Kiln release. Kiln uses calendar versions in
+> `YY.M.N` form. Its setup, planning-agent package, browser workspace, validation, research, and
+> handoff workflows are implemented and tested. Review release notes before updating an active
 > project.
 
 ## Prerequisites
@@ -27,7 +27,7 @@ Run these commands from an empty project directory:
 
 ```sh
 git init
-git clone https://github.com/don-milsey-miller/kiln.git .planning
+git clone --branch v26.9.0 --depth 1 https://github.com/don-milsey-miller/kiln.git .planning
 node .planning/bin/setup.mjs --name "My Project" --description "What this project should accomplish"
 node .planning/bin/start-kiln.mjs
 ```
@@ -88,14 +88,30 @@ substitute for `start-kiln.mjs` when you want the planning agent.
 
 ### Update Kiln
 
-Review upstream changes, then update the ignored tool clone:
+Review the target release notes, then move the ignored tool clone to that immutable release tag. For
+example, after a later `v26.9.1` release:
 
 ```sh
-git -C .planning pull --ff-only
+git -C .planning fetch --tags origin
+git -C .planning checkout v26.9.1
 ```
 
-The next setup or start checks the locked dependency tree. Before 1.0, updates follow the current
-default branch rather than a compatibility-pinned release.
+The next setup or start checks the locked dependency tree. A release checkout is intentionally
+detached at its tag; do not use `git pull` to turn it into an unreviewed moving target.
+
+### Versioning and releases
+
+Kiln uses Calendar Versioning in `YY.M.N` form:
+
+- `YY` is the final two digits of the release year;
+- `M` is the month number from `1` through `12`, without a leading zero; and
+- `N` starts at `0` for the first release of the month and increments for each additional release
+  that month.
+
+For example, `26.9.0` is the first September 2026 release, followed by `26.9.1`; the first October
+2026 release is `26.10.0`. Git tags add a `v` prefix, such as `v26.9.0`. Calendar components do not
+express SemVer compatibility promises; release notes identify material or incompatible changes.
+See the [versioning and release policy](docs/versioning.md) and [changelog](CHANGELOG.md).
 
 ### Publish the handoff
 
@@ -242,7 +258,7 @@ focused feature requests. Before opening a pull request, run `npm test` and the 
 that cover your change. Include tests for behavior changes and update the relevant documentation in
 the same pull request.
 
-Kiln is pre-1.0 and has no separate support SLA. Search existing issues before filing a new one.
+Kiln has no separate support SLA. Search existing issues before filing a new one.
 
 ## Security
 

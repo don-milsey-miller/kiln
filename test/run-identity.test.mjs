@@ -149,10 +149,9 @@ test("the build version comes from the package the code was loaded from", () => 
   assert.equal(toolVersion(), expected);
   assert.equal(healthIdentity(identified).body.build, expected);
 
-  // ⚠️ AND IT DISCRIMINATES NOTHING TODAY: this package is `0.0.0` and every build reports it. The
-  // field is real and its source is right; the lookalike-defeating work is done by the run ID.
-  // Recorded here rather than left for the supervisor's identity check to discover.
-  assert.equal(expected, "0.0.0", "when this changes, the build field starts carrying real weight");
+  // ⚠️ THE DECLARED RELEASE MUST FOLLOW KILN'S YY.M.N POLICY. It is compatibility metadata; the
+  // lookalike-defeating work remains the run ID even though this value now changes per release.
+  assert.match(expected, /^\d{2}\.(?:[1-9]|1[0-2])\.\d+$/, "the package version must use YY.M.N CalVer");
 
   // ⚠️ A PACKAGE IT CANNOT READ IS `null`, AND `null` IS NOT A BUILD IDENTITY. It is not a throw
   // and not an invented version either — and it no longer reaches a 200, which is the repair.

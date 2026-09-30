@@ -3,20 +3,20 @@
 **Generated. Nothing here was written by hand**, and editing it edits a rendering — the next
 `npm run handoff` overwrites you. Change `planning-content/` instead.
 
-- snapshot: `d81ade254e9b49b9`
-- tool version: `0.0.0`
+- snapshot: `c476e5833395003c`
+- tool version: `26.9.0`
 
 ## What is in it
 
-- 102 acceptance-criterions
+- 120 acceptance-criterions
 - 53 assertions
 - 41 components
 - 33 decisions
-- 87 evidences
+- 156 evidences
 - 33 questions
 - 28 requirements
 - 1 runbook-step
-- 70 tasks
+- 75 tasks
 
 ## How to read it
 

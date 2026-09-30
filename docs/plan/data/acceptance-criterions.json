@@ -769,9 +769,12 @@
     "evaluates": [
       "CMP-0021"
     ],
+    "evidencedBy": [
+      "EVD-0090"
+    ],
     "id": "ACC-0041",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With a different Pi version installed globally and earlier on PATH, every Pi process Kiln starts reports the pinned version. A test that removes the local dependency causes a refusal naming the expected version and the resolved path, rather than falling through to the global binary.",
@@ -803,9 +806,13 @@
     "evaluates": [
       "CMP-0022"
     ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
     "id": "ACC-0043",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-23 on EVD-0138. A second run naming nothing reads back the committed selection and this host's approval of it, asks no question, and leaves every file byte-identical — the whole tree by digest rather than a reported status — including the settings file, the ignore block, the identity file and the generated content; the compatibility record too, and the live check is not run again. A third run leaves the identity file's mtime untouched, so nothing is rewritten with identical bytes.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Running setup twice with the same inputs against the same project leaves every file it owns byte-identical, including the settings file, the ignore block, the project identity file and the generated skills. The comparison is over file bytes, not over a reported status.",
@@ -835,12 +842,16 @@
     "evaluates": [
       "CMP-0022"
     ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
     "id": "ACC-0045",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-23 on EVD-0138, measured by killing real children rather than by making one throw. Inside the bootstrap, which runs before any journal exists: the project is byte-identical afterwards, no `.pi` survives, and an ordinary rerun completes. After the journal opens: what the killed run left records the phase in flight as running — true only because that status is written before the work — and carries an exact resume command naming the project. THE ARGUMENTS ARE PARSED OUT OF THAT COMMAND, not typed beside it, so a command naming another project, omitting `--resume`, or missing altogether fails the control; running them completes the remaining phases and leaves no journal. A failure in an agent phase leaves the scaffold and reports partial setup. THE MEASUREMENT FOUND FIVE DEFECTS IN THE LOCK, EACH FOUND BY THE CONTROL OR THE REVIEW OF THE FIX BEFORE IT, ALL NOW FIXED, AND ALL THE SAME MISTAKE: acting on a judgement about a file that can change, or that never proved what it was read for. A killed run's lockfile made every rerun wait out the two-minute stale window; clearing such a lock by read-then-unlink lets two recoveries both acquire; claiming it by rename moves a lock that went live in the meantime, leaving the name free for a waiter, which four racing recoveries caught in CI; reclaiming the gate introduced for that had the same shape again; and judging a gate abandoned by age treated a process stopped between creating its gate and writing its name into it as dead. Removing somebody else's lock is now serialised behind a gate beside it, taken by the recovery path and the waiter's stale break alike, with the judgement made inside it; reclaiming a gate is serialised by a token and happens only when the gate's record names a process on this host that is demonstrably gone; and nothing reclaims the token. Everything else fails closed: the command refuses with exit code 17 and names both files to remove. Setup still refuses another machine's lock, an unreadable one, and a live one.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Killing setup partway through leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
+    "statement": "Killing setup after its journal has begun leaves a journal naming the last completed phase and an exact resume command; running that command completes the remaining phases. Killing it during the dependency bootstrap, which runs before any journal exists, leaves consumer project state unchanged, and rerunning setup repeats the locked install safely. A failure in any agent phase leaves an already-initialised planning scaffold in place and reports partial setup rather than rolling it back.",
     "title": "An interrupted setup resumes from its journal and never deletes valid content",
     "type": "acceptance-criterion",
     "verifies": [
@@ -854,8 +865,9 @@
     ],
     "id": "ACC-0046",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
-    "reviewStatus": "draft",
+    "notes": "⚠️ \"EXACT UNMODIFIED\" IS ENFORCED AS BYTES, AND THE CRITERION'S WORDING IS WHAT DECIDED THAT. Migration replaces bytes rather than appending them, so the question it answers is not \"does this look like Kiln's block\" but \"is this, byte for byte, output nobody has touched\". A trimmed comparison answers the first and reads as if it answered the second: an indented rule, a trailing space, a tab, a blank line inside the block or mixed line endings all compare equal, and the edit that is the evidence the block was not Kiln's to replace is what gets destroyed. ⚠️ THE MISSING-FINAL-NEWLINE CASE WAS SETTLED THE OTHER WAY ON PURPOSE. A legacy block whose trailing newline something stripped is short one byte Kiln wrote, so it is modified and is reported rather than migrated. The alternative was to amend this criterion to permit one normalisation, which buys an automatic migration in a rare case at the cost of the criterion no longer meaning what it says. The tolerance survives where it belongs — on an explicit rewrite, where the operator asked and the only duty is not to tidy anything unasked. ⚠️ \"REQUIRES AN EXPLICIT CHOICE\" IS ABOUT OWNERSHIP, NOT COVERAGE. An edited or malformed block can hold every rule Kiln would have written and still be somebody's own work, so the choice is required whether or not its contents happen to protect the paths. Deriving it from coverage produced a report offering two options and requiring neither. ⚠️ WHAT \"NEVER SILENTLY REWRITTEN\" TURNED OUT TO COVER, after four review rounds, is wider than a single check: consent is to replacing the bytes the operator was SHOWN, so an answer about one block does not authorise replacing a different one that replaced it, and a plan that reported operator-owned content writes nothing at all — not a create, not an append, not a migration — unless that exact file is still there and the answer was `rewrite`. Deleting the block one has just been told about is a plausible answer to being told about it; the run that recreated it for `keep` is the clearest statement of what this criterion forbids.",
+    "outcome": "pass",
+    "reviewStatus": "approved",
     "schemaVersion": 2,
     "statement": "A fresh project receives exactly one Kiln-marked block containing `.planning/`, `.pi/sessions/` and `.pi/runtime/`. An exact unmodified legacy block containing only `.planning/` is migrated to the extended block with every byte outside the markers preserved, and the migration is recorded and byte-stable on rerun. A block the operator removed or edited is reported and requires an explicit choice; it is never silently rewritten.",
     "title": "One owner writes the ignore block, and a removed block is not restored",
@@ -868,13 +880,17 @@
     "evaluates": [
       "CMP-0024"
     ],
+    "evidencedBy": [
+      "EVD-0095",
+      "EVD-0099"
+    ],
     "id": "ACC-0047",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "A settings file carrying third-party packages, unrelated keys and a custom key order is merged with Kiln's four owned fields and every unrelated entry is preserved and not reordered gratuitously. A malformed file, or one declaring an unknown schema version, is refused with the file left unchanged.",
-    "title": "Unrelated settings and package entries survive the merge untouched",
+    "statement": "Merging Kiln's owned fields into a `.pi/settings.json` that carries third-party packages, unrelated keys and a custom key order preserves the value of every unrelated key and every unrelated package entry, and preserves the relative order of ordinary string keys. Integer-like property names follow the order Pi's and JavaScript's JSON parsing and serialization give them, not their original textual position. A file that is not valid JSON, whose root is not an object, or whose Kiln-owned fields hold invalid values is refused before anything is written, and the file is left byte-identical; unknown Pi and third-party fields are preserved rather than refused. Applying the same desired state again changes no bytes and does not change the file's modification time.",
+    "title": "The settings merge preserves unrelated content, refuses invalid input, and is byte-stable",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0024",
@@ -885,13 +901,16 @@
     "evaluates": [
       "CMP-0024"
     ],
+    "evidencedBy": [
+      "EVD-0095"
+    ],
     "id": "ACC-0048",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, the committed `.pi/settings.json` and `.pi/kiln.json` are asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path.",
-    "title": "The committed settings file contains no secret and no absolute home path",
+    "statement": "The `.pi/settings.json` content produced by the settings merge and the `.pi/kiln.json` content produced by `ensureProjectId` contain no credential value, token, authorisation header or credential-derived fingerprint, and no absolute user path or `~` home reference, asserted over the bytes each produces.",
+    "title": "The settings merge and project record write no secret and no absolute user path",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0024"
@@ -901,13 +920,18 @@
     "evaluates": [
       "CMP-0025"
     ],
+    "evidencedBy": [
+      "EVD-0097",
+      "EVD-0098"
+    ],
     "id": "ACC-0049",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ NARROWED TO WHAT TSK-0031 BUILDS. The criterion asked for interactive setup to OFFER the three choices and for non-interactive setup to REFUSE. There is no setup command yet, so nothing could render them and nothing could be non-interactive about them; what this library produces is the refusal and the choices as data. The integration moved to the criterion on TSK-0060 that owns the setup command. ⚠️ THE ASSERTION IS ABSENCE, NOT A MESSAGE. A warning printed before a directory is created is exactly the failure REQ-0027 names, so the check is that the paths are not there.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "With the Kiln ignore block absent or edited, project-local mode writes no session, consent, compatibility or journal file: interactive setup offers the exact block, external state, or stopping, and non-interactive setup refuses. The check is that the paths do not exist after the refusal, not that a warning was printed.",
-    "title": "No runtime data is written before its protection exists",
+    "statement": "With the Kiln ignore block absent, edited, partial or negated, deciding project-local state refuses and creates nothing: the state root and every runtime path it would hold do not exist after the refusal, which is what is asserted rather than that a warning was produced. The refusal carries the three choices as data - append the exact ignore block, with the bytes it would add; external state; stop - each marked available or not, and a block that is present but edited marks the append choice unavailable rather than silently composing new bytes over it.",
+    "title": "No state root or runtime path is created while coverage is missing",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0027"
@@ -917,13 +941,18 @@
     "evaluates": [
       "CMP-0025"
     ],
+    "evidencedBy": [
+      "EVD-0097",
+      "EVD-0098"
+    ],
     "id": "ACC-0050",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ THE RUNTIME-CAPABILITY GATE MOVED. The criterion said the mode is available only if the pinned runtime supports relocation. Nothing in this library gates availability on a capability check: the mode is a parameter, and relocation support is a property of the pinned runtime, recorded in AST-0047 and measured in EVD-0081 and EVD-0083. Offering the mode only once that support is established belongs with the setup command, and is now part of the criterion on TSK-0060. ⚠️ THE NO-PATH CLAIM IS BOUNDED TO THE RECORD THIS TASK WRITES. `.pi/settings.json` is ACC-0048's, and every committed file a complete setup produces is ACC-0106's.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "In external mode the state root derives from the platform convention and the committed non-secret project ID; two projects on one machine occupy separate roots; and no committed file contains an absolute user path. The mode is available only if the pinned runtime supports relocation.",
-    "title": "External state derives from the committed project ID with no path committed",
+    "statement": "In external mode the state root is derived from the platform's own convention for per-user state and the stable non-secret project ID: two different IDs on one machine occupy separate roots, an ID that could traverse never becomes a path component, and a root that is not outside the project is refused rather than used. `.pi/kiln.json` holds the ID and the record version and nothing else, and contains no absolute user path, no home directory and not the project's own path.",
+    "title": "The external state root derives from the platform convention and the committed project ID",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0027",
@@ -934,13 +963,17 @@
     "evaluates": [
       "CMP-0026"
     ],
+    "evidencedBy": [
+      "EVD-0100"
+    ],
     "id": "ACC-0051",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ NARROWED TO WHAT TSK-0032 BUILDS. The criterion asked for interactive setup to display the path and obtain the decision, for `--trust approve`, and for a non-interactive refusal - none of which can exist before the setup command does. Those moved to the criterion on TSK-0060. What is left is the module and the launch gate, which are this task's to deliver and can be tested today. ⚠️ THE STORE IS THE BOUNDARY. DEC-0027 withdrew writing `trust.json` directly; depending on the exported class is the whole of the difference, so 'through the exported store' is part of the assertion rather than an implementation note. ⚠️ MISSING IS NOT DENIED. An absent decision is a project nobody has been asked about; a denial is an operator's answer. Setup may ask about the first and must not re-ask about the second, so a module that reported both as 'not trusted' would make that impossible one layer up.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Interactive setup displays the canonical project path and obtains the decision through Pi's own supported mechanism. A denial leaves the planning scaffold intact and valid, does not describe the agent as ready, and still permits an explicit browser-only start. Non-interactive setup with no pre-existing decision refuses rather than defaulting to approval.",
-    "title": "Trust is obtained through a supported route, and a denial stops the agent cleanly",
+    "statement": "The trust decision for this project is read, granted, denied and revoked through `ProjectTrustStore` as exported from the pinned package's root, keyed by the canonical project directory, with no write to Pi's trust file shape and no import of an unexported path. A project with no decision and a project that was denied are distinct outcomes, never collapsed into one. An agent launch over a project whose trust is not approved is refused BEFORE the child is spawned, the planning scaffold is left untouched by that refusal, and the refusal names `bin/start-shell.mjs` as the browser-only way to carry on without an agent.",
+    "title": "The trust decision is read and recorded through Pi's exported store, and an unapproved project never launches an agent",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0023",
@@ -951,9 +984,13 @@
     "evaluates": [
       "CMP-0027"
     ],
+    "evidencedBy": [
+      "EVD-0125"
+    ],
     "id": "ACC-0052",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-21 on EVD-0125. The consent boundary is observed at Node's own modules: with the recorder started before the module is imported, nothing touched Pi's authentication store, its custom-model file, a credential variable or the network before the answer, after a decline, or for any answer other than true. A decline reports connections as not inspected, unknown rather than absent. Granted runs are the positive control, showing the recorder detects those reads. CI run 35648974488 passed the tests in all four cells. Consent persistence (TSK-0034) and placement in setup (TSK-0060) are not part of this result.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Before the inspection prompt is answered, no read of Pi's authentication store, no load of the custom-model registry and no credential-variable presence check has occurred — observed by instrumenting those access points, not by reading the code. A declined inspection performs none of them, contacts nothing, and leaves setup honestly partial rather than reporting that nothing is configured.",
@@ -967,9 +1004,13 @@
     "evaluates": [
       "CMP-0027"
     ],
+    "evidencedBy": [
+      "EVD-0125"
+    ],
     "id": "ACC-0053",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-21 on EVD-0125. The granted result holds provider display names, exact model IDs from getAvailable() and present-or-absent for the research credential, and nothing else; getAll() is never called, and a provider whose status alone says configured is not listed. No network attempt was made and no credential value, header or credential field reached the result. LIMIT: this is configured availability under Pi's registry. No provider request was made or shown to succeed. CI run 35648974488 passed the tests in all four cells.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The presented result contains provider display names, exact model identifiers and present-or-absent for the research credential, and is asserted to contain no key, token, header, environment value or credential-derived fingerprint. No external service is contacted during the inspection.",
@@ -984,8 +1025,14 @@
     "evaluates": [
       "CMP-0027"
     ],
+    "evidencedBy": [
+      "EVD-0126",
+      "EVD-0127",
+      "EVD-0128"
+    ],
     "id": "ACC-0054",
     "lifecycle": "active",
+    "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0126 is component proof for TSK-0034: clone controls for project-local and per-user state, negative controls for a force-added record (R1), a staged but uncommitted removal (R5) and an unignored record in a parent repository (R6), and the no-Git limit (R4). EVD-0127 is component proof for TSK-0035: the research choice writer clears this host's research grant before it writes the choice, so Tavily to none to Tavily asks again, and a failed probe changes nothing. EVD-0128 is component proof for TSK-0036: the model selection writer clears this host's model-use grant before it writes a changed selection, refuses the change when the grant cannot be cleared, and changing away and back reopens approval. This criterion is evaluated once setup (TSK-0060) and the launch path (TSK-0037) exercise these writers and grants.",
     "outcome": "not-evaluated",
     "reviewStatus": "draft",
     "schemaVersion": 2,
@@ -1000,8 +1047,12 @@
     "evaluates": [
       "CMP-0028"
     ],
+    "evidencedBy": [
+      "EVD-0128"
+    ],
     "id": "ACC-0055",
     "lifecycle": "active",
+    "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0128 is component proof for TSK-0036: a single listed model is shown by display name and exact ID and confirmed before it is assigned, no answer other than a listed number chooses anything, Pi's global default is never read, and a committed selection is not used on a host without confirmation. This criterion is evaluated once setup (TSK-0060) exercises the path.",
     "outcome": "not-evaluated",
     "reviewStatus": "draft",
     "schemaVersion": 2,
@@ -1017,9 +1068,14 @@
     "evaluates": [
       "CMP-0028"
     ],
+    "evidencedBy": [
+      "EVD-0129",
+      "EVD-0132"
+    ],
     "id": "ACC-0056",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-22 on EVD-0132, measured through the real start command with its own launch checks. With the recorded model removed from Pi's catalogue, the run refuses naming openai and that exact id and says no other model was used in its place; with the authentication store empty and the credential variable empty, it refuses naming the recorded ids and says no other provider was used in its place. Both refusals carry the two remedies — rerun setup, or start once with --provider <id> --model <id> --thinking <level> — the supervisor is never reached, and the command exits 2. A compatibility record taken under other conditions is refused by the differing determinant before anything starts, and a host without model-use consent is refused with zero reads of any auth.json or models.json, zero credential-variable reads and no network. On the accepted path Pi is held to exactly the checked selection. CI run 35759728422 passed the 12 launch-path tests in all four cells. LIMITS: no billable provider was called, so the one-run override's own live check is proved at the component level (EVD-0130, EVD-0131) rather than through this command against a real provider; a custom provider cannot launch until the command can supply its credential declaration and provider configuration (D25); and the command checks project-local state only (D24).",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With the recorded model removed from the registry, or its authentication absent, launch refuses and names the recorded provider and model, offering a setup rerun or an explicit one-run override. No other model, provider, or answer from model memory is substituted.",
@@ -1033,10 +1089,13 @@
     "evaluates": [
       "CMP-0029"
     ],
+    "evidencedBy": [
+      "EVD-0091"
+    ],
     "id": "ACC-0057",
     "lifecycle": "active",
     "notes": "⚠️ THE CONTROL IS PART OF THE CRITERION, not a nicety. A sentinel test with no control passes identically whether the boundary works or the sentinels were never set. ⚠️ IT IS DELIBERATELY NOT WRITTEN AS 'the child sees only the union', which was the first phrasing and is not achievable: Windows injects nine home and user variables into every child regardless of the environment supplied (AST-0045). What is provable on both platforms is that no secret Kiln did not choose to pass is among what the child receives.",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "With unrelated secrets present in the parent environment under names a naive implementation would match, a spawned specialist child's observed environment contains none of them, while a control child spawned with the environment inherited observes all of them. Kiln adds to the child only the measured base variables, the selected provider's declared model-plane names and that role's tool-plane names. The assertion is made over what the child observed, not over what the parent intended.",
@@ -1050,9 +1109,14 @@
     "evaluates": [
       "CMP-0029"
     ],
+    "evidencedBy": [
+      "EVD-0091",
+      "EVD-0092",
+      "EVD-0094"
+    ],
     "id": "ACC-0058",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A provider whose credential contract is neither built in nor declared through the validated custom shape yields an `unsupported-credential-contract` refusal naming the provider. No additional variables are inherited, and no variable name is inferred from the provider id or discovered by scanning the environment.",
@@ -1067,9 +1131,12 @@
     "evaluates": [
       "CMP-0029"
     ],
+    "evidencedBy": [
+      "EVD-0091"
+    ],
     "id": "ACC-0059",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The research child receives the research credential when research is enabled and not otherwise; planning and validation children never receive it in any configuration.",
@@ -1083,8 +1150,12 @@
     "evaluates": [
       "CMP-0030"
     ],
+    "evidencedBy": [
+      "EVD-0131"
+    ],
     "id": "ACC-0060",
     "lifecycle": "active",
+    "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0131 is component proof for TSK-0042: the section 6.4 prompt names the provider, the exact model and the possible charge; declining is a choice with no request and no record; a run that cannot ask needs --live-model-check approve. Setup does not yet call the check (TSK-0060).",
     "outcome": "not-evaluated",
     "reviewStatus": "draft",
     "schemaVersion": 2,
@@ -1100,8 +1171,12 @@
     "evaluates": [
       "CMP-0030"
     ],
+    "evidencedBy": [
+      "EVD-0130"
+    ],
     "id": "ACC-0061",
     "lifecycle": "active",
+    "notes": "⚠️ NOT EVALUATED, 2026-09-22. EVD-0130 is component proof for TSK-0041: through Pi's real openai-completions client to a loopback endpoint, only an exact call with this run's challenge passes, and prose, malformed, extra, wrong, repeated and other-tool calls each fail under their own reason. No billable provider was called and the canary does not yet run in setup.",
     "outcome": "not-evaluated",
     "reviewStatus": "draft",
     "schemaVersion": 2,
@@ -1117,12 +1192,17 @@
     "evaluates": [
       "CMP-0030"
     ],
+    "evidencedBy": [
+      "EVD-0130",
+      "EVD-0131"
+    ],
     "id": "ACC-0062",
     "lifecycle": "active",
+    "notes": "⚠️ AMENDED 2026-09-22 (Q6). The statement named the package capability signature as an invalidation input. DEC-0033 and section 3.12 of the proposal replaced it with determinant 8, preflightContractDigest, which digests the canary protocol as handed to Pi: keying on the whole signature charged for a new billable canary whenever an unrelated planning tool changed, while the canary runs with only the preflight tool exposed. The signature is kept as a zero-cost launch check (lib/launch-checks.mjs step 6). Not evaluated: EVD-0130 is component proof for TSK-0041, and the record and its key are TSK-0042's. EVD-0131 adds TSK-0042's component proof: each determinant reopens approval, the key is computed from the request the canary actually made (R8) and its effective endpoint (R9), and a tracked or unprotected record is never reused. Still not evaluated.",
     "outcome": "not-evaluated",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, package capability signature or endpoint identity invalidates it and reopens approval.",
+    "statement": "During the canary no planning content is sent and no mutation tool is reachable; the setup-only tool is absent from the user-facing orchestrator and from every specialist. The stored success record contains no credential or credential-derived value, and changing the provider, model, thinking level, runtime version, preflight contract digest or endpoint identity invalidates it and reopens approval. The package capability signature is not part of the record's key; it remains a zero-cost check at every launch.",
     "title": "The canary cannot see or change planning content, and its record invalidates correctly",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1134,13 +1214,17 @@
     "evaluates": [
       "CMP-0031"
     ],
+    "evidencedBy": [
+      "EVD-0101"
+    ],
     "id": "ACC-0063",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ NARROWED TO THE PACKAGE ITSELF. The criterion asked for the package's TOOLS to load, which is TSK-0044 and TSK-0045's work on CMP-0032, and those depend on this task - so as written it could not be satisfied until its own dependants were finished. What this asserts is the unit: a manifest whose resources exist, an entry point that loads, a declaration that agrees with the manifest, and Pi finding those resources when the project is trusted and not finding them when it is not. ⚠️ WHAT IT DELIBERATELY DOES NOT CLAIM: the final Kiln tool set (ACC-0064), the write discipline of each wrapper (ACC-0065), that the registered capability tool returns this declaration (the TSK-0045 criterion below), that a child without the signature is refused (ACC-0075), that the canary's record invalidates on drift (ACC-0062), or that a launch over an untrusted project is refused (ACC-0051, already passing). ⚠️ THE UNTRUSTED CONTROL IS NOT OPTIONAL. `pi-compat` measured what an untrusted run does on 0.84.4: it loads no package and reports nothing. A positive result with no control would read the same way whether the package loaded or Pi simply behaved as it always does.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "With the project trusted, a real Pi run loads the package's extensions, tools, skills and start prompt and exposes a capability signature. With trust absent the package does not load — and that state is detected and reported rather than passing silently, which is the control that makes the positive result meaningful.",
-    "title": "The package loads under trust, does not load without it, and reports its signature",
+    "statement": "`pi-package/package.json` is a valid manifest whose declared extension, skill and prompt resources all exist in the package, and its registration entry point loads without error. A versioned, machine-readable signature declaration is exposed by the package and agrees with that manifest: the resources it names are the resources the manifest declares, neither more nor fewer. A real Pi run over a trusted project discovers those package-owned resources, and the same run over an untrusted project discovers none of them - the control that makes the positive result mean something rather than describing what Pi would have done anyway.",
+    "title": "The package declares what it owns, loads under trust, and is absent without it",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0026",
@@ -1151,9 +1235,12 @@
     "evaluates": [
       "CMP-0032"
     ],
+    "evidencedBy": [
+      "EVD-0102"
+    ],
     "id": "ACC-0064",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "The user-facing session's measured active tool set contains the registered Kiln tools and does not contain Pi's built-in shell, write or edit tools. The measurement is of the session's reported registry, not of what the launch options requested.",
@@ -1168,13 +1255,18 @@
     "evaluates": [
       "CMP-0032"
     ],
+    "evidencedBy": [
+      "EVD-0102",
+      "EVD-0106"
+    ],
     "id": "ACC-0065",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ REOPENED 2026-09-14 (F114): EVERY RESULT WAS STRUCTURED FOR KILN AND EMPTY FOR THE MODEL. EVD-0102 observed handler results returned through a recording stub and the session registry, not the provider-facing tool content. No wrapper result or refusal was model-visible. `rendered()` in `pi-package/extensions/kiln.js` returned `{output, details}` with no `content`, and Pi sends a tool result without `content` to the provider as `(no tool output)`. A real `/kiln-start` session measured it on 2026-09-14: `kiln_project_status` executed without error and the provider received exactly that placeholder. The historical evidence and its link are kept unchanged. This criterion returns to pass only on supplemental evidence that the provider-facing tool message carries the rendered result. ⚠️ RESTORED TO PASS 2026-09-14 ON EVD-0106: commit 81f69a9 returns every result as text content equal to its rendering, and CI run 34812083727 observed it at the handler boundary for all 28 tools and in a real provider request for kiln_capability. ⚠️ NARROWED TO TSK-0044. This criterion accepted TSK-0044 AND TSK-0045, which do not depend on each other, so neither could be finished without the other's work also being done - and its wording is about mutation wrappers, which are TSK-0044's, while TSK-0045's adapters mostly write no planning content at all. TSK-0045 now has its own criterion for what its adapters must do. ⚠️ THE WRAPPER IS A BOUNDARY, NOT A SECOND IMPLEMENTATION. Everything it calls already exists in `lib/` with the lock, the atomic write, the schema validation and the id allocator behind it. A wrapper that re-derived the content root, or re-checked a rule, would be a second answer to a question that already has one - which is how the two drift apart without either being obviously wrong.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Each registered mutation tool writes through the existing locked, atomic, validated path with the content root resolved by the shared resolver, returns structured success or refusal, and leaks no credential or absolute home path in its result. Business rules stay in `lib/`; the wrapper adds schema and rendering only.",
-    "title": "Every wrapper resolves the canonical content root and preserves the write discipline",
+    "statement": "Each registered creation, mutation, activation and stage-attestation tool performs its write through the existing locked, atomic, validated implementation rather than reaching the filesystem itself, and every wrapper - read or write - resolves the content root through the shared resolver rather than deriving one. A wrapper adds only the Pi-facing schema and the rendering of a result: no validation rule, no id allocation, no trace rule and no write path is restated in it. Every result is structured, a refusal is returned as data rather than thrown as prose, and neither carries a credential, a credential-derived value or an absolute user path.",
+    "title": "Every registered wrapper writes through the existing discipline and adds nothing to it",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0002"
@@ -1184,12 +1276,16 @@
     "evaluates": [
       "CMP-0033"
     ],
+    "evidencedBy": [
+      "EVD-0104"
+    ],
     "id": "ACC-0066",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ SCOPED 2026-09-13 TO WHAT TSK-0046 PROMISES, AND NO FURTHER (O1, then F88). The criterion accepts the decision owner, the outputs and the exit criteria - the three things a canonical definition carries - together with the nine identities and their paths, byte determinism, the three drift classes by name, a check that writes nothing, and both CI platforms. Purpose, method, next activity, delegations, boundaries and the completion summary are accepted by ACC-0112 instead, because their canonical fields do not exist yet. ⚠️ OUTPUT PROSE IS NOT A PURPOSE (F88). `producesProse` says what a stage emits. A skill that printed it under Purpose would tell an agent what the stage is for on the strength of a field that never said so - the drift CMP-0033 exists to prevent, arrived at by relabelling rather than by duplication. ⚠️ MISSING AND ORPHANED ARE STALENESS TOO. A definition added without regenerating, and a definition removed while its skill stays packaged, are the same drift as an edited one; a check that only compared the files present on both sides would pass both. ⚠️ BYTE DETERMINISM IS WHAT MAKES THE CHECK MEAN ANYTHING. A generator whose output varies with line endings, key order or the clock makes every check stale on some platform, and a check that is always stale is one nobody reads.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Each packaged stage skill carries the purpose, outputs and exit criteria of its canonical definition, produced by a generator rather than hand-maintained. Editing a stage definition without regenerating makes the check mode fail in CI, naming the stale skill.",
+    "statement": "The generator produces exactly nine packaged stage skills, one per canonical stage definition - `kiln-stage-01-intake`, `kiln-stage-02-intent-decomposition`, `kiln-stage-03-discovery`, `kiln-stage-04-requirement-gaps`, `kiln-stage-05-solution-design`, `kiln-stage-06-risk-feasibility`, `kiln-stage-07-acceptance-criteria`, `kiln-stage-08-implementation-plan`, `kiln-stage-09-handoff` - each at `pi-package/skills/<name>/SKILL.md` with that name in its frontmatter, and each carrying its definition's decision owner, its outputs - the typed artifacts, the outputs not yet typed and the output prose - and its exit criteria. The output prose is rendered as output prose and never relabelled as the stage's purpose. Generation is deterministic: the same definitions produce byte-identical files on every run and on every platform, with no timestamp and no machine-specific content. The check mode writes nothing, and fails naming each skill by name that is stale (its content differs from what the definitions generate), missing (a definition has no generated skill) or orphaned (a generated skill has no definition). The check runs in CI on Windows and on Ubuntu. The handwritten `kiln-planning` skill is neither adopted nor removed by generation or by the check.",
     "title": "Packaged skills are generated, and staleness fails a check",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1200,13 +1296,17 @@
     "evaluates": [
       "CMP-0033"
     ],
+    "evidencedBy": [
+      "EVD-0105"
+    ],
     "id": "ACC-0067",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ CORRECTED 2026-09-13 (F91, F92). The criterion said the override directory was registered after the packaged set, and it named three states. Pi 0.84.4 resolves project-settings skill paths ahead of package resources and keeps the first skill with each name, and TSK-0047 promises four states; the packaged-only state and the exact meaning of removal - the skill removed, the directory and the entry kept - are now stated, with one generated identity and path-based provenance. ⚠️ CONTROLS, RECORDED AS BEHAVIOUR (D9). An absent override directory is silently ignored: Pi skips a settings skill path that does not exist, emits no diagnostic, and the packaged skill loads. An untrusted project - no trust decision, or an explicit denial - loads neither the package's resources nor the override, because Pi empties project settings when the project is not trusted. Neither control is a Kiln refusal. ⚠️ R8, NOT CLAIMED. Kiln's settings merge keeps every existing project `skills` entry where it is and appends its own. Project-settings entries share Pi's precedence and keep their order, so an earlier project-settings skill path holding the same identity outranks Kiln's appended override entry. This criterion does not claim otherwise. ⚠️ R9 IS SETUP'S (TSK-0060). The entry is fixed relative to `.pi`; that it names the selected content root's `skills-overrides/` is for setup to guarantee. This criterion proves the entry in the default layout, where the content root is `<project>/planning-content`.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "With the consumer's override directory registered after the packaged set, a real Pi resource load resolves the override file for a skill of the same identity; editing the override changes what loads; removing it reverts to the packaged skill. Provenance is read from the loaded file path, not from model behaviour.",
-    "title": "An override with the same identity wins, and removing it reverts",
+    "statement": "In an isolated trusted project whose `.pi/settings.json` holds Kiln's package entry and the skill-override entry `../planning-content/skills-overrides` as produced by `mergeSettingsText`, the pinned Pi runtime's real resource loader, reloaded for each state, resolves the generated skill identity `kiln-stage-01-intake` exactly as follows. (1) Packaged only - the override directory exists and holds no skill: the loaded skill's `filePath` is the packaged `pi-package/skills/kiln-stage-01-intake/SKILL.md`, and Pi reports no collision for that identity. (2) Override present - `planning-content/skills-overrides/kiln-stage-01-intake/SKILL.md` declares that name: exactly one skill with that identity loads, its `filePath` is the override file, and Pi's collision diagnostic names the override file as the winner path and the packaged file as the loser path. (3) Override edited - the override's description is changed: the same override `filePath` loads, with the edited description. (4) Override skill removed while the override directory and the settings entry remain: the packaged `filePath` and the packaged description load again, and Pi reports no collision for that identity. In every state the other packaged skills still load from the package. Provenance is read from `filePath` and the collision diagnostic's winner and loser paths, never from model behaviour. Pi 0.84.4 resolves project-settings skill paths ahead of package resources, and the first skill loaded with a given identity wins, so this criterion claims only that the consumer override wins over the packaged skill, not over every earlier project-settings skill path.",
+    "title": "A consumer override of a generated stage skill wins over the packaged skill, tracks edits, and reverts when removed",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0001"
@@ -1216,13 +1316,17 @@
     "evaluates": [
       "CMP-0034"
     ],
+    "evidencedBy": [
+      "EVD-0107"
+    ],
     "id": "ACC-0068",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ NARROWED 2026-09-13 (F98, D14). The criterion used to accept that the first turn asked 'a single relevant question' and proposed no solution. Whether a question is relevant is model behaviour, and a scripted provider decides the answer before the model is asked, so a test built on one would claim a selection nobody made. This criterion now accepts only what Kiln deterministically gives the session. The user-visible first turn - a real model on a clean consumer - is accepted by the TSK-0063 journey criterion instead. ⚠️ PERSISTENCE MOVED (D15). Writing the operator's answer into the intake document is TSK-0049's continuous capture and has its own criterion there; no typed stage-document writer exists yet. ⚠️ FRESH IS DEFINED BY STATE, NOT BY TEXT (D12). No typed planning artifacts and no stage attestations. The generated starter documents and `project.yaml` exist in every initialised project and do not make it non-fresh. ⚠️ PASSED 2026-09-14 ON EVD-0107: G4 run 34790900443 and G5 run 34838944777 observed the hook, the status tool and a real trusted /kiln-start session at the provider, with the packaged and the edited-override skill. Declared: R10, R12, F82, local-only mutations, no macOS.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "On a fresh project the orchestrator reads the name, description and starter document and responds with a single relevant question. It proposes no architecture, no requirement set and no solution, and the answer it receives is written into the intake document through the typed path rather than by editing the file.",
-    "title": "The first Stage 1 turn asks one question and invents no solution",
+    "statement": "On a fresh project - one with no typed planning artifacts and no stage attestations, whatever its starter documents and project metadata say - `/kiln-start` deterministically supplies the orchestrator with the project's name and description and the Stage 1 starter document, both through `kiln_project_status`; the exact loaded `kiln-stage-01-intake` skill content, injected at `before_agent_start` from the derived current stage, including a consumer override when Pi resolved one; and instructions to ask exactly one question, to propose no architecture, requirement set or solution, and to call no mutating tool. Each of these is observed in what the session is given, not inferred from what a model says.",
+    "title": "On a fresh project, /kiln-start supplies Stage 1's context and one-question instructions",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0022",
@@ -1233,9 +1337,13 @@
     "evaluates": [
       "CMP-0034"
     ],
+    "evidencedBy": [
+      "EVD-0112"
+    ],
     "id": "ACC-0069",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Evidence split agreed 2026-09-18 during TSK-0049. This criterion stays a claim about model behaviour: the second question itself must differ, not merely the state it is derived from. Restating it as \"the state turn two is derived from differs\" was considered and refused, because that is the mechanism and not adaptive questioning. It is therefore evidenced in two parts, and neither part alone satisfies it. (1) Deterministic tests prove the mechanism: two different first answers produce different persisted intake state and different turn-two inputs, with no real model involved. (2) Two retained real-model runs prove the behaviour: both start from the same project snapshot, differ only in the operator's first answer, and are reviewed by a person for whether the second questions differ and are relevant to the answers given.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "After the intake document changes, the next question differs according to what the answer supplied — demonstrated by driving two different first answers from the same starting state and observing two different second questions.",
@@ -1249,12 +1357,16 @@
     "evaluates": [
       "CMP-0034"
     ],
+    "evidencedBy": [
+      "EVD-0113"
+    ],
     "id": "ACC-0070",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Amended 2026-09-18 under TSK-0050, before implementation, and again the same day (F18). The original statement named Stage 1 attestation alone. The boundary is the same act for artifact approval and for type activation and deactivation, so all three are stated here rather than left to the implementation to generalise. Material-change preview is a separate criterion, ACC-0115: that one is the orchestrator's behaviour before a mutation, where this one is the tool boundary that holds whatever the orchestrator does.\n\nAuthorisation is Pi's interactive confirmation channel, `ctx.ui.confirm`, called with the invocation's own signal and a 30,000 ms timeout. Only a literal `true` authorises the action. No UI context, rejection, cancellation, timeout, abort and an unexpected UI error all refuse and all write the bounded refusal record. They share one refusal code, `operator-confirmation-not-granted`, because Pi returns the same `false` for every one of them: with no UI bound `confirm` is `async () => false`, and in RPC mode a cancelled dialog and an expired timeout both resolve `false` through the same path, which is why the SDK's own timed-confirm example labels the result \"Cancelled or timed out\". A code claiming to separate them would be a distinction Kiln invented rather than observed. An unexpected UI error refuses without the raw error reaching the model or the record.\n\nF18: what each operation DOES with Kiln's actor string differs, and this criterion claims only what is true of all three. All three receive `operator via Pi UI`. Attestation persists it as `decidedBy`, and activation persists it in the project manifest. Review status persists the `approved` status and returns the actor to the caller, but stores no approver: the artifact envelope in `schemas/common.schema.json` has no reviewer field. Adding one, or an approval history, is an artifact-schema and migration decision that TSK-0050 does not make, so neither this criterion nor the confirmation dialog claims durable attribution for an approval.\n\nThe refusal record is `state/operator-boundary-refusals.json`, bounded at the newest 100 entries and holding only validated identifiers and enums. Evidence is split: deterministic tests cover both the confirmed and the refused branch, including an injected UI context for the confirmed one, because a harness that answered the dialog would be acting as the operator. The retained RPC run leaves the dialog unanswered and shows refusal after the bound.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "An attempt to advance or attest Stage 1 without explicit operator authorisation is refused by the orchestrator, and no attestation file changes. The refusal is observable in the recorded state, not only in the transcript.",
+    "statement": "An attempt by the orchestrator to attest or advance a stage exit criterion, to set an artifact's review status to `approved`, or to activate or deactivate an artifact type is refused unless the operator confirmed that exact action through Kiln's interactive confirmation channel during that same tool invocation. No model-supplied argument can carry an authorisation value or actor identity. After confirmation, Kiln supplies its own internal actor string to the underlying operation; any actor identity that operation records therefore comes from Kiln, not the model. The confirmation result does not outlive the invocation that obtained it. Where no confirmation channel is available, or the operator cancels, rejects, or does not answer, the tool refuses with a stable refusal code. On a refusal the target attestation file, artifact file and type manifest are unchanged in bytes and in modification time, and a bounded refusal record naming the operation, the refusal code and the target identifiers is persisted and reported by `kiln_project_status`.",
     "title": "The orchestrator cannot cross a user-owned gate",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1265,12 +1377,16 @@
     "evaluates": [
       "CMP-0034"
     ],
+    "evidencedBy": [
+      "EVD-0108"
+    ],
     "id": "ACC-0071",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ SPLIT 2026-09-13 (F96, F97, D13). F96: the launcher refuses the tool checkout (`resolveSelfHost`, EVD-0089), but the orchestrator's handlers re-resolve the content root inside the Pi child, which inherits `PLANNING_CONTENT_DIR`, and `resolveContentRoot` accepts any override - including the tool's own `planning-content/` - because its inside-the-tool-root backstop runs only without one. The child is never told whether self-hosting was validated, and Pi started without the launcher bypasses the launcher's refusal entirely. So the refusal must also live in the orchestrator, gated by a marker only the launcher emits. F97: 'names both paths' conflicted with the model-facing disclosure boundary - tool results expose no absolute path - so the operator sees canonical paths and the model sees placeholders. ⚠️ STRICT MEANS STRICT. A marker that accepted 'true', '1' or an empty value would let any inherited environment variable grant self-hosting; only the exact value the launcher writes after validation permits it. ⚠️ PASSED 2026-09-14 ON EVD-0108: G3b run 34778806796 observed the resolver, every handler's two refusal surfaces and the supervisor's marker propagation. Declared: F112, local-only mutations, no macOS.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root; given a state in which the tool's own bundled content would resolve instead, it refuses and names both paths rather than authoring into the tool's plan.",
+    "statement": "Started in a consumer checkout, the orchestrator resolves the canonical sibling content root. In any state in which the tool's own bundled planning content would resolve instead - including `PLANNING_CONTENT_DIR` naming it, and a sibling that is a link into it - it refuses before authoring anything, and no file under either root changes. The refusal has two surfaces: the operator-facing refusal names both canonical absolute paths, the resolved content root and the tool root; the model-facing structured refusal carries a stable refusal code and stable placeholders for those paths, and no absolute path. Self-hosting is permitted only by an explicit, strict self-host marker that the launcher emits into the orchestrator's environment after it has validated `--self-host`; an absent marker, or any value other than the exact expected one, refuses.",
     "title": "It refuses to operate on the tool's own planning content",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1281,13 +1397,17 @@
     "evaluates": [
       "CMP-0035"
     ],
+    "evidencedBy": [
+      "EVD-0115"
+    ],
     "id": "ACC-0072",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Amended 2026-09-18 under TSK-0051, before implementation. This criterion previously opened with \"a real Pi run of each specialist reports an active tool set equal to the intersection of that role's declared allowlist and the measured host registry\". That sentence needs a child process, and TSK-0051 owns only the role definitions and their static check. The measurement moved to ACC-0076, which already measures what a real child reports and already belongs to TSK-0053. What remains here is testable the moment the three definitions exist: they are generated, so the declared list is the contract's list by construction and a `--check` mode compares the generated bytes in every CI cell.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "A real Pi run of each specialist reports an active tool set equal to the intersection of that role's declared allowlist and the measured host registry. A role definition with no declared tool list fails the roster lint rather than inheriting Pi's default active set.",
-    "title": "Each role has exactly its contract's tools, and a missing allowlist is a lint error",
+    "statement": "Every shipped role definition declares an explicit tool list, and that list equals the one its role's contract derives. The role-definition check fails a definition whose tool declaration is missing or empty, and a definition that declares no tools is never treated as inheriting the agent's default active set.",
+    "title": "Each role definition declares exactly its contract's tools, and an empty declaration fails the check",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0026"
@@ -1297,13 +1417,17 @@
     "evaluates": [
       "CMP-0035"
     ],
+    "evidencedBy": [
+      "EVD-0116"
+    ],
     "id": "ACC-0073",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Amended 2026-09-18 under TSK-0051, before implementation. This criterion previously added \"and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it\". That is a measurement of a real child, which TSK-0051 does not own; ACC-0076 already states it and belongs to TSK-0053. CMP-0035's note gives the reason the static half matters on its own: a role-shipped model would silently override the operator's project selection.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "No shipped role definition contains a model declaration, and a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it.",
-    "title": "No role declares a model",
+    "statement": "No shipped role definition declares a provider, a model or a thinking level, and the role-definition check fails one that does.",
+    "title": "No role definition declares a provider, a model or a thinking level",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0025"
@@ -1313,12 +1437,16 @@
     "evaluates": [
       "CMP-0009"
     ],
+    "evidencedBy": [
+      "EVD-0117"
+    ],
     "id": "ACC-0074",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Clarified 2026-09-19 under TSK-0052, before implementation. The original said \"observed at the child\", which reads as a child self-report. Provider-side capture is the stronger observation and is what the compatibility spike already retains: the child is spawned with stdin closed (`stdio: [\"ignore\", \"pipe\", \"pipe\"]`) and a recording provider logs the request the child's own model turn produced, so `sentinelReachedProvider` is evidence from outside the child that the exact task arrived. A child saying it received the task would be the child vouching for itself, which is the failure REQ-0026 exists to prevent.\n\nScope: this criterion is about the VERIFIER's vocabulary and the paired measurement that feeds it. `verifyChild` is a pure function that consumes a run record; producing that record during a real specialist launch is TSK-0053's, under ACC-0076. No real specialist process, child self-report or new transport belongs here.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "One test asserts both facts about the same child: its stdin was closed, and the exact delegated task reached it through the supported non-stdin channel, observed at the child. The verifier's field and its refusal reason describe task binding rather than stdin.",
+    "statement": "One test asserts both facts about the same retained child run: its stdin was closed, and the exact delegated task reached the child's model turn, observed independently through provider-side capture of the child's outbound model request rather than through anything the child reported about itself. The verifier's field and its refusal reason describe task binding rather than stdin.",
     "title": "Stdin is closed and the exact task still arrived",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1329,9 +1457,12 @@
     "evaluates": [
       "CMP-0036"
     ],
+    "evidencedBy": [
+      "EVD-0120"
+    ],
     "id": "ACC-0075",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A child that exits zero, emits a well-formed transcript and returns plausible prose without Kiln's tools causes the delegation to fail loudly; none of its substantive output is used. The same holds for signature drift, an out-of-role write, a nonzero exit, a timeout, malformed JSON events, a missing task binding and a provider or model mismatch.",
@@ -1345,12 +1476,16 @@
     "evaluates": [
       "CMP-0036"
     ],
+    "evidencedBy": [
+      "EVD-0118"
+    ],
     "id": "ACC-0076",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "Amended 2026-09-18 under TSK-0051's review. The active-tool-set clause came from ACC-0072, which belongs to a task that owns no specialist process. It sits here because this criterion already measures what a real child reports and because TSK-0053's own statement already names the intersected tool allowlist. ACC-0072 keeps the static half: that each definition declares exactly its contract's tools and that an empty declaration fails the check.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "The child's reported provider, model and thinking level equal the orchestrator's, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
+    "statement": "The child's reported provider, model and thinking level equal the orchestrator's, its active tool set equals the intersection of its role's declared allowlist and the measured host registry, it receives a task-scoped payload rather than the conversation, and temporary prompt material is absent from disk after every exit path including timeout and abort.",
     "title": "The child inherits the orchestrator's exact selection and a scoped context",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1427,12 +1562,21 @@
     "evaluates": [
       "CMP-0037"
     ],
+    "evidencedBy": [
+      "EVD-0088",
+      "EVD-0109",
+      "EVD-0111",
+      "EVD-0146",
+      "EVD-0149",
+      "EVD-0152"
+    ],
     "id": "ACC-0081",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ Reopened 2026-09-15 on R18 and R19; settled 2026-09-16. EVD-0088 stands unchanged as the historical record of commit 36df281. R18 was a real overrun and a criterion/evidence mismatch: run 34910936533 recorded spentMs 8092 against an 8,000 ms budget with withinBudget false, while the evidence test passed it against an unstated 9,500 ms ceiling, the budget plus six 250 ms phase floors. Identity reads and termination spawns ran outside every scaled wait, so neither the budget nor that ceiling bounded them. Both are closed: one deadline now covers every operation, that ceiling is deleted, and a completed result requires withinBudget. R19 is closed by a per-operation timeline that records when each tree was observed stopped. The 8,000 ms budget is unchanged; what changed is that it is enforced rather than described. F119, intermittent Windows WMI latency, is MITIGATED, NOT ELIMINATED: the provider's first use is now paid by the bounded launch preflight, measured at 3,142 ms and 3,057 ms on cold CI runners, after which every tracked query cost 370 to 830 ms. If a primed route times out again in CI, WMI is removed wholesale in favour of a WMI-free identity format, which is a deliberate change of identity precision and not a fallback. F119's successor is settled: F122 retired WMI after a primed timeout, and EVD-0111 records the WMI-free reader, the six complete Windows records under the enforced deadline, and F130 as instrumented but unexplained. ⚠️ FAIL 2026-09-24 on EVD-0146. After an interrupt on a loaded Windows runner (CI run 36074016941, job 107881093769), the launcher's identity read ran out of deadline. A launcher descendant was still running when the supervisor returned. The shutdown was correctly reported partial (launcher-descendants-unverified), but both trees were not stopped, and this criterion requires that they were. O1 (ca476de) fixed the natural-mode starvation and is verified for natural shutdown only. The pass is not restored until both open mechanisms are resolved: the live descendant after an interrupt, and the short-lived agent whose descendants the tracker never observes (F130, TSK-0058). ✅ PASS 2026-09-25 on EVD-0149, against the statement as amended the same day (29f529d, eb9df03). Both F130 mechanisms are resolved: on Windows both trees start in jobs, so a short-lived agent's descendants and a launcher descendant after an interrupt are named and ended by their jobs, and one Ctrl+C in an interactive session is a keyboard stop. The overall CI run carrying the evidence was red on one Windows Node 22 cell, where the journey test's headless Chrome never exposed a page after Kiln's first run had passed its shutdown checks; the cause was not captured and nothing observed ties it to Kiln, disclosed in EVD-0149. ⚠️ FAIL 2026-09-25, reopened the same day. The shipped command recorded budget.ms 11000 (EVD-0150: the supervisor defaults of 8,000 ms grace plus 3,000 ms hard), while this criterion states one 8,000 ms deadline and its evidence fixture ran with 5,000 plus 3,000. EVD-0149 evidenced the fixture configuration, not the shipped one. The criterion stands; the product is corrected to one shared 5,000 plus 3,000 configuration used by the command and the fixture, and this pass is not restored until the real command records budget.ms 8000 and CI passes. ✅ PASS RESTORED 2026-09-25 on EVD-0152 with EVD-0149: the shipped command records the stated 8,000 ms budget from the one configuration its evidence also uses, the per-tree stop functions default to it too, and CI run 36196549020 passed all four cells with every evidence record at budget.ms 8000.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "After Pi exits, or after an interrupt, both process trees are stopped within their grace periods, the port is free, and only files created by that invocation were removed. Verified on Windows and on the supported POSIX platform.",
+    "statement": "After Pi exits, after an interrupt, or after one Ctrl+C at the keyboard in an interactive Kiln session, both process trees are stopped within their grace periods, the port is free, and only files created by that invocation were removed. Seven things are observed and recorded SEPARATELY, because they fail separately and because any one of them standing for the others is how a shutdown claim becomes untestable. An observation that was not made is recorded as unmade and the shutdown is reported partial; it is never treated as one that passed. (1) Which of the three triggers ended the run — Pi exiting on its own, a signal, or the keyboard stop — each recorded where it was observed rather than supplied beside it, so the record cannot contradict itself. A signal is recorded where it was handled and never inferred from the processes having gone. The keyboard stop exists because an interactive Pi reads Ctrl+C as a key, so no signal occurs: Kiln's Pi extension consumes the key in the editor and in dialogs and writes a per-run notice before asking Pi to stop, and the stop is recorded as `keyboard` when the supervisor sees that notice, including when Pi's exit is observed first; it never records a signal that did not occur. A run ended by Pi exiting on its own records neither a signal nor a keyboard stop. (2) For each tree independently, either that it had already exited or that a stop was requested of it: a tree that was already gone is recorded as such and is not asked, and a supervisor that asks one tree and not the other looks identical to a correct one on every run where the unasked tree exits anyway. (3) That each tree's exit was independently observed, so one going never stands in for the other. (4) That where a graceful stop did not complete, escalation was bounded and its outcome observed — reported as unobserved rather than assumed when the process still did not go. (5) That the port accepts a fresh exclusive bind afterwards, observed by rebinding rather than derived from any process record: an exit code says the leader is gone and says nothing about a worker still listening. (6) That only runtime files this invocation created were removed, proved by a file it did not create still being present afterwards, not merely by its own being gone. (7) That the results are recorded independently for Windows and for the supported POSIX platform through CI, rather than one platform's pass standing for both, and that each platform's observation includes a KNOWN DESCENDANT of each tree rather than only the leader's exit code. The platforms differ in the only mechanism that matters here: a graceful signal is unavailable on Windows, and on POSIX a process group can be targeted only for a child spawned as a group leader — which the foreground agent cannot be, since a detached process cannot read the terminal, so its descendants must be enumerated and signalled individually. A descendant enumeration that fails is recorded as unmade, because an empty list would claim a tree with no children. On Windows both trees are held by jobs (the launch prerequisite below), so each tree's descendants are its job's members, listed and terminated through the job, and a job that cannot be listed is recorded as unmade in the same way. Two bounds are stated separately, because they cover different work and are paid at different times. THE WINDOWS LAUNCH PREREQUISITE: Pi and the launcher are each created suspended inside a job object held by a host process outside that job, with kill-on-job-close set, and each is resumed only once it is assigned, so every descendant, detached ones included, is a member of its tree's job from its first instruction. A host that cannot create the job, set its limits, create the process or assign it refuses the launch, and nothing falls back to a plain spawn or to process-table tracking. No Windows shutdown operation then reads a process table, so the process-table preflight is not run on Windows and is recorded as not run, with that reason. The hosts' start-up is the launch's own cost and is never counted against the shutdown budget. POSIX has neither job hosts nor a preflight. THE SHUTDOWN: from the trigger — Pi exiting, an interrupt arriving, or the keyboard stop's notice being seen, without waiting for Pi to exit — the whole teardown has one 8,000 ms deadline, and every operation draws its allowance from it: the descendant tracker joins, each tree's grace and hard waits, every identity read, every signal or `taskkill`, the launcher's control channel, the removal of this invocation's owned files, and the port probe. An operation whose minimum allowance the deadline cannot cover is not started, is named in the record's `unfinished` list with its reason, and makes the result incomplete. A shutdown is complete only when all six hold: both trees were observed stopped; the port accepts a fresh exclusive bind; the removal of owned files succeeded; every required observation was made, so `notObserved` is empty; `unfinished` is empty; and `withinBudget` is true. A teardown that ran past its deadline is not complete, whatever else it managed.",
     "title": "Shutdown leaves nothing running on either platform",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1443,9 +1587,12 @@
     "evaluates": [
       "CMP-0037"
     ],
+    "evidencedBy": [
+      "EVD-0089"
+    ],
     "id": "ACC-0082",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Run where the tool root and project root are the same directory, the normal command refuses rather than writing `.pi/` into the tool repository. The opt-in requires both the explicit content-directory override and the self-host flag, and the supervisor verifies the two agree before starting.",
@@ -1459,9 +1606,13 @@
     "evaluates": [
       "CMP-0039"
     ],
+    "evidencedBy": [
+      "EVD-0133"
+    ],
     "id": "ACC-0083",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-22 on EVD-0133, slice 1 of TSK-0060. The setup command's static import graph, walked from bin/setup.mjs through every relative import transitively, reaches 8 node: built-ins and 14 Kiln modules — including the initializer, the ignore owner, the scaffold and the transaction — and no installed package at any depth. The scan is itself checked: a top-level `import Ajv from \"ajv/dist/2020.js\"` and an import of @earendil-works/pi-coding-agent are both caught by it, so the criterion's second sentence is measured rather than assumed. Everything installed — Ajv through runtime-records, the state library, the initializer, the ignore owner — is imported dynamically after the install step, which is D26's order. The check runs in the full suite on all four CI cells. It is evaluated from this slice because the criterion is about the graph up to and including the install, and that part of the command is complete; the later slices can only add dynamic imports, and the same check guards them.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A static check of the setup command's import graph, up to and including the dependency-install step, finds no import of any installed dependency. Adding a top-level import of the Pi runtime or the validator makes that check fail.",
@@ -1475,13 +1626,17 @@
     "evaluates": [
       "CMP-0039"
     ],
+    "evidencedBy": [
+      "EVD-0139"
+    ],
     "id": "ACC-0084",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
-    "reviewStatus": "draft",
+    "notes": "PASS 2026-09-24 on EVD-0139, observed by running the command rather than by reading the table. Twenty scenarios are driven through `main()` and the code each returns is compared with what `--help` publishes: four kinds of bad argument, a project root that does not own the content, an install that is not the pin, a bootstrap that could not complete, a repository that does not ignore the runtime paths with nobody to ask, a settings file somebody broke, a package entry that cannot be proved, a project nobody trusts, a refused look at this computer, a refused billable check, an interrupted run nobody chose to continue, a model that did not pass the check, a model named but never confirmed, a model this computer declined, a provider Kiln has no contract for, research that cannot be turned back on safely, a recovery whose files only the operator may remove, and a computer with no provider connected. Scenarios are grouped by class, so several bad arguments are one code while two different instructions may not share one, and every code observed is asserted to be published with a meaning. AUTHENTICATION BECAME ITS OWN CLASS WHILE MEASURING THIS: \"connect a provider in Pi\" cannot be answered by rerunning with flags, and arriving as the selection code would have a script retry forever, so it is exit 18.\n\n⚠️ AMENDED 2026-09-24 TO THE COMMAND IT EVALUATES (D3). This criterion evaluates CMP-0039, the setup command, and its original wording also named launch failure and the unusable-selection class. Neither can be observed through `bin/setup.mjs`: the selection phase refuses first in every case that would reach the preflight's `LaunchRefusal`, and launch failure belongs to `bin/start-kiln.mjs` altogether. Leaving the criterion open on classes another command owns would have kept it open forever while telling nobody where the gap was. Setup publishes `EXIT.UNUSABLE`, which is checked here, and has no separate launch-failure code; what moved is WHERE THEY ARE MEASURED. The launch-side refusal classes and their codes are owed their own criterion against CMP-0037, the combined runtime supervisor that raises them, recorded there and on TSK-0037, and are not evaluated by this one — so no record yet claims the launcher's codes are distinct or published.",
+    "outcome": "pass",
+    "reviewStatus": "amended",
     "schemaVersion": 2,
-    "statement": "Invalid arguments, content conflict, filesystem or settings refusal, missing runtime, trust denial, interactive authentication required, provider or credential-contract failure, live compatibility refusal, package or capability failure, and launch failure each exit with their own code, and the mapping in `--help` matches the codes the tests observe.",
-    "title": "Each refusal class has a distinct published exit code",
+    "statement": "For `bin/setup.mjs`: invalid arguments, a content conflict, a runtime that is not the pinned one, a failed bootstrap, runtime state that could not be protected, a file it owns that it cannot read, a trust denial, an answer that leaves setup partial, an interrupted run, a model that was not shown to work, a model that cannot be chosen or confirmed, a provider or credential-contract failure, a package or registration failure, a research refusal, a recovery that cannot be proved safe, and a computer with no authenticated provider each exit with their own code, and the mapping published by `--help` is the mapping the command returns, observed by running it.",
+    "title": "Each of the setup command's refusal classes has a distinct published exit code",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0022"
@@ -1491,9 +1646,13 @@
     "evaluates": [
       "CMP-0039"
     ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
     "id": "ACC-0085",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-23 on EVD-0138. A project-local run prints the canonical tool root, project root, content root, settings path and runtime state path in its first five lines, and the install seam captures the project tree at that moment: byte-identical to its pre-run state. The external case is measured in a child with every filesystem call recorded from before the command starts — the line naming the per-user runtime path is printed after ZERO writes to the project, and the id in that path is the id the run then commits, because the id is derived in memory and the identity phase is handed it rather than left to invent a second one. A `--project-root` disagreeing with the resolved content owner refuses with both printed, having written nothing.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Before the first lasting write, the command has printed the canonicalised tool root, project root, content root, settings path and runtime state path. A disagreement between the explicit project root and the resolved content owner refuses and prints both.",
@@ -1508,9 +1667,13 @@
     "evaluates": [
       "CMP-0040"
     ],
+    "evidencedBy": [
+      "EVD-0145"
+    ],
     "id": "ACC-0086",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-24 on EVD-0145, on the journey control, which passed in all four cells of CI run 36065687783. That run was RED OVERALL: Windows Node 24 failed an unrelated shutdown platform-evidence test (F130). The documented sequence ran as the README states it, from an empty repository with no commit. Setup's questions were answered by flags and the model was a non-billable loopback fixture. The run reached a Stage 1 question with identity-confirmed readiness. The first turn was piped /kiln-start test input; an interactive session is observed by ACC-0103 and ACC-0088.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "From a temporary empty directory the documented sequence — including `git init` into a repository with no commits, before any commit exists — initialises, installs, registers, binds a deterministic non-billable model, starts both processes with identity-confirmed readiness, and reaches a Stage 1 question. Verified on Windows and the supported POSIX CI platform.",
@@ -1525,9 +1688,13 @@
     "evaluates": [
       "CMP-0040"
     ],
+    "evidencedBy": [
+      "EVD-0145"
+    ],
     "id": "ACC-0087",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-24 on EVD-0145, on the journey control, which passed in all four cells of CI run 36065687783. That run was RED OVERALL: Windows Node 24 failed an unrelated shutdown platform-evidence test (F130). The answer was written through kiln_write_stage_document while a headless browser had the Stage 1 page open and subscribed. The page showed it after a reload the change stream caused. An unauthorised kiln_write_stage_attestation was then refused with operator-confirmation-not-granted, and no attestation file changed. This required F12's fix: the stream now watches the whole content root.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A deterministic Stage 1 answer is written through the typed path, observed arriving in the browser through the change stream, and an attempted unauthorised stage advance is refused with no attestation changed.",
@@ -1541,12 +1708,18 @@
     "evaluates": [
       "CMP-0040"
     ],
+    "evidencedBy": [
+      "EVD-0145",
+      "EVD-0150",
+      "EVD-0151"
+    ],
     "id": "ACC-0088",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ THE IMMEDIATE-QUIT RUN EXISTS BECAUSE OF F82 (2026-09-12), AND IT IS THE ONE CELL NOTHING ELSE CAN OBSERVE. WHAT WAS MEASURED: over 98 runs against the pinned runtime on Windows, `--mode rpc` on Node 24.18.0 aborts with a libuv assertion - `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\\win\\async.c, line 94`, exit 3221226505 (0xC0000409) - when shutdown begins within 50ms of a SECOND OR LATER turn settling. WHAT WAS NOT THE CAUSE: it is not tool execution. A tool call forces a second provider request, and two text-only turns abort identically; one turn never does. Forcing a fresh connection per request and disabling session persistence each still abort. THE CONTROLS WERE CLEAN: Node 22.23.2 in every configuration, print mode with and without a tool call, terminating the child rather than asking it to stop, and every shutdown delayed 50ms or more. WHY IT IS NOT A TASK: Kiln's launch never passes `--mode`, so production runs interactive or, without a TTY, print - and print was clean. No Kiln code is on that stack, and no delay, flag or dependency patch is justified by evidence that does not reach production. THE INTERACTIVE PATH, OBSERVED 2026-09-25 (EVD-0151). It ends in the same `process.exit(0)` as RPC, with an awaited terminal drain in front of it. It was observed in Windows Terminal on Node 24.18.0, where Pi had a real console on both ends and ran interactive: a second turn completed a tool call, and `/quit` was submitted 9 ms and 44 ms after Pi's own `agent_end`, inside the 50 ms window. The keystrokes were synthetic input events sent to a Windows Terminal window verified to be in the foreground, not a physical keypress, and a person reviewed the retained records against their hashes. Both runs exited 0 through the supervisor with a complete shutdown, no surviving tree, no bound port and no run file left. IF IT FAILS: a dedicated defect and an upstream report are opened before this criterion is accepted. A delay is a diagnostic control and is not a fix. ✅ PASS 2026-09-25 on EVD-0151 (the immediate quit after a completed tool call on a second turn, Windows and Node 24) and EVD-0145 (clean shutdown, exact resume and unchanged setup in the documented journey). EVD-0150 is linked as the earlier first-turn runs, which did not meet the second-turn condition. LIMIT: the keys were synthetic input in a verified foreground Windows Terminal window; no physical keypress is claimed.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes.",
+    "statement": "Stopping the supervisor leaves no child process, no bound port and no temporary file from that invocation; rerunning resumes the recorded session and the current stage, and the setup phase changes no bytes. One of the runs is a real interactive session on Windows and Node 24 quit immediately after a completed tool call: it exits cleanly through the supervisor, its process exit status and the supervisor's shutdown record are retained, and it leaves no child, no bound port and no temporary file of that invocation behind.",
     "title": "Shutdown is clean and a rerun resumes rather than restarting",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1557,12 +1730,16 @@
     "evaluates": [
       "CMP-0040"
     ],
+    "evidencedBy": [
+      "EVD-0155"
+    ],
     "id": "ACC-0089",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": " ✅ PASS 2026-09-26 on EVD-0155: the index shows no wrong state lacks a named control; CI run 36246021430 shows every control ran and passed in all four cells.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "Each of the enumerated wrong states produces a refusal rather than an apparent success: wrong working directory, inspection denied, a configuration read attempted before consent, implicit adoption of a sole or default model, missing model authentication, an overbroad environment-only provider, a TTY-less login attempt, live-check denial and a malformed canary tool call, Tavily contacted before approval, a committed research choice with no local consent, trust denial, corrupt settings, untracked-state exposure, an interrupted transaction, an occupied port, an unrelated healthy HTTP service, tool signature drift, and a fake child returning plausible prose without Kiln tools.",
+    "statement": "Each of the enumerated wrong states produces a refusal rather than an apparent success: a missing or mismatched project or content root, whatever the working directory (an unrelated working directory is valid when the resolved content root and the explicit project root agree, and nothing is written into it), inspection denied, a configuration read attempted before consent, implicit adoption of a sole or default model, missing model authentication, an overbroad environment-only provider, a TTY-less login attempt, live-check denial and a malformed canary tool call, Tavily contacted before approval, a committed research choice with no local consent, trust denial, corrupt settings, untracked-state exposure, an interrupted transaction, an occupied port, an unrelated healthy HTTP service, tool signature drift, and a fake child returning plausible prose without Kiln tools.",
     "title": "Every negative control refuses",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1575,14 +1752,17 @@
     "evaluates": [
       "CMP-0027"
     ],
+    "evidencedBy": [
+      "EVD-0123"
+    ],
     "id": "ACC-0090",
     "lifecycle": "active",
-    "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation.",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ NARROWED 2026-09-03. This previously required a REFUSAL with a stated recovery route, which is Kiln's behaviour and not Pi's, and could not have been evaluated when its task completed. It now records what Pi does; what Kiln must do about it is a separate criterion downstream of the setup command. ⚠️ 'STATED AS THE OBSERVED OUTCOME, NOT A REQUIRED ONE' is the load-bearing phrase: an observation that only passes when the runtime behaves the way the design hoped is not an observation. ⚠️ AMENDED 2026-09-21 (F7, F8): Pi 0.84.4 has no authentication-only launch, so the observation is of the full interactive TUI with /login typed into it, and the no-TTY runs are recorded as the print-mode runs they are. ✅ PASS 2026-09-21 on EVD-0123. Pi 0.84.4 has no authentication-only launch, so the full interactive TUI was observed owning the terminal while /login saved an OpenAI API key, and a separate pi auth check --no-refresh went from not_ready to ready. With stdin or stdout not a TTY the TUI never rendered: two runs exited 0 silently and two were still running at the 20 s timeout, and none refused. The sanitized transcripts are retained, and CI run 35632352056 passed the retained test in all four cells. LIMITS: the terminal observation is Linux only, under script(1), and says nothing about Windows terminals. The auth check proves local configuration, not a working provider key; account authentication is TSK-0066.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "A manually invoked check records, against the pinned runtime alone: that the authentication-only step launches with exclusive terminal ownership; that a successful exit is distinguished from proven authentication by rediscovering auth afterwards rather than trusting the exit code; and what the same invocation does with no TTY, stated as the observed outcome — clean refusal, error, or indefinite wait — rather than as a required one. The transcript is retained. No claim is made here about Kiln's own refusal or its recovery messaging.",
-    "title": "Pi's login step is observed owning the terminal, and its no-TTY behaviour is recorded",
+    "statement": "A manually invoked check records, against the pinned runtime alone: that the full interactive Pi TUI, launched against an isolated Pi configuration, owns the terminal while `/login` completes through the built-in `openai` API-key route with a throwaway key; that its exit is distinguished from configured authentication by a separate `pi auth check --provider openai --json --no-refresh` afterwards, which confirms locally configured authentication and does not prove the key works against a provider; and, with the same arguments and stdin, stdout or both not a TTY, which mode Pi selected and the bounded outcome (exit and code, error, or still running at a stated timeout), stated as observed rather than as required. Those controls are not the interactive mode and are not described as it. A sanitized transcript is retained, and the entered key is not recorded. No claim is made here about Kiln's refusal or recovery messaging, about OAuth, or about usable account authentication.",
+    "title": "Pi's interactive /login is observed owning the terminal, and the no-TTY controls are recorded",
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0022"
@@ -1592,10 +1772,13 @@
     "evaluates": [
       "CMP-0027"
     ],
+    "evidencedBy": [
+      "EVD-0124"
+    ],
     "id": "ACC-0091",
     "lifecycle": "active",
-    "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication.",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ THE SECOND HALF IS NOT OPTIONAL. A model appearing in `getAvailable()` after a login is consistent with the login having worked and equally consistent with it having been available already; only the revocation distinguishes them. ⚠️ THE 'FRESHLY CONSTRUCTED' CLAUSE MATTERS TOO: reusing a runtime built before the login would report a cached snapshot, and 'login UI exited' is not 'login succeeded' — the same rule section 6.2 applies to the exit code. ⚠️ FABRICATION IS EXCLUDED IN THE STATEMENT RATHER THAN IN A NOTE, because it is the cheap way to make this pass and it would prove a storage shape instead of usable authentication. ✅ PASS 2026-09-21 on EVD-0124. One manual, account-bound Windows run with an isolated Pi configuration and a sanitized environment: after a real /login to openai-codex, a freshly constructed ModelRuntime and ModelRegistry reported gpt-5.5 in getAvailable() with hasConfiguredAuth() true, and after the stored credential was removed the same construction reported it unavailable. The record is sanitized and labelled manual, account-bound and single-instance, and no fabricated credential was used. CI run 35644573627 passed the retained test in all four cells. LIMITS: this is registry discovery and its loss. No model request or token refresh was made, removal was local rather than a provider-side revocation, and nothing is inferred for other providers or for Linux.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "A manual run against a real subscription records, with an isolated Pi configuration directory and a sanitized environment: that after Pi's interactive `/login` exits, a FRESHLY constructed `ModelRuntime` and `ModelRegistry` report the chosen built-in model in `getAvailable()` and return true from `hasConfiguredAuth()`; and that after the stored credential is removed or revoked, the same construction reports the model unavailable. The retained record is sanitized — asserted to contain no token, authorisation header, credential-derived value, username or absolute home path — and is labelled manual, account-bound and single-instance. A fabricated OAuth credential does not satisfy this criterion in any form.",
@@ -1609,9 +1792,14 @@
     "evaluates": [
       "CMP-0031"
     ],
+    "evidencedBy": [
+      "EVD-0106",
+      "EVD-0122"
+    ],
     "id": "ACC-0092",
     "lifecycle": "active",
-    "outcome": "not-evaluated",
+    "notes": "PASS 2026-09-21 on EVD-0106 and EVD-0122. Presence: a real loaded session calls kiln_capability and receives the shipped declaration (EVD-0106). Drift: real sessions on Windows and Linux, Pi 0.84.4, read every research tool signature from the live registry, and verifyChild accepts the unmodified package and refuses a changed research_fetch as signature-mismatch without returning its output (EVD-0122). CI run 35591168378 at d927151 passed in all four cells, and the live tier re-proved it on ubuntu-latest node 24 only. LIMIT: verifyChild compares property names and the required list only, so a type-only change is not detected and this criterion does not cover one.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
     "statement": "Once the Kiln package exists, a real Pi run reports its capability signature in the loaded session, and a deliberate change to a measured tool signature causes a comparing consumer to refuse. Both halves are required: presence alone does not show that a consumer would notice its absence.",
@@ -1625,13 +1813,16 @@
     "evaluates": [
       "CMP-0039"
     ],
+    "evidencedBy": [
+      "EVD-0153"
+    ],
     "id": "ACC-0093",
     "lifecycle": "active",
-    "notes": "⚠️ THE PROCESS-NEVER-SPAWNED HALF IS THE ONE THAT MATTERS. A refusal message printed just before launching the TUI anyway would satisfy a text assertion and still hang a CI job, which is the failure this exists to prevent — a hang is indistinguishable from work until a timeout. ⚠️ AND THE SECOND ROW IS A CONTROL: if the non-TTY path refused unconditionally, the refusal would prove nothing about TTY detection.",
-    "outcome": "not-evaluated",
+    "notes": "⚠️ THE PROCESS-NEVER-SPAWNED HALF IS THE ONE THAT MATTERS. A refusal message printed just before launching the TUI anyway would satisfy a text assertion and still hang a CI job, which is the failure this exists to prevent — a hang is indistinguishable from work until a timeout. ⚠️ AND THE SECOND ROW IS A CONTROL: if the non-TTY path refused unconditionally, the refusal would prove nothing about TTY detection. ⚠️ AMENDED 2026-09-21 (F8): stdout is checked as well as stdin, because Pi itself leaves interactive mode when either is not a TTY. ✅ PASS 2026-09-26 on EVD-0153: in each no-terminal case the stand-in launch function was never called and setup exited 18 naming both routes; the real piped command confirmed exit 18 and the recovery text; with authentication present the same run proceeded.",
+    "outcome": "pass",
     "reviewStatus": "draft",
     "schemaVersion": 2,
-    "statement": "With stdin not a TTY and no usable authentication already present, setup refuses BEFORE starting the interactive login step — verified by the login process never being spawned, not merely by the message printed — and prints both supported recovery routes: run setup from a local interactive terminal, or configure authentication on the target host outside Kiln and rerun with the required non-interactive decisions. With usable authentication already present, the same non-TTY invocation proceeds instead of refusing.",
+    "statement": "With stdin, stdout or both not a TTY and no usable authentication already present, setup refuses BEFORE starting the interactive Pi TUI — verified by the Pi process never being spawned, not merely by the message printed — and prints both supported recovery routes: run setup from a local interactive terminal, or configure authentication on the target host outside Kiln and rerun with the required non-interactive decisions. Each of the three non-TTY combinations is checked. With usable authentication already present, the same non-TTY invocation proceeds instead of refusing.",
     "title": "Setup refuses before launching login when there is no terminal, and names the way out",
     "type": "acceptance-criterion",
     "verifies": [
@@ -1785,6 +1976,382 @@
     "type": "acceptance-criterion",
     "verifies": [
       "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0037"
+    ],
+    "evidencedBy": [
+      "EVD-0110",
+      "EVD-0143"
+    ],
+    "id": "ACC-0103",
+    "lifecycle": "active",
+    "notes": "⚠️ REOPENED 2026-09-24. The pass on EVD-0110 did not cover the clause \"On that first run the supervisor sends the start prompt\". EVD-0110 measures session identity, resume and recovery, and its observations stand. No code sent a start prompt: a first run started Pi with its entry file, --tools, --provider, --model, --thinking and --session-id and no message (bin/start-kiln.mjs, lib/supervisor.mjs), and every test that reached /kiln-start sent it itself over RPC. This criterion is re-evaluated once the supervisor sends /kiln-start on a new session only and a real-command control observes it. ⚠️ AMENDED 2026-09-24: the start prompt is required on a first INTERACTIVE run only. With piped input Pi runs in print mode and joins the piped text and a positional /kiln-start into one unexpanded message (EVD-0143), so a run whose input or output is not a terminal is sent no start prompt and its piped text is the first turn. Not re-evaluated until the four-cell CI run for the correction passes; EVD-0143 holds the local measurements. ⚠️ RE-EVALUATED 2026-09-24: PASS on EVD-0110 and EVD-0143. CI run 36038639205 at 009a16e passed all four cells; the real-command control ran and passed on both Ubuntu cells and is skipped on Windows, where the unit cases cover the argument list. A Windows interactive session is observed only by ACC-0088's manual run.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A fresh start requires BOTH that no session record is present and that the session storage was successfully inspected and found absent or empty. Storage that could not be inspected — unreadable, or a regular file where the directory belongs — is not an empty one, and a record that exists but cannot be opened is not a missing one: only a genuine absence answers, and every other failure asks. Starting fresh over sessions nobody could enumerate is the failure this clause exists to prevent, and it is reachable by exactly those two routes. On a first interactive run, where Pi's input and output are both terminals, the supervisor sends the start prompt; on every first run it records the session it began. On a later run it resumes the exact session named in the record, proved by the session identifier the agent was invoked with matching the stored one — not by the agent having started successfully, which is equally true of a brand-new unrelated session and is the check this criterion exists to rule out. The record is accepted only when its project and its state mode both match the run: a state root can be shared or copied, so a record whose every field is individually valid can still belong to another project, and the mode decides which store the identifier refers to. When the record is missing, unreadable, invalid, foreign, recorded under a different mode, or names a session that is no longer there, the supervisor presents the sessions actually available and asks; it never silently resumes a different one and never silently starts a fresh one in place of a session the operator believes they are returning to. A non-interactive run refuses instead, with the exact recovery command for the shell it is running in. The record names a session and a mode and carries no absolute path, so a project moved or a state root relocated does not resume something belonging elsewhere.",
+    "title": "A rerun resumes the exact recorded session, not merely a session",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0029"
+    ],
+    "evidencedBy": [
+      "EVD-0093"
+    ],
+    "id": "ACC-0104",
+    "lifecycle": "active",
+    "notes": "⚠️ AVAILABILITY AND `configured` DISAGREE, AND THE DISAGREEMENT IS MEASURED. The pinned runtime's `getProviderAuthStatus()` can report `configured: true` while `hasConfiguredAuth()` is false and the model is absent from `getAvailable()`; the compatibility spike's `withOAuth` cell records exactly that, with `statusDisagreesWithAvailability: true`. Anything gating on \"some authentication source is configured\" tells an operator they are connected when they cannot infer, which is why this criterion names the available-model set rather than the status object. ⚠️ THE PERMITTED CATEGORIES ARE THE THREE CMP-0029 DECLARES. Pi's own vocabulary is wider: `runtime` means a key was passed on the command line, and `models_json_command` and `fallback` are routes that produce a credential by executing something or by inheriting an extension's. None of the three is a category Kiln permits, so each is a refusal rather than a classification — mapping them onto `custom-environment-key` would let a route the table refuses arrive under a name it accepts. ⚠️ THE REPORT IS A CLOSED SHAPE, NOT A FILTERED ONE. Pi's `environment` status carries a `label` built from `getConfigValueEnvVarNames()` — variable NAMES — so a report assembled by spreading the status object leaks them by default. Asserting the absence of known-bad fields cannot see a field nobody thought of; asserting the exact key set can. ⚠️ WHAT THIS CANNOT REACH, and it is an evidence omission rather than a gap in the criterion: OAuth for a BUILT-IN provider needs an interactive `/login` against a real account. A `models.json` provider is composed with apiKey auth only, so a stored OAuth credential for one has no flow to resolve it — the spike records this as `oauthProvedForCustomProvider: false` and `oauthRemainsOpenForBuiltInProviders: true`. Real completions, token refresh and subscription-tier behaviour are account-bound for the same reason.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before a provider contract is accepted, a disposable restricted child using the pinned Pi SDK resolves the exact selected provider and model. Availability comes from that exact model appearing in the available-model set, never merely from the provider reporting configured. A successful report contains only provider, model, availability and an auth-source category permitted by the declared contract. Planted credentials, variable names, headers and credential-derived fingerprints appear in no report, refusal, stdout or stderr, against a positive control. All disposable state is confined to a temporary root removed on success and refusal.",
+    "title": "The canary confirms the exact model is available and names a permitted auth source",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0024"
+    ],
+    "evidencedBy": [
+      "EVD-0096"
+    ],
+    "id": "ACC-0105",
+    "lifecycle": "active",
+    "notes": "⚠️ SPLIT FROM ACC-0047. That criterion accepted both TSK-0029 and TSK-0030, and TSK-0030 depends on TSK-0029, so the merge could not be accepted until normalisation was built as well. ACC-0047 now covers the merge primitive alone; this criterion covers the decision to rewrite the entry, which TSK-0029's merge then applies. ⚠️ PROOF BEFORE REWRITE, NEVER A CONSTRUCTED TARGET. An entry whose equivalence cannot be proved is left exactly as `pi install -l` wrote it; guessing the portable form would point the project at a directory nobody showed was the pinned package.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The literal package entry that `pi install -l` wrote is rewritten to the portable `../.planning/pi-package` spelling only after both spellings are shown to canonicalise to the same package directory on the running platform, and the rewrite is applied through the settings merge so every third-party package entry and unrelated key is preserved. When equivalence cannot be established - the entry resolves somewhere else, does not resolve, or cannot be read - normalisation is refused and `.pi/settings.json` is left byte-identical.",
+    "title": "The package entry is normalised only after canonical equivalence is proved",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024",
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
+    "id": "ACC-0106",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-23 on EVD-0138. A complete run against an environment-authenticated provider — asserted from the preflight's own line — with research enabled and its connection checked. THE FILE SET IS WHAT THIS RUN ADDED OR CHANGED: git's own answer before and after, NUL-delimited so a newline in a path cannot read as two entries, with the rename form handled. There is no exemption list: every entry in that set is read, and one that is not a regular file fails. A file the operator writes before the run, carrying a key and a path of its own, is outside the set, which is how the boundary is observable. Every file in it carries no credential, nothing derived from one (sha256 hex and base64, base64 of the key, a prefix), no authorisation header, no path belonging to this machine by value OR BY SHAPE, and not even the names of the credential variables. `.pi/settings.json` and `.pi/kiln.json` are asserted in that set by name; the ignored consent and compatibility records are asserted not to be. Deleting the assertions fails nothing, because nothing currently leaks, so what proves the scan bites is injected leaks: a credential variable's name in settings, an absolute path in a generated document, and the research key in the project record are each caught, as is widening the set back to the whole after-state.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "After a complete setup against an environment-authenticated provider and an enabled research connection, every committed file the setup produced or modified is asserted to contain no API key, token, authorisation header, credential-derived fingerprint, or absolute user path - the set taken from what the setup actually wrote, not from a list fixed in advance - and `.pi/settings.json` and `.pi/kiln.json` are each asserted explicitly by name.",
+    "title": "A complete setup commits no secret and no absolute home path",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
+    "id": "ACC-0107",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-23 on EVD-0138. The project id is minted once and reused on later runs, and a completed run leaves no journal. A project with no coverage is shown exactly the three choices the state library returns, with the ignore block's own bytes; answering nothing, `stop`, `user-state` or anything unrecognised stops with nothing written; a non-interactive run refuses on the same object with no `.pi`, no content root and no ignore file — asserted by those paths not existing. External state is offered, which this criterion permits now that AST-0047 (on EVD-0081) establishes relocation for the pinned runtime: `--session-dir` and `PI_CODING_AGENT_SESSION_DIR` reach a per-user root without committing an absolute path, and a run in that mode commits no `sessionDir` at all.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A complete setup creates the stable non-secret project ID once and reuses an existing one rather than minting a second identity. Where coverage is missing, interactive setup renders exactly the three choices the state library returns - the exact ignore block with its bytes, external state, and stopping - and non-interactive setup refuses on the same object, with the refusal occurring before setup has written any session, consent, compatibility or journal file, asserted by those paths not existing. External state is offered only once relocation support for the pinned runtime has been established.",
+    "title": "Setup mints the project ID, renders the coverage choices, and refuses before writing runtime data",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0027",
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "evidencedBy": [
+      "EVD-0138"
+    ],
+    "id": "ACC-0108",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-23 on EVD-0138. An interactive run prints the canonical project directory the decision applies to and asks about it; `--trust approve` records an approval with no prompt, and answers over a recorded decision because it is the operator answering now; a run with nobody to ask refuses WITHOUT REACHING THE QUESTION, measured as zero questions asked. Only an explicit yes approves and only an explicit no denies: a closed input, an empty line and an unreadable answer each leave the trust store with no decision. A denial is reported as not ready, nothing is registered, the journal is removed, and the scaffold that survives passes Kiln's own plan linter; Pi loads none of the package's tools for that project, which is the same fact from the runtime's side. THE BROWSER-ONLY ROUTE IS SERVED, NOT INFERRED: the application is started against that denied project and asked for a page, which returns a rendered document — content that validates does not establish that a server can read it. LIMIT: what is not exercised is `npm start`'s production path, which installs and builds before serving, because a test may not run an install.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Interactive setup displays the canonical project directory the decision applies to and obtains an approval or a denial for it. `--trust approve` records an approval without a prompt. Non-interactive setup neither prompts nor assumes: with no pre-existing decision and no explicit approval it refuses. A denial is reported as not ready - setup does not describe the agent as usable - while the planning scaffold is left intact and valid and the browser-only start remains available.",
+    "title": "Setup obtains the trust decision for the path it names, and never defaults one",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0023",
+      "REQ-0026"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0032"
+    ],
+    "evidencedBy": [
+      "EVD-0103",
+      "EVD-0106"
+    ],
+    "id": "ACC-0109",
+    "lifecycle": "active",
+    "notes": "⚠️ REOPENED 2026-09-14 (F114): THE MODEL RECEIVED NO CAPABILITY DECLARATION. EVD-0103 observed the handler result and the session's `tool_execution_end.details`, not the provider-facing tool content. `rendered()` in `pi-package/extensions/kiln.js` returned `{output, details}` with no `content`, and Pi sends a tool result without `content` to the provider as `(no tool output)`. A real `/kiln-start` session measured it on 2026-09-14: `kiln_project_status` executed without error and the provider received exactly that placeholder. The historical evidence and its link are kept unchanged. This criterion returns to pass only on supplemental evidence that the provider-facing tool message carries the rendered result. ⚠️ RESTORED TO PASS 2026-09-14 ON EVD-0106: commit 81f69a9 returns every result as text content equal to its rendering, and CI run 34812083727 observed it at the handler boundary for all 28 tools and in a real provider request for kiln_capability. ⚠️ TSK-0045's STATEMENT ALREADY PROMISED THIS AND NOTHING ACCEPTED IT. That task registers the research and validation adapters, delegation, AND the Kiln capability signature, but its only criterion was ACC-0065, which is about the write discipline of mutation wrappers. The capability tool could have been registered wrongly, or not at all, without a single criterion noticing. ⚠️ THE PACKAGE DECLARES, THE TOOL RETURNS, A CONSUMER COMPARES. ACC-0063 covers the declaration agreeing with the manifest; this covers the tool handing that declaration back intact; ACC-0075 covers a delegation refusing a child whose signature is absent or drifted. Three criteria, three owners, one chain - and no single one of them is the whole claim.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The registered Kiln capability tool, called in a session that loaded the package, returns the package's own versioned signature declaration unchanged: the same version and the same resource names the package declares, with nothing added, dropped or rewritten in transit. A session that did not load the package has no such tool to call, and that difference is what a consumer comparing an expected signature against a returned one relies on.",
+    "title": "The capability tool returns exactly the package's declared signature",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026",
+      "REQ-0028"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0032"
+    ],
+    "evidencedBy": [
+      "EVD-0103",
+      "EVD-0106"
+    ],
+    "id": "ACC-0110",
+    "lifecycle": "active",
+    "notes": "⚠️ REOPENED 2026-09-14 (F114): NO RESEARCH OR VALIDATION RESULT OR REFUSAL REACHED THE MODEL. EVD-0103 observed the adapters' handler results and refusals, not the provider-facing tool content. `rendered()` in `pi-package/extensions/kiln.js` returned `{output, details}` with no `content`, and Pi sends a tool result without `content` to the provider as `(no tool output)`. A real `/kiln-start` session measured it on 2026-09-14: `kiln_project_status` executed without error and the provider received exactly that placeholder. The historical evidence and its link are kept unchanged. This criterion returns to pass only on supplemental evidence that the provider-facing tool message carries the rendered result. ⚠️ RESTORED TO PASS 2026-09-14 ON EVD-0106: commit 81f69a9 returns every result as text content equal to its rendering, and CI run 34812083727 observed it at the handler boundary for all 28 tools and in a real provider request for kiln_capability. ⚠️ SPLIT FROM ACC-0065, WHICH ACCEPTED TWO TASKS THAT DO NOT DEPEND ON EACH OTHER. That criterion is about the write discipline of mutation wrappers - TSK-0044's work - and would have held TSK-0045 behind it while describing almost none of what TSK-0045 builds. ⚠️ A CAPABILITY CALL IS A READ, AND \"CHANGES NOTHING\" MEANS NO PERSISTED CHANGE. It mutates no planning content, no configuration and no stored state - no credential cached, no choice recorded, no file written. It does NOT mean the call touches nothing: `research_capability` makes a live request to the backend and `validation_capability` runs the interpreter, because #121 requires a capability to be PROVEN rather than declared, and #67 measured what a declared-but-unusable capability costs. A test asserting no request and no subprocess would contradict the rule the probes exist to satisfy; what must be asserted is that nothing persisted changed. ⚠️ DELEGATION IS NO LONGER HERE (F80, 2026-09-12). This criterion required each registered delegation tool to call \"the existing implementation in `lib/`\", and no delegation runtime exists there: it is CMP-0036's, built by TSK-0053 and TSK-0054, which TSK-0045 does not depend on. As written the criterion could not be satisfied by the task it accepts. `kiln_delegate` is now registered by TSK-0053 beside the runtime it builds, under its own criterion. ⚠️ THE FIVE WIRE NAMES ARE UNPREFIXED, AND THAT IS DELIBERATE (F79). `research_capability`, `research_search`, `research_fetch`, `validation_capability` and `validation_run` are the names `lib/specialists/contract.mjs` requires by key and `verifyChild` checks a child against; renaming them to `kiln_*` would break the contract and the child-signature check. ⚠️ THE SIGNATURE TOOL IS ACC-0109's, NOT THIS ONE'S. `kiln_capability` returning the package's declaration unchanged is accepted there; this covers the adapters beside it. ⚠️ THE PI WRAPPER IS THE DISCLOSURE BOUNDARY; THE VALIDATION CONTROLLER IS DELIBERATELY NOT (F84, 2026-09-12). Measured against the real lib/validation/: a validation_run result carries absolute machine paths by four routes - failure.message when provisioning fails (the interpreter and the vpw-tier1- workspace), destroy.retainedPath and the retained-workspace omission reason when cleanup leaves the workspace behind, and executions[].stderr or stdout when a job prints its own paths, as a Python traceback does. The controller keeps those precise paths on purpose, as diagnostics for its own callers, and is not changed. The Pi wrapper renders a sanitised COPY - the exact workspace root becomes <workspace> with its relative tail kept, the interpreter, temporary directory and home become <path>, and a general absolute-path scrub runs last - and leaves the controller object untouched. A separate controller issue is warranted only if another model-facing or persisted consumer shows a controller result without going through this boundary. ⚠️ CREDENTIAL BOUNDARY (D5). Import and registration read no environment. At handler invocation, the wrapper delegates without collecting credentials for redaction; the invoked research and validation implementations may read their own permitted environment inputs. The validation controller constructs the allowlisted child environment, and tests prove a planted credential reaches neither the controller result nor the rendered result.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each registered research and validation tool performs its work by calling the existing implementation in `lib/` rather than restating its rules: no capability decision, retrieval policy or validation rule is re-implemented in the wrapper. A capability call reports what is available and changes nothing - no planning content, no configuration and no stored state. Every result and every refusal is structured data, and neither carries a credential, a credential-derived value or an absolute user path.",
+    "title": "The research, validation and delegation adapters call the implementations that already exist",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0002",
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0032"
+    ],
+    "evidencedBy": [
+      "EVD-0119"
+    ],
+    "id": "ACC-0111",
+    "lifecycle": "active",
+    "notes": "⚠️ REGISTRATION MOVED HERE FROM TSK-0045 (F80, 2026-09-12). TSK-0045 promised to register a delegation adapter over an implementation that does not exist: the delegation runtime is CMP-0036's, TSK-0045 depends only on TSK-0043, and its criterion required each adapter to call \"the existing implementation in `lib/`\". The registration now sits with the runtime it wraps. ⚠️ WHAT THIS DOES NOT COVER. Whether the runtime's own rules hold is ACC-0076's; whether a child without the Kiln capability signature is refused is ACC-0075's. This covers only the boundary between Pi and that runtime - which is why it evaluates CMP-0032 rather than CMP-0036.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "The registered `kiln_delegate` tool performs a delegation by calling the delegation runtime it is registered beside, and restates none of that runtime's rules: not the child's launch arguments, not the task binding, not model or thinking-level inheritance, not the intersected tool allowlist, not the timeout, not the abort propagated to the process tree, and not the cleanup of temporary material. The wrapper adds only the Pi-facing schema and the rendering of a result. Every result and every refusal is structured data returned to the caller rather than thrown as prose, and neither carries a credential, a credential-derived value or an absolute user path.",
+    "title": "The delegation tool adds a schema and a rendering, and no rule of its own",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0026",
+      "REQ-0024"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0033",
+      "CMP-0001"
+    ],
+    "evidencedBy": [
+      "EVD-0121"
+    ],
+    "id": "ACC-0112",
+    "lifecycle": "active",
+    "notes": "⚠️ DEFERRED FROM TSK-0046 ON PURPOSE (O1 and F88, 2026-09-13). TSK-0046 promised these seven, and no canonical definition carries any of them: `stages/*.json` has a name, a decision owner, outputs and exit criteria, and nothing else. A generator asked to emit them would have to write them into its own templates or borrow another field, which recreates exactly the drift CMP-0033 exists to prevent - two descriptions of one pipeline, each invisible from the other. So the definitions gain the fields first, and generation follows. ⚠️ PURPOSE WAS NEARLY BORROWED (F88). The first generator printed `producesProse` under Purpose. That field describes outputs; relabelling it is inference by another route, and it is refused for the same reason a template default is. ⚠️ A TEMPLATE DEFAULT IS A FAILURE, NOT A CONVENIENCE. A skill that says 'delegate as appropriate' because its definition was silent reads exactly like one whose definition said so; refusing the definition is the only way the gap stays visible. ⚠️ THE SPLIT, STATED EXACTLY (corrected 2026-09-20, D50-D56). The earlier wording said delegations and the mutation boundary both \"name roles, not rules\", which is true of one and misleading about the other. Three separate authorities apply. (1) DELEGATION ROLES AND CAPABILITIES ARE CHECKED AGAINST THE SPECIALIST CONTRACTS. A delegation declares `role` and `capabilities` independently; the loader validates the role against `ROLES` and requires the declared capabilities to equal `contractFor(role).requiredCapabilities`, sorted and unique. It never derives or replaces them, so a definition and a contract that disagree are a refusal rather than a silent rewrite. A role whose contract requires nothing declares `\"capabilities\": []` explicitly, and a stage that delegates nowhere declares `\"delegations\": []`. (2) CREATION AUTHORITY REMAINS `produces`, AND THE MUTATION BOUNDARY DOES NOT RESTATE IT. `stages/` already defines what a stage produces and `lib/stages.mjs` opens by warning that two hand-maintained descriptions of one pipeline disagree. A `mayCreate` list would be that second description, so there is none. (3) `mutationBoundary` NAMES CANONICAL NON-CREATION OPERATIONS. Its `mayMutate` entries are operation identifiers - the registry mutation keys plus `writeStageDocument`, `writeStageAttestation` and `setTypeActivation` - not artifact types and not tool wire names. It therefore says what a stage may CHANGE, while `produces` says what it may CREATE, and neither can be read as a weaker copy of the other. This still depends on TSK-0051, because the roster and the contracts it settled are what (1) is checked against.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each canonical stage definition in `stages/*.json` declares its purpose, its method, its rules for selecting the next question or activity, its allowed delegations with the capabilities each requires, its mutation boundary, its approval boundary and its expected completion summary, and each generated `kiln-stage-<stage-id>` skill carries those seven from its definition. None of them is supplied by the generator's templates or inferred from another field - in particular a stage's purpose is not taken from `producesProse`, which describes its outputs. The generator refuses a definition that lacks a required field rather than filling it in, and the check fails, naming the skill, when any generated field no longer matches its definition.",
+    "title": "Every stage skill carries its purpose, method, next activity, delegations and boundaries from the canonical definition",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "evidencedBy": [
+      "EVD-0112"
+    ],
+    "id": "ACC-0113",
+    "lifecycle": "active",
+    "notes": "Created 2026-09-13 (D15) from the persistence clause ACC-0068 used to carry. It belongs to TSK-0049's continuous intake capture rather than to TSK-0048's first turn. No typed stage-document writer exists today: `lib/tools/` writes typed artifacts under `data/` only, and nothing writes `stages/*.md`. TSK-0049 has to add one. ACC-0069's adaptive second question is unchanged.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "When the operator answers during a stage, the answer is written into that stage's document - for Stage 1, the intake document - through a registered typed stage-document writer, never by editing the file directly. What is written keeps the operator's own wording verbatim and separate from the orchestrator's interpretation of it, and the writer refuses a write outside the content root's stage documents.",
+    "title": "The operator's answer is persisted through a typed stage-document writer, wording kept apart from interpretation",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0040",
+      "CMP-0034"
+    ],
+    "id": "ACC-0114",
+    "lifecycle": "active",
+    "notes": "Created 2026-09-13 (F98, D14). ACC-0068 now accepts only what Kiln deterministically supplies to the session. What a real model then does with it is behaviour, and a scripted provider cannot establish it: the script chooses the reply before any model is asked. So the user-visible first turn is observed here, in the clean-consumer journey, with a real model and a retained record a human judges.",
+    "outcome": "not-evaluated",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "In the clean-consumer journey, on a fresh project started with `/kiln-start` against a real configured model, the orchestrator's first user-visible Stage 1 turn asks exactly one question, proposes no architecture, requirement set or solution, and calls no mutating tool. The turn is retained as recorded output, and its judgement - one question, no solution - is made by a human reviewer against that record, not by the model and not by a scripted provider.",
+    "title": "In the clean-consumer journey, the first Stage 1 turn asks one question and proposes no solution",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022",
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0034"
+    ],
+    "evidencedBy": [
+      "EVD-0114"
+    ],
+    "id": "ACC-0115",
+    "lifecycle": "active",
+    "notes": "Created 2026-09-18 under TSK-0050. The task's statement carries two obligations and ACC-0070 tested only one: show-before-doing had no criterion, so delivering it would have been work no criterion accepted. This is a single orchestrator-wide behaviour stated once, not TSK-0071's per-stage mutation policy: TSK-0071 owns a per-stage mutation-boundary field, and this criterion declares no stage-definition field. Like ACC-0069 it is a model-behaviour claim, so its evidence needs a retained real-model record judged by a person. The deterministic suite can show that the instruction is delivered, not that it is followed.\n\nDelivery is the every-turn stage-context frame, as a global preamble ahead of the stage-skill block and outside it. Neither the `/kiln-start` prompt nor the packaged planning skill governs every later turn: the prompt is read once on the fresh turn, and the stage skill is per-stage content a consumer may override. The frame is rebuilt on every `before_agent_start`, so the preamble is the only delivery point that holds for the whole session.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Before calling a tool that creates or mutates a typed artifact, the orchestrator states in a separate turn which artifact it proposes to create or change and what the change would be, and waits for the operator. If the operator rejects the proposal, cancels, or does not reply, no mutating tool call is made. Capturing an operator's own answer into a stage document is excluded, because that records the operator's reply rather than proposing a change to the project. Approval, activation and attestation are governed by ACC-0070 rather than by this criterion.",
+    "title": "The orchestrator states a material change before making it",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0001"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0028"
+    ],
+    "evidencedBy": [
+      "EVD-0142",
+      "EVD-0144"
+    ],
+    "id": "ACC-0116",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-24 on EVD-0142, accepted on review. The real bin/start-kiln.mjs, with nothing replaced, started a project set up against TSK-0062's loopback provider with --credential-var: the launch checks passed on setup's record, the shell was identity-confirmed ready, and the started Pi sent one authorised request for the recorded model, offering Kiln's tools, then exited 0 and the supervisor stopped everything with nothing left serving. With the declared variable empty the same launch exited 2, refusing by provider and model, and reached no supervisor. CI runs 36017066917 (fc7d72b) and 36019484188 (c9d7dd9) passed all four cells. Pi's input was a pipe: an interactive terminal session is not covered here and remains TSK-0063's. A custom provider cannot be a one-run override, a declared limit of this criterion. F11, 2026-09-24 (EVD-0144): the test's cleanup failed with EBUSY on Windows Node 22 in CI runs 36040353843 and 36040712503 after every assertion had passed. Measured on a diagnostic branch: in two captured events no Kiln process was alive and no handle was found, and the directory was removable within 8.1 s. The pass stands. The test's cleanup now waits at most 15.3 s.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "A project whose recorded selection is a custom provider, set up with its credential declaration, passes the launch checks and starts through `bin/start-kiln.mjs` with Pi held to that selection. With the declared credential variable absent, the same launch refuses and names the recorded provider and model. Measured by running the command against a non-billable local provider.",
+    "title": "A project set up with a custom provider starts",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0030"
+    ],
+    "evidencedBy": [
+      "EVD-0147"
+    ],
+    "id": "ACC-0117",
+    "lifecycle": "active",
+    "notes": "Evidence recorded 2026-09-24 in EVD-0147, and left not-evaluated for review. The control passed in all four cells of CI run 36077139114. In the earlier red run 36076748293 it failed once on Windows Node 22, at its launch step, from F130 mechanism 2, after its compat assertions had passed. ⚠️ STATEMENT AMENDED 2026-09-25 on review. Control (2) had said the child's file contains no `apiKey`, but the canary intentionally writes the provider's `apiKey` as `$NAME`; that exception is now stated and tested on the file's bytes. Refusing credential-NAMED keys could not show that a value under an innocuous key is non-secret, so the accepted values are now a closed contract, and any string outside it is refused. Stays not-evaluated for review. ⚠️ PASS 2026-09-25 on EVD-0147, on review. The amended contract, the child-file byte check and the real-command control passed in all four cells of CI run 36122196186 at cacb817. That run was RED OVERALL: ACC-0116 failed on Windows Node 22 with Not observed: agent-descendants (F130 mechanism 2), which is unrelated to this criterion.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "For a custom provider whose `models.json` declares `compat`, the live canary's child receives the `compat` configuration Pi resolves for the selected model. Measured against a local loopback provider: the request observed at the provider matches the request that configuration produces, and the compatibility record written from that run matches the same configuration. Controls: (1) changing `compat` after a passed canary makes the stored record fail to prove the next launch; (2) the configuration passed to the child is closed, and anything outside it is refused before any child is created. It has no `apiKey`, `headers` or `authHeader` at the provider or model level, and no key named for a credential at any depth. A string value may appear only in the provider's `baseUrl` (with no user, password, query or fragment) and `api`; in each model's `id`, `name` and `input` modalities; in compat fields whose values Pi restricts to fixed literals, and only as one of those literals; and as a chat-template variable's `$var`. Elsewhere, including `samplingParams`, chat-template arguments and structured routing fields, values are numbers, booleans or null. A model whose request needs any other value cannot be proved by the live check. (3) The child's `models.json` is checked byte for byte. Its only credential field is the provider's `apiKey`, which the canary writes as exactly `$NAME` of the declared variable, and it contains no credential value, no header and no other credential field.",
+    "title": "The live canary sends a custom provider's resolved compat configuration and nothing credential-bearing",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0025"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039",
+      "CMP-0037",
+      "CMP-0022",
+      "CMP-0033"
+    ],
+    "evidencedBy": [
+      "EVD-0148"
+    ],
+    "id": "ACC-0118",
+    "lifecycle": "active",
+    "notes": "PASS 2026-09-24 on EVD-0148: all four commands run through a real junction (Windows) and directory symlink (POSIX), each proved by its effect, and importing any of them runs nothing. CI run 36077139114 passed all four cells.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With `.planning` a junction to the tool checkout on Windows and a directory symlink on POSIX, `bin/setup.mjs`, `bin/start-kiln.mjs`, `bin/init-project.mjs` and `bin/generate-stage-skills.mjs`, each invoked through the link, execute their command. Each run is asserted to have executed by an observable effect of that command, not by its exit status, so none of these linked invocations exits 0 without running. Importing each of the four as a module runs no command. Verified on Windows and the supported POSIX CI platform.",
+    "title": "The four entry-point commands run through a linked .planning and not on import",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0039"
+    ],
+    "evidencedBy": [
+      "EVD-0156"
+    ],
+    "id": "ACC-0119",
+    "lifecycle": "active",
+    "notes": " ✅ PASS 2026-09-26 on EVD-0156: at a real Windows terminal setup disclosed what Pi may change, handed the terminal to Pi, a provider was connected through /login (the API-key route), and setup continued; with Pi closed and nothing connected it refused with the authentication code. OAuth sign-in and a billable request are not required by this criterion. LIMIT: the keys were synthetic input events sent to a verified foreground window; no physical keypress is claimed.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "With stdin and stdout both terminals, the look at this computer allowed, and no usable authentication present, setup opens the pinned Pi interactive TUI for the operator to connect a provider with /login, and before opening it says what Pi itself may do: Pi uses its own agent directory, which setup does not isolate, may download helper programs into it, and /login may change Pi's own default provider and model there. Pi owns the terminal directly: nothing of the session is logged, copied or captured (F13). Pi is opened with no session and no extensions, skills, prompt templates, context files or tools, from a temporary working directory that is removed afterwards, and with the agent directory setup uses. When Pi closes, setup looks at this computer again: with a provider now connected it continues to model selection; with none, it refuses with the authentication exit code and says Pi was closed without one. Observed at a real Windows terminal with the pinned runtime, the operator completing /login, and the resulting authentication and setup outcome recorded.",
+    "title": "With a terminal and nothing authenticated, setup hands the terminal to Pi for /login and continues once a provider is connected",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0022"
+    ]
+  },
+  {
+    "evaluates": [
+      "CMP-0006",
+      "CMP-0027"
+    ],
+    "evidencedBy": [
+      "EVD-0154"
+    ],
+    "id": "ACC-0120",
+    "lifecycle": "active",
+    "notes": " ✅ PASS 2026-09-26 on EVD-0154: every refusal reason at every research entry point before the key is read or a request made, both state modes, the record destination check, and the key withheld from both children; CI run 36244920683, four cells.",
+    "outcome": "pass",
+    "reviewStatus": "draft",
+    "schemaVersion": 2,
+    "statement": "Each research entry point - the research_capability, research_search and research_fetch tools Kiln registers in Pi, research:search and research:record (bin/research.mjs), and research:probe (bin/research-probe.mjs) - refuses unless the project's committed research choice is tavily AND this computer holds a standing research grant for it, read from where the run keeps its runtime state: project-local, or the per-user root setup keeps with --local-state user. The refusal happens before TAVILY_API_KEY is read and before any request is made, and it names a stable reason: no project context, the project record unreadable, research not chosen, this computer's consent record unreadable, no standing grant, or a local-state mode that is neither project nor user. An unreadable record of either kind refuses; it is never read as permission. The context is explicit: Pi receives the project root and state mode from the supervisor, and the commands require --project-root and take --local-state; nothing is guessed from the working directory. research:record additionally refuses, before fetching, when its evidence destination (the content-root rule or PLANNING_CONTENT_DIR) belongs to a project other than the one whose consent was read. When research is not permitted at launch, TAVILY_API_KEY is kept out of the environment of both of the supervisor's children. Each refusal reason is shown at each entry point by a test that also shows no key was read and no request was made, and the permitted cases, project-local and per-user, are shown to reach the key only after the gate.",
+    "title": "Research is refused at every entry point unless the project chose Tavily and this computer granted it",
+    "type": "acceptance-criterion",
+    "verifies": [
+      "REQ-0023"
     ]
   }
 ]
