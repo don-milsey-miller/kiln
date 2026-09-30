@@ -699,7 +699,7 @@
   },
   {
     "acceptedBy": [
-      "ACC-0047"
+      "ACC-0105"
     ],
     "dependsOn": [
       "TSK-0021",
@@ -714,7 +714,7 @@
       "CMP-0024"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Compare the literal entry `pi install -l` wrote against the portable `../.planning/pi-package` form, prove both canonicalise to the same directory on this platform, and rewrite only on proof. Refuse when equivalence cannot be established rather than constructing a target.",
@@ -790,11 +790,11 @@
       "CMP-0027"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ THE SURFACE WAS CORRECTED 2026-09-03 AFTER MEASUREMENT. This previously said 'Pi's public auth-storage and model-registry APIs'. `AuthStorage` is a real class at `dist/core/auth-storage.js` and is NOT importable — the package's exports map publishes only `.`, `./rpc-entry` and `./client` — so an implementer following the old wording would have written code that cannot resolve. ⚠️ `allowModelNetwork: false` IS WHAT MAKES THIS STEP HONEST: the consent prompt promises the check contacts no external service, and that option (which is the default) is what keeps the promise. ⚠️ AND GATE ON AVAILABILITY, NOT ON STATUS: `getProviderAuthStatus()` reports `configured: true` for a credential the registry will not use, so anything reading it alone will report ready for a project that cannot infer.",
+    "notes": "⚠️ THE SURFACE WAS CORRECTED 2026-09-03 AFTER MEASUREMENT. This previously said 'Pi's public auth-storage and model-registry APIs'. `AuthStorage` is a real class at `dist/core/auth-storage.js` and is NOT importable — the package's exports map publishes only `.`, `./rpc-entry` and `./client` — so an implementer following the old wording would have written code that cannot resolve. ⚠️ `allowModelNetwork: false` IS WHAT MAKES THIS STEP HONEST: the consent prompt promises the check contacts no external service, and that option (which is the default) is what keeps the promise. ⚠️ AND GATE ON AVAILABILITY, NOT ON STATUS: `getProviderAuthStatus()` reports `configured: true` for a credential the registry will not use, so anything reading it alone will report ready for a project that cannot infer. ⚠️ AMENDED 2026-09-21 (D10). The statement asked for a presence-only check of the known provider variables. Pi already reads them after consent while computing availability, and a per-variable result would exceed ACC-0053's output scope, so the only presence check Kiln makes is the research credential's.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. Add the presence-only check for the known provider variables and the research credential. Instrument each access point so the before-consent criterion is observable.",
+    "statement": "Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. After consent, Pi reads the provider credential variables itself while computing availability, so Kiln adds no separate per-variable check or result; Kiln separately checks only whether the research credential is present. Instrument each access point so the before-consent criterion is observable.",
     "title": "Build permission-gated connection inspection",
     "type": "task"
   },
@@ -815,6 +815,7 @@
       "CMP-0027"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ CONSENT REUSE REQUIRES A CONCLUSIVE GIT CHECK. An unchanged project is not asked again only where Git gives a definite answer that the consent record is in neither the index nor HEAD and is ignored by the repository that holds it, or that no repository holds it. Without such an answer no saved answer is trusted or written, the answer applies only to the current run, and the operator is told so (NOT_REMEMBERED.unverified in lib/consent-record.mjs). The clean-machine requirement already specifies Git. Component proof in EVD-0126.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -863,6 +864,7 @@
       "CMP-0028"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ LOGIN SELECTS A MODEL; KILN STILL REQUIRES ITS OWN CHOICE (F14, EVD-0123). After an API-key /login, Pi printed 'Selected gpt-5.5' and the session switched to that model. Whether Pi persisted it was not established. Kiln must still require its own explicit model choice after login and must not treat the model Pi selected as the operator's selection.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -875,7 +877,8 @@
       "ACC-0056"
     ],
     "dependsOn": [
-      "TSK-0036"
+      "TSK-0036",
+      "TSK-0042"
     ],
     "fulfils": [
       "REQ-0025",
@@ -886,6 +889,7 @@
       "CMP-0028"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ DEPENDS ON TSK-0042, ADDED 2026-09-22 (B1). The fourth launch check needs the full compatibility key, including the preflight contract digest, and only TSK-0042 (on TSK-0041's canary contract) computes it and writes the record. Without it no launch can show a matching record. ⚠️ THE EXPECTED KEY IS COMPUTED FROM THE CURRENT RUNTIME INPUTS at launch, never read back from the stored record, or the comparison compares the record with itself. ⚠️ A DIFFERENT-MODEL ONE-RUN OVERRIDE NEEDS A ROUTE TO MATCHING COMPATIBILITY PROOF, or the override offered as a remedy can never start a run. ⚠️ WIRED 2026-09-22 (EVD-0132). bin/start-kiln.mjs runs the checks before the supervisor starts anything, with the one-run override flags and a live-canary runner, and holds Pi to the selection that passed. The component work is EVD-0129, and EVD-0131 made the key computable from the resolved model and effective endpoint. ⚠️ STILL OWED: a custom provider cannot launch until the command can supply its credential declaration and provider configuration (D25, D13), and setup (TSK-0060) must call the setup-side live model check so a project's first record is written by setup. ⚠️ AND THAT GAP IS NOW LOAD-BEARING FOR A SECOND REASON (D2, 2026-09-24, EVD-0139). TSK-0061 made the declared non-secret identities a project record `bin/start-kiln.mjs` reads and passes to `checkLaunch`, so the launch side of D22 works — for a built-in provider. A CUSTOM-provider project still cannot be started at all, because this command has no input for the credential declaration `--credential-var` gives setup, and `checkLaunch` refuses it with `unsupported-credential-contract`. Setup can prove such a project; only launching it is owed, and the setup-side control for declared identities therefore reaches `checkLaunch` rather than a started process. ⚠️ AND THE LAUNCHER'S REFUSAL CODES HAVE NO CRITERION (recorded 2026-09-24 with ACC-0084's amendment). ACC-0084 covers `bin/setup.mjs` only: it evaluates CMP-0039, and the two classes it used to name that belong here — launch failure, and a committed selection that cannot be used — cannot be observed through setup, because its selection phase refuses first in every case that would reach the preflight. What is owed is a criterion against CMP-0037, the combined runtime supervisor that raises them, for this command's own refusal classes and the codes it publishes, measured by running it. EVD-0139 states the boundary from setup's side. ⚠️ THE CUSTOM-PROVIDER LAUNCH GAP IS OWNED BY TSK-0072 (2026-09-24), accepted by ACC-0116, and TSK-0063 depends on it.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -942,7 +946,7 @@
   },
   {
     "acceptedBy": [
-      "ACC-0058"
+      "ACC-0104"
     ],
     "dependsOn": [
       "TSK-0024",
@@ -957,7 +961,7 @@
       "CMP-0029"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Spawn a throwaway restricted Pi child that resolves the exact provider and model and reports only availability and the auth-source category — never variable names, values, headers or credential-derived fingerprints — and refuse the contract if it cannot.",
@@ -1012,6 +1016,7 @@
       "CMP-0030"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ LAUNCH CONSUMES THIS KEY (TSK-0037, B1). The expected compatibility key must be computable at every launch from the current runtime inputs, independently of the stored record, and passed to checkLaunch as expectedKey. A different-model one-run override must have a route to obtain matching compatibility proof for that model, so the override TSK-0037 offers as a remedy can start a run.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1070,7 +1075,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0065"
+      "ACC-0109",
+      "ACC-0110"
     ],
     "dependsOn": [
       "TSK-0043"
@@ -1083,10 +1089,10 @@
       "CMP-0032"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.",
+    "statement": "Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run` and the Kiln capability signature `kiln_capability` over the existing `lib/research/` and `lib/validation/` implementations without restating their rules. Delegation is NOT registered here: the delegation runtime is CMP-0036's and does not exist yet, so TSK-0053 registers `kiln_delegate` beside the runtime it builds.",
     "title": "Register the research, validation and delegation adapters",
     "type": "task"
   },
@@ -1105,10 +1111,11 @@
       "CMP-0033"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "notes": "⚠️ NARROWED 2026-09-13 (O1, then F88). The original statement promised ten things. The canonical definitions carry three of them - decision owner, outputs and exit criteria - and the seven without a canonical field moved to TSK-0071, which adds them to `stages/*.json` before anything generates them, so this task never has to invent methodology in a template. ⚠️ PURPOSE IS ONE OF THE SEVEN (F88). `producesProse` describes what a stage produces, not what the stage is for. Labelling it Purpose would be exactly the inference O1 refuses, so it is carried under Outputs as output prose and purpose waits for a field of its own.",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.",
+    "statement": "Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>` at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, carrying the stage's decision owner, its outputs - the typed artifacts it produces, the outputs not yet typed and its output prose - and its exit criteria exactly as `stages/*.json` declares them, with deterministic generated-file metadata; and a `--check` mode that writes nothing and fails, naming each stale, missing or orphaned skill. Purpose, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary are NOT generated here, because no canonical definition carries them yet: TSK-0071 adds them to the definitions first.",
     "title": "Build the stage-skill generator and its check mode",
     "type": "task"
   },
@@ -1127,11 +1134,12 @@
       "CMP-0033"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ CORRECTED 2026-09-13 (F91, F94, D9). The statement said the override directory is registered after the packaged skills. Pi 0.84.4 does the reverse: its package manager ranks a project-settings entry ahead of a package resource before loading, and skill loading keeps the first skill with each name, so the override wins because it is resolved first. ⚠️ THIS TASK PROVES AN ENTRY; IT DOES NOT REGISTER ONE. The entry is already produced by CMP-0024's settings merge (`lib/pi-settings.mjs`), and writing it into a real project belongs to setup (TSK-0060). ⚠️ D9: AN ABSENT OVERRIDE DIRECTORY IS IGNORED. Pi skips a settings skill path that does not exist and reports nothing. This task records that behaviour as a control; a refusal for a missing directory, if one is ever wanted, belongs to setup or preflight, not to launch.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.",
-    "title": "Register the consumer override path and test all four override states",
+    "statement": "Prove, through the pinned Pi runtime's real resource loader, that the project-settings `skills` entry Kiln's settings merge produces - `../planning-content/skills-overrides`, written by `mergeSettingsText` and resolved relative to `.pi` - lets a consumer override of a generated stage skill win over the packaged skill of the same identity. Pi 0.84.4 resolves project-settings skill paths ahead of package resources, and the first skill loaded with a given identity wins, so the consumer override wins over the packaged skill; it is not claimed to win over every earlier project-settings skill path. Cover the packaged-only, override-present, override-edited and override-skill-removed states for `kiln-stage-01-intake`, reading provenance from the loaded file path and Pi's collision diagnostic. This task writes no settings in production and adds no launch refusal: setup writes the entry (TSK-0060), and an absent override directory is measured as ignored, not refused.",
+    "title": "Prove the consumer skill-override entry through Pi's real loader, in all four override states",
     "type": "task"
   },
   {
@@ -1152,6 +1160,7 @@
       "CMP-0034"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ F87 (2026-09-13), TO BE FIXED BEFORE THE FIRST REAL ORCHESTRATOR SESSION. The handwritten `pi-package/skills/kiln-planning/SKILL.md` still says the typed tools 'are registered by later work' and are not implemented, and `pi-package/prompts/kiln-start.md` tells the session to say the tools are not registered and take no other action. Both have been false since TSK-0044 and TSK-0045 registered the tools. A session started with them would tell the operator the tools do not exist and then refuse to use them. ⚠️ G0 REVIEW 2026-09-13. F95: the launch allowlist is exactly Kiln's declared tools, so Pi's `read` tool is absent, and Pi's skill mechanism needs it to open a skill file; no Kiln tool returned `project.yaml` or a stage document. The orchestrator could read neither its stage skill nor the project it is about. F96: the orchestrator's handlers accept a `PLANNING_CONTENT_DIR` naming the tool's own content, and the Pi child is never told whether self-hosting was validated. F97: an operator-facing refusal naming absolute paths conflicts with the model-facing disclosure boundary. F98: a scripted provider cannot establish that a model chose a relevant question. D10: `kiln_project_status` is extended - no new tool - to return the derived current stage, its blockers, one recommended next action, the project's name and description, and the Stage 1 starter document, through the existing read-only boundary; the tool count and allowlist stay as they are. D11: a `before_agent_start` hook selects the stage skill from the derived current stage and injects the exact skill content Pi loaded, including a consumer override when Pi resolved one; Pi's `read` tool stays disabled. D12: a fresh project has no typed planning artifacts and no stage attestations; starter documents and project metadata do not make it non-fresh. D13: ACC-0071 has two surfaces - canonical absolute paths for the operator, stable placeholders and no absolute path for the model - and self-hosting needs a strict marker the launcher emits only after validating `--self-host`; absence or any malformed value refuses. D14: ACC-0068 accepts deterministic orchestration only; the user-visible first turn is ACC-0114 on TSK-0063. D15: persisting the operator's answer is ACC-0113 on TSK-0049. Out of scope here and unchanged: TSK-0049's adaptive second question, TSK-0050's approval and attestation boundary, TSK-0071's deferred stage fields, and R8, R9, F82 and F89 with their assigned tasks.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1161,7 +1170,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0069"
+      "ACC-0069",
+      "ACC-0113"
     ],
     "dependsOn": [
       "TSK-0048"
@@ -1175,6 +1185,7 @@
       "CMP-0034"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ D15 (2026-09-13): ACC-0113 accepts persisting the operator's answer through a typed stage-document writer, moved from ACC-0068. No such writer exists yet; this task adds it. ACC-0069 is unchanged.\n\n⚠️ THE STAGE-DEFINITION BOUNDARY WITH TSK-0071 (recorded 2026-09-18). This task adds ONE OPTIONAL field, `questionSelection`, to `stages/01-intake.json` only, because ACC-0069 requires the question rule to be canonical rather than hard-coded in a prompt. It governs WHICH question to ask while a stage is questioning. It does not govern whether the next activity should be questioning, authoring, delegating, attesting or exiting, and it is not named `method`, `purpose` or `nextActivity`. The loader gains no new refusal for an absent field, so every definition that loads today still loads. See [[TSK-0071]].",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1184,7 +1195,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0070"
+      "ACC-0070",
+      "ACC-0115"
     ],
     "dependsOn": [
       "TSK-0048"
@@ -1198,6 +1210,7 @@
       "CMP-0034"
     ],
     "lifecycle": "active",
+    "notes": "Scope settled 2026-09-18, before any implementation. Authorisation is Pi's interactive confirmation channel. The handler shows a canonical preview through `ctx.ui.confirm`, the returned boolean is ephemeral and bound to that one invocation, no token or authorisation value reaches the model, `approvedBy` and `decidedBy` leave the model-facing schemas, and a confirmed act reaches the libraries as the internal actor string `operator via Pi UI`. Artifact approval joins the same channel instead of refusing, as it does today, because `reviewedBy` was never plumbed through the wrapper. Refusals are recorded in `state/operator-boundary-refusals.json`, newest 100 entries, each holding `occurredAt`, `operation`, `code` and a `target` of validated identifiers and enums only, with no paths, arguments, operator or model wording, reasons, credentials or transcript content, written under the existing lock and atomic-write discipline. A refusal may change only that file.\n\nBoundary with TSK-0071: TSK-0071 owns seven per-stage declaration fields, two of which are the mutation boundary and the approval boundary. TSK-0050 adds no stage-definition field and reads none. It gates attestation, approval and type activation unconditionally, and in particular it does not interpret `decidedBy`. That field is free prose: across the nine stage definitions it takes seven distinct values, among them \"Both\", \"Agent → user confirms\" and \"—\". Deciding from those strings would be interpreting prose, and giving them an enum would be declaring TSK-0071's approval- boundary field. Where enforcement would need per-stage policy, TSK-0050 refuses conservatively and leaves the field to TSK-0071. Stages 02-09 keep their deferred sentence unchanged.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1222,11 +1235,12 @@
       "CMP-0035"
     ],
     "lifecycle": "active",
+    "notes": "Scope settled 2026-09-18, before implementation.\n\nSCOPE. This task owns the three role definitions and their static check. It does not own a specialist process. Two clauses were therefore moved out before any code: ACC-0072's \"a real Pi run of each specialist reports an active tool set equal to the intersection of that role's declared allowlist and the measured host registry\" now sits in ACC-0076, and ACC-0073's \"a specialist run reports the same provider, model and thinking level as the orchestrator that delegated to it\" is already covered there. ACC-0076 belongs to TSK-0053, which owns the delegation runtime and depends on this task.\n\nNAMING. The check is the ROLE-DEFINITION check, never the \"roster lint\". Decision #18 and #143 settled that this project has no artifact roster: `task.role` is a plain string and the role set is derived by collecting values, which is why `schemas/task.schema.json` refuses a `role-assignment` type and why the scaffold writes \"There is no roster to maintain\". CMP-0035's \"specialist roster\" is an unrelated object - three child-agent role definitions - and a check named for the first meaning would read as contradicting a settled decision.\n\nFORM. Generated Markdown with strict YAML frontmatter for machine-checked identity and tool declarations, then fixed sections for the input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, so the files are directly usable as child prompts. Authored role prose is canonical data under `lib/specialists/`; `contractFor(role)` supplies tools, write boundaries, required signatures and forbidden actions. Generating rather than authoring the merged result is what makes drift structurally impossible to accept rather than a promise, the same trade `skills:check` already makes for the nine stage skills.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Write `research.md`, `planning.md` and `validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, deriving write boundaries from `lib/specialists/contract.mjs`; add the lint that fails a role with no declared tools.",
-    "title": "Author the three role definitions and the roster lint",
+    "statement": "Write `specialists/research.md`, `specialists/planning.md` and `specialists/validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, generating them from authored role prose merged with `lib/specialists/contract.mjs` rather than restating its write boundaries; add the role-definition check that fails a role with no declared tools, with a `--check` mode that compares generated bytes without writing and runs in every CI cell.",
+    "title": "Author the three role definitions and the role-definition check",
     "type": "task"
   },
   {
@@ -1253,7 +1267,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0076"
+      "ACC-0076",
+      "ACC-0111"
     ],
     "dependsOn": [
       "TSK-0039",
@@ -1267,13 +1282,15 @@
     ],
     "id": "TSK-0053",
     "implements": [
+      "CMP-0032",
       "CMP-0036"
     ],
     "lifecycle": "active",
+    "notes": "Scope settled 2026-09-19, before implementation.\n\nTHE TASK-BINDING OBSERVER (D42). `taskBindingObserved` is produced by a private Kiln observer extension loaded explicitly into the child. Its `before_provider_request` hook inspects the FINAL provider payload for a framed task carrying a one-time nonce, a length and a digest, and emits only a minimal attestation - never the payload - over a dedicated extra pipe the parent opens. The parent validates that attestation against the nonce, length and digest it generated. A mismatch in any of the three produces no binding.\n\nREJECTED SOURCES, AND WHY. Model output and ordinary JSON events are not acceptable: both are things the child says about itself, which is the failure REQ-0026 exists to prevent. Writing or hashing the prompt file is not acceptable either: it proves the parent PREPARED the task, not that the child CONSUMED it. The provider payload at the last moment before dispatch is the first point where consumption is observable, and the hook runs inside the child but reports on the child's outbound request rather than on its own account of itself.\n\nWHAT THE ATTESTATION MAY CARRY. The nonce, the length and the digest, and nothing else. Never the task text, never a credential or a credential-derived value, never an absolute path. The payload is neither retained nor returned.\n\nTHE TSK-0054 BOUNDARY (D43). This task builds the runtime and registers `kiln_delegate`, and it must pass every run through the EXISTING `verifyChild` gate before any substantive output is exposed. There is no temporarily permissive delegation path. Expanding and proving the complete refusal matrix - malformed events, nonzero exit, provider mismatch, out-of-role writes - is TSK-0054's, under ACC-0075. In short: this task produces the run record and gates on it; TSK-0054 judges the full set of ways a record can be bad.\n\nPROCESS TEARDOWN (D44). The runtime reuses `trackDescendants` and `stopTree` from `lib/supervisor.mjs` and owns one child tree wrapping those primitives. No second PID-only termination implementation, and no change to supervisor behaviour unless an unavailable seam forces a separate decision, which would be recorded before it is made. F116's rule stands: a pid alone is not an identity.\n\nWATCH ITEM. F130 - `A8 each companion is a separate process` - is a watch item, not a blocker. It has passed in every cell of the last four CI runs. This task spawns child processes under a bounded timeout, so the areas overlap; if it recurs during this task the run stops and is reported rather than absorbed.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path.",
+    "statement": "Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path. Register `kiln_delegate` over that runtime, in the same task, because a registration cannot wrap an implementation that does not exist yet.",
     "title": "Build the delegation extension: launch, binding, inheritance and cleanup",
     "type": "task"
   },
@@ -1294,6 +1311,7 @@
       "CMP-0036"
     ],
     "lifecycle": "active",
+    "notes": "Scope settled 2026-09-20, before implementation. ACC-0075 needs no amendment: it already names all eight causes, and this task builds the detection for them.\n\nTHE MATRIX AUDIT FOUND THREE CAUSES WITH NO CHECK AT ALL. A nonzero exit is captured as `run.exit` and never consulted. A line that fails `JSON.parse` is silently skipped, so a child emitting garbage around one valid assistant message is accepted. And `CHILD_REFUSED.OUT_OF_ROLE_WRITE` is defined with `mayWrite` implemented and no production caller anywhere, so nothing observes a write outside a role's boundary. It also found that answer extraction runs BEFORE verification: `answerFrom(stdout)` is called inside `runChild` while the gate runs after it, so the assistant text is selected before anything is checked. The refusal path drops it today, which is why the criterion is not violated, but the ordering makes that incidental rather than structural.\n\nD47 TWO NEW WIRE CODES, EVERY EXISTING LITERAL PRESERVED. `NONZERO_EXIT: \"child-exited-nonzero\"` and `EVENTS_MALFORMED: \"child-events-malformed\"`. \"The child did not finish\" and \"the child's stream could not be read\" are different facts from the five already coded, and a caller that cannot tell them apart cannot act on either. The pinned wire-contract test in test/specialist-contract.test.mjs is extended rather than replaced.\n\nD48 A SELECTION MISMATCH IS NOT A MISSING CAPABILITY. `SELECTION_MISMATCH: \"child-selection-mismatch\"`. A child answering under a provider or model nobody asked for fails for a reason a delegating model would otherwise be told was a missing tool, and would look for the wrong fix. A missing or malformed report still resolves to `capability-missing`, because in that case the child genuinely cannot demonstrate its tools.\n\nD49 ABSENCE STAYS PRIMARY; OBSERVATION IS A FAIL-SAFE. `--tools` and the measured active registry keep an out-of-role tool unavailable, which is the boundary #67 asks for and the one a child cannot argue with. The package extension is NOT made role-aware: that would put a second, weaker copy of the write boundary inside the child and would change a launch protocol that was just measured. Instead Pi's own `tool_execution_start` events are parsed, and an out-of-role mutation that nevertheless STARTS is a refusal. Starting is sufficient: a handler that failed may already have partially mutated state, so waiting for `tool_execution_end` would be waiting for damage to finish. The stable code remains `out-of-role-write`.\n\nNOT READ, OPERATIONALLY. Rejected assistant prose is never selected as the answer, returned, logged or included in refusal details. Buffering process stdout is permitted and necessary: malformed-event detection requires reading the stream. `answerFrom` moves after acceptance so the ordering enforces it.\n\nPRECEDENCE. A run can fail several ways at once, so the order the checks run in is itself a contract and gets its own test: timeout or abort, then malformed events, then nonzero exit, then the task binding, then the selection, then out-of-role writes, then capabilities and signatures. Cheapest and most fundamental first, and nothing about the child's own account is consulted before the facts the process itself supplies.\n\nFIVE REVIEW CORRECTIONS, APPLIED BEFORE THE MUTATION GATE. F39 the binding now refuses at its own step rather than waiting for `verifyChild`, so a child that was never given the task is never refused for a wrong model or a write instead. F40 the write boundary is `mayWrite` over the canonical operation a wire name resolves to, not membership of the allowlist: `active` is the role's tools intersected with the host registry, so a host missing a tool would otherwise make a declared write look out of role, and a read the role simply was not given would be reported as an attempted mutation. F41 a `toolName` this host does not register makes the stream unreadable and is never copied anywhere; every name in an observation comes from Kiln's own table. F42 a type is not a shape: the event types the gate consumes are checked for the fields it reads, and the answer and the native selection are taken only from `message_end` and `turn_end`. The shapes are measured, not assumed - a real child run showed `message_update` carries no `message` at all, which a guessed rule refused. F43 the matrix fixture takes a LIST of faults, so every adjacent pair in the precedence order is a genuine double failure; `bindingDetail` is gone from observations because it quotes the child's own material, and `durationMs` is restored and read when each observation is built.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1375,7 +1393,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0081"
+      "ACC-0081",
+      "ACC-0103"
     ],
     "dependsOn": [
       "TSK-0031",
@@ -1391,7 +1410,8 @@
       "CMP-0037"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "notes": "F122 (2026-09-16): CI run 35097288227, at commit b8b09b2, windows-latest node 22, natural mode. The launch preflight timed out on the primed WMI route at 10,009.7 ms with no rows, and the supervisor refused with process-table-not-primed before either Pi or the launcher was spawned. ACC-0081's 10-second preflight bound held as specified, so the criterion outcome stands. This is the second primed-route timeout event that EVD-0109's recorded rule names: WMI is withdrawn as the Windows identity strategy and replaced wholesale by a WMI-free identity format, delivered as a separate correction. The later green run 35141902017 does not cancel it. Interactive session recovery for ACC-0103 is paused until the replacement is green. F130 (2026-09-17, watch item): CI run 35214314607 at commit a957d43, windows-latest node 22, interrupt evidence. One WMI-free identity read for the launcher tree started 5,384 ms into the shutdown with a 2,316 ms allowance and did not answer (process-table-timeout); the other seven Windows reads in that cell took 362 to 530 ms. With 298 ms left no further read was started, the launcher descendant was recorded unverified, and the run refused with shutdown-not-observed at 7,706 of 8,000 ms. The deadline and fail-closed behaviour held. The failed job was not rerun and production shutdown behaviour is unchanged. If another Windows CI run times out on a WMI-free identity read, phase instrumentation of identity reads (spawn, first byte, exit) follows. F130 recurred in the same run on windows-latest node 24: five consecutive WMI-free reads ran to the full 10,000 ms bound (four real-reader tests and the natural evidence preflight, which refused the launch before spawning), while later reads in that cell took 245 to 638 ms. Under the recorded rule, O6 phase instrumentation is active. F133 (2026-09-17, watch item): CI run 35250274939 at commit 3a2a830, windows-latest node 22. The unit test 'a descendant that survives its parent is escalated, and the tree is not reported stopped' reported no surviving descendant where it expected one. It injects its processes but uses real timers (200 ms grace, 150 ms hard wait, a 30 ms parent exit), and the commit under test changed only the guard-file module. Not investigated. If it recurs, that test's real-time dependency is replaced with deterministic clock controls; its waits are not increased. ⚠️ NEEDS CORRECTION, 2026-09-24. ACC-0103 is reopened: the first-run start prompt this task owns was never sent. The correction: send /kiln-start only when the session recorded after locking is new, and send no start message on a resume. ACC-0081's shutdown verdict is unaffected. ⚠️ CORRECTED 2026-09-24 (EVD-0143, commits c46f16d and eb734bc): the start prompt is sent on a new session recorded under the lock, when Pi has a terminal, and never on a resume. F130 RECURRED THREE TIMES ON 2026-09-24 and stays open for a focused shutdown investigation. (1) Diagnostic run 36046760284, job 107792102267: Windows interrupt platform evidence, shutdown-not-observed. (2) Run 36056185119, Windows Node 24: ACC-0116's launch ended with 'Not observed: agent-descendants'. (3) Run 36065687783, Windows Node 24: PLATFORM EVIDENCE (win32, natural), shutdown-not-observed. It is not dismissed as a flake. F130 O1 (2026-09-24, commit ca476de): the trees now stop side by side and one process-table read at a time serves both. CI run 36074014369 at ca476de passed all four cells. The one focused Windows batch was run 36074016941 on the never-merged branch diag/f130-batch: the full suite 8 times, 4 on Node 22 and 4 on Node 24. RESULT: natural-mode platform evidence, the demonstrated cause, passed 8 of 8; it had failed 3 times earlier that day. TWO MECHANISMS REMAIN, and neither is fixed. (1) Interrupt mode, 1 of 8 (job 107881093769): the launcher tree waited 4.2 s for a descendant that did not exit. Its identity read then got 2,225 ms, up from about 1,511 before O1, and needed 2,435 ms to its first byte. The read was abandoned, and the descendant, pid 5700, was STILL ALIVE when the supervisor returned (aliveAtReturn). It was reported launcher-descendants-unverified and not killed. (2) ACC-0116 on the real launcher, 3 of 8: Not observed: agent-descendants. The piped Pi lives for about 1 to 2 seconds, and the Windows tracker samples every 3,000 ms with reads of 0.4 to 2.4 s, so no clean look completes while the agent is alive. This was seen before O1 as well. Both are recorded as limits of this batch; F130 stays open. ⚠️ REOPENED 2026-09-24: ACC-0081 fails on EVD-0146, so the shutdown work is open again. Two mechanisms remain to resolve before ACC-0081's pass is restored or ACC-0088 is completed: (1) a launcher descendant left running after an interrupt when its identity read runs out of deadline; (2) a short-lived agent whose descendants the Windows tracker never observes. ACC-0103's first-prompt pass stands. F130 MECHANISM 2 AGAIN, 2026-09-24, run 36076748293 at 529e5db: on Windows Node 22 the ACC-0117 control and on Windows Node 24 the TSK-0063 journey were refused with Not observed: agent-descendants. Every Windows test that starts a short-lived piped agent is exposed to it. F130 MECHANISM 2 MEASURED, 2026-09-25. Bounded Windows batch: run 36125319153, the full suite 8 times on the never-merged branch diag/f130-m2b at 129881a. The agent tree was unobserved in 4 of 8 jobs, each in the ACC-0117 control's launch. Every time the tree made exactly one look: it started while Pi lived, took 1,234 to 2,038 ms, and completed after Pi exited (raced, leader-exited-before-completion). In 3 of 4 the late table held no row for Pi's pid. In 1 of 4 it held a row created 2026-09-25T10:47:58.741Z against a logged spawn of 10:47:58.740Z, which does not tie it to the original process. A late table is therefore not a route to recovery, and the spawn-time identity rule was rejected on review: a pid reused within milliseconds of the spawn falls inside any such window. The F118 control now covers that case (129881a). Recovery has to come from a verified look completed while Pi lives. ACC-0081 stays fail. F130 MECHANISM 2, JOB OBJECT FEASIBILITY, 2026-09-25 (6720faa; test/job-object-feasibility.test.mjs and test/fixtures/job/job-shim.ps1; no production change). A PowerShell shim joins a new job before it creates the child, using P/Invoke with no compiler. CI run 36132762184 passed all four cells, and both Windows cells ran the control. (1) While the child ran, the job's own process list named the shim, the child and the grandchild the child started first; a process started outside the job and the test runner were never named. (2) An attached grandchild died with its Node parent, because libuv's own job kills it. A detached grandchild outlived its parent, was still named by the job after the parent exited, and ended when the job was terminated. (3) Joining the job after starting the child failed the ordering control, which is the race this design removes. COST: the shim took 13,864 ms to join its job on Windows Node 22 in CI and 1,340 ms on Node 24, and about 110 ms locally. It is PowerShell start-up plus the dynamic assembly, paid before the agent starts. Production shutdown is unchanged. F130 MECHANISM 2, JOB MODE PROTOTYPE, 2026-09-25, opt-in only (KILN_WINDOWS_JOB_HOST=1). lib/windows/job-host.ps1 and lib/windows-job.mjs: a host the supervisor starts creates the agent SUSPENDED inside a new job, with KILL_ON_JOB_CLOSE, then assigns and resumes it, while the host stays outside the job. It passes the terminal through and is controlled by files. In job mode the supervisor stops the agent tree through the job with stopJobTree: list, terminate, list, release, and observe the host's exit, all within the one deadline. A host that cannot start the agent refuses the launch as spawn-failed with a JOB_HOST_ code, and there is no plain-spawn fallback. Commits bb42a05, a3299a5 and ba9be11. Windows CI tests (run 36137051884 and later) show exact arguments including quotes, backslashes, empty and non-ASCII values; piped input, output, stderr and exit code passing through; a detached survivor named after the agent exits and ended by terminating the job in 31 to 49 ms; members ended when the host is killed; and refusal when the program does not exist. MEASUREMENT BATCH: run 36139928505 on the never-merged branch diag/f130-jobmode ran the full Windows suite 8 times with job mode on for every real launch. There was no Not observed: agent-descendants in any job; before, it appeared in 4 of 8 such jobs. Host start-up to agent running was 124 to 486 ms under load: the first launch in each job 139 to 486 ms, the later one 124 to 314 ms. One job failed ACC-0117 and the journey at cleanup with EBUSY after the 15.3 s retry (F11). F11 also hit ACC-0117 in main run 36139902826 with job mode off, so it is not caused by job mode, and it now outlasts its bound. NOT YET VERIFIED: an interactive Pi in a real Windows terminal through the host, which needs a manual run. Job mode covers only the agent tree: mechanism 1's survivor was a launcher descendant. ACC-0081 stays fail. JOB MODE MANUAL CHECK, 2026-09-25, PARTIAL and not passed: in a Windows PTY with a non-billable project and KILN_WINDOWS_JOB_HOST=1, Pi completed an interactive first turn, accepted a second prompt, and /quit exited 0 with launcher tree stopped: true. A Ctrl+C sent mid-turn arrived through the PTY as a byte that did not interrupt Pi, so the interrupt was not exercised. A real keyboard Ctrl+C in Windows Terminal is still required. Next: job coverage for the launcher tree; job mode stays opt-in until both trees have integrated shutdown evidence; F11 is investigated separately. JOB MODE FOR BOTH TREES, 2026-09-25 (a8a560d and f735114): the launcher, too, is created inside a job by its own host, and its control pipe passes through the host unchanged. Its tree is stopped through its job. Main CI run 36150339425 at f735114 passed all four cells, including a real two-tree Windows test: the stand-in launcher received stop through its host, its detached worker was named by its job and ended, both hosts were seen to exit, and the shutdown completed in 332 ms locally. INTEGRATED BATCH: run 36150343204 on the never-merged branch diag/f130-jobmode-both at 686e6ba ran the full Windows suite 8 times, 4 on Node 22 and 4 on Node 24, with KILN_WINDOWS_JOB_HOST=1, so every real launch started both trees inside jobs. Every job failed only ACC-0066's workflow check, which the branch breaks by design. There was no Not observed, no shutdown-not-observed and no EBUSY. Host start to process running was 113 to 303 ms for agents and 116 to 204 ms for launchers. NOT COVERED: test/shutdown-evidence.test.mjs, ACC-0081's platform evidence including the interrupt cell where mechanism 1 was seen, drives its own supervisor fixture without jobs, so it did not run in job mode. The keyboard Ctrl+C in Windows Terminal is still owed. Job mode stays opt-in; ACC-0081 stays fail. KEYBOARD CTRL+C IN WINDOWS TERMINAL, 2026-09-25, FAILED: a non-billable project (loopback fixture, a turn held 30 s) ran from start-kiln at 996fc2e in Windows Terminal. Keys were real input events (SendInput) sent only after the Kiln window was verified to be in the foreground; a process watcher outside Kiln recorded every descendant by pid and creation time. With KILN_WINDOWS_JOB_HOST=1, one Ctrl+C 2 s into the turn stopped nothing: the turn ran its full 30 s and start-kiln, both job hosts, start-shell, next start and Pi were all alive 30 s later. With job mode off (A1), the same key did the same: the turn ran to the end and start-kiln, start-shell, next start and Pi stayed alive. WHO RECEIVES IT: read from the console mid-turn with job mode off, its input mode was 520 with ENABLE_PROCESSED_INPUT clear (Pi's raw mode), so Windows raises no CTRL_C_EVENT for any attached process (the PowerShell host, start-kiln, start-shell, next start and Pi) and the key reaches the console's reader, Pi, as the byte 0x03. Pi 0.84.4 binds that byte to app.clear: one press clears the editor, a second within 500 ms calls its own shutdown, which exits 0; Escape is its turn interrupt. So the supervisor never sees an interrupt, with or without job mode, and the same holds on POSIX, where raw mode clears ISIG. A double Ctrl+C is Pi's quit, recorded as agent-exit with code 0: at the idle prompt in job mode both trees were gone 0.78 s after the keys; mid-turn in job mode start-kiln exited 0.9 s after them (no per-process record: that case's watcher failed); at the idle prompt with job mode off it exited 0.9 s after them and none of its processes remained. Those are exit routes, not the required stop. DECIDED (Q1 = O2): a single Ctrl+C must stop Pi and the launcher within the 8 s deadline; that correction belongs to this task. Then (Q2 = O3) job mode becomes the Windows default, the non-job Windows path is removed and a job-host failure refuses launch, and ACC-0081's Windows process-table preflight clause is amended to name the job-mode launch prerequisite before the non-job platform test is retired. ACC-0081 stays fail. O2, THE KEYBOARD STOP, 2026-09-25 (4fa5f97): in an interactive Kiln session Kiln's Pi extension subscribes to Pi's raw terminal input at session start, consumes one Ctrl+C in any encoding the pinned pi-tui reads as Ctrl+C, writes a per-run notice named by KILN_KEYBOARD_STOP_FILE, aborts an active turn and asks Pi to shut down. The supervisor starts its 8 s shutdown when it sees the notice, without waiting for Pi, records the trigger as keyboard with no signal, and exits 1. A Pi exit observed before the notice is checked against it synchronously; that race has a test, and removing the check makes the test fail. The variable is set only when Pi has a terminal on both ends, so outside Kiln and in piped runs Pi keeps its own Ctrl+C. Consumption from the editor and from a dialog was driven through the pinned TuiMainScreen. ACC-0081's trigger wording was amended (29f529d). WINDOWS TERMINAL, JOB MODE, SAME HARNESS AS BEFORE: one Ctrl+C 4.4 s into a held turn: the supervisor saw the notice 5 ms after the key, Pi's turn was aborted and Pi was gone 0.15 s after the key, every tracked process (both job hosts, start-shell, next start, Pi) 0.87 s after, and start-kiln printed stopped (keyboard) with launcher tree stopped: true and exited 1 at 0.84 s. One Ctrl+C with Pi's /settings dialog open: notice seen 3 ms after the key, Pi gone 0.16 s after it, everything 0.74 s after it, same summary, exit 1. A first dialog attempt typed a path-converted command instead of /settings, so it exercised a turn, not a dialog; it also stopped within 0.86 s. Local full suite: the ten failures were all Turbopack refusing the delete-pending .git/worktrees/wt-f11 (access denied), unrelated to this change; CI is the check. Job mode stays opt-in until O3; ACC-0081 stays fail. O2 CONTROLS, 2026-09-25 (37d76fe): CI run 36169304790 cancelled supervisor.test.mjs on Ubuntu and Windows Node 22 because the notice watch's timer was unreferenced and the test process exited while waiting; the timer is now referenced and disposed on every path. The keyboard stop's deadline now counts from the key's time in the notice, not from when the notice was seen: a notice seen 250 ms late spends those 250 ms of a 600 ms bound, a notice seen after the whole bound is refused as shutdown-not-observed, and a key time later than now counts from now. A notice that cannot be written still stops Pi, which then exits 130 rather than 0: an exit listener sets the status, and if Pi's own shutdown has not ended the process within 8 s it is ended with 130. Two real child processes prove both, and the supervisor reports that run as agent-exit with status 130, never as a clean quit and never as a keyboard stop it did not see. Each of the three controls was mutated out and its test failed. CI run 36171409254 (37d76fe): every O2 test passed in all four cells; Windows Node 24 failed ACC-0117 and the journey on Not observed: agent-descendants (mechanism 2, job mode still off) and the F11 self-test, whose inventory timed out at 15 s on a loaded runner while handle64 named the holder; the test now accepts an unavailable inventory with its reason and requires the holder named by at least one diagnostic (773bfc8). O3, 2026-09-25 (eb9df03, 6353b6b): ACC-0081's Windows launch prerequisite is now both trees started inside jobs, with no fallback and no process-table preflight. start-kiln starts both trees in jobs on every Windows run; KILN_WINDOWS_JOB_HOST is removed. With both trees in jobs the preflight is recorded as not run (both-trees-in-jobs), and a real two-job run reads no process table at all. The non-job Windows platform evidence cells are retired; the job-mode cells and the enumeration check run the default. The supervisor library keeps its tracker path for POSIX and for unit tests with stand-in processes. CI run 36174640599 at 6353b6b: all four cells green, with every real Windows launch in normal CI starting both trees in jobs (hosts 196 to 308 ms). ACC-0081 stays fail until the operator decides. F2, THE STANDALONE LAUNCHER'S CHILD, NOT REPRODUCED (2026-09-26). test/launcher.test.mjs once failed on windows-latest Node 22 (CI run 36197842986): the launcher reported stopped., meaning it saw its child exit, yet 1.5 s later the recorded child pid 3744 answered as alive, and the test stopped there without probing the port. The test now records the child's identity (parent pid and creation time) while it runs, and after shutdown takes three facts before asserting: whether the pid is alive, whether a live pid has the child's creation time (a surviving child) or another (a reused pid), and whether the port is bound (2f6d6fa). In a bounded pass of eight Windows runs (36204554670, four per Node version) the test passed every time, so no surviving-child or reused-pid observation exists yet. This test runs the launcher without the supervisor; ACC-0081's supervised path starts both trees in jobs and is not implicated.",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Send the start prompt on a first session and resume the recorded Kiln session afterwards, recovering by presenting available sessions when the record is missing or corrupt rather than resuming an unrelated generic session; stop both trees on Pi exit and on signals with bounded escalation, on Windows and POSIX.",
@@ -1427,7 +1447,10 @@
       "ACC-0043",
       "ACC-0045",
       "ACC-0083",
-      "ACC-0085"
+      "ACC-0085",
+      "ACC-0106",
+      "ACC-0107",
+      "ACC-0108"
     ],
     "dependsOn": [
       "TSK-0024",
@@ -1453,10 +1476,11 @@
       "CMP-0039"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ R9 IS SETUP'S (recorded 2026-09-13). The skill-override entry `../planning-content/skills-overrides` is fixed relative to `.pi`, while the content root can be selected elsewhere, for example through `PLANNING_CONTENT_DIR`. Setup owns making the entry it writes agree with the selected content root's `skills-overrides/`. TSK-0047 proves the entry only in the default layout, where the content root is `<project>/planning-content`.\n\n⚠️ STAGE-DOCUMENT MIGRATION IS SETUP'S (recorded 2026-09-18, TSK-0049). `kiln_write_stage_document` writes into a `## Intake` section with two anchored regions, and refuses a document that does not have them rather than upgrading one during a write: a write is not the moment to restructure a document somebody may have edited. Projects initialized before that section existed therefore cannot record an answer until their stage documents carry it. Setup owns adding it, the same way it owns making the skill-override entry agree with the selected content root. Kiln's own Stage 1 document was migrated by hand as a one-off and is not the general answer.\n\n⚠️ THE ORDER IS D26 (2026-09-22): paths, Node, lock, install, dynamic imports, plan, initializer, project ID and state protection, journal, then the remaining phases. The dependency install comes before the transaction plan because the plan validates existing Kiln records, and that validation needs Ajv, which the install is what provides. Everything up to and including the install is therefore built-ins only (ACC-0083), and the install is a bootstrap mutation confined to the .planning checkout: it changes no consumer project state and does not rewrite the lockfile. ⚠️ SLICE 1 LANDED 2026-09-22 (EVD-0133, commits e808b96 and 7ef9d4d). bin/setup.mjs runs D26's order as far as the journal: the five paths printed before any mutation, the engines check, the single lock held for the whole run, `npm ci --ignore-scripts` confined to this checkout, the dynamic imports, the transaction plan, and the phases state-coverage, initialize, state-protection and project-identity before the journal opens. Two review findings were closed in 7ef9d4d: the .gitignore fix now runs inside the planned transaction as a declared phase rather than before it, and the bootstrap install is locked and runs no dependency lifecycle script. ACC-0083 passes from that evidence. STILL OWED HERE: slice 2 (Pi import and version verification, trust, package registration, the skill-override entry agreeing with the selected content root — R9 above), slice 3 (consent, discovery, selection, the credential contract, research) and slice 4 (preflight, the live model check, read-back, the full exit-code mapping and resume), plus `--local-state user`, which refuses by name in slice 1. ACC-0085 waits until every supported state path is implemented; ACC-0043, ACC-0045, ACC-0106, ACC-0107 and ACC-0108 wait for the integration record after all slices land. ⚠️ REGISTRATION IS A PLANNED MERGE, NOT `pi install -l` (D27, 2026-09-22). Setup writes the package entry itself, through the transaction's own settings merge, and does not run `pi install -l` against the consumer project. `.pi/settings.json` is a planned target whose recorded identity is what makes the merge refuse a file that moved; `pi install -l` writes that file itself, so inside the plan it would have to be adopted — widening the rule that stops a concurrent edit being laundered into the plan — and outside the plan it would write a project file the transaction has not contained or probed. The portable entry `../.planning/pi-package` is written only after it is proved to resolve to this checkout's canonical package directory, and that the registered entry loads is proved by running pinned Pi against it. EVD-0079 and ACC-0105 remain the component proof of Pi's literal entry and its portable equivalent. Because the settings writer requires a provider, a model and a thinking level that are not chosen until slice 3, slice 2 writes through a package-and-skill-only merge that preserves existing defaults and every unrelated setting. ⚠️ SLICE 2 LANDED 2026-09-22 (commits 309e26c and b1d455e). The pinned Pi version is verified immediately after the dynamic imports and before the transaction plan; the trust decision is obtained and never assumed, with `--trust approve|deny` answering over a recorded decision and only an explicit no recording a denial; and Kiln's package and the content root's skill overrides are registered through a package-and-skill-only merge that leaves every other setting alone. ⚠️ **R9 IS STILL OPEN.** The skill-override entry is now derived from the resolved content root and proved to resolve back to it, instead of being a fixed spelling — but the command refuses every content root other than `<project>/planning-content`, because `initializeProject` creates that one by its own single rule and a run that accepted another selection would print one content root and create a second. R9 is closed only when setup can own a content root the initializer does not create; until then the derivation is proved at the unit level and the command's behaviour is the refusal. ⚠️ OWED BY THE EXIT-CODE MAPPING (2026-09-22, narrowed after slice 3): every Kiln refusal class now prints as the written refusal it carries — slice 3 gave `reportFailure` a branch for them — so a registration refusal no longer reaches the operator as a stack trace. What remains is the classification: `PackageEntryRefusal`, `SettingsRefusal`, `ModelSelectionRefusal` and the rest all exit with the generic setup code. Which code each deserves is the mapping this task publishes. ⚠️ SLICE 3 LANDED 2026-09-22 (EVD-0135, commits 4313e6e and 5aaa2da). Inspection consent precedes every read of this host — and, since 3317fff, every touch of the environment: loading Pi's SDK enumerates it, so the trust decision, which the proposal orders first, is taken in a child whose environment is built by naming variables, and this process loads no Pi until the operator has allowed it — model discovery and selection run through the existing writers so a changed choice clears the previous grant before the new selection is written, the selected provider's credential contract is resolved from Kiln's table, and the research decision is settled separately. An answer the command cannot read is never recorded as a decision, a run with nobody to ask does not ask, and a partial setup exits 9 with a valid project. STILL OWED: slice 4 (the preflight canary, the live model check, read-back, resume and the full exit-code mapping), R9's content root, custom-provider credential inputs (D25, D13) and `--local-state user`. ⚠️ SLICE 4 LANDED 2026-09-23 (EVD-0136, commit 7d0d48a). The zero-cost preflight runs before anything billable is offered, the live model check has its own approval (`--live-model-check approve|deny`, a prompt, or a refusal when there is nobody to ask), the compatibility record is read back and compared against the key recomputed from what Pi resolved before any readiness is reported, an interrupted run is continued only with `--resume`, and `--help` publishes every exit code. STILL OWED BY THIS TASK: R9's alternate content root, custom-provider credential inputs (D25, D13), `--local-state user`, and narrowing the refusal classes that still share the generic setup exit code. The spanning criteria stay not-evaluated until those land and the integration record is written. ⚠️ SLICE 5 LANDED 2026-09-23 (EVD-0137, commits 0a325c7, 2c61a1b and 804dd43), closing what the earlier slices owed: R9's alternate content root (the initializer takes an explicit root contained in the project and stages beside it; setup initializes there and says later runs need the same selection), `--local-state user` (the external root is keyed by the committed id, which is committed first in a transaction planning that record alone), the custom-provider credential inputs (`--credential-var NAME`, a name and never a value, with the canary given the provider's non-credential configuration and exercised for real against a loopback endpoint), and one published exit code per refusal class. WHAT REMAINS FOR THIS TASK: the integrated acceptance evidence, from which ACC-0043, ACC-0045, ACC-0085, ACC-0106, ACC-0107 and ACC-0108 can be evaluated. ⚠️ INTEGRATED 2026-09-23 (EVD-0138, at 9510d6e). All six spanning criteria are evaluated and pass: ACC-0043, ACC-0045, ACC-0085, ACC-0106, ACC-0107 and ACC-0108. The integrated measurement found and fixed a defect of its own: a killed run's lockfile made every rerun wait out the two-minute stale window. REVIEW FOUND A SECOND DEFECT IN THE FIX, THE CONTROL FOR IT FOUND A THIRD IN CI, AND REVIEW FOUND A FOURTH AND A FIFTH; three criteria were also withdrawn while their controls were repaired and restored only after. All five lock defects are one mistake at five depths — acting on a judgement about a file that can change, or that never proved what it was read for. A fifth followed from review of that fix: a gate judged abandoned by age treats a process stopped between creating its gate and naming itself as dead. Breaking a lock is now serialised behind a gate beside it, taken by the recovery path and the waiter's stale break alike; reclaiming a gate is serialised by a token and happens only when the gate's record names a demonstrably dead local process; and nothing reclaims the token. Everything else fails closed: exit 17, with both files named. The repairs: ACC-0045 parses the resume arguments out of the recorded command rather than typing them beside it; ACC-0106 takes its file set from a NUL-delimited before/after boundary with no exemption list and checks absolute paths by shape as well as by value; ACC-0108 serves the browser-only route against the denied project and asserts a rendered page. ONE LIMIT REMAINS: `npm start`'s production path, which installs and builds before serving, is not exercised, because no billable request or registry install happens anywhere in the suite.",
     "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.",
+    "statement": "Implement `bin/setup.mjs` running the ordered phases: path resolution, Node validation, the setup lock, the locked dependency install, the dynamic imports, the transaction plan, initialization, the project ID and state protection, the journal, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back — with every installed dependency imported dynamically after the install step, and no second initializer.",
     "title": "Compose the ordered setup command over the existing primitives",
     "type": "task"
   },
@@ -1476,6 +1500,7 @@
       "CMP-0039"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ NON-INTERACTIVE MODEL-USE CONFIRMATION IS UNRESOLVED (EVD-0128). selectModel refuses when it cannot ask, because --provider and --model alone do not grant model use. This task must decide how a fresh non-interactive setup supplies that confirmation. ⚠️ THE HELP MUST NAME --research tavily AS THE WAY TO ENABLE RESEARCH LATER (EVD-0127), matching the hint every user-disabled research outcome carries. ⚠️ DECLARED NON-SECRET IDENTITIES NEED AN INPUT (D22, EVD-0131). A model whose endpoint cannot be canonicalised or whose request profile holds unbounded inputs has no compatibility key without a declared identity, and setup and launch refuse it. This task's argument surface must provide a way to declare the endpoint and request identities, validated as non-secret labels, or such configurations cannot complete setup. ⚠️ LANDED 2026-09-24 (EVD-0139, commit 4f07b18 and the credential-shape guard after it). All three notes above are closed through the command. NON-INTERACTIVE MODEL USE: `--model-use approve|deny` is the confirmation given in advance, with the confirmation text printed in full before either answer is applied; it confirms and does not choose. Reaching it needed `--inspect approve|deny` as well, because the inspection question had no non-interactive answer either and such a run stopped before the model phase. DECLARED IDENTITIES: `--endpoint-identity`, checked by the one canonicaliser (moved to `lib/declared-identity.mjs` so an argument is still checked before anything is installed), and `--request-identity`, checked against the pattern its schema declares. Both are COMMITTED to `.pi/kiln.json`, because the key is recomputed at every setup and every launch; `bin/start-kiln.mjs` passes them to `checkLaunch`. Neither may be in the shape of a credential — an issuer prefix, a JWT, a long opaque token, one beside a word, or one routed as an endpoint path segment — and that is an argument check, so nothing is installed, written or committed first. HELP names every option and says `--research tavily` is what turns research on. EXIT CODES: authentication became its own class, 18, because \"connect a provider in Pi\" cannot be answered by rerunning with flags. ⚠️ WHAT THIS TASK DOES NOT CLOSE, DECLARED RATHER THAN IMPLIED: a shape check is not a secret detector, and a declared identity is committed and printed by design; `bin/start-kiln.mjs` still cannot START a custom-provider project, which is TSK-0037's (D2), so the launch control reaches `checkLaunch` and stops there; and ACC-0084's launch-side classes (`EXIT.UNUSABLE`, launch failure) are not observed through this command, because the selection phase refuses first in every case that would reach them. ACC-0084 stays not-evaluated until those are assessed against EVD-0139.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1501,6 +1526,7 @@
       "CMP-0040"
     ],
     "lifecycle": "active",
+    "notes": "⚠️ COMPONENT WORK LANDED 2026-09-24 (EVD-0140, commit 702ee9c). The fixture is resolved by the pinned runtime as a custom model, completes a real tool call through Pi's CLI, and passes the live canary. ACC-0086 stays open: it needs TSK-0063's journey, which in turn needs TSK-0072 to launch a custom-provider project.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1512,13 +1538,16 @@
     "acceptedBy": [
       "ACC-0086",
       "ACC-0087",
-      "ACC-0088"
+      "ACC-0088",
+      "ACC-0114"
     ],
     "dependsOn": [
       "TSK-0048",
       "TSK-0057",
       "TSK-0060",
-      "TSK-0062"
+      "TSK-0062",
+      "TSK-0071",
+      "TSK-0072"
     ],
     "fulfils": [
       "REQ-0022",
@@ -1531,10 +1560,11 @@
       "CMP-0040"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "notes": "⚠️ D14 (2026-09-13): ACC-0114 accepts the user-visible first Stage 1 turn with a real model, judged by a human against a retained record, because a scripted provider cannot establish a model's choice of question (F98). ⚠️ DEPENDS ON TSK-0072, ADDED 2026-09-24. The fixture TSK-0062 built is a custom provider, and TSK-0072 made such a project startable (accepted 2026-09-24, ACC-0116 on EVD-0142). What that start does not cover stays here: the Stage 1 exchange and the interactive-terminal observation, because its Pi read piped input rather than a terminal. ⚠️ 2026-09-24 (EVD-0145): the automated journey is built and passes in all four cells of CI run 36065687783, which was red overall because of F130. ACC-0086 and ACC-0087 pass. ACC-0088 stays not-evaluated for its manual Windows Node 24 immediate-quit run, and ACC-0114 for its real-model review. The journey found and fixed F12 through F16. F17, an Ubuntu Node 22 cancellation at 45 minutes, is unexplained. The README's sequence is now setup and the launcher. F1, THE JOURNEY TEST'S HEADLESS CHROME, OPEN WITH A RECORDED LIMIT (2026-09-26). The test's own browser sometimes never becomes ready on Windows: seen in CI runs 36178450744 (Node 22) and 36197842986 (Node 24), and in focused Windows journey runs 1 of 4 (36180776736, none), 1 of 8 (36199281598) and 1 of 8 (36204554670), each after Kiln's first run had passed its shutdown checks. What the bounded diagnostics establish (a873d83, d9b31ae, 2f6d6fa; capture retained outside the repository, D:\\work\\kiln-job-manual\\f1-browser-capture-2026-09-26\\browser-diag.jsonl, sha256 8a5f0231d0b2e5cb146d21f084396bf3fce1638a661decc6b6f66117c70500ec): the launched chrome.exe (pid 7028, a child of the test's own node process) was created at 00:26:34.410Z and never exited; its only child (pid 6620) appeared 2.8 s later; no other Chrome process ever started; Chrome wrote nothing to stderr in 30 s although the same verbose-logging flags produce about 41 KB in 3 s on a healthy start; DevToolsActivePort never appeared. So Chrome stalled inside its own early start-up, after starting one child and before its logging produced any output. What is NOT established: the role of the one child (the CIM query for command lines timed out at 20 s on the loaded runner, the WMI slowness F119 and F122 describe), and why the browser process stalled. The process-table read that returned no rows in run 36199281598 succeeded in 36204554670 (140 rows, 1.1 s); why it failed earlier was not recorded. LIMIT: the pass was bounded and is inconclusive about the origin of the stall. No restart retry was added. The diagnostics stay in place.",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform.",
+    "statement": "Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform. Include one run that cannot be automated and must be performed at a real terminal: on Windows and Node 24, quit the interactive session IMMEDIATELY after a completed tool call, and record what the process and the supervisor did.",
     "title": "Build the clean-consumer end-to-end journey test",
     "type": "task"
   },
@@ -1543,7 +1573,8 @@
       "ACC-0089"
     ],
     "dependsOn": [
-      "TSK-0063"
+      "TSK-0063",
+      "TSK-0075"
     ],
     "fulfils": [
       "REQ-0022",
@@ -1556,7 +1587,7 @@
       "CMP-0040"
     ],
     "lifecycle": "active",
-    "reviewStatus": "approved",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
     "statement": "Automate each enumerated wrong state as its own case asserting the specific refusal, so that a regression which turns any of them into an apparent success fails a named test.",
@@ -1579,12 +1610,12 @@
       "CMP-0027"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ NARROWED 2026-09-03 TO PI'S BEHAVIOUR ALONE. The original wording mixed an observation of the runtime with a requirement on Kiln's wrapper, and its criterion demanded a Kiln recovery message — which cannot exist before the setup command does. What Kiln must DO about the no-TTY case is now its own task against the setup component. ⚠️ THE OBSERVATION IS THE INPUT TO THAT DECISION: if Pi already refuses cleanly, setup's precondition is a nicety; if Pi waits indefinitely, the precondition is the only thing standing between an automated run and a hang. That is why this comes first and the wrapper follows it.",
+    "notes": "⚠️ NARROWED 2026-09-03 TO PI'S BEHAVIOUR ALONE. The original wording mixed an observation of the runtime with a requirement on Kiln's wrapper, and its criterion demanded a Kiln recovery message — which cannot exist before the setup command does. What Kiln must DO about the no-TTY case is now its own task against the setup component. ⚠️ THE OBSERVATION RECORDS WHAT PI DOES; IT DOES NOT DECIDE WHETHER SETUP NEEDS ITS CHECK. Pi selects print mode when either stream is redirected, so setup needs its TTY check to reach /login at all (F8). What this measures is the bounded outcome of those print-mode runs, which tells setup what an unguarded launch would have done. ⚠️ AMENDED 2026-09-21 (F7, F8). The earlier wording asked for an 'authentication-only step', which Pi 0.84.4 does not have (F7). And Pi selects print mode whenever stdin or stdout is not a TTY (resolveAppMode in dist/main.js), so a no-TTY run of the same arguments is a different mode rather than the same interactive one without a terminal; with stdin a pipe, Pi also reads it until it closes (F8). The route is the built-in openai API-key login with a throwaway key, because it exercises /login without an account.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive `/login` step does: whether it can be launched with exclusive terminal ownership, what its exit conveys and whether authentication must be rediscovered afterwards rather than inferred from the exit code, and what happens when it is invoked with no TTY — refusal, error, or an indefinite wait. Record it as a manually invoked check with its transcript retained, because it needs a real terminal and cannot run in the default suite.",
-    "title": "Observe Pi's authentication-only TUI behaviour, including the no-TTY case",
+    "statement": "Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive login does. Pi 0.84.4 has no authentication-only launch: `pi auth` offers only `check`, `print-api-key` and `print-bearer-token`, and `/login` exists only as a slash command inside the interactive TUI. The manual check therefore launches the full interactive Pi TUI against an isolated Pi configuration, types `/login`, takes the built-in `openai` API-key route with a throwaway key, exits, and then checks auth state separately with `pi auth check --provider openai --json --no-refresh` rather than inferring it from the exit code. It records whether the TUI owns the terminal while this runs. That check confirms locally configured authentication only and does not prove the key works against a provider. The no-TTY controls keep the launch arguments fixed and vary stdin and stdout. Each records which mode Pi selected and a bounded outcome: its exit and code, an error, or still running at a stated timeout. They are not the interactive mode and are not described as it. A sanitized transcript is retained, and the entered key is never recorded. Real subscription OAuth and proof of usable account authentication belong to TSK-0066.",
+    "title": "Observe Pi's interactive /login flow, and what the same launch does without a TTY",
     "type": "task"
   },
   {
@@ -1603,7 +1634,7 @@
       "CMP-0027"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ MANUAL AND OUTSIDE CI BY DECISION, not by omission. Automating it would require a real subscription credential in CI, which REQ-0024 forbids. ⚠️ DO NOT FABRICATE THE CREDENTIAL. Writing a canonical-shaped OAuth record into `auth.json` proves the shape round-trips and nothing about whether a subscription authenticates; the spike already did exactly that and the model stayed unavailable, which was a fact about provider composition rather than about OAuth. ⚠️ THE REVOCATION CONTROL IS THE HALF THAT CARRIES THE RESULT. Without it a model that was already available for an unrelated reason reads as a successful login. ⚠️ UNTIL THIS RUNS, no criterion and no section of the specification may state the OAuth route as verified — 'supported' is what the documentation may say.",
+    "notes": "⚠️ MANUAL AND OUTSIDE CI BY DECISION, not by omission. Automating it would require a real subscription credential in CI, which REQ-0024 forbids. ⚠️ DO NOT FABRICATE THE CREDENTIAL. Writing a canonical-shaped OAuth record into `auth.json` proves the shape round-trips and nothing about whether a subscription authenticates; the spike already did exactly that and the model stayed unavailable, which was a fact about provider composition rather than about OAuth. ⚠️ THE REVOCATION CONTROL IS THE HALF THAT CARRIES THE RESULT. Without it a model that was already available for an unrelated reason reads as a successful login. ⚠️ UNTIL THIS RUNS, no criterion and no section of the specification may state the OAuth route as verified — 'supported' is what the documentation may say. ✅ RAN 2026-09-21 (EVD-0124, ACC-0091 pass): openai-codex / gpt-5.5 on Windows, one manual account-bound run. OAuth discovery after a real login and its loss after removal are verified. That no model request or token refresh was tested stays part of the claim.",
     "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
@@ -1627,7 +1658,7 @@
       "CMP-0031"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ IT CANNOT BE MEASURED YET AND SAYING SO IS THE POINT. The signature belongs to a package that does not exist; a spike cannot prove a property of something unbuilt, and claiming it did is the failure this cycle exists to prevent. Blocked on CMP-0031.",
+    "notes": "The Kiln package exists, and both halves of ACC-0092 now have evidence. Presence: a real loaded Pi session calls kiln_capability and receives the shipped signature.json unchanged (ACC-0109, EVD-0106). Drift: the compatibility suite loads the shipped package and a copy whose research_fetch gains a required property into real Pi sessions, reads every research tool signature from the live registry, and verifyChild(contractFor(\"research\")) accepts the unmodified package and refuses the changed one as signature-mismatch without returning its output (EVD-0122, commit 7c3b8a1). The retained and live tiers apply the same assertion, and the retained records were taken on Windows and WSL Ubuntu 24.04 against Pi 0.84.4. verifyChild compares property names and the required list only, so a type-only change is not detected, and widening that comparison is outside this task. CI run 35591168378 at d927151 passed in all four cells, and the live tier re-proved the result on ubuntu-latest node 24 only. ACC-0092 passed on EVD-0106 and EVD-0122 on 2026-09-21.",
     "reviewStatus": "approved",
     "role": "platform",
     "schemaVersion": 2,
@@ -1637,7 +1668,8 @@
   },
   {
     "acceptedBy": [
-      "ACC-0093"
+      "ACC-0093",
+      "ACC-0119"
     ],
     "dependsOn": [
       "TSK-0060",
@@ -1651,11 +1683,11 @@
       "CMP-0039"
     ],
     "lifecycle": "active",
-    "notes": "⚠️ SPLIT OUT OF TSK-0065 ON 2026-09-03, because that task's criterion demanded this behaviour while the task itself was sequenced before any setup code existed. ⚠️ IT IS DOWNSTREAM OF THE OBSERVATION, NOT INSTEAD OF IT: what Pi does with no TTY decides how much this precondition is carrying. A runtime that already refuses cleanly makes it a nicety; one that waits makes it the only thing between an automated run and a hang.",
-    "reviewStatus": "approved",
+    "notes": "⚠️ SPLIT OUT OF TSK-0065 ON 2026-09-03, because that task's criterion demanded this behaviour while the task itself was sequenced before any setup code existed. ⚠️ THE CHECK IS REQUIRED, NOT A CONVENIENCE: Pi selects print mode when either stream is redirected, so without it setup cannot reach /login at all (F8). TSK-0065 records what Pi does in those cases; it does not decide whether this check is needed. ⚠️ AMENDED 2026-09-21 (F8). Pi selects print mode whenever stdin or stdout is not a TTY, so with either redirected the TUI would never appear, and with stdin an open pipe Pi reads it until it closes. Checking stdin alone would let a redirected stdout through to exactly that. ⚠️ HAND THE TERMINAL TO PI DIRECTLY (F13, EVD-0123). Pi displays a pasted API key in plain text during /login, so setup must give Pi the terminal itself and must not log, tee or capture the /login session.",
+    "reviewStatus": "amended",
     "role": "platform",
     "schemaVersion": 2,
-    "statement": "Before setup launches the authentication-only login step, check for a real TTY. With no TTY and no usable authentication already present, refuse without spawning the login process and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.",
+    "statement": "Before setup launches the full interactive Pi TUI for `/login`, require both stdin and stdout to be TTYs. If either is not a TTY and no usable authentication is already present, refuse without spawning Pi and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.",
     "title": "Implement setup's TTY precondition and its two recovery routes",
     "type": "task"
   },
@@ -1701,6 +1733,121 @@
     "schemaVersion": 2,
     "statement": "Replace the hardcoded array of seventeen trace-like field names with a derivation over the schema set's `x-traceTarget` declarations, using the existing effective-schema resolver rather than re-reading schemas independently. Every declared trace field is then refused by construction, and adding one to a schema needs no code change.",
     "title": "Derive reviseArtifact's trace-field guard from the schemas",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0112"
+    ],
+    "dependsOn": [
+      "TSK-0046",
+      "TSK-0051"
+    ],
+    "fulfils": [
+      "REQ-0001"
+    ],
+    "id": "TSK-0071",
+    "implements": [
+      "CMP-0001",
+      "CMP-0033"
+    ],
+    "lifecycle": "active",
+    "notes": "Created 2026-09-13 when TSK-0046 was narrowed to what the canonical definitions can already generate (O1). Purpose was added the same day as the seventh field (F88): `producesProse` describes what a stage produces rather than what it is for, so a purpose needs a field of its own. The end-to-end journey (TSK-0063) depends on this, so it cannot pass with incomplete stage instructions; TSK-0048 does not, so the orchestrator can begin against the narrower skills.\n\n⚠️ `questionSelection` DOES NOT DISCHARGE ANY OF THE SEVEN (recorded 2026-09-18, TSK-0049). Stage 1 now declares an optional `questionSelection` field, and its generated skill carries it. All seven fields this task requires - purpose, method, next-activity selection, delegations and required capabilities, mutation boundary, approval boundary and completion summary - remain undeclared on all nine stages, and every generated skill still names them as absent. Stage 1's deferred sentence changes by one phrase only: it says \"how to choose the next activity\" where it said \"how to choose the next question or activity\", because choosing the next ACTIVITY is still this task's, and only the choice of question has been declared. This task is required for every stage, where that one is one stage's question rule. See [[TSK-0049]].",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Extend each canonical `stages/*.json` definition with its purpose, method, next-activity selection rules, allowed delegations and required capabilities, mutation boundary, approval boundary and expected completion summary, with the loader refusing a definition that omits a required field; then extend the stage-skill generator and its check mode to carry those seven fields from the definitions into every `kiln-stage-<stage-id>` skill. Nothing is hard-coded in templates, and no existing field is relabelled to stand in for one: `producesProse` describes a stage's outputs and is not its purpose.",
+    "title": "Add purpose, method, next activity, delegations and boundaries to the stage definitions, and generate them",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0116"
+    ],
+    "dependsOn": [
+      "TSK-0037"
+    ],
+    "fulfils": [
+      "REQ-0025",
+      "REQ-0023"
+    ],
+    "id": "TSK-0072",
+    "implements": [
+      "CMP-0028"
+    ],
+    "lifecycle": "active",
+    "notes": "Created 2026-09-24 from TSK-0037's STILL OWED note (D25, D13), which TSK-0037's acceptance did not cover. TSK-0063 depends on it: its journey binds the TSK-0062 fixture, a custom provider, and cannot reach a running Kiln until this lands. The launcher's own refusal codes (owed against CMP-0037) are not part of this task. ⚠️ IMPLEMENTED 2026-09-24 (EVD-0141, commits c3c8fd0, 8ab0b16, 1d0ee30). The declaration lives on this host's model-use grant (`modelUse.credentialVar`), never committed. ⚠️ REVISED 2026-09-24 (EVD-0142, commits 8db3f35, fc7d72b, 19e487c) after review findings F11 to F14: the variable is confirmed with the model and a new one asks again; setup refuses before the live check when it cannot be kept; setup and launch refuse when Pi's models.json reads another route; and a real start and stop is measured. ⚠️ ACCEPTED 2026-09-24: ACC-0116 passes on EVD-0142.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Give `bin/start-kiln.mjs` the credential declaration and provider configuration a custom-provider project was set up with, so `checkLaunch` can evaluate that project instead of refusing it with `unsupported-credential-contract`, and the supervisor can start it. Setup already proves such a project; this task owns only starting it.",
+    "title": "Launch a project bound to a custom provider",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0117"
+    ],
+    "dependsOn": [
+      "TSK-0072"
+    ],
+    "fulfils": [
+      "REQ-0025",
+      "REQ-0023"
+    ],
+    "id": "TSK-0073",
+    "implements": [
+      "CMP-0030"
+    ],
+    "lifecycle": "active",
+    "notes": "Created 2026-09-24. Commit 8ab0b16 removed `compat` from the TSK-0062 provider fixture because the canary could not carry it to its child. The compatibility key already includes the resolved `compat` through `projectRequestProfile`, so a changed `compat` already changes the key. What is missing is that the canary's proof is taken with `compat` absent, so a record can claim a request profile the canary did not send. Pi merges `compat` from the provider block, the model definition and `modelOverrides`, so the child receives the merged value Pi resolved, not a re-derivation from `models.json`. ⚠️ IMPLEMENTED 2026-09-24 (EVD-0147, commits b267beb and 529e5db). ACC-0117 has its evidence and awaits review. ⚠️ ACCEPTED 2026-09-25: ACC-0117 passes on EVD-0147.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Carry the `compat` configuration Pi resolves for the selected custom-provider model into the live canary child's provider configuration, so the canary sends the request this project's Pi sends and the compatibility record describes that request. `customProviderConfig` in `lib/launch-checks.mjs` builds the child's configuration from the resolved model without `compat`, and `lib/pi-provider-canary.mjs` refuses a configuration that carries it, so a provider that declares `compat` is checked with a different request than the one it is launched with. Only the non-credential configuration crosses: `apiKey`, `headers`, `authHeader` and any credential-bearing nested value stay out of the child.",
+    "title": "Give the live canary's child the compat configuration Pi resolves for a custom provider",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0118"
+    ],
+    "fulfils": [
+      "REQ-0022"
+    ],
+    "id": "TSK-0074",
+    "implements": [
+      "CMP-0039",
+      "CMP-0037",
+      "CMP-0022",
+      "CMP-0033"
+    ],
+    "lifecycle": "active",
+    "notes": "Created 2026-09-24. Scope revised on review: the same guard is in all four commands, not only setup and launch. The link is a junction on Windows and a directory symlink on POSIX. ⚠️ IMPLEMENTED 2026-09-24 (EVD-0148, commits 94e8a36 and 564f8a7). ACC-0118 passes.",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "Make `bin/setup.mjs`, `bin/start-kiln.mjs`, `bin/init-project.mjs` and `bin/generate-stage-skills.mjs` run their command when invoked through a `.planning` directory that is a link to the tool checkout. Each decides whether it is the entry point by comparing `pathToFileURL(process.argv[1]).href` with `import.meta.url`. Node resolves the main module's real path, so through a link the two differ, the command does not run, and the process exits 0. Importing any of the four as a module must still not run its command.",
+    "title": "Run the four entry-point commands when invoked through a linked .planning",
+    "type": "task"
+  },
+  {
+    "acceptedBy": [
+      "ACC-0120"
+    ],
+    "fulfils": [
+      "REQ-0023"
+    ],
+    "id": "TSK-0075",
+    "implements": [
+      "CMP-0006"
+    ],
+    "lifecycle": "active",
+    "reviewStatus": "approved",
+    "role": "platform",
+    "schemaVersion": 2,
+    "statement": "F4: Kiln's Pi extension built the Tavily adapter for research_capability, research_search and research_fetch with no check of the project's research choice or this computer's research grant, and the supervisor passed TAVILY_API_KEY to Pi unchanged, so a Kiln session could reach Tavily with an operator's key when research was disabled or not consented on this computer; bin/research.mjs did the same. Gate every research entry point on the committed choice being tavily and a standing research grant, refusing before the key is read or a request made, including when either record is unreadable; give Pi the project root explicitly; require --project-root for bin/research.mjs; and keep TAVILY_API_KEY out of both children's environments when research is not permitted at launch.",
+    "title": "Refuse research at every entry point without the project's choice and this computer's grant",
     "type": "task"
   }
 ]

@@ -1021,13 +1021,11 @@ Implement `bin/start-kiln.mjs` as the lifecycle owner:
 6. poll the Kiln-specific loopback health endpoint until it returns the expected service and
    protocol, the exact run ID and the exact project ID, while the expected child remains alive.
    **Readiness rests on those four facts and child liveness — not on the build version.** The
-   reported package version is compared and a mismatch is reported, but it is *checked compatibility
-   metadata*, not independent build identity: this package is `0.0.0`, every build reports it, and a
-   field that cannot differ cannot discriminate. Neither of the available ways to make the wording
-   true is acceptable — inventing a fingerprint puts a derived value in a readiness handshake that
-   nothing versions, and bumping the version to satisfy a sentence is the sentence editing the
-   system. The clause becomes a real check when there is a real versioning policy, and says only
-   what it does until then;
+   reported package version is compared and a mismatch is reported, but it is *checked release
+   compatibility metadata*, not independent process identity. Kiln's `YY.M.N` CalVer changes for
+   each official release, so the comparison now detects a different release; a match still cannot
+   distinguish this invocation or untagged changes made before the next release. The run and project
+   identifiers remain the identity proof;
 7. start the pinned Pi CLI in the outer project root with terminal stdin/stdout/stderr inherited;
 8. on first session, send the unique `/kiln-start` prompt; on later sessions, resume the stored session
    and invoke the resume behavior;
@@ -1336,8 +1334,8 @@ following:
 - Session, consent, compatibility, and transaction state was either covered by the exact project
   ignore policy or placed in the validated external user-local state root.
 - The browser health response matched the current run ID and project ID; an unrelated listener could
-  not satisfy readiness. The build version was compared as compatibility metadata and carried no part
-  of the identity claim, since every build of this package reports `0.0.0`.
+  not satisfy readiness. The build version matched the expected CalVer release as compatibility
+  metadata and carried no part of the process-identity claim.
 - The Kiln capability signature was present.
 - The Stage 1 skill was loaded.
 - The first user-facing response asks one relevant question.
@@ -1515,7 +1513,7 @@ visible in the browser, and unable to cross a user-owned gate.
 Update:
 
 - `README.md` with the one-command setup path, separate browser/agent commands, supported auth routes,
-  and an explicit pre-1.0 limitation until the E2E test passes;
+  and the current release status and known limitations;
 - `docs/initializing-a-project.md` to distinguish the low-level scaffold command from full setup;
 - `docs/running-the-shell.md` to state that `npm start` is browser-only and document the supervisor;
 - a new provider/model guide covering `/login`, API keys, custom/local providers, configuration

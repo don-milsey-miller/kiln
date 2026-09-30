@@ -173,7 +173,7 @@ Before reporting a component ready, the system must confirm the identity of what
 Defines the pipeline's stages, what each produces, and evaluates whether a stage may be exited.
 
 *Satisfies: REQ-0001, REQ-0002*
-*Implemented by: stages/*.json, lib/stages.mjs, lib/lint.mjs, lib/attestations.mjs*
+*Implemented by: stages/*.json, lib/stages.mjs, lib/lint.mjs, lib/attestations.mjs, test/stage-declared-fields.test.mjs*
 
 ### CMP-0002 — The lint
 
@@ -229,7 +229,7 @@ Derives verdict and confidence from the evidence graph at read time, filtering f
 Describes each role's measured capabilities, write boundary and credential scope, and refuses a child's output that cannot demonstrate them.
 
 *Satisfies: REQ-0012*
-*Implemented by: lib/specialists/contract.mjs*
+*Implemented by: lib/specialists/contract.mjs, test/pi-compat.test.mjs, test/specialist-contract.test.mjs*
 
 ### CMP-0010 — Reader surface
 
@@ -313,7 +313,7 @@ Install and run the shell from one documented command: build the application and
 Be the only route by which any Pi process is started. Resolve the exact pinned CLI from the tool's own node_modules, report its version, refuse a version that does not match the pin, and hand every caller — setup, the user-facing session, and every specialist child — the same executable invoked through the current Node binary with shell interpolation disabled. Discovering Pi on PATH is outside this component and outside the product.
 
 *Satisfies: REQ-0022, REQ-0028*
-*Not yet implemented.*
+*Implemented by: lib/pi-runtime.mjs, bin/start-kiln.mjs, test/supervisor.test.mjs*
 
 ### CMP-0022 — Setup transaction
 
@@ -327,28 +327,28 @@ Own one project-wide lock for the whole of setup, and make every lasting write h
 Be the single owner of every Kiln edit to the consumer's `.gitignore`: plan the change without writing, append rather than rewrite, take the line ending from the file, record what it did, migrate an exact unmodified legacy block to the extended block under the same lock and atomic-write discipline, and never restore a block the operator deliberately removed or edited.
 
 *Satisfies: REQ-0027*
-*Not yet implemented.*
+*Implemented by: lib/project-gitignore.mjs, test/project-gitignore.test.mjs*
 
 ### CMP-0024 — Pi settings merge
 
-Merge only Kiln's owned fields into the project's `.pi/settings.json` — the local package entry, the skill-override path, the selected default provider, model and thinking level, and the project-local session directory when that mode is chosen — preserving every unrelated key and package entry, refusing a malformed or unknown-schema-version file rather than replacing it, and changing no bytes when the desired state is already present.
+Merge only Kiln's owned fields into the project's `.pi/settings.json` - the local package entry, the skill-override path `../planning-content/skills-overrides`, the selected default provider, model and thinking level, and `sessionDir: ".pi/sessions"` when project-local state is selected (removing Kiln's owned `sessionDir` when it is not, so no external path is committed) - preserving the value of every unrelated key, package entry and unknown Pi or third-party field and the relative order of ordinary string keys, with integer-like property names following Pi's and JavaScript's JSON serialization order, refusing malformed JSON, a non-object root or an invalid value in a Kiln-owned field rather than replacing the file, preserving the file's trailing-newline style, and changing no bytes when the desired state is already present.
 
 *Satisfies: REQ-0024, REQ-0025*
-*Not yet implemented.*
+*Implemented by: lib/pi-settings.mjs, lib/pi-package-entry.mjs*
 
 ### CMP-0025 — Local-state policy
 
 Decide and enforce where session transcripts, consent records, compatibility results and setup journals live: by default under the outer project's ignored `.pi/sessions/` and `.pi/runtime/`, or, when explicitly selected, under an external per-user root derived from the committed non-secret project ID. Refuse to write any runtime data before the chosen location's protection is in place, and never commit an absolute user path in order to reach it.
 
 *Satisfies: REQ-0027, REQ-0023*
-*Implemented by: schemas/runtime/, lib/runtime-records.mjs, test/runtime-records.test.mjs*
+*Implemented by: schemas/runtime/, lib/runtime-records.mjs, test/runtime-records.test.mjs, lib/local-state.mjs, test/local-state.test.mjs*
 
 ### CMP-0026 — Project trust integration
 
 Obtain, verify and report the operator's trust decision for this project's Pi resources through Pi's own supported mechanism, display the canonical project path the decision applies to, treat a denial as a first-class outcome that stops agent launch without touching the planning scaffold, and refuse a non-interactive run that has no pre-existing decision rather than defaulting one.
 
 *Satisfies: REQ-0023, REQ-0026*
-*Not yet implemented.*
+*Implemented by: lib/pi-trust.mjs, lib/pi-runtime.mjs, lib/supervisor.mjs, bin/start-kiln.mjs*
 
 ### CMP-0027 — Connection inspection and consent
 
@@ -369,11 +369,11 @@ Turn discovery into a recorded decision and hold it: present available providers
 Be the single audited statement of which environment-variable NAMES each supported provider needs on the model plane, holding no values; separate those from tool-plane names that belong to one role; construct each child's environment from the measured base runtime variables, the selected provider's model-plane names and that role's tool-plane names, adding nothing else; and classify a provider with no safe known mapping as unsupported rather than granting it a wider inheritance.
 
 *Satisfies: REQ-0024, REQ-0026*
-*Not yet implemented.*
+*Implemented by: lib/pi-provider-credentials.mjs, test/pi-provider-credentials.test.mjs, lib/specialists/contract.mjs, test/specialist-contract.test.mjs, lib/pi-provider-canary.mjs, lib/pi-provider-canary-child.mjs, test/pi-provider-canary.test.mjs, lib/pi-runtime.mjs, test/supervisor.test.mjs*
 
 ### CMP-0030 — Live model and tool canary
 
-Prove, with one separately authorised request, that the selected provider and model actually answer and actually emit the shape of tool call Kiln depends on: expose a single read-only setup-only tool, require the model to call it with a random challenge against the declared schema, send no planning content, permit no mutation, cap the token budget, and record success only against the exact provider, model, thinking level, runtime version, package capability signature and non-secret endpoint identity that produced it.
+Prove, with one separately authorised request, that the selected provider and model actually answer and actually emit the shape of tool call Kiln depends on: expose a single read-only setup-only tool, require the model to call it with a random challenge against the declared schema, send no planning content, permit no mutation, cap the token budget, and record success only against the exact provider, model, thinking level, runtime version, preflight contract digest and non-secret endpoint identity that produced it. The package capability signature is not part of the record's key; it remains a zero-cost check at every launch.
 
 *Satisfies: REQ-0025, REQ-0023, REQ-0028*
 *Not yet implemented.*
@@ -383,42 +383,42 @@ Prove, with one separately authorised request, that the selected provider and mo
 Be the installable unit Pi loads for this project: a declared package manifest naming its extensions, skills and prompts; a registration entry point; and a machine-readable capability signature that any consumer — the supervisor, the canary, a delegation verifier — can compare against what it expected to be loaded.
 
 *Satisfies: REQ-0022, REQ-0026, REQ-0028*
-*Not yet implemented.*
+*Implemented by: pi-package/package.json, pi-package/signature.json, pi-package/extensions/kiln.js, pi-package/skills/kiln-planning/SKILL.md, pi-package/prompts/kiln-start.md, lib/pi-package.mjs*
 
 ### CMP-0032 — Pi tool registration
 
 Expose the existing typed libraries to the agent as validated Pi tools and nothing more: project status and lint reads, artifact creation and mutation through the existing registries, project-type activation, stage attestation reads and writes, the research and validation capability adapters, and delegation. Own the tool schemas and result rendering; leave every business rule in `lib/`. Launch the session with Pi's built-in filesystem and shell mutation tools disabled.
 
 *Satisfies: REQ-0022, REQ-0024*
-*Not yet implemented.*
+*Implemented by: bin/start-kiln.mjs, lib/pi-package.mjs, lib/supervisor.mjs, pi-package/extensions/kiln.js, pi-package/package.json, pi-package/signature.json, test/fixtures/start-kiln/capture-launch.mjs, test/pi-package-delegate.test.mjs, test/pi-package-load.test.mjs, test/pi-package-tool-content.test.mjs, test/pi-package-tools.test.mjs, test/pi-package.test.mjs, test/pi-session-tools.test.mjs, test/supervisor.test.mjs*
 
 ### CMP-0033 — Stage skill generation and overrides
 
-Generate one packaged skill per canonical stage definition so that stage purpose, outputs and exit criteria are never hand-maintained twice, fail a check when the packaged skills are stale relative to `stages/`, and register the consumer's own override directory after the packaged set so an override with the same identity wins without editing the tool clone.
+Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>`, so that stage purpose, decision owner, outputs and exit criteria are never hand-maintained twice; fail a check that writes nothing when a packaged stage skill is stale, missing or orphaned relative to `stages/`; and let a consumer override a packaged stage skill without editing the tool clone, through the project-settings `skills` entry for the consumer's override directory: Pi resolves project-settings skill paths ahead of package resources and the first skill with a given identity wins, so the consumer's override wins over the packaged skill of that identity.
 
 *Satisfies: REQ-0022*
-*Not yet implemented.*
+*Implemented by: lib/stage-skills.mjs, lib/stage-skills-files.mjs, bin/generate-stage-skills.mjs, pi-package/skills/kiln-stage-01-intake/SKILL.md, pi-package/skills/kiln-stage-02-intent-decomposition/SKILL.md, pi-package/skills/kiln-stage-03-discovery/SKILL.md, pi-package/skills/kiln-stage-04-requirement-gaps/SKILL.md, pi-package/skills/kiln-stage-05-solution-design/SKILL.md, pi-package/skills/kiln-stage-06-risk-feasibility/SKILL.md, pi-package/skills/kiln-stage-07-acceptance-criteria/SKILL.md, pi-package/skills/kiln-stage-08-implementation-plan/SKILL.md, pi-package/skills/kiln-stage-09-handoff/SKILL.md, test/stage-skills.test.mjs, test/stage-skills-cli.test.mjs, test/stage-skills-packaged.test.mjs, test/pi-package.test.mjs, test/pi-package-load.test.mjs, test/stage-skill-overrides.test.mjs, test/stage-skill-operating-instructions.test.mjs*
 
 ### CMP-0034 — User-facing orchestrator
 
 Be the single persistent planning session: resolve the canonical sibling content root and refuse to operate on the tool's own planning content, derive the current stage from definitions and attestations rather than storing a duplicate status, load the matching stage skill, ask one question at a time chosen by information value, keep the operator's wording separate from its own interpretation, mutate only through registered typed tools, show material changes before making them, and resume from files and attestations when the transcript is gone.
 
 *Satisfies: REQ-0022*
-*Not yet implemented.*
+*Implemented by: lib/operator-boundary.mjs, lib/orchestrator-state.mjs, lib/project-scaffold.mjs, lib/project-status.mjs, lib/stage-documents.mjs, lib/stage-skills.mjs, lib/tools/review-status.mjs, pi-package/extensions/kiln.js, pi-package/prompts/kiln-start.md, pi-package/signature.json, pi-package/skills/kiln-stage-01-intake/SKILL.md, stages/01-intake.json, test/mdx-rejection.test.mjs, test/operator-boundary.test.mjs, test/package-resource-claims.test.mjs, test/pi-package-operator-boundary.test.mjs, test/pi-package-project-status.test.mjs, test/pi-package-stage-context.test.mjs, test/pi-package-tools.test.mjs, test/pi-session-orchestrator.test.mjs, test/project-status.test.mjs, test/stage-documents.test.mjs, test/stage-skills.test.mjs*
 
 ### CMP-0035 — Specialist roster
 
-Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a lint error.
+Declare the research, planning and validation roles as data: stable name and description, an explicit tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions. Derive write boundaries and required tool signatures from the existing specialist contract rather than restating them, and treat a role definition with no declared tool list as a role-definition check failure.
 
 *Satisfies: REQ-0026*
-*Not yet implemented.*
+*Implemented by: bin/generate-specialist-roles.mjs, lib/specialists/contract.mjs, lib/specialists/parse.mjs, lib/specialists/render.mjs, lib/specialists/role-files.mjs, lib/specialists/roles.mjs, lib/specialists/roster.mjs, lib/tool-wire-names.mjs, specialists/planning.md, specialists/research.md, specialists/validation.md, test/specialist-role-files.test.mjs, test/specialist-roles.test.mjs, test/tool-wire-names.test.mjs*
 
 ### CMP-0036 — Delegation runtime
 
 Run a specialist as an isolated Pi child and decide whether its answer may be used: build a task-scoped context rather than forwarding the conversation, bind the role prompt and the task through a private file with restrictive permissions and closed stdin, pass the orchestrator's exact provider, model and thinking level, pass the intersection of the role's allowlist and the measured host registry, enforce a bounded timeout, delete temporary material on every exit path, and verify the child's capability signature before reading its substantive output.
 
 *Satisfies: REQ-0026, REQ-0024, REQ-0025*
-*Not yet implemented.*
+*Implemented by: lib/specialists/delegate.mjs, lib/specialists/task-observer.mjs, lib/specialists/task-frame.mjs, lib/specialists/child-report.mjs, lib/specialists/contract.mjs, test/delegate.test.mjs, test/delegate-real-child.test.mjs, test/task-binding.test.mjs, test/child-report.test.mjs, lib/specialists/child-events.mjs, lib/tool-wire-names.mjs, test/refusal-matrix.test.mjs, test/tool-wire-names.test.mjs*
 
 ### CMP-0037 — Combined runtime supervisor
 
@@ -436,7 +436,7 @@ Answer the supervisor's readiness question with an identity rather than a status
 
 ### CMP-0039 — Setup command
 
-Compose the whole first run in one ordered, resumable, idempotent command over the existing primitives: resolve and print every path before mutating, validate the runtime, run the existing initializer under the shared transaction, establish state protection, install and register the package, obtain each consent in its own step, bind and prove the model, read back everything it wrote, and either launch the combined runtime or explain exactly what remains. Use a distinct exit code per refusal class and publish the mapping.
+Compose the whole first run in one ordered, resumable, idempotent command over the existing primitives: resolve and print every path before mutating, validate the runtime, take the setup lock, install the locked dependencies as a bootstrap mutation confined to the .planning checkout, then plan the transaction, run the existing initializer under it, establish state protection, install and register the package, obtain each consent in its own step, bind and prove the model, read back everything it wrote, and either launch the combined runtime or explain exactly what remains. Use a distinct exit code per refusal class and publish the mapping.
 
 *Satisfies: REQ-0022, REQ-0023, REQ-0027*
 *Not yet implemented.*
@@ -651,7 +651,7 @@ Kiln supports OAuth through Pi's public interactive `/login` flow. Verification 
 
 ### DEC-0033 — The five runtime records are Ajv-validated contracts, and the canary key is eight determinants
 
-Kiln's five persisted runtime records are schema-validated through the existing Ajv layer, in `schemas/runtime/` with an `x-runtimeRecord` discriminator and per-record versions. The cached canary result is keyed on exactly eight determinants, nested in a `key` object so comparison is one deep equality: provider, model, thinkingLevel, piVersion, apiType, endpointIdentity (with its source), effectiveRequestProfile, and preflightContractDigest. THE REQUEST PROFILE IS BOUNDED BY CLASSIFICATION, NOT BY HASHING: scalar compat fields and the safely typed structures are persisted by value; the unbounded inputs — `chatTemplateKwargs`, `chatTemplateArgs`, non-empty `samplingParams` and non-authentication headers — are recorded only as CATEGORY NAMES and require an explicitly supplied, non-secret declared identity, without which no result is cached at all. That identity is never derived from the values it stands for. Known authentication headers are credential transport: excluded entirely, and not determinants. The Kiln capability signature remains a zero-cost launch check.
+Kiln's five persisted runtime records are schema-validated through the existing Ajv layer, in `schemas/runtime/` with an `x-runtimeRecord` discriminator and per-record versions. The cached canary result is keyed on exactly eight determinants, nested in a `key` object so comparison is one deep equality: provider, model, thinkingLevel, piVersion, apiType, endpointIdentity (with its source), effectiveRequestProfile, and preflightContractDigest. THE REQUEST PROFILE IS BOUNDED BY CLASSIFICATION, NOT BY HASHING: scalar compat fields and the safely typed structures are persisted by value; the unbounded inputs — `chatTemplateKwargs`, `chatTemplateArgs`, non-empty `samplingParams` and non-authentication headers — are recorded only as CATEGORY NAMES and require an explicitly supplied, non-secret declared identity, without which there is no key: no result is cached, no live check is sent, and setup and launch refuse. That identity is never derived from the values it stands for. Known authentication headers are credential transport: excluded entirely, and not determinants. The Kiln capability signature remains a zero-cost launch check.
 
 **Why:** These five are Kiln-owned contracts: Kiln invents, writes, versions and reads them, so a shape nobody validates is a comment, and hand-parsing them would stand up a second informal schema implementation beside the real one. `.pi/settings.json` is deliberately NOT the precedent — Pi owns that file, an operator may hand-edit it, and Kiln merges four keys into it defensively. The key set contains only inputs capable of changing the proven model and tool behaviour, because it decides when a BILLABLE check re-runs: too wide and the operator is charged for nothing, too narrow and a proof is reused on a path nobody tested.
 
@@ -1250,7 +1250,7 @@ Retain each proof, with its control and its redaction assertions, as a test that
 
 Add `lib/pi-runtime.mjs`: resolve the CLI entry point from the tool root's node_modules, report the installed version, refuse a mismatch against the pin, and spawn through the current Node executable with shell interpolation disabled. Add the pinned dependency and raise engines.node per DEC-0026.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0021 · fulfils: REQ-0022, REQ-0028*
 
 ### TSK-0025 — Add project-root resolution to the shared resolver
@@ -1278,42 +1278,42 @@ Change `lib/initialize-project.mjs` and the shared ignore owner to run inside an
 
 Move the existing planning, append-safety, line-ending and recorded-idempotency logic out of `lib/initialize-project.mjs` into `lib/project-gitignore.mjs` used by both initialization and setup, and add the exact-legacy-block migration under the same lock and atomic-write discipline.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0023 · fulfils: REQ-0027*
 
 ### TSK-0029 — Build the locked atomic schema-aware settings merge
 
 Add `lib/pi-settings.mjs`: read under the transaction, validate the existing shape, merge only the package entry, skill-override path, provider/model/thinking defaults and session directory, write atomically through a same-directory temporary file, and produce identical bytes when the desired state already holds.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0024 · fulfils: REQ-0024, REQ-0025*
 
 ### TSK-0030 — Normalise the package entry only after proving canonical equivalence
 
 Compare the literal entry `pi install -l` wrote against the portable `../.planning/pi-package` form, prove both canonicalise to the same directory on this platform, and rewrite only on proof. Refuse when equivalence cannot be established rather than constructing a target.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0024 · fulfils: REQ-0024, REQ-0025*
 
 ### TSK-0031 — Implement the local-state policy and its two modes
 
 Derive and create the chosen state root, enforce coverage-before-data, generate and persist the stable non-secret project ID once, and pass external session and runtime locations through the route the spike proved. Withdraw the external mode if QST-0027 comes back negative.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0025 · fulfils: REQ-0027, REQ-0023*
 
 ### TSK-0032 — Integrate project trust through the route the spike established
 
 Implement obtaining, reading and reporting the trust decision per DEC-0027, including the non-interactive refusal and the browser-only fallback. If QST-0026 found no supported programmatic route, remove or defer the `--trust` option and document the manual step instead.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0026 · fulfils: REQ-0023, REQ-0026*
 
 ### TSK-0033 — Build permission-gated connection inspection
 
-Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. Add the presence-only check for the known provider variables and the research credential. Instrument each access point so the before-consent criterion is observable.
+Implement the inspection prompt and, only after approval, sanitised discovery through the supported surface: `ModelRuntime.create({ authPath, modelsPath, allowModelNetwork: false })` with `ModelRegistry`, reading availability from `getAvailable()` — never `getAll()`, which returns the entire built-in catalogue — plus `getProviderDisplayName()` and `hasConfiguredAuth()`, and the root-exported `readStoredCredential` where a presence-only read is needed. After consent, Pi reads the provider credential variables itself while computing availability, so Kiln adds no separate per-variable check or result; Kiln separately checks only whether the research credential is present. Instrument each access point so the before-consent criterion is observable.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0027 · fulfils: REQ-0023, REQ-0024*
 
 ### TSK-0034 — Build the local consent record and its invalidation rules
@@ -1327,7 +1327,7 @@ Persist the host-specific grant in the ignored local-state root, keyed so that a
 
 After a separate approval, run the existing `GET /usage` capability probe from `lib/research/tavily-adapter.mjs`, persist the non-secret project choice and the local approval, and map each internal state to its required user-facing wording. Declining leaves research unavailable and does not block planning.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**outstanding** (1/2 criteria passed) · role: platform
 *Implements: CMP-0027 · fulfils: REQ-0003, REQ-0012*
 
 ### TSK-0036 — Build model discovery, explicit selection and persistence
@@ -1341,28 +1341,28 @@ Present available providers and exact model identifiers, validate any supplied `
 
 At every launch resolve the recorded selection, verify an authentication source is configured, verify the package and required tools loaded, verify a matching compatibility record exists, and refuse the run with a specific reason when any check fails.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0028 · fulfils: REQ-0025, REQ-0023*
 
 ### TSK-0038 — Build the audited provider credential contract table
 
 Add `lib/pi-provider-credentials.mjs` declaring, per supported provider, the id, supported auth source categories, and the exact required and optional model-plane variable names — names only, never values — plus the validated declarative shape by which a custom provider may contribute names.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
 
 ### TSK-0039 — Build child environment construction and prove it with sentinels
 
 Construct each child's environment as the union of the measured base runtime and configuration variables, the selected provider's model-plane names and the role's tool-plane names, and prove the boundary with sentinel variables that must not cross it. Extend the existing `childEnv()` in `lib/specialists/contract.mjs` rather than adding a parallel builder.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
 
 ### TSK-0040 — Prove the contract with a disposable restricted child before accepting it
 
 Spawn a throwaway restricted Pi child that resolves the exact provider and model and reports only availability and the auth-source category — never variable names, values, headers or credential-derived fingerprints — and refuse the contract if it cannot.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0029 · fulfils: REQ-0024, REQ-0026*
 
 ### TSK-0041 — Build the setup-only preflight tool and the bounded canary request
@@ -1383,84 +1383,84 @@ Check configuration, auth availability, model resolution, package loading and to
 
 Add `pi-package/` with a declared package manifest naming extensions, skills and prompts, a registration entry point, and a machine-readable capability signature that the supervisor, the canary and the delegation verifier can each compare against what they expected.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0031 · fulfils: REQ-0026, REQ-0028*
 
 ### TSK-0044 — Register the read, mutation and attestation tools over the existing registries
 
 Wrap project status and lint reads, `TYPED_TOOLS`, `MUTATION_TOOLS`, `PROJECT_TOOLS` and the stage-attestation read and write operations as validated Pi tools, and launch the session with Pi's built-in mutation tools disabled.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0032 · fulfils: REQ-0024, REQ-0001, REQ-0002*
 
 ### TSK-0045 — Register the research, validation and delegation adapters
 
-Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run`, specialist delegation and the Kiln capability signature over the existing `lib/research/` and `lib/validation/` implementations without restating their rules.
+Expose `research_capability`, `research_search`, `research_fetch`, `validation_capability`, `validation_run` and the Kiln capability signature `kiln_capability` over the existing `lib/research/` and `lib/validation/` implementations without restating their rules. Delegation is NOT registered here: the delegation runtime is CMP-0036's and does not exist yet, so TSK-0053 registers `kiln_delegate` beside the runtime it builds.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0032 · fulfils: REQ-0003*
 
 ### TSK-0046 — Build the stage-skill generator and its check mode
 
-Generate one skill per canonical stage definition covering purpose, decision owner, outputs, exit criteria, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary, with a `--check` mode that fails on staleness.
+Generate one packaged skill per canonical stage definition, named `kiln-stage-<stage-id>` at `pi-package/skills/kiln-stage-<stage-id>/SKILL.md`, carrying the stage's decision owner, its outputs - the typed artifacts it produces, the outputs not yet typed and its output prose - and its exit criteria exactly as `stages/*.json` declares them, with deterministic generated-file metadata; and a `--check` mode that writes nothing and fails, naming each stale, missing or orphaned skill. Purpose, method, next-activity selection, allowed delegations, mutation and approval boundaries and the completion summary are NOT generated here, because no canonical definition carries them yet: TSK-0071 adds them to the definitions first.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0033 · fulfils: REQ-0001*
 
-### TSK-0047 — Register the consumer override path and test all four override states
+### TSK-0047 — Prove the consumer skill-override entry through Pi's real loader, in all four override states
 
-Register `planning-content/skills-overrides/` after the packaged skills and cover the packaged-only, override-present, override-edited and override-removed cases through a real Pi resource load.
+Prove, through the pinned Pi runtime's real resource loader, that the project-settings `skills` entry Kiln's settings merge produces - `../planning-content/skills-overrides`, written by `mergeSettingsText` and resolved relative to `.pi` - lets a consumer override of a generated stage skill win over the packaged skill of the same identity. Pi 0.84.4 resolves project-settings skill paths ahead of package resources, and the first skill loaded with a given identity wins, so the consumer override wins over the packaged skill; it is not claimed to win over every earlier project-settings skill path. Cover the packaged-only, override-present, override-edited and override-skill-removed states for `kiln-stage-01-intake`, reading provenance from the loaded file path and Pi's collision diagnostic. This task writes no settings in production and adds no launch refusal: setup writes the entry (TSK-0060), and an absent override directory is measured as ignored, not refused.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0033 · fulfils: REQ-0001*
 
 ### TSK-0048 — Implement the orchestrator context, policy and the /kiln-start entry
 
 Build the persistent session behaviour: resolve and guard the content root, derive the current stage from definitions and attestations, load the matching skill, and register the start prompt that begins Stage 1 on a fresh project or summarises stage, blockers and the single recommended next action on an existing one.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
 
 ### TSK-0049 — Implement adaptive question selection and continuous intake capture
 
 Choose each next question by information value and blocking impact rather than from a fixed list, keep the operator's wording separate from interpretation, update the intake document continuously through typed tools, and run lint after material mutations without paraphrasing findings away.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
 
 ### TSK-0050 — Implement the approval and attestation boundary
 
 Make the orchestrator show material proposed changes before making them, require the operator's decision where the stage says the decision is theirs, and refuse to approve an artifact or satisfy a user-owned exit criterion under any prompting.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0034 · fulfils: REQ-0022, REQ-0001*
 
-### TSK-0051 — Author the three role definitions and the roster lint
+### TSK-0051 — Author the three role definitions and the role-definition check
 
-Write `research.md`, `planning.md` and `validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, deriving write boundaries from `lib/specialists/contract.mjs`; add the lint that fails a role with no declared tools.
+Write `specialists/research.md`, `specialists/planning.md` and `specialists/validation.md` declaring name, description, tool allowlist, input contract, responsibilities, forbidden actions, output schema, exit criteria and escalation conditions, generating them from authored role prose merged with `lib/specialists/contract.mjs` rather than restating its write boundaries; add the role-definition check that fails a role with no declared tools, with a `--check` mode that compares generated bytes without writing and runs in every CI cell.
 
-**outstanding** (0/2 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0035 · fulfils: REQ-0026, REQ-0025*
 
 ### TSK-0052 — Replace stdinDelivered with an observed task-binding result
 
 Change `verifyChild()` in `lib/specialists/contract.mjs` from `stdinDelivered` to an independently observed task-binding outcome, rename `CHILD_REFUSED.NO_STDIN` and its detail text to describe a missing task binding, and update the existing tests so both facts are asserted together.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0009 · fulfils: REQ-0026*
 
 ### TSK-0053 — Build the delegation extension: launch, binding, inheritance and cleanup
 
-Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path.
+Implement child launch with `--mode json -p --no-session`, shell disabled and stdin closed; private restricted-permission prompt files; task-scoped context; exact model inheritance; the intersected tool allowlist; bounded timeout with abort propagated to the process tree; and deletion of temporary material on every exit path. Register `kiln_delegate` over that runtime, in the same task, because a registration cannot wrap an implementation that does not exist yet.
 
-**outstanding** (0/1 criteria passed) · role: platform
-*Implements: CMP-0036 · fulfils: REQ-0026, REQ-0025, REQ-0024*
+**accepted** (2/2 criteria passed) · role: platform
+*Implements: CMP-0032, CMP-0036 · fulfils: REQ-0026, REQ-0025, REQ-0024*
 
 ### TSK-0054 — Build capability-signature verification and the refusal matrix
 
 Verify the child's Kiln capability signature before reading its substantive answer, and cover each refusal cause with a test, including the fake child that returns plausible prose with none of Kiln's tools. This is the detection half of decision #67 that has never been built.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0036 · fulfils: REQ-0026, REQ-0025, REQ-0024*
 
 ### TSK-0055 — Add the run-identity health route
@@ -1488,77 +1488,77 @@ Implement `bin/start-kiln.mjs` over an importable supervisor: validate the Kiln 
 
 Send the start prompt on a first session and resume the recorded Kiln session afterwards, recovering by presenting available sessions when the record is missing or corrupt rather than resuming an unrelated generic session; stop both trees on Pi exit and on signals with bounded escalation, on Windows and POSIX.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
 
 ### TSK-0059 — Implement the self-host refusal and its explicit opt-in
 
 Refuse the consumer command when the tool root and project root coincide, and implement the two-part opt-in with agreement verified before start, covered separately so it can never weaken the consumer-root checks.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0037 · fulfils: REQ-0028, REQ-0020, REQ-0022*
 
 ### TSK-0060 — Compose the ordered setup command over the existing primitives
 
-Implement `bin/setup.mjs` running the ordered phases from path resolution through initialization, state protection, install, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back, with dynamic imports after the install step and no second initializer.
+Implement `bin/setup.mjs` running the ordered phases: path resolution, Node validation, the setup lock, the locked dependency install, the dynamic imports, the transaction plan, initialization, the project ID and state protection, the journal, trust, package registration, consent, model binding, credential contract, research choice, preflight, canary and read-back — with every installed dependency imported dynamically after the install step, and no second initializer.
 
-**outstanding** (0/4 criteria passed) · role: platform
+**accepted** (7/7 criteria passed) · role: platform
 *Implements: CMP-0039 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0061 — Implement the argument surface, refusal codes and non-interactive contract
 
 Implement the documented flags including the explicit consent options, reject API keys as arguments, refuse on any missing decision in non-interactive mode, and publish the exit-code mapping in `--help` and in tests.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0039 · fulfils: REQ-0022, REQ-0027*
 
 ### TSK-0062 — Build the deterministic non-billable provider fixture
 
 Stand up a local provider the pinned runtime can resolve as a custom model, answering deterministically and able to emit a correctly shaped tool call, so the canary and the Stage 1 exchange are testable in CI without a paid account or a network dependency.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
 
 ### TSK-0063 — Build the clean-consumer end-to-end journey test
 
-Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform.
+Automate the documented sequence from an empty directory through setup, the Stage 1 exchange, the browser observation, the refused advance, shutdown and the resuming rerun, on Windows and the supported POSIX CI platform. Include one run that cannot be automated and must be performed at a real terminal: on Windows and Node 24, quit the interactive session IMMEDIATELY after a completed tool call, and record what the process and the supervisor did.
 
-**outstanding** (0/3 criteria passed) · role: platform
+**outstanding** (3/4 criteria passed) · role: platform
 *Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
 
 ### TSK-0064 — Build the negative-control suite
 
 Automate each enumerated wrong state as its own case asserting the specific refusal, so that a regression which turns any of them into an apparent success fails a named test.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0040 · fulfils: REQ-0022, REQ-0020, REQ-0028, REQ-0023*
 
-### TSK-0065 — Observe Pi's authentication-only TUI behaviour, including the no-TTY case
+### TSK-0065 — Observe Pi's interactive /login flow, and what the same launch does without a TTY
 
-Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive `/login` step does: whether it can be launched with exclusive terminal ownership, what its exit conveys and whether authentication must be rediscovered afterwards rather than inferred from the exit code, and what happens when it is invoked with no TTY — refusal, error, or an indefinite wait. Record it as a manually invoked check with its transcript retained, because it needs a real terminal and cannot run in the default suite.
+Establish, against the pinned runtime and with nothing of Kiln's involved, what Pi's interactive login does. Pi 0.84.4 has no authentication-only launch: `pi auth` offers only `check`, `print-api-key` and `print-bearer-token`, and `/login` exists only as a slash command inside the interactive TUI. The manual check therefore launches the full interactive Pi TUI against an isolated Pi configuration, types `/login`, takes the built-in `openai` API-key route with a throwaway key, exits, and then checks auth state separately with `pi auth check --provider openai --json --no-refresh` rather than inferring it from the exit code. It records whether the TUI owns the terminal while this runs. That check confirms locally configured authentication only and does not prove the key works against a provider. The no-TTY controls keep the launch arguments fixed and vary stdin and stdout. Each records which mode Pi selected and a bounded outcome: its exit and code, an error, or still running at a stated timeout. They are not the interactive mode and are not described as it. A sanitized transcript is retained, and the entered key is never recorded. Real subscription OAuth and proof of usable account authentication belong to TSK-0066.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0027 · fulfils: REQ-0022, REQ-0025*
 
 ### TSK-0066 — Run the manual, account-bound OAuth compatibility check
 
 Against a real subscription and outside CI: run Pi's interactive `/login` with an isolated configuration directory and a sanitized environment; after it exits, construct a fresh `ModelRuntime` and `ModelRegistry` and record whether the chosen built-in model appears in `getAvailable()` and passes `hasConfiguredAuth()`; then remove or revoke the stored credential and record that the model becomes unavailable. Retain a sanitized single-instance evidence record — no token, header, credential-derived value, username or home path — and label it as manual and account-bound so it is never mistaken for a suite result.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0027 · fulfils: REQ-0022, REQ-0025*
 
 ### TSK-0067 — Prove the Kiln capability signature loads and can be compared
 
 Once the Kiln Pi package exists, extend the compatibility suite to observe that its machine-readable capability signature is present in a loaded session and that a deliberate change to a measured tool signature is detected by a comparing consumer. Until then the suite proves extension, skill and prompt loading only.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0031 · fulfils: REQ-0022, REQ-0025*
 
 ### TSK-0068 — Implement setup's TTY precondition and its two recovery routes
 
-Before setup launches the authentication-only login step, check for a real TTY. With no TTY and no usable authentication already present, refuse without spawning the login process and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.
+Before setup launches the full interactive Pi TUI for `/login`, require both stdin and stdout to be TTYs. If either is not a TTY and no usable authentication is already present, refuse without spawning Pi and print both documented recovery routes with the exit code reserved for interactive authentication being required. With authentication already present, continue through the non-interactive contract instead.
 
-**outstanding** (0/1 criteria passed) · role: platform
+**accepted** (2/2 criteria passed) · role: platform
 *Implements: CMP-0039 · fulfils: REQ-0022*
 
 ### TSK-0069 — Make unlinkTrace able to remove an invalid or stale link
@@ -1574,6 +1574,41 @@ Replace the hardcoded array of seventeen trace-like field names with a derivatio
 
 **accepted** (1/1 criteria passed) · role: platform
 *Implements: CMP-0005 · fulfils: REQ-0013, REQ-0014*
+
+### TSK-0071 — Add purpose, method, next activity, delegations and boundaries to the stage definitions, and generate them
+
+Extend each canonical `stages/*.json` definition with its purpose, method, next-activity selection rules, allowed delegations and required capabilities, mutation boundary, approval boundary and expected completion summary, with the loader refusing a definition that omits a required field; then extend the stage-skill generator and its check mode to carry those seven fields from the definitions into every `kiln-stage-<stage-id>` skill. Nothing is hard-coded in templates, and no existing field is relabelled to stand in for one: `producesProse` describes a stage's outputs and is not its purpose.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0001, CMP-0033 · fulfils: REQ-0001*
+
+### TSK-0072 — Launch a project bound to a custom provider
+
+Give `bin/start-kiln.mjs` the credential declaration and provider configuration a custom-provider project was set up with, so `checkLaunch` can evaluate that project instead of refusing it with `unsupported-credential-contract`, and the supervisor can start it. Setup already proves such a project; this task owns only starting it.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0028 · fulfils: REQ-0025, REQ-0023*
+
+### TSK-0073 — Give the live canary's child the compat configuration Pi resolves for a custom provider
+
+Carry the `compat` configuration Pi resolves for the selected custom-provider model into the live canary child's provider configuration, so the canary sends the request this project's Pi sends and the compatibility record describes that request. `customProviderConfig` in `lib/launch-checks.mjs` builds the child's configuration from the resolved model without `compat`, and `lib/pi-provider-canary.mjs` refuses a configuration that carries it, so a provider that declares `compat` is checked with a different request than the one it is launched with. Only the non-credential configuration crosses: `apiKey`, `headers`, `authHeader` and any credential-bearing nested value stay out of the child.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0030 · fulfils: REQ-0025, REQ-0023*
+
+### TSK-0074 — Run the four entry-point commands when invoked through a linked .planning
+
+Make `bin/setup.mjs`, `bin/start-kiln.mjs`, `bin/init-project.mjs` and `bin/generate-stage-skills.mjs` run their command when invoked through a `.planning` directory that is a link to the tool checkout. Each decides whether it is the entry point by comparing `pathToFileURL(process.argv[1]).href` with `import.meta.url`. Node resolves the main module's real path, so through a link the two differ, the command does not run, and the process exits 0. Importing any of the four as a module must still not run its command.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0039, CMP-0037, CMP-0022, CMP-0033 · fulfils: REQ-0022*
+
+### TSK-0075 — Refuse research at every entry point without the project's choice and this computer's grant
+
+F4: Kiln's Pi extension built the Tavily adapter for research_capability, research_search and research_fetch with no check of the project's research choice or this computer's research grant, and the supervisor passed TAVILY_API_KEY to Pi unchanged, so a Kiln session could reach Tavily with an operator's key when research was disabled or not consented on this computer; bin/research.mjs did the same. Gate every research entry point on the committed choice being tavily and a standing research grant, refusing before the key is read or a request made, including when either record is unreadable; give Pi the project root explicitly; require --project-root for bin/research.mjs; and keep TAVILY_API_KEY out of both children's environments when research is not permitted at launch.
+
+**accepted** (1/1 criteria passed) · role: platform
+*Implements: CMP-0006 · fulfils: REQ-0023*
 
 ## Retired and superseded
 

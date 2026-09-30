@@ -383,11 +383,12 @@ async function healthServer(bodyFor) {
   return { server, port, close: () => new Promise((r) => server.close(r)) };
 }
 
+const PACKAGE_VERSION = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
 const good = (over = {}) => ({
   status: 200,
-  body: { service: "kiln", protocol: "kiln.health/1", runId: "a".repeat(32), projectId: PROJECT_ID, build: "0.0.0", ...over },
+  body: { service: "kiln", protocol: "kiln.health/1", runId: "a".repeat(32), projectId: PROJECT_ID, build: PACKAGE_VERSION, ...over },
 });
-const expected = { runId: "a".repeat(32), projectId: PROJECT_ID, build: "0.0.0" };
+const expected = { runId: "a".repeat(32), projectId: PROJECT_ID, build: PACKAGE_VERSION };
 
 test("an unrelated healthy HTTP service does not satisfy readiness", async () => {
   // ⚠️ THE NEGATIVE CONTROL THE GENERIC PROBE LACKED. This server is up, healthy and answering 200.
@@ -432,9 +433,8 @@ test("a matching identity is ready, and the build is credited with nothing", asy
   try {
     const r = await awaitReadiness({ port: h.port, expected, childAlive: () => true, deadlineMs: 8000 });
     assert.equal(r.ready, true);
-    // ⚠️ FOUR FACTS, AND `build` IS NOT ONE. Every build of this package reports `0.0.0`, so
-    // agreement between two copies of it is not evidence — counting it would inflate the handshake
-    // without strengthening it.
+    // ⚠️ FOUR IDENTITY FACTS, AND `build` IS NOT ONE. Agreement proves release compatibility, not
+    // that the responder is this invocation, so counting it would mix two different claims.
     assert.deepEqual(r.identityConfirmedBy, ["service", "protocol", "runId", "projectId"]);
     assert.ok(!r.identityConfirmedBy.includes("build"));
     assert.equal(r.buildCompared, true, "compared, and refused on mismatch — just not counted");
