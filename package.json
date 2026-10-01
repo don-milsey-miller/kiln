@@ -41,6 +41,8 @@
     "decisioning:evidence": "node bin/decisioning.mjs evidence",
     "decisioning:review": "node bin/decisioning.mjs review",
     "decisioning:proposal": "node bin/decisioning.mjs proposal",
+    "decisioning:intake": "node bin/decisioning.mjs intake",
+    "decisioning:specialist": "node bin/decisioning.mjs specialist",
     "handoff": "node bin/handoff.mjs",
     "migrate:content": "node bin/migrate-content.mjs",
     "start": "node bin/start-shell.mjs"

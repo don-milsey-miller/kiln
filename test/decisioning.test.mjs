@@ -423,6 +423,105 @@ test("issue #68: invalid or unavailable specialist verification cannot revoke ex
   assert.equal(result.reason, "invalid-response");
 });
 
+test("issue #69: intake prioritization is bounded and cannot author a question or satisfy a gate", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async ({ questions }) => {
+      assert.deepEqual(Object.keys(questions.highest_impact_uncertainty.criteria), [
+        "objective", "scope", "stakeholder", "constraint", "success_condition", "dependency",
+      ]);
+      return {
+        ok: true,
+        backend: "stand-in",
+        model: "jev-test",
+        answers: {
+          highest_impact_uncertainty: {
+            type: "choice",
+            choice: "success_condition",
+            confidence: 0.51,
+            probabilities: { objective: 0.08, scope: 0.12, stakeholder: 0.05, constraint: 0.1, success_condition: 0.51, dependency: 0.14 },
+          },
+        },
+      };
+    },
+  });
+  const out = await tools.kiln_prioritize_intake_uncertainty({
+    context: "We know the audience and scope, but not how success will be measured.",
+    stage: { id: "01-intake", purpose: "Clarify the problem.", blockers: [], nextAction: "Ask one question." },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.recommendation.choice, "success_condition");
+  assert.equal(out.recommendation.probabilities.dependency, 0.14);
+  assert.equal(out.questionText, null);
+  assert.equal(out.stageGateEffect, "none");
+  assert.match(out.fallback, /Pi/);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #69: an out-of-contract intake category falls back", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { highest_impact_uncertainty: { type: "choice", choice: "budget", confidence: 1, probabilities: { budget: 1 } } },
+    }),
+  });
+  const out = await tools.kiln_prioritize_intake_uncertainty({
+    context: "Clarify the project.", stage: { id: "01-intake" },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, "invalid-response");
+  assert.match(out.fallback, /Pi/);
+});
+
+test("issue #70: specialist routing is bounded to stage-permitted roles and preserves probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async ({ questions }) => {
+      assert.deepEqual(Object.keys(questions.specialist_role.criteria), ["research", "validation"]);
+      return {
+        ok: true, backend: "stand-in", model: "jev-test",
+        answers: { specialist_role: { type: "choice", choice: "validation", confidence: 0.72, probabilities: { research: 0.28, validation: 0.72 } } },
+      };
+    },
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Run the declared checks and compare the results with published guidance.",
+    stage: { id: "06-risk-feasibility", purpose: "Test feasibility." },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find external sources.", validation: "Run declared validation jobs." },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.recommendation.choice, "validation");
+  assert.equal(out.recommendation.probabilities.research, 0.28);
+  assert.deepEqual(out.permittedRoles, ["research", "validation"]);
+  assert.equal(out.delegationAuthorized, false);
+  assert.match(out.fallback, /Pi/);
+});
+
+test("issue #70: an out-of-policy specialist role is rejected", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { specialist_role: { type: "choice", choice: "security", confidence: 1, probabilities: { security: 1 } } },
+    }),
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Assess the risk.",
+    stage: { id: "06-risk-feasibility" },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find sources.", validation: "Run checks." },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, "invalid-response");
+  assert.match(out.fallback, /Pi/);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },

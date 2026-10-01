@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { consentLocation } from "../lib/consent-record.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
-import { currentProposalContext, currentRoutingContext, readComparisonCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, readTraceCandidates } from "../lib/decisioning/context.mjs";
+import { currentProposalContext, currentRoutingContext, currentSpecialistRoutingContext, readComparisonCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { configureDecisioning } from "../lib/decisioning-enablement.mjs";
 import { decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -33,6 +33,8 @@ function usage() {
     "  npm run decisioning:configure -- --project-root <dir> --provider typesafe|none [--local-state project|user]",
     "  npm run decisioning:probe -- --project-root <dir> [--local-state project|user]",
     '  npm run decisioning:route -- --project-root <dir> --request "..." [--content-root <dir>] [--local-state project|user]',
+    '  npm run decisioning:intake -- --project-root <dir> --context "..." [--content-root <dir>] [--local-state project|user]',
+    '  npm run decisioning:specialist -- --project-root <dir> --task "..." [--content-root <dir>] [--local-state project|user]',
     '  npm run decisioning:compare -- --project-root <dir> --type requirement --content "..." --candidates REQ-0001,REQ-0002 [--content-root <dir>]',
     "  npm run decisioning:trace -- --project-root <dir> --source CMP-0001 --field satisfies --candidates REQ-0001,REQ-0002 [--content-root <dir>]",
     "  npm run decisioning:evidence -- --project-root <dir> --assertion AST-0001 --evidence EVD-0001 [--content-root <dir>]",
@@ -148,6 +150,44 @@ async function route() {
   return out.ok ? 0 : 1;
 }
 
+async function intake() {
+  const context = common();
+  if (!gate(context)) return 1;
+  const intakeContext = flag("context");
+  if (!intakeContext) throw new Error("--context is required.");
+  const ctx = planningContext(context);
+  const stage = currentRoutingContext(ctx, { toolRoot: TOOL_ROOT });
+  if (stage.complete || stage.id !== "01-intake") {
+    console.log(JSON.stringify({ ok: true, kind: "not-applicable", recommendation: null, stageId: stage.complete ? null : stage.id }, null, 2));
+    return 0;
+  }
+  const out = await createDecisioningTools(createTypeSafeAdapter()).kiln_prioritize_intake_uncertainty({ context: intakeContext, stage });
+  console.log(JSON.stringify(out, null, 2));
+  return out.ok ? 0 : 1;
+}
+
+async function specialist() {
+  const context = common();
+  if (!gate(context)) return 1;
+  const task = flag("task");
+  if (!task) throw new Error("--task is required.");
+  const ctx = planningContext(context);
+  const bounded = currentSpecialistRoutingContext(ctx, { toolRoot: TOOL_ROOT });
+  if (bounded.complete || bounded.permittedRoles.length < 2) {
+    console.log(JSON.stringify({
+      ok: true,
+      kind: "not-applicable",
+      permittedRoles: bounded.permittedRoles,
+      recommendation: bounded.permittedRoles.length === 1 ? { role: bounded.permittedRoles[0], reason: "only-stage-permitted-role" } : null,
+      delegationAuthorized: false,
+    }, null, 2));
+    return 0;
+  }
+  const out = await createDecisioningTools(createTypeSafeAdapter()).kiln_route_specialist({ task, ...bounded });
+  console.log(JSON.stringify(out, null, 2));
+  return out.ok ? 0 : 1;
+}
+
 async function compare() {
   const context = common();
   if (!gate(context)) return 1;
@@ -230,6 +270,8 @@ try {
   if (command === "configure") process.exitCode = await configure();
   else if (command === "probe") process.exitCode = await probe();
   else if (command === "route") process.exitCode = await route();
+  else if (command === "intake") process.exitCode = await intake();
+  else if (command === "specialist") process.exitCode = await specialist();
   else if (command === "compare") process.exitCode = await compare();
   else if (command === "trace") process.exitCode = await trace();
   else if (command === "evidence") process.exitCode = await evidence();
