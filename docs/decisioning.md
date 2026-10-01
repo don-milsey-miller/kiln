@@ -90,10 +90,15 @@ npm --prefix .planning run decisioning:proposal -- \
 npm --prefix .planning run decisioning:intake -- \
   --project-root . \
   --context "The audience is known, but a measurable success condition is not."
+
+npm --prefix .planning run decisioning:specialist -- \
+  --project-root . \
+  --task "Compare the published constraint with the declared validation result."
 ```
 
 The Pi package exposes the same operations as `kiln_decisioning_capability`, `kiln_route_turn`,
 `kiln_prioritize_intake_uncertainty`,
+`kiln_route_specialist`,
 `kiln_compare_artifacts`, `kiln_rank_trace_targets`, `kiln_verify_evidence_relationship`, and
 `kiln_semantic_review`, and `kiln_review_proposal`. Route results include full Choice probabilities and confidence plus the
 deterministic next action. Comparison results include one probability distribution per candidate.
@@ -118,6 +123,11 @@ approval path.
 Kiln's fixed objective, scope, stakeholder, constraint, success-condition, and dependency categories
 and returns the full probability distribution. It deliberately returns no question text and has no
 stage-gate effect: Pi still writes the natural-language question and may ignore a low-confidence result.
+
+`kiln_route_specialist` derives its closed role set from the current canonical stage definition. It
+avoids inference when zero or one role is permitted; when a future stage permits multiple roles, Jev
+may recommend only within that set. The result preserves role probabilities, sets
+`delegationAuthorized:false`, and never starts a child process.
 
 When both research and decisioning have been separately enabled, `research_search` performs semantic
 triage after the authorized backend returns results. Results classified `essential`, `relevant`, or

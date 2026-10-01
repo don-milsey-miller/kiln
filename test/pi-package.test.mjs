@@ -64,6 +64,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_resolve_question",
   "kiln_review_proposal",
   "kiln_revise_artifact",
+  "kiln_route_specialist",
   "kiln_route_turn",
   "kiln_semantic_review",
   "kiln_set_lifecycle",
