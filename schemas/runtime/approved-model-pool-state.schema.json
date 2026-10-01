@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/approved-model-pool-state.schema.json",
+  "x-runtimeRecord": "approved-model-pool-state",
+  "x-location": "<local-state>/runtime/approved-model-pool-state.json",
+  "x-committed": false,
+  "title": "Host-local approved model pool state",
+  "description": "Per-entry model-use decisions and compatibility proofs for this host. The record is ignored, untracked, versioned, and keyed by the committed pool entry id. Keeping each decision beside its proof allows a changed or removed entry to be invalidated in one atomic replacement. It contains credential route names only, never credentials or credential-derived fingerprints.",
+  "type": "object",
+  "required": ["recordVersion", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "entries": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/entryState" }
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "required": ["provider", "model", "thinkingLevel"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" },
+        "model": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" },
+        "thinkingLevel": { "$ref": "runtime-common.schema.json#/$defs/nonEmptyString" }
+      }
+    },
+    "credentialRoute": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "provider-default" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "variable"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "environment" },
+            "variable": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+          }
+        }
+      ]
+    },
+    "grant": {
+      "type": "object",
+      "required": ["granted", "decidedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "granted": { "type": "boolean" },
+        "decidedAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["key", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "model-compatibility.schema.json#/properties/key" },
+        "result": { "$ref": "model-compatibility.schema.json#/properties/result" }
+      }
+    },
+    "entryState": {
+      "type": "object",
+      "required": ["identity", "credentialRoute", "grant"],
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "$ref": "#/$defs/identity" },
+        "credentialRoute": { "$ref": "#/$defs/credentialRoute" },
+        "grant": { "$ref": "#/$defs/grant" },
+        "compatibility": { "$ref": "#/$defs/compatibility" }
+      }
+    }
+  }
+}
