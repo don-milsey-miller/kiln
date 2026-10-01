@@ -1520,7 +1520,7 @@ test("partial coverage is not coverage, and the refusal names what is missing", 
 
   assert.throws(
     () => resolveRunState({ projectRoot: dir, projectId: PROJECT_ID }),
-    (e) => e.reason === REFUSAL.STATE_UNPROTECTED && e.detail.uncovered.join() === ".pi/sessions/,.pi/runtime/"
+    (e) => e.reason === REFUSAL.STATE_UNPROTECTED && e.detail.uncovered.join() === ".pi/sessions/,.pi/runtime/,.pi/ingest/"
   );
 });
 
