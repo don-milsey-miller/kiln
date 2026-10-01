@@ -1362,7 +1362,7 @@ export const MATERIAL_CHANGE_RULE = [
   "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say in a turn of its",
   "own which artifact you propose to create or change and what the change would be. When optional decisioning is available, call",
   "`kiln_review_proposal` first and include any advisory concern in that proposal; an unavailable review does not replace or block",
-  "the existing approval path. Then stop and wait for",
+  "the existing approval path; then stop and wait for",
   "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
   "rejects it, cancels, or does not reply, make no mutating tool call.",
   "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
