@@ -51,8 +51,9 @@ npm run test:pi-compat
 ```
 
 `npm test` remains the complete local suite. It runs those five exhaustive groups serially, in separate
-Node processes, so setup or consumer journeys that install dependencies can never overlap a group that
-is importing or inspecting the checkout's `node_modules`. Group commands use the same Node test runner
+Node processes, and disables file-level concurrency inside each child. Setup or consumer journeys that
+install dependencies therefore cannot overlap any test importing or inspecting the checkout's
+`node_modules`. Group commands use the same Node test runner
 and print a ranked `[kiln-ci-profile]` table for the 15 slowest files plus group wall time. CI therefore
 records separate Ubuntu and Windows measurements in ordinary logs without a second profiling execution.
 

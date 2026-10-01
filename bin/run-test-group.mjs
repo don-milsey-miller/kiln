@@ -9,6 +9,7 @@ import { CI_GROUPS } from "../test/ci-groups.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const group = process.argv[2];
+const serial = process.argv.includes("--serial");
 
 if (!Object.hasOwn(CI_GROUPS, group)) {
   console.error(`[ci-tests] choose one group: ${Object.keys(CI_GROUPS).join(", ")}`);
@@ -18,7 +19,7 @@ if (!Object.hasOwn(CI_GROUPS, group)) {
   const timings = new Map();
   let failed = false;
   const started = performance.now();
-  const events = run({ files });
+  const events = run({ files, ...(serial ? { concurrency: false } : {}) });
 
   events.on("data", (event) => {
     if ((event.type === "test:pass" || event.type === "test:fail") && event.data.nesting === 0) {
@@ -37,7 +38,7 @@ if (!Object.hasOwn(CI_GROUPS, group)) {
 
   const ranked = [...timings].sort((a, b) => b[1] - a[1]);
   const totalMs = Math.round(performance.now() - started);
-  console.log(`\n[kiln-ci-profile] group=${group} files=${files.length} wallMs=${totalMs}`);
+  console.log(`\n[kiln-ci-profile] group=${group} files=${files.length} serial=${serial} wallMs=${totalMs}`);
   for (const [path, durationMs] of ranked.slice(0, 15)) {
     console.log(`[kiln-ci-profile] ${String(durationMs).padStart(8)} ms  ${path}`);
   }

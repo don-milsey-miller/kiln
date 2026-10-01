@@ -21,7 +21,7 @@ export const SAFE_TEST_GROUP_ORDER = Object.freeze(Object.keys(CI_GROUPS));
 export function runGroupProcess(group, { spawnProcess = spawn, output = process.stdout } = {}) {
   return new Promise((resolve, reject) => {
     output.write(`\n[kiln-test-suite] starting group=${group}\n`);
-    const child = spawnProcess(process.execPath, [join(ROOT, "bin", "run-test-group.mjs"), group], {
+    const child = spawnProcess(process.execPath, [join(ROOT, "bin", "run-test-group.mjs"), group, "--serial"], {
       cwd: ROOT,
       env: process.env,
       stdio: "inherit",
