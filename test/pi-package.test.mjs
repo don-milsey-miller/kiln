@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import {
@@ -498,10 +498,20 @@ test("⚠️ ACC-0063 loading and registering touches no project, no credential,
   assert.deepEqual(seen.control, { reads: true, writes: true, spawns: true }, "the watchers see nothing at all, so the negative proves nothing");
 });
 
-/** `file://` for the child, without importing node:url into the test's own namespace twice. */
+/** Convert a filesystem path to a correctly escaped `file:` URL for the purity child. */
 function pathToFileUrl(path) {
-  return new URL(`file://${path.startsWith("/") ? "" : "/"}${path.replace(/\\/g, "/")}`).href;
+  return pathToFileURL(path).href;
 }
+
+test("the purity-child file URL round-trips URL-significant path characters", () => {
+  const path = join(tmpdir(), "kiln package # percent % query ?.mjs");
+  const url = pathToFileUrl(path);
+
+  assert.equal(fileURLToPath(url), path);
+  assert.match(url, /%23/);
+  assert.match(url, /%25/);
+  assert.match(url, /%3F/i);
+});
 
 test("⚠️ ACC-0063 the entry point reads no environment and imports nothing outside the package", () => {
   const source = readFileSync(join(PACKAGE, "extensions", "kiln.js"), "utf-8")
