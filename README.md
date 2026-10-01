@@ -86,6 +86,20 @@ npm --prefix .planning start
 Open <http://127.0.0.1:3000>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it. This command is not a
 substitute for `start-kiln.mjs` when you want the planning agent.
 
+### Add source material
+
+Activate the `source` artifact type for the project, then use **Add source material** in the browser
+or copy a file into `.pi/ingest/inbox/`. Kiln retains raw bytes locally under `.pi/ingest/blobs/`
+and commits a typed `SRC-*` record plus normalized Markdown to `planning-content/`. Repeated bytes
+share one retained blob, while separate import actions remain separate source records.
+
+Plain text is normalized locally. Audio transcription is optional and disabled unless both
+`OPENAI_API_KEY` is present and `KILN_INGEST_REMOTE_PROCESSING` is exactly `allow`; an API key alone
+does not authorize a remote upload. The default OpenAI adapter uses `gpt-transcribe` and refuses
+audio larger than 25,000,000 bytes before making a request. Material marked as an external
+reference remains external reference material—ingestion never converts its contents into approved
+project intent.
+
 ### Update Kiln
 
 Review the target release notes, then move the ignored tool clone to that immutable release tag. For
@@ -137,6 +151,9 @@ remain in Pi's authentication store or the host environment; do not place them i
 | `VPW_SHUTDOWN_GRACE_MS` | No | `8000` | Milliseconds the browser process may exit gracefully before termination escalates. |
 | `TAVILY_API_KEY` | Only for Tavily research | — | Enables the optional public-web research adapter after the project and this computer approve research. Treat it as a secret. |
 | `TYPESAFE_API_KEY` | Only for TypeSafe decisioning | — | Enables optional Jev routing and artifact comparison after the project and this computer explicitly opt in. Treat it as a secret. |
+| `OPENAI_API_KEY` | Only for remote source processing | — | Authenticates optional OpenAI extraction providers. It has no effect unless remote processing is separately authorized. Treat it as a secret. |
+| `KILN_INGEST_REMOTE_PROCESSING` | No | disabled | Set exactly to `allow` to authorize configured source bytes to be sent to a remote extraction provider. |
+| `KILN_OPENAI_TRANSCRIPTION_MODEL` | No | `gpt-transcribe` | Overrides the OpenAI transcription model when remote processing is authorized. |
 
 `setup.mjs` also accepts explicit non-interactive answers for automation, including `--trust`,
 `--provider`, `--model`, `--thinking`, `--research`, and `--live-model-check`. Omitted decisions are
