@@ -777,6 +777,18 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
     },
   },
   {
+    name: "kiln_route_specialist",
+    label: "Kiln route specialist",
+    description:
+      "Recommend a specialist role from the roles the current stage already permits. Advisory only; this never authorizes or starts delegation.",
+    parameters: {
+      type: "object",
+      properties: { task: { type: "string", minLength: 1, maxLength: 32000 } },
+      required: ["task"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "kiln_compare_artifacts",
     label: "Kiln compare artifacts",
     description:
@@ -1760,6 +1772,25 @@ export default function register(pi, deps = {}) {
                 detail: "Intake uncertainty prioritization applies only while stage 01-intake is current.",
               });
             return rendered(await handler({ context: params?.context, stage }));
+          }
+          if (name === "kiln_route_specialist") {
+            const { currentSpecialistRoutingContext } = await import("../../lib/decisioning/context.mjs");
+            const bounded = currentSpecialistRoutingContext(context.ctx, { toolRoot: context.toolRoot });
+            if (bounded.complete || bounded.permittedRoles.length < 2)
+              return rendered({
+                tool: name,
+                ok: true,
+                kind: "not-applicable",
+                recommendation: bounded.permittedRoles.length === 1
+                  ? { role: bounded.permittedRoles[0], reason: "only-stage-permitted-role" }
+                  : null,
+                permittedRoles: bounded.permittedRoles,
+                delegationAuthorized: false,
+                detail: bounded.complete
+                  ? "Every stage is complete, so no specialist can be routed."
+                  : "Semantic routing is unnecessary unless the current stage permits multiple specialist roles.",
+              });
+            return rendered(await handler({ task: params?.task, ...bounded }));
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));

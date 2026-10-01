@@ -476,6 +476,52 @@ test("issue #69: an out-of-contract intake category falls back", async () => {
   assert.match(out.fallback, /Pi/);
 });
 
+test("issue #70: specialist routing is bounded to stage-permitted roles and preserves probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async ({ questions }) => {
+      assert.deepEqual(Object.keys(questions.specialist_role.criteria), ["research", "validation"]);
+      return {
+        ok: true, backend: "stand-in", model: "jev-test",
+        answers: { specialist_role: { type: "choice", choice: "validation", confidence: 0.72, probabilities: { research: 0.28, validation: 0.72 } } },
+      };
+    },
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Run the declared checks and compare the results with published guidance.",
+    stage: { id: "06-risk-feasibility", purpose: "Test feasibility." },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find external sources.", validation: "Run declared validation jobs." },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.recommendation.choice, "validation");
+  assert.equal(out.recommendation.probabilities.research, 0.28);
+  assert.deepEqual(out.permittedRoles, ["research", "validation"]);
+  assert.equal(out.delegationAuthorized, false);
+  assert.match(out.fallback, /Pi/);
+});
+
+test("issue #70: an out-of-policy specialist role is rejected", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { specialist_role: { type: "choice", choice: "security", confidence: 1, probabilities: { security: 1 } } },
+    }),
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Assess the risk.",
+    stage: { id: "06-risk-feasibility" },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find sources.", validation: "Run checks." },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, "invalid-response");
+  assert.match(out.fallback, /Pi/);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },
