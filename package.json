@@ -9,7 +9,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node bin/run-test-suite.mjs",
     "test:ci:core": "node bin/run-test-group.mjs core",
     "test:ci:node": "node bin/run-test-group.mjs node",
     "test:ci:platform": "node bin/run-test-group.mjs platform",

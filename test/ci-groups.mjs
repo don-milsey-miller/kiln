@@ -61,6 +61,7 @@ export const CI_GROUPS = Object.freeze({
     "resolve-question.test.mjs",
     "review-write.test.mjs",
     "runtime-records.test.mjs",
+    "safe-default-test-command.test.mjs",
     "schema-resolver.test.mjs",
     "skeleton.test.mjs",
     "slice-5c.test.mjs",

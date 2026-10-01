@@ -197,6 +197,10 @@ Run the complete suite:
 npm test
 ```
 
+The full local command runs the same exhaustive CI groups and their files serially. This is intentional:
+setup and clean-consumer journeys may install dependencies in isolated fixtures, and must not overlap
+suites that are importing or inspecting the checkout's dependency tree, especially on Windows.
+
 CI uses explicit, locally reproducible groups:
 
 | Command | Contract |
