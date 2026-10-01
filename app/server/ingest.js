@@ -3,13 +3,17 @@ import "server-only";
 import { resolveContentRoot } from "../../lib/content-root.mjs";
 import { createIngestService } from "../../lib/ingest/service.mjs";
 import { createInboxWatcher } from "../../lib/ingest/watch.mjs";
+import { createOpenAITranscriptionProviderFromEnv } from "../../lib/ingest/providers/openai-transcription.mjs";
 
 let current = null;
 
 function runtime() {
   const contentRoot = resolveContentRoot();
   if (current?.contentRoot === contentRoot) return current;
-  const service = createIngestService({ contentRoot });
+  const service = createIngestService({
+    contentRoot,
+    transcriptionProvider: createOpenAITranscriptionProviderFromEnv(),
+  });
   const watcher = createInboxWatcher(service, { contentRoot }).catch(() => null);
   current = { contentRoot, service, watcher };
   return current;
