@@ -136,6 +136,7 @@ remain in Pi's authentication store or the host environment; do not place them i
 | `PLANNING_CONTENT_DIR` | No | Sibling `planning-content/` | Opens an explicit existing content directory. Kiln prints the resolved absolute path and refuses a missing path. |
 | `VPW_SHUTDOWN_GRACE_MS` | No | `8000` | Milliseconds the browser process may exit gracefully before termination escalates. |
 | `TAVILY_API_KEY` | Only for Tavily research | — | Enables the optional public-web research adapter after the project and this computer approve research. Treat it as a secret. |
+| `TYPESAFE_API_KEY` | Only for TypeSafe decisioning | — | Enables optional Jev routing and artifact comparison after the project and this computer explicitly opt in. Treat it as a secret. |
 
 `setup.mjs` also accepts explicit non-interactive answers for automation, including `--trust`,
 `--provider`, `--model`, `--thinking`, `--research`, and `--live-model-check`. Omitted decisions are
@@ -144,6 +145,20 @@ prompted in an interactive terminal or refused in `--non-interactive` mode; they
 To open content that is not beside the tool clone, set `PLANNING_CONTENT_DIR` before starting. See
 [Running the shell](docs/running-the-shell.md) for PowerShell and POSIX examples, launcher behavior,
 and shutdown guarantees.
+
+### Enable semantic decisioning
+
+TypeSafe Jev can optionally classify a turn into a stage-permitted activity/tool family and compare a
+proposed artifact with selected existing artifacts. It is advisory: Kiln still owns permissions, gates,
+approvals, validation, and canonical state.
+
+```sh
+TYPESAFE_API_KEY="..." npm --prefix .planning run decisioning:configure -- \
+  --project-root . --provider typesafe
+```
+
+See [Optional semantic decisioning with TypeSafe Jev](docs/decisioning.md) for consent, privacy, CLI,
+fallback, and architecture details.
 
 ## Develop Kiln
 

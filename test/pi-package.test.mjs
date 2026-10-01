@@ -37,6 +37,7 @@ const PACKAGE = packageRootFor(ROOT);
 
 const REGISTERED_TOOLS = Object.freeze([
   "kiln_capability",
+  "kiln_compare_artifacts",
   "kiln_create_acceptance_criterion",
   "kiln_create_api_spec",
   "kiln_create_assertion",
@@ -49,6 +50,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_create_schema",
   "kiln_create_task",
   "kiln_create_wireframe",
+  "kiln_decisioning_capability",
   "kiln_delegate",
   "kiln_link_evidence",
   "kiln_link_trace",
@@ -59,6 +61,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_read_stage_attestations",
   "kiln_resolve_question",
   "kiln_revise_artifact",
+  "kiln_route_turn",
   "kiln_set_lifecycle",
   "kiln_set_review_status",
   "kiln_set_type_activation",

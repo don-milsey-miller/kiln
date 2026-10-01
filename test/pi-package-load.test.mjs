@@ -146,6 +146,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
         // session rather than merely declared in a file.
         tools: [
           "kiln_capability",
+          "kiln_compare_artifacts",
           "kiln_create_acceptance_criterion",
           "kiln_create_api_spec",
           "kiln_create_assertion",
@@ -158,7 +159,8 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "kiln_create_schema",
           "kiln_create_task",
           "kiln_create_wireframe",
-  "kiln_delegate",
+          "kiln_decisioning_capability",
+          "kiln_delegate",
           "kiln_link_evidence",
           "kiln_link_trace",
           "kiln_lint",
@@ -168,6 +170,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "kiln_read_stage_attestations",
           "kiln_resolve_question",
           "kiln_revise_artifact",
+          "kiln_route_turn",
           "kiln_set_lifecycle",
           "kiln_set_review_status",
           "kiln_set_type_activation",

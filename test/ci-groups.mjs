@@ -25,6 +25,7 @@ export const CI_GROUPS = Object.freeze({
     "controller.test.mjs",
     "create-requirement.test.mjs",
     "cross-cutting-traceability.test.mjs",
+    "decisioning.test.mjs",
     "dependency-freshness.test.mjs",
     "derived-not-stored.test.mjs",
     "diagnostics.test.mjs",

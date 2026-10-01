@@ -102,6 +102,10 @@ test("the committed project record accepts a project id and a research choice, a
   rejects("kiln-project", { recordVersion: 1 }, "a project record without an id identifies nothing");
   rejects("kiln-project", { recordVersion: 1, projectId: PROJECT_ID, research: { provider: "brave" } },
     "an unknown research provider is not a choice this project can express");
+  ok("kiln-project", { recordVersion: 1, projectId: PROJECT_ID, decisioning: { provider: "typesafe" } });
+  ok("kiln-project", { recordVersion: 1, projectId: PROJECT_ID, decisioning: { provider: "none" } });
+  rejects("kiln-project", { recordVersion: 1, projectId: PROJECT_ID, decisioning: { provider: "other" } },
+    "an unknown decisioning provider is not a choice this project can express");
 });
 
 test("a generated project id satisfies its own schema and is not derived from anything", () => {
@@ -115,13 +119,14 @@ test("a generated project id satisfies its own schema and is not derived from an
 
 const GRANT = { granted: true, decidedAt: NOW };
 
-test("consent records three separate grants, each dated, and refuses credential material", () => {
+test("consent records four separate grants, each dated, and refuses credential material", () => {
   ok("consent", { recordVersion: 1, inspection: GRANT });
   ok("consent", {
     recordVersion: 1,
     inspection: GRANT,
     modelUse: { ...GRANT, provider: "openai", model: "gpt-5" },
     research: { ...GRANT, provider: "tavily" },
+    decisioning: { ...GRANT, provider: "typesafe" },
   });
 
   // ⚠️ A REFUSAL IS A RECORDED DECISION. Treating `granted: false` as "not yet asked" is how a
@@ -136,6 +141,8 @@ test("consent records three separate grants, each dated, and refuses credential 
     "a model grant that names no model authorises nothing in particular");
   rejects("consent", { recordVersion: 1, research: { ...GRANT, provider: "tavily", credentialDigest: "sha256:" + "a".repeat(64) } },
     "a credential-derived fingerprint is forbidden by section 3.12");
+  rejects("consent", { recordVersion: 1, decisioning: { ...GRANT, provider: "typesafe", apiKey: "apikey-secret" } },
+    "decisioning consent cannot persist a credential");
 });
 
 /* ================================================================ setup-transaction (ignored) == */

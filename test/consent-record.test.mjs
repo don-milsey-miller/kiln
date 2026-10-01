@@ -158,7 +158,7 @@ test("⚠️ a record in a location this repository does not ignore grants nothi
   }
 });
 
-test("⚠️ the three grants are separate: one answer grants nothing else", async () => {
+test("⚠️ inspection, model, and research grants remain separate", async () => {
   const { root, dir } = project();
   try {
     const where = consentLocation({ projectRoot: dir });

@@ -18,13 +18,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { dirname as parentOf } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { contractFor } from "../lib/specialists/contract.mjs";
 import { buildChildReport } from "../lib/specialists/child-report.mjs";
 
 const REPO = join(parentOf(fileURLToPath(import.meta.url)), "..");
 import { ATTESTATION_VERSION, frameTask } from "../lib/specialists/task-frame.mjs";
-import { DELEGATION_REFUSED, delegateToSpecialist, intersectAllowlist } from "../lib/specialists/delegate.mjs";
+import {
+  DELEGATION_REFUSED,
+  delegateToSpecialist,
+  intersectAllowlist,
+  taskObserverExtensionPath,
+} from "../lib/specialists/delegate.mjs";
+
+test("#60 the observer extension path decodes spaces before it is passed to Pi", () => {
+  const modulePath = join(tmpdir(), "kiln checkout with spaces", "lib", "specialists", "delegate.mjs");
+  const expected = join(tmpdir(), "kiln checkout with spaces", "lib", "specialists", "task-observer.mjs");
+  const actual = taskObserverExtensionPath(pathToFileURL(modulePath).href);
+  assert.equal(actual, expected);
+  assert.equal(actual.includes("%20"), false);
+});
 
 /** The fixed cleanup message, read from the module rather than restated. */
 const FIXED_CLEANUP_MESSAGE = (await delegateToSpecialist({ role: "research", task: "x", agentDir: "d", hostRegistry: ["nothing"] }, {})).message === undefined ? "" : "The delegation's temporary material could not be removed, so the run is not reported.";

@@ -47,6 +47,10 @@ const DECLARATION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "signature.json")
 /** The tools whose subject is not the project: the package's own declaration, and the public web. */
 const PROJECTLESS = new Set([
   "kiln_capability",
+  // Permission is deliberately checked before either of these resolves planning content.
+  "kiln_compare_artifacts",
+  "kiln_decisioning_capability",
+  "kiln_route_turn",
   "research_capability",
   "research_search",
   "research_fetch",
@@ -186,6 +190,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
     [...tools.keys()].sort(),
     [
       "kiln_capability",
+      "kiln_compare_artifacts",
       "kiln_create_acceptance_criterion",
       "kiln_create_api_spec",
       "kiln_create_assertion",
@@ -198,6 +203,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_create_schema",
       "kiln_create_task",
       "kiln_create_wireframe",
+      "kiln_decisioning_capability",
       "kiln_delegate",
       "kiln_link_evidence",
       "kiln_link_trace",
@@ -208,6 +214,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_read_stage_attestations",
       "kiln_resolve_question",
       "kiln_revise_artifact",
+      "kiln_route_turn",
       "kiln_set_lifecycle",
       "kiln_set_review_status",
       "kiln_set_type_activation",
@@ -1329,6 +1336,104 @@ test("⚠️ ACC-0065 with no content root to resolve, each tool refuses as data
     if (saved !== undefined) process.env.PLANNING_CONTENT_DIR = saved;
     rmSync(empty, { recursive: true, force: true });
   }
+});
+
+/* ============================================ the decisioning tools =========================== */
+
+const withDecisioning = ({ decisioningTools, artifactReader } = {}) => {
+  const tools = new Map();
+  register(
+    { registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) },
+    {
+      decisioningTools,
+      artifactReader,
+      decisioningPermission: () => ({ permitted: true, provider: "typesafe" }),
+    }
+  );
+  return tools;
+};
+
+test("issue #59: decisioning tools register with the vendor-neutral contract", async () => {
+  const { DECISIONING_TOOL_SIGNATURES } = await import("../lib/decisioning/tools.mjs");
+  const tools = registered();
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts"]) {
+    const tool = tools.get(name);
+    assert.ok(tool, `${name} is not registered`);
+    assert.deepEqual(tool.parameters, DECISIONING_TOOL_SIGNATURES[name].input);
+    assert.equal(tool.description, DECISIONING_TOOL_SIGNATURES[name].description);
+    assert.ok(DECLARATION.tools.includes(name));
+  }
+});
+
+test("issue #59: the wrappers inject only authoritative stage and artifact context", async () => {
+  const seen = [];
+  const decisioningTools = {
+    kiln_decisioning_capability: async () => ({ tool: "kiln_decisioning_capability", available: true }),
+    kiln_route_turn: async (input) => {
+      seen.push({ name: "route", input });
+      return { tool: "kiln_route_turn", ok: true, stageId: input.stage.id };
+    },
+    kiln_compare_artifacts: async (input) => {
+      seen.push({ name: "compare", input });
+      return { tool: "kiln_compare_artifacts", ok: true, ids: input.candidates.map((candidate) => candidate.id) };
+    },
+  };
+  const artifactReader = {
+    readArtifact: ({ id }) => ({
+      ok: true,
+      type: "requirement",
+      artifact: {
+        id,
+        type: "requirement",
+        schemaVersion: 1,
+        title: `Requirement ${id}`,
+        statement: "A bounded requirement.",
+        reviewStatus: "draft",
+        lifecycle: "active",
+      },
+    }),
+  };
+  const tools = withDecisioning({ decisioningTools, artifactReader });
+  const { contentRoot } = await project();
+
+  const capability = await invoke(tools.get("kiln_decisioning_capability"), contentRoot);
+  const route = await invoke(tools.get("kiln_route_turn"), contentRoot, { request: "Split authentication into its own requirement." });
+  const compared = await invoke(tools.get("kiln_compare_artifacts"), contentRoot, {
+    type: "requirement",
+    content: "Authentication must use short-lived tokens.",
+    candidateIds: ["REQ-0001", "REQ-0002"],
+  });
+
+  assert.equal(capability.details.available, true);
+  assert.equal(route.details.stageId, "01-intake");
+  assert.deepEqual(compared.details.ids, ["REQ-0001", "REQ-0002"]);
+  assert.equal(seen[0].input.request, "Split authentication into its own requirement.");
+  assert.ok(seen[0].input.stage.permittedActivities.includes("question"));
+  assert.ok(seen[0].input.stage.permittedToolFamilies.includes("read"));
+  assert.deepEqual(seen[1].input.candidates.map((candidate) => candidate.artifact), [
+    { id: "REQ-0001", type: "requirement", title: "Requirement REQ-0001", statement: "A bounded requirement." },
+    { id: "REQ-0002", type: "requirement", title: "Requirement REQ-0002", statement: "A bounded requirement." },
+  ]);
+});
+
+test("issue #59: decisioning permission refuses before an adapter or project reader runs", async () => {
+  const touched = [];
+  const tools = new Map();
+  register(
+    { registerTool: (tool) => tools.set(tool.name, providerVisible(tool)) },
+    {
+      decisioningPermission: () => ({ permitted: false, reason: "decisioning-not-granted", detail: "No host grant." }),
+      decisioningTools: new Proxy({}, { get: () => (touched.push("adapter"), async () => ({})) }),
+      artifactReader: new Proxy({}, { get: () => (touched.push("reader"), () => ({})) }),
+    }
+  );
+
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts"]) {
+    const result = await invokeAnywhere(tools.get(name), {});
+    assert.equal(result.details.ok, false);
+    assert.equal(result.details.reason, "decisioning-not-granted");
+  }
+  assert.deepEqual(touched, []);
 });
 
 /* ============================================ the research tools =============================== */
