@@ -64,7 +64,7 @@ test("no adapter uses `export *`", () => {
   }
 });
 
-test("⚠️ no adapter exposes a locking, writing or spawning capability except the one that was reviewed", () => {
+test("⚠️ adapters expose only the two individually reviewed write capabilities", () => {
   // The concrete case DEC-0021 was written around: `loadStageAttestations` and
   // `writeStageAttestation` are exports of the SAME module, and only one of them is a read.
   const FORBIDDEN = [
@@ -80,6 +80,7 @@ test("⚠️ no adapter exposes a locking, writing or spawning capability except
     "unlinkTrace",
     "setLifecycle",
     "runJob",
+    "enqueueSource",
   ];
   for (const name of adapters()) {
     const src = readFileSync(join(SERVER_DIR, name), "utf-8");
@@ -93,13 +94,21 @@ test("⚠️ no adapter exposes a locking, writing or spawning capability except
       // write landed — it named the write and kept refusing every other one, including in that
       // same file. `test/review-write.test.mjs` pins the file's whole surface from the other side.
       if (bad === "setReviewStatus" && name === "review.js") continue;
+      if (bad === "enqueueSource" && name === "ingest.js") continue;
       assert.ok(
         !exported.includes(bad),
         `app/server/${name} exports ${bad}. Locking and writing capabilities are reviewed one at a ` +
-          `time (DEC-0021); ${bad === "setReviewStatus" ? "the review write belongs in review.js alone" : "this one has not been reviewed"}`
+          `time (DEC-0021); ${bad === "setReviewStatus" ? "the review write belongs in review.js alone" : bad === "enqueueSource" ? "source intake belongs in ingest.js alone" : "this one has not been reviewed"}`
       );
     }
   }
+});
+
+test("⚠️ the ingest adapter exposes enqueueSource plus read-only job status, and no destination primitive", () => {
+  const src = stripComments(readFileSync(join(SERVER_DIR, "ingest.js"), "utf-8"));
+  const exportedFunctions = [...src.matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/gm)].map((match) => match[1]).sort();
+  assert.deepEqual(exportedFunctions, ["enqueueSource", "getIngestJob", "ingestUploadLimit", "listIngestJobs"]);
+  assert.doesNotMatch(src, /export\s+(?:async\s+)?function\s+(?:write|resolve|open|createFile|destination)/i);
 });
 
 test("⚠️ the two-consumer adapter's export surface is PINNED to the one name that earned it", () => {

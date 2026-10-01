@@ -37,6 +37,8 @@ export const CI_GROUPS = Object.freeze({
     "ingest-registry.test.mjs",
     "ingest-service.test.mjs",
     "ingest-store.test.mjs",
+    "ingest-watch.test.mjs",
+    "ingest-web.test.mjs",
     "initialize-project.test.mjs",
     "kiln-start-entry.test.mjs",
     "launch-checks.test.mjs",

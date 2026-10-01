@@ -185,6 +185,7 @@ test("⚠️ every adapter's permitted consumers are DECLARED, and the list is s
     // `app/health/kiln/route.js`, shortened by the two-segment rule above.)
     ["server/identity.js", ["kiln/route.js"]],
     ["server/review.js", ["_write/review-action.js"]],
+    ["server/ingest.js", ["ingest/route.js"]],
   ]);
 
   // ⚠️ THE WRITE DOOR HAS EXACTLY ONE CONSUMER, and that is the property DEC-0021's individual
@@ -192,6 +193,8 @@ test("⚠️ every adapter's permitted consumers are DECLARED, and the list is s
   // taken from, which is the review happening again — so it fails here rather than passing quietly.
   const write = declared.find(([a]) => a.endsWith("review.js"));
   assert.deepEqual(write?.[1], ["_write/review-action.js"], "the write adapter admits the Server Action alone");
+  const ingest = declared.find(([a]) => a.endsWith("ingest.js"));
+  assert.deepEqual(ingest?.[1], ["ingest/route.js"], "the source-intake adapter admits the ingest route alone");
 
   // ...and the content adapters are NOT in it, so they still admit only the reader.
   for (const name of ["content.js", "stages.js"])
