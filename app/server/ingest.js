@@ -4,15 +4,20 @@ import { resolveContentRoot } from "../../lib/content-root.mjs";
 import { createIngestService } from "../../lib/ingest/service.mjs";
 import { createInboxWatcher } from "../../lib/ingest/watch.mjs";
 import { createOpenAITranscriptionProviderFromEnv } from "../../lib/ingest/providers/openai-transcription.mjs";
+import { createOpenAIExtractionProviderFromEnv } from "../../lib/ingest/providers/openai-extraction.mjs";
+import { ingestLimitsFromEnv } from "../../lib/ingest/store.mjs";
 
 let current = null;
 
 function runtime() {
   const contentRoot = resolveContentRoot();
   if (current?.contentRoot === contentRoot) return current;
+  const extractionProvider = createOpenAIExtractionProviderFromEnv();
   const service = createIngestService({
     contentRoot,
     transcriptionProvider: createOpenAITranscriptionProviderFromEnv(),
+    extractionProvider,
+    limits: ingestLimitsFromEnv(),
   });
   const watcher = createInboxWatcher(service, { contentRoot }).catch(() => null);
   current = { contentRoot, service, watcher };
