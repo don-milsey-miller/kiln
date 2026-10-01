@@ -116,6 +116,11 @@ async function runSmokeCheck(t) {
   });
   // The build's own words are NOT the assertion. They are kept only to report with a failure.
   const buildOut = `${build.stdout ?? ""}${build.stderr ?? ""}`;
+  assert.doesNotMatch(
+    buildOut,
+    /Dynamic filesystem access causes tracing of the whole project/,
+    `the production build traced a runtime-selected path into the server output:\n${buildOut.slice(-4000)}`
+  );
 
   // A COPY, so the regression can run on every commit without touching the project's own content.
   const contentCopy = reapLater(mkdtempSync(join(tmpdir(), "vpw-smoke-")));
