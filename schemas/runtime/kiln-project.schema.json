@@ -37,6 +37,23 @@
         }
       }
     },
+    "decisioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider"
+      ],
+      "description": "The project's committed semantic-decisioning choice. This is intent, not consent and never a credential. A TypeSafe choice only becomes usable when this host separately grants TypeSafe use in its ignored consent record.",
+      "properties": {
+        "provider": {
+          "enum": [
+            "typesafe",
+            "none"
+          ],
+          "description": "`none` deliberately disables semantic decisioning. An absent field means the project has not configured the optional capability."
+        }
+      }
+    },
     "declaredIdentities": {
       "type": "object",
       "additionalProperties": false,

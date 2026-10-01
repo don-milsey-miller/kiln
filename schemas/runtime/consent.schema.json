@@ -5,7 +5,7 @@
   "x-location": "<local-state>/runtime/consent.json",
   "x-committed": false,
   "title": "Host consent record",
-  "description": "What THIS operator, on THIS machine, permitted — and nothing else. ⚠️ IT IS IGNORED RATHER THAN COMMITTED, AND THAT IS THE WHOLE DESIGN. A committed consent record would mean cloning a repository handed you somebody else's permission to use your machine's credentials, and nobody would ever see the prompt again (section 3.3). ⚠️ THREE PERMISSIONS, RECORDED SEPARATELY, BECAUSE THEY ARE THREE DIFFERENT QUESTIONS: may Kiln LOOK at what is configured here; may it USE a named provider and model, which authorises ongoing billable work; may it validate and use an optional external service. Detection is not consent and one grant is not another. ⚠️ NO CREDENTIAL, NO FINGERPRINT, NO VARIABLE VALUE — the record says what was permitted, never what was found. The one declaration it carries is a custom provider's credential variable NAME, which the operator supplied rather than Kiln found.",
+  "description": "What THIS operator, on THIS machine, permitted — and nothing else. ⚠️ IT IS IGNORED RATHER THAN COMMITTED, AND THAT IS THE WHOLE DESIGN. A committed consent record would mean cloning a repository handed you somebody else's permission to use your machine's credentials, and nobody would ever see the prompt again (section 3.3). ⚠️ FOUR PERMISSIONS, RECORDED SEPARATELY, BECAUSE THEY ARE FOUR DIFFERENT QUESTIONS: may Kiln LOOK at what is configured here; may it USE a named provider and model, which authorises ongoing billable work; may it validate and use an optional research service; may it send bounded project state to an optional semantic-decisioning service. Detection is not consent and one grant is not another. ⚠️ NO CREDENTIAL, NO FINGERPRINT, NO VARIABLE VALUE — the record says what was permitted, never what was found. The one declaration it carries is a custom provider's credential variable NAME, which the operator supplied rather than Kiln found.",
   "type": "object",
   "required": ["recordVersion"],
   "additionalProperties": false,
@@ -45,6 +45,18 @@
         "provider": {
           "enum": ["tavily"],
           "description": "Recorded so that changing the research provider invalidates the grant rather than silently transferring it."
+        }
+      },
+      "required": ["provider"]
+    },
+    "decisioning": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "Permission to use the optional semantic-decisioning service on this host. Enabling it may send the current user request, bounded stage state, and selected planning artifacts to the named provider. It never authorises a mutation, stage gate, or operator approval.",
+      "properties": {
+        "provider": {
+          "enum": ["typesafe"],
+          "description": "Recorded so changing the decisioning provider invalidates this host's grant instead of transferring it."
         }
       },
       "required": ["provider"]

@@ -101,6 +101,33 @@ async function defaultResearchTools() {
   return createResearchTools(createTavilyAdapter());
 }
 
+/** Optional semantic decisions, constructed only after project and host permission have been proved. */
+async function defaultDecisioningTools() {
+  const [{ createDecisioningTools }, { createTypeSafeAdapter }] = await Promise.all([
+    import("../../lib/decisioning/tools.mjs"),
+    import("../../lib/decisioning/typesafe-adapter.mjs"),
+  ]);
+  return createDecisioningTools(createTypeSafeAdapter());
+}
+
+/**
+ * Apply the self-host content boundary when the shared resolver can identify a content root, before
+ * a decisioning permission refusal can mask it. An absent root is left to the permission gate: that
+ * gate must be able to refuse without causing any project reader to run.
+ */
+async function explicitDecisioningContentRefusal(deps = {}) {
+  try {
+    const [{ resolveContentRoot, toolRoot }, { assertOrchestratorContentRoot }] = await Promise.all([
+      import("../../lib/content-root.mjs"),
+      import("../../lib/orchestrator-root.mjs"),
+    ]);
+    assertOrchestratorContentRoot({ contentRoot: resolveContentRoot(), toolRoot: deps.toolRoot ?? toolRoot() });
+    return null;
+  } catch (error) {
+    return error?.code === "tool-content-refused" ? error : null;
+  }
+}
+
 /**
  * The validation tools this host can offer, built when one is first called - for the reasons the
  * research tools are: the package must load on its own, and a session may never validate anything.
@@ -694,6 +721,70 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
       type: "object",
       properties: { url: { type: "string" }, maxBytes: { type: "integer", minimum: 1024 } },
       required: ["url"],
+      additionalProperties: false,
+    },
+  },
+]);
+
+/**
+ * Optional decisioning tools. Written here because this package must still register from a package-only
+ * fixture; `test/decisioning-package.test.mjs` holds these schemas to the library's declarations.
+ */
+const DECISIONING_TOOL_TABLE = Object.freeze([
+  {
+    name: "kiln_decisioning_capability",
+    label: "Kiln decisioning capability",
+    description:
+      "Report whether the optional semantic decisioning backend is usable. Advisory only; deterministic Kiln rules remain authoritative.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "kiln_route_turn",
+    label: "Kiln route turn",
+    description:
+      "Classify the current request into a stage-permitted activity and tool family. The result only narrows attention; it never grants access or changes state.",
+    parameters: {
+      type: "object",
+      properties: { request: { type: "string", minLength: 1, maxLength: 12000 } },
+      required: ["request"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "kiln_compare_artifacts",
+    label: "Kiln compare artifacts",
+    description:
+      "Compare a proposed artifact with existing same-type candidates as distinct, duplicate, overlapping, refining, or contradictory. Advisory only.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: [
+            "acceptance-criterion",
+            "api-spec",
+            "assertion",
+            "component",
+            "decision",
+            "evidence",
+            "question",
+            "requirement",
+            "runbook-step",
+            "schema",
+            "task",
+            "wireframe",
+          ],
+        },
+        content: { type: "string", minLength: 1, maxLength: 24000 },
+        candidateIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" },
+        },
+      },
+      required: ["type", "content", "candidateIds"],
       additionalProperties: false,
     },
   },
@@ -1484,6 +1575,88 @@ export default function register(pi, deps = {}) {
           // ⚠️ THE MESSAGE IS SCRUBBED OF THIS MACHINE, and of nothing else: the library's own
           // sanitiser has already taken the credential out of anything it emits.
           return rendered(refusal("refused", scrub(e?.message ?? String(e), "")));
+        }
+      },
+    });
+
+  /**
+   * Jev recommends; Kiln remains authoritative. Permission is checked before the adapter exists, the
+   * current stage and candidates come from Kiln's existing readers, and every result remains advisory.
+   */
+  for (const { name, label, description, parameters } of DECISIONING_TOOL_TABLE)
+    pi?.registerTool?.({
+      name,
+      label,
+      description,
+      parameters,
+      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+        if (typeof deps.decisioningPermission !== "function") {
+          const contentRefusal = await explicitDecisioningContentRefusal(deps);
+          if (contentRefusal) return toolContentRefused(contentRefusal, ctx);
+        }
+
+        const permission = await import("../../lib/decisioning/permission.mjs");
+        let gate;
+        try {
+          gate = (deps.decisioningPermission ?? permission.decisioningPermissionFromEnv)();
+        } catch (e) {
+          gate = {
+            permitted: false,
+            reason: permission.DECISIONING_REFUSAL.CONSENT_UNREADABLE,
+            detail: scrub(e?.message ?? String(e), ""),
+          };
+        }
+        if (!gate?.permitted) return rendered(permission.refusedDecisioning(name, gate));
+
+        const tools = deps.decisioningTools ?? (await defaultDecisioningTools());
+        const handler = tools[name];
+        if (typeof handler !== "function")
+          return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
+
+        if (name === "kiln_decisioning_capability") {
+          try {
+            return rendered(await handler());
+          } catch {
+            return rendered(refusal("decisioning-unavailable", "The decisioning capability could not be measured."));
+          }
+        }
+
+        let context;
+        try {
+          context = await projectContext(deps);
+        } catch (e) {
+          return toolContentRefused(e, ctx) ?? rendered(
+            refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`)
+          );
+        }
+
+        try {
+          if (name === "kiln_route_turn") {
+            const { currentRoutingContext } = await import("../../lib/decisioning/context.mjs");
+            const stage = currentRoutingContext(context.ctx, { toolRoot: context.toolRoot });
+            if (stage.complete)
+              return rendered({
+                tool: name,
+                ok: true,
+                kind: "not-applicable",
+                complete: true,
+                recommendation: null,
+                detail: "Every stage is complete, so there is no current stage activity to route.",
+              });
+            return rendered(await handler({ request: params?.request, stage }));
+          }
+
+          const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
+          const { readComparisonCandidates } = await import("../../lib/decisioning/context.mjs");
+          const candidates = readComparisonCandidates(
+            { type: params?.type, candidateIds: params?.candidateIds },
+            context.ctx,
+            reader
+          );
+          return rendered(await handler({ type: params?.type, content: params?.content, candidates }));
+        } catch (e) {
+          const code = e?.name === "ArtifactReadRefusal" ? e.code : "decisioning-refused";
+          return rendered(refusal(code, scrub(e?.message ?? String(e), context.contentRoot)));
         }
       },
     });
