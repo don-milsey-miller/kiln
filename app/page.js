@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import StagesPanel from "./stages-panel.js";
 import DiagnosticsPanel from "./diagnostics-panel.js";
 import ProjectIdentity from "./project-identity.js";
+import IngestPanel from "./ingest-panel.js";
 
 /**
  * The project view — `/`.
@@ -27,6 +28,8 @@ export default function Page() {
           Stage position is derived on every read. Nothing about it is stored.
         </div>
       </header>
+
+      <IngestPanel />
 
       <Suspense
         fallback={

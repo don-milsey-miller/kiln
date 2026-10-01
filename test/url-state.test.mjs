@@ -7,8 +7,8 @@
  * did not choose and without telling them what went. Transient interface state survives that fine
  * because losing it costs nothing. A selection does not.
  *
- * ⚠️ Today the application has no client components at all, so these checks pass trivially. They are
- * written anyway, because the first `"use client"` file is exactly when someone reaches for
+ * ⚠️ Client components are enumerated below, so adding one is a visible architectural event. These
+ * checks are written because a new `"use client"` file is exactly when someone may reach for
  * `useState` to remember which artifact is open — and that is the moment this should fail rather
  * than the moment someone notices a reload lost their place.
  */
@@ -48,11 +48,12 @@ test("⚠️ any client component must not hold the selection", () => {
       assert.ok(!bad.test(src), `${relative(ROOT, f)} holds a correctness-critical selection in client state`);
   }
   // ⚠️ Recorded so the count moving is a visible event rather than a silent one. It moved from 0 to
-  // 1 with TSK-0017: the stream watchdog is the application's only client component, and it holds
-  // the stream's health — transient by definition — while both selections stay in the URL.
+  // 1 with TSK-0017: the stream watchdog holds transient stream health. Source ingestion added the
+  // upload panel, which holds transient file/progress/job-polling state; a reload loses no planning
+  // record and the server-side job continues. Both correctness-critical selections stay in the URL.
   assert.deepEqual(
     clients.map((f) => relative(ROOT, f).split("\\").join("/")),
-    ["app/_stream/watchdog.js"],
+    ["app/ingest-panel.js", "app/_stream/watchdog.js"],
     "a new client component is a deliberate act; say why it needs to be one"
   );
 });
