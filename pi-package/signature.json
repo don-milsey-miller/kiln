@@ -40,6 +40,7 @@
     "kiln_lint",
     "kiln_list_artifacts",
     "kiln_project_status",
+    "kiln_prioritize_intake_uncertainty",
     "kiln_rank_trace_targets",
     "kiln_read_artifact",
     "kiln_read_stage_attestations",
