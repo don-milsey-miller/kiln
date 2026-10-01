@@ -19,7 +19,9 @@ User
 
 Verbatim request, context, stakeholders, constraints stated up front.
 
-This stage produces no typed artifact.
+Typed artifact capability envelope for this stage (author only the types activated for this project):
+
+- `source`
 
 ## Exit criteria
 
@@ -51,7 +53,7 @@ Activities this stage may choose between, in order:
 Always:
 
 - Do not propose, name or imply a solution, a technology or a design.
-- Do not author a typed artifact; this stage produces none.
+- Do not interpret a source during extraction; source artifacts preserve supplied material and provenance only.
 
 ## Delegations
 
@@ -67,7 +69,7 @@ This stage may perform these non-creation operations:
 It must not touch:
 
 - Another stage's document.
-- Any typed artifact, because this stage produces none.
+- Any typed artifact other than source; source creation occurs only through the ingestion or typed-source boundary.
 
 Approving this stage approves: That the recorded request is what the operator meant.
 

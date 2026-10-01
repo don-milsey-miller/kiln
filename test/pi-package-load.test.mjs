@@ -157,6 +157,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "kiln_create_requirement",
           "kiln_create_runbook_step",
           "kiln_create_schema",
+          "kiln_create_source",
           "kiln_create_task",
           "kiln_create_wireframe",
           "kiln_decisioning_capability",

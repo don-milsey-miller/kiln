@@ -485,7 +485,7 @@ test("⚠️ partial coverage is not coverage", async () => {
 
   const result = openStateRoot({ projectRoot: dir, mode: STATE_MODE.PROJECT });
   assert.equal(result.ok, false);
-  assert.deepEqual(result.covers.uncovered, [".pi/sessions/", ".pi/runtime/"]);
+  assert.deepEqual(result.covers.uncovered, [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"]);
   for (const d of stateDirs(result.roots)) assert.equal(existsSync(d), false, d);
 });
 

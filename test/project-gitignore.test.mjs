@@ -98,10 +98,10 @@ test("⚠️ a rule inside the block and the same rule outside it are told apart
   // The distinction is what lets an appended block carry only what nobody has written yet. Counting
   // the block's own lines as the operator's would make every rerun believe the file already covered
   // everything and that the block was therefore unnecessary.
-  const text = `.planning/\n\n${blockText("\n", [".pi/sessions/", ".pi/runtime/"])}`;
+  const text = `.planning/\n\n${blockText("\n", [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"])}`;
   const covers = coverage(text);
   assert.deepEqual([...covers.inFile], [".planning/"]);
-  assert.deepEqual([...covers.inBlock].sort(), [".pi/runtime/", ".pi/sessions/"]);
+  assert.deepEqual([...covers.inBlock].sort(), [".pi/ingest/", ".pi/runtime/", ".pi/sessions/"]);
   assert.deepEqual(covers.uncovered, []);
 });
 
@@ -109,7 +109,7 @@ test("⚠️ a negation REVOKES coverage rather than providing it", () => {
   // `!.planning/` re-includes what the line above ignored. Counting it because it contains the same
   // path would report a tracked directory as protected — the one error coverage-before-data cannot
   // tolerate, because the next thing that happens is a transcript being written into it.
-  const covers = coverage(`.planning/\n!.planning/\n.pi/sessions/\n.pi/runtime/\n`);
+  const covers = coverage(`.planning/\n!.planning/\n.pi/sessions/\n.pi/runtime/\n.pi/ingest/\n`);
   assert.deepEqual(covers.uncovered, [".planning/"]);
   assert.deepEqual([...covers.negated], [".planning/"]);
 });
@@ -177,11 +177,11 @@ test("⚠️ the block carries only the rules the operator has not already writt
   write(dir, "# mine\n.pi/runtime/\n");
 
   const plan = planIgnoreBlock(dir);
-  assert.deepEqual(plan.adds, [".planning/", ".pi/sessions/"]);
+  assert.deepEqual(plan.adds, [".planning/", ".pi/sessions/", ".pi/ingest/"]);
 
   const applied = await applyIgnoreBlock(plan);
   const text = read(dir);
-  assert.deepEqual(applied.wrote, [".planning/", ".pi/sessions/"]);
+  assert.deepEqual(applied.wrote, [".planning/", ".pi/sessions/", ".pi/ingest/"]);
   assert.equal(text.split(/\r?\n/).filter((l) => l.trim() === ".pi/runtime/").length, 1, "not written twice");
   assert.deepEqual(coverage(text).uncovered, []);
 });
@@ -340,7 +340,7 @@ test("⚠️ migration does not duplicate a rule the operator wrote outside the 
   await applyIgnoreBlock(planIgnoreBlock(dir));
 
   const text = read(dir);
-  assert.deepEqual(findBlock(text).interior, [".planning/", ".pi/sessions/"]);
+  assert.deepEqual(findBlock(text).interior, [".planning/", ".pi/sessions/", ".pi/ingest/"]);
   assert.equal(text.split(/\r?\n/).filter((l) => l.trim() === ".pi/runtime/").length, 1);
 });
 
@@ -598,7 +598,7 @@ test("⚠️ an edited block is REPORTED and never silently rewritten", async ()
   assert.equal(applied.changed, false);
   assert.equal(applied.reported, true);
   assert.equal(applied.requiresChoice, true);
-  assert.deepEqual(applied.uncovered, [".pi/sessions/", ".pi/runtime/"], "and it says what is unprotected");
+  assert.deepEqual(applied.uncovered, [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"], "and it says what is unprotected");
   assert.equal(read(dir), edited, "nothing was written");
 });
 
@@ -877,7 +877,7 @@ test("⚠️ a file that disappears after a PARTIAL-coverage plan is recreated w
   const dir = repo();
   write(dir, "# mine\n.planning/\n");
   const plan = planIgnoreBlock(dir);
-  assert.deepEqual(plan.adds, [".pi/sessions/", ".pi/runtime/"], "the plan is right about the file it read");
+  assert.deepEqual(plan.adds, [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"], "the plan is right about the file it read");
 
   rmSync(ignoreFile(dir)); // the operator deletes the whole file
   const applied = await applyIgnoreBlock(plan);
@@ -898,7 +898,7 @@ test("⚠️ a rule that arrives between plan and apply is not written a second 
   await applyIgnoreBlock(plan);
 
   const text = read(dir);
-  assert.deepEqual(findBlock(text).interior, [".pi/sessions/", ".pi/runtime/"], "the plan's list was re-derived");
+  assert.deepEqual(findBlock(text).interior, [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"], "the plan's list was re-derived");
   assert.equal(text.split(/\r?\n/).filter((l) => l.trim() === ".planning/").length, 1);
 });
 

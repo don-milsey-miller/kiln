@@ -446,6 +446,7 @@ const CREATION_TOOLS = Object.freeze([
   { name: "kiln_create_wireframe", type: "wireframe", noun: "wireframe" },
   { name: "kiln_create_acceptance_criterion", type: "acceptance-criterion", noun: "acceptance criterion" },
   { name: "kiln_create_task", type: "task", noun: "task" },
+  { name: "kiln_create_source", type: "source", noun: "source" },
 ]);
 
 

@@ -53,7 +53,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -70,7 +70,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -87,7 +87,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -104,7 +104,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -121,7 +121,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -215,7 +215,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -232,7 +232,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -542,7 +542,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -559,7 +559,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -576,7 +576,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -642,7 +642,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -659,7 +659,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -676,7 +676,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -759,7 +759,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -776,7 +776,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -793,7 +793,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -810,7 +810,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -860,7 +860,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -986,7 +986,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1003,7 +1003,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1020,7 +1020,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1037,7 +1037,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1054,7 +1054,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1132,7 +1132,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1149,7 +1149,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1166,7 +1166,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1183,7 +1183,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1200,7 +1200,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1411,7 +1411,7 @@
               "items": {
                 "type": "string",
                 "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-                "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+                "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
                 "examples": [
                   "REQ-0001",
                   "DEC-0014",
@@ -1440,7 +1440,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1457,7 +1457,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1474,7 +1474,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1525,7 +1525,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1543,7 +1543,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1570,7 +1570,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1632,7 +1632,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1650,7 +1650,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1668,7 +1668,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1685,7 +1685,7 @@
         "items": {
           "type": "string",
           "description": "One trace edge. Deliberately just an ID: the RELATIONSHIP is supplied by the field name that holds it, not by a value inside it. Named as its own primitive so every trace field in every schema refers to one concept.",
-          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP)-[0-9]{4,}$",
+          "pattern": "^(REQ|DEC|SCH|API|RSK|ACC|TSK|ROL|WIR|SCP|QST|RFD|AST|EVD|RBK|RBS|CMP|SRC)-[0-9]{4,}$",
           "examples": [
             "REQ-0001",
             "DEC-0014",
@@ -1715,6 +1715,147 @@
       "implements",
       "role",
       "statement",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "source": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Short human label. Not an identifier."
+      },
+      "sourceKind": {
+        "enum": [
+          "text",
+          "document",
+          "audio",
+          "image"
+        ],
+        "description": "The broad class of supplied material, determined by inspection rather than trusted from its filename."
+      },
+      "relationship": {
+        "enum": [
+          "project-manager-input",
+          "external-reference"
+        ],
+        "description": "Whether the material expresses first-party project intent or is an external reference. Processors never infer this value."
+      },
+      "origin": {
+        "type": "object",
+        "description": "Portable provenance for the intake event. No absolute local path is permitted or stored.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "upload",
+              "inbox"
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string that is present. Whitespace-only is caught by the lint, not by the schema — JSON Schema cannot express it without a pattern that is worse than the rule."
+          }
+        },
+        "required": [
+          "kind",
+          "filename"
+        ],
+        "additionalProperties": false
+      },
+      "integrity": {
+        "type": "object",
+        "description": "Content-addressed identity and inspected media facts for the retained raw object.",
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mediaType": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+          }
+        },
+        "required": [
+          "sha256",
+          "bytes",
+          "mediaType"
+        ],
+        "additionalProperties": false
+      },
+      "derivedPayload": {
+        "type": "object",
+        "description": "The normalized, human-readable representation consumed by the planning orchestrator. The path is relative to planning-content and never names the retained raw blob.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Narrowed to an enum by each artifact type.",
+            "const": "markdown"
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the content root (#70) — never absolute, never escaping it. One resolver, so a path here means the same thing to the app, the lint and the typed tools.",
+            "pattern": "^sources/SRC-[0-9]{4,}/[A-Za-z0-9._-]+\\.md$",
+            "examples": [
+              "data/openapi.json",
+              "data/schema.yaml"
+            ]
+          }
+        },
+        "required": [
+          "format",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "processor": {
+        "type": "object",
+        "description": "Reproducibility metadata for the extraction step; operational job state remains under .pi/ingest/jobs.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string that is present. Whitespace-only is caught by the lint, not by the schema — JSON Schema cannot express it without a pattern that is worse than the rule."
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "notes": {
+        "type": "string"
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A string that is present. Whitespace-only is caught by the lint, not by the schema — JSON Schema cannot express it without a pattern that is worse than the rule."
+        },
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "derivedPayload",
+      "integrity",
+      "origin",
+      "processor",
+      "relationship",
+      "sourceKind",
       "title"
     ],
     "additionalProperties": false
