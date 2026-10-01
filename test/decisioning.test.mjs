@@ -322,6 +322,32 @@ test("issue #65: canonical evidence links are derived before semantic review", (
   );
 });
 
+test("issue #66: semantic review is separate from deterministic lint and has no gate effect", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        artifact_0: { type: "choice", choice: "compound_scope", confidence: 0.86, probabilities: { clear: 0.04, compound_scope: 0.86, untestable_or_subjective: 0.1 } },
+        artifact_1: { type: "choice", choice: "clear", confidence: 0.78, probabilities: { clear: 0.78, overly_broad: 0.22 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_semantic_review({ artifacts: [
+    { id: "REQ-0001", type: "requirement", artifact: { statement: "Encrypt data and add SSO." } },
+    { id: "ACC-0001", type: "acceptance-criterion", artifact: { statement: "A request completes within 500 ms." } },
+  ] });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-semantic-review");
+  assert.equal(out.gateEffect, "none");
+  assert.deepEqual(out.findings.map((finding) => finding.artifactId), ["REQ-0001"]);
+  assert.equal(out.assessments[0].assessment.probabilities.compound_scope, 0.86);
+  assert.equal(out.policy.automaticAction, false);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },

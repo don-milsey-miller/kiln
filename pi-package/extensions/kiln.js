@@ -838,6 +838,26 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
       additionalProperties: false,
     },
   },
+  {
+    name: "kiln_semantic_review",
+    label: "Kiln semantic review",
+    description:
+      "Review validated planning artifacts for bounded semantic-quality concerns. Separate from deterministic lint, advisory only, and never gate-capable.",
+    parameters: {
+      type: "object",
+      properties: {
+        artifactIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" },
+        },
+      },
+      required: ["artifactIds"],
+      additionalProperties: false,
+    },
+  },
 ]);
 
 /**
@@ -1697,7 +1717,7 @@ export default function register(pi, deps = {}) {
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
-          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship } = await import("../../lib/decisioning/context.mjs");
+          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship, readSemanticReviewArtifacts } = await import("../../lib/decisioning/context.mjs");
           if (name === "kiln_rank_trace_targets") {
             const bounded = readTraceCandidates(
               { sourceId: params?.sourceId, field: params?.field, candidateIds: params?.candidateIds },
@@ -1713,6 +1733,14 @@ export default function register(pi, deps = {}) {
               reader
             );
             return rendered(await handler(bounded));
+          }
+          if (name === "kiln_semantic_review") {
+            const artifacts = readSemanticReviewArtifacts(
+              { artifactIds: params?.artifactIds },
+              context.ctx,
+              reader
+            );
+            return rendered(await handler({ artifacts }));
           }
           const candidates = readComparisonCandidates(
             { type: params?.type, candidateIds: params?.candidateIds },

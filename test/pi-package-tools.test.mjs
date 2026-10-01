@@ -52,6 +52,7 @@ const PROJECTLESS = new Set([
   "kiln_decisioning_capability",
   "kiln_rank_trace_targets",
   "kiln_route_turn",
+  "kiln_semantic_review",
   "kiln_verify_evidence_relationship",
   "research_capability",
   "research_search",
@@ -218,6 +219,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_resolve_question",
       "kiln_revise_artifact",
       "kiln_route_turn",
+      "kiln_semantic_review",
       "kiln_set_lifecycle",
       "kiln_set_review_status",
       "kiln_set_type_activation",
@@ -1360,7 +1362,7 @@ const withDecisioning = ({ decisioningTools, artifactReader } = {}) => {
 test("issue #59: decisioning tools register with the vendor-neutral contract", async () => {
   const { DECISIONING_TOOL_SIGNATURES } = await import("../lib/decisioning/tools.mjs");
   const tools = registered();
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review"]) {
     const tool = tools.get(name);
     assert.ok(tool, `${name} is not registered`);
     assert.deepEqual(tool.parameters, DECISIONING_TOOL_SIGNATURES[name].input);
@@ -1388,6 +1390,10 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
     kiln_verify_evidence_relationship: async (input) => {
       seen.push({ name: "evidence", input });
       return { tool: "kiln_verify_evidence_relationship", ok: true, recordedRelationship: input.recordedRelationship };
+    },
+    kiln_semantic_review: async (input) => {
+      seen.push({ name: "semantic-review", input });
+      return { tool: "kiln_semantic_review", ok: true, ids: input.artifacts.map((artifact) => artifact.id), gateEffect: "none" };
     },
   };
   const artifactReader = {
@@ -1438,12 +1444,17 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
     assertionId: "AST-0001",
     evidenceId: "EVD-0001",
   });
+  const reviewed = await invoke(tools.get("kiln_semantic_review"), contentRoot, {
+    artifactIds: ["REQ-0001", "REQ-0002"],
+  });
 
   assert.equal(capability.details.available, true);
   assert.equal(route.details.stageId, "01-intake");
   assert.deepEqual(compared.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.deepEqual(ranked.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.equal(evidence.details.recordedRelationship, "support");
+  assert.deepEqual(reviewed.details.ids, ["REQ-0001", "REQ-0002"]);
+  assert.equal(reviewed.details.gateEffect, "none");
   assert.equal(seen[0].input.request, "Split authentication into its own requirement.");
   assert.ok(seen[0].input.stage.permittedActivities.includes("question"));
   assert.ok(seen[0].input.stage.permittedToolFamilies.includes("read"));
@@ -1456,6 +1467,7 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
   assert.equal(seen[3].input.assertion.id, "AST-0001");
   assert.equal(seen[3].input.evidence.id, "EVD-0001");
   assert.equal(seen[3].input.recordedRelationship, "support");
+  assert.deepEqual(seen[4].input.artifacts.map((artifact) => artifact.id), ["REQ-0001", "REQ-0002"]);
 });
 
 test("issue #59: decisioning permission refuses before an adapter or project reader runs", async () => {
@@ -1470,7 +1482,7 @@ test("issue #59: decisioning permission refuses before an adapter or project rea
     }
   );
 
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review"]) {
     const result = await invokeAnywhere(tools.get(name), {});
     assert.equal(result.details.ok, false);
     assert.equal(result.details.reason, "decisioning-not-granted");

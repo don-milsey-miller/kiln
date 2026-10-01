@@ -39,6 +39,7 @@
     "decisioning:compare": "node bin/decisioning.mjs compare",
     "decisioning:trace": "node bin/decisioning.mjs trace",
     "decisioning:evidence": "node bin/decisioning.mjs evidence",
+    "decisioning:review": "node bin/decisioning.mjs review",
     "handoff": "node bin/handoff.mjs",
     "migrate:content": "node bin/migrate-content.mjs",
     "start": "node bin/start-shell.mjs"
