@@ -87,17 +87,20 @@ test("expired, overlong, mismatched, malformed and stale exceptions fail closed"
   }
 });
 
-test("the installed production graph is the patched graph declared by the manifest and lock", () => {
+test("the production manifest and lock declare the patched graph", () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
   const installed = (path) => JSON.parse(readFileSync(join(ROOT, "node_modules", ...path.split("/"), "package.json"), "utf8")).version;
 
   assert.equal(manifest.dependencies.next, "16.3.7");
   assert.equal(manifest.dependencies["@earendil-works/pi-coding-agent"], "0.87.1");
+  assert.equal(manifest.dependencies["brace-expansion"], "5.0.12");
+  assert.equal(manifest.overrides["brace-expansion"], "$brace-expansion");
   assert.equal(manifest.overrides["fast-uri"], "3.1.8");
   assert.equal(lock.packages["node_modules/next"].version, "16.3.7");
   assert.equal(lock.packages["node_modules/fast-uri"].version, "3.1.8");
   assert.equal(lock.packages["node_modules/@earendil-works/pi-coding-agent/node_modules/undici"].version, "8.10.2");
+  assert.equal(lock.packages["node_modules/@earendil-works/pi-coding-agent/node_modules/brace-expansion"].version, "5.0.12");
   assert.equal(installed("next"), "16.3.7");
   assert.equal(installed("fast-uri"), "3.1.8");
   assert.equal(installed("@earendil-works/pi-coding-agent"), "0.87.1");

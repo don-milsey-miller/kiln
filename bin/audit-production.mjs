@@ -6,8 +6,15 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { evaluateProductionAudit } from "../lib/production-audit.mjs";
+import { repairPiBraceExpansion } from "./repair-pi-brace-expansion.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+try {
+  repairPiBraceExpansion(root, { check: true });
+} catch (error) {
+  process.stderr.write(`[production-audit] installed dependency check failed: ${error?.message ?? String(error)}\n`);
+  process.exitCode = 1;
+}
 const npmCli = process.env.npm_execpath;
 const audited = npmCli
   ? spawnSync(process.execPath, [npmCli, "audit", "--omit=dev", "--json"], { cwd: root, encoding: "utf8", windowsHide: true })
