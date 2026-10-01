@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GRANT, consentLocation, recordGrant } from "../lib/consent-record.mjs";
+import { readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { DECISIONING_REFUSAL, decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { permittedToolFamilies } from "../lib/decisioning/policy.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -13,6 +14,7 @@ import { createTypeSafeAdapter } from "../lib/decisioning/typesafe-adapter.mjs";
 import { configureDecisioning } from "../lib/decisioning-enablement.mjs";
 import { IGNORE_RULES } from "../lib/project-gitignore.mjs";
 import { projectRecordTarget } from "../lib/local-state.mjs";
+import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { runTransaction } from "../lib/setup-transaction.mjs";
 
 const PROJECT_ID = "0123456789abcdef0123456789abcdef";
@@ -175,6 +177,79 @@ test("issue #59: artifact comparisons batch candidates and preserve probability 
   assert.equal(result.comparisons[0].relationship.probabilities.duplicate, 0.96);
   assert.equal(Object.keys(evaluated.questions).length, 2, "both comparisons share one API request");
   assert.equal(result.policy.automaticAction, false);
+});
+
+test("issue #63: trace ranking is bounded to Kiln's legal candidates and retains probabilities", async () => {
+  let evaluated;
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async (input) => {
+      evaluated = input;
+      return {
+        ok: true,
+        backend: "stand-in",
+        model: "jev-test",
+        usage: { input_tokens: 12, output_tokens: 3 },
+        answers: {
+          candidate_0: { type: "choice", choice: "strong", confidence: 0.94, probabilities: { strong: 0.94, possible: 0.05, unrelated: 0.01 } },
+          candidate_1: { type: "choice", choice: "unrelated", confidence: 0.89, probabilities: { strong: 0.02, possible: 0.09, unrelated: 0.89 } },
+        },
+      };
+    },
+  });
+  const result = await tools.kiln_rank_trace_targets({
+    source: { id: "ACC-0001", type: "acceptance-criterion", artifact: { statement: "Requests finish within 500 ms." } },
+    field: "verifies",
+    allowedTypes: ["requirement"],
+    candidates: [
+      { id: "REQ-0001", type: "requirement", artifact: { statement: "Requests finish within 500 ms." } },
+      { id: "REQ-0002", type: "requirement", artifact: { statement: "Requests require authentication." } },
+    ],
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.legalCandidateIds, ["REQ-0001", "REQ-0002"]);
+  assert.deepEqual(result.recommendations.map((entry) => entry.candidateId), ["REQ-0001", "REQ-0002"]);
+  assert.equal(result.recommendations[0].assessment.probabilities.strong, 0.94);
+  assert.deepEqual(evaluated.state.structurally_legal_target_types, ["requirement"]);
+  assert.equal(result.policy.automaticAction, false);
+});
+
+test("issue #63: an out-of-contract trace answer falls back without creating graph authority", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { candidate_0: { type: "choice", choice: "create_trace", confidence: 1, probabilities: { create_trace: 1 } } },
+    }),
+  });
+  const result = await tools.kiln_rank_trace_targets({
+    source: { id: "TSK-0001", type: "task", artifact: { summary: "Build login." } },
+    field: "fulfils",
+    allowedTypes: ["requirement"],
+    candidates: [{ id: "REQ-0001", type: "requirement", artifact: { statement: "Provide login." } }],
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "invalid-response");
+  assert.match(result.fallback, /Pi or the operator/i);
+});
+
+test("issue #63: Kiln refuses an illegal trace candidate before invoking decisioning", () => {
+  const schemas = loadSchemaSet(join(process.cwd(), "schemas"));
+  const reader = {
+    readArtifact: ({ id }) => id.startsWith("CMP-")
+      ? { type: "component", artifact: { id, type: "component" } }
+      : { type: "question", artifact: { id, type: "question" } },
+  };
+  assert.throws(
+    () => readTraceCandidates(
+      { sourceId: "CMP-0001", field: "satisfies", candidateIds: ["QST-0001"] },
+      { schemas },
+      reader
+    ),
+    /not a legal target/
+  );
 });
 
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {

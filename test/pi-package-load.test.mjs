@@ -166,6 +166,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "kiln_lint",
           "kiln_list_artifacts",
           "kiln_project_status",
+          "kiln_rank_trace_targets",
           "kiln_read_artifact",
           "kiln_read_stage_attestations",
           "kiln_resolve_question",

@@ -1,10 +1,11 @@
 # Optional semantic decisioning with TypeSafe Jev
 
-Kiln can use TypeSafe Jev for two bounded, advisory decisions:
+Kiln can use TypeSafe Jev for three bounded, advisory decisions:
 
 - classify a user request into an activity and tool family already permitted by the current stage;
 - compare a proposed artifact with selected existing artifacts as `distinct`, `duplicate`, `overlaps`,
   `refines`, or `contradicts`.
+- rank only the trace targets that Kiln has already proved structurally legal for a source field.
 
 Jev never grants a tool, changes project state, satisfies a stage gate, records an approval, or replaces
 Kiln's deterministic validation. If TypeSafe is unavailable or returns an answer outside the permitted
@@ -60,11 +61,19 @@ npm --prefix .planning run decisioning:compare -- \
   --type requirement \
   --content "Normal API requests must complete within 500 ms" \
   --candidates REQ-0012,REQ-0027
+
+npm --prefix .planning run decisioning:trace -- \
+  --project-root . \
+  --source CMP-0001 \
+  --field satisfies \
+  --candidates REQ-0012,REQ-0027
 ```
 
-The Pi package exposes the same operations as `kiln_decisioning_capability`, `kiln_route_turn`, and
-`kiln_compare_artifacts`. Route results include full Choice probabilities and confidence plus the
+The Pi package exposes the same operations as `kiln_decisioning_capability`, `kiln_route_turn`,
+`kiln_compare_artifacts`, and `kiln_rank_trace_targets`. Route results include full Choice probabilities and confidence plus the
 deterministic next action. Comparison results include one probability distribution per candidate.
+Trace recommendations preserve the same distributions but cannot create a trace or widen the target
+types declared by the source artifact's schema.
 
 Kiln intentionally ships no automatic-action confidence threshold. Thresholds must be calibrated against
 project-specific examples and a pinned Jev model before they can safely suppress context or automate a
