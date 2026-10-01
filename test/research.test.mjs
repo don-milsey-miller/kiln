@@ -115,8 +115,66 @@ test("search returns discovery, tagged as not-evidence", async () => {
   });
   const out = await createResearchTools(adapter).research_search({ query: "q" });
   assert.equal(out.kind, "discovery");
-  assert.deepEqual(out.results[0], { title: "T", url: "https://example.com/a", snippet: "snippet", publishedAt: "2026-01-01" });
+  assert.deepEqual(out.results[0], { id: "result-1", title: "T", url: "https://example.com/a", snippet: "snippet", publishedAt: "2026-01-01" });
+  assert.deepEqual(out.triage, { applied: false, originalCount: 1, selectedCount: 1 });
   assert.match(out.note, /Not evidence/);
+});
+
+test("#64 semantic triage removes low-value snippets from downstream context and keeps review metadata", async () => {
+  const adapter = {
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    search: async (query) => ({
+      ok: true,
+      backend: "stand-in",
+      query,
+      results: [
+        { title: "Useful", url: "https://example.com/useful", snippet: "direct answer" },
+        { title: "Duplicate", url: "https://example.com/duplicate", snippet: "repeated answer" },
+        { title: "Noise", url: "https://example.com/noise", snippet: "unrelated material" },
+      ],
+    }),
+  };
+  const semanticFilter = async ({ results }) => ({
+    ok: true,
+    backend: "typesafe",
+    model: "jev-test",
+    selectedIds: [results[0].id],
+    assessments: results.map((entry, index) => ({
+      resultId: entry.id,
+      assessment: { type: "choice", choice: index === 0 ? "essential" : index === 1 ? "duplicate" : "irrelevant", confidence: 0.9, probabilities: {} },
+    })),
+    usage: { input_tokens: 10, output_tokens: 3 },
+  });
+  const out = await createResearchTools(adapter, { semanticFilter }).research_search({ query: "q" });
+  assert.deepEqual(out.results.map((entry) => entry.id), ["result-1"]);
+  assert.equal(out.triage.applied, true);
+  assert.equal(out.triage.originalCount, 3);
+  assert.equal(out.triage.selectedCount, 1);
+  assert.deepEqual(out.triage.omitted.map((entry) => entry.id), ["result-2", "result-3"]);
+  assert.equal(JSON.stringify(out.triage.omitted).includes("repeated answer"), false, "omitted snippets still consumed downstream context");
+  assert.match(out.triage.fallback, /semanticTriage:false/);
+});
+
+test("#64 invalid or disabled semantic triage returns every original result", async () => {
+  const adapter = {
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    search: async (query) => ({ ok: true, backend: "stand-in", query, results: [
+      { title: "A", url: "https://example.com/a", snippet: "a" },
+      { title: "B", url: "https://example.com/b", snippet: "b" },
+    ] }),
+  };
+  let calls = 0;
+  const semanticFilter = async () => (calls += 1, { ok: false, reason: "invalid-response" });
+  const tools = createResearchTools(adapter, { semanticFilter });
+  const fallback = await tools.research_search({ query: "q" });
+  const disabled = await tools.research_search({ query: "q", semanticTriage: false });
+  assert.equal(fallback.results.length, 2);
+  assert.equal(fallback.triage.applied, false);
+  assert.equal(fallback.triage.reason, "invalid-response");
+  assert.equal(disabled.results.length, 2);
+  assert.equal(calls, 1, "disabled triage still invoked decisioning");
 });
 
 /* ------------------------------------------------------ the credential contract, as an invariant */

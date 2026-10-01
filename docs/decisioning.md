@@ -75,6 +75,13 @@ deterministic next action. Comparison results include one probability distributi
 Trace recommendations preserve the same distributions but cannot create a trace or widen the target
 types declared by the source artifact's schema.
 
+When both research and decisioning have been separately enabled, `research_search` performs semantic
+triage after the authorized backend returns results. Results classified `essential`, `relevant`, or
+`uncertain` remain in downstream context; `duplicate` and `irrelevant` snippets are omitted while their
+titles, URLs, assessments, probabilities, and usage remain visible in `triage.omitted`. If the backend
+is unavailable or returns an invalid decision, every original result is returned. Pass
+`semanticTriage:false` to bypass triage and inspect the complete result set.
+
 Kiln intentionally ships no automatic-action confidence threshold. Thresholds must be calibrated against
 project-specific examples and a pinned Jev model before they can safely suppress context or automate a
 branch. Until then, every result is an advisory input to Pi or the operator.

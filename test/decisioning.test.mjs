@@ -252,6 +252,35 @@ test("issue #63: Kiln refuses an illegal trace candidate before invoking decisio
   );
 });
 
+test("issue #64: research triage batches authorized results and preserves full assessments", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      usage: { input_tokens: 20, output_tokens: 4 },
+      answers: {
+        result_0: { type: "choice", choice: "essential", confidence: 0.92, probabilities: { essential: 0.92, relevant: 0.05, uncertain: 0.02, duplicate: 0, irrelevant: 0.01 } },
+        result_1: { type: "choice", choice: "duplicate", confidence: 0.81, probabilities: { essential: 0.01, relevant: 0.05, uncertain: 0.1, duplicate: 0.81, irrelevant: 0.03 } },
+        result_2: { type: "choice", choice: "uncertain", confidence: 0.46, probabilities: { essential: 0.08, relevant: 0.2, uncertain: 0.46, duplicate: 0.06, irrelevant: 0.2 } },
+      },
+    }),
+  });
+  const results = [
+    { id: "result-1", title: "Primary", url: "https://example.com/1", snippet: "direct answer" },
+    { id: "result-2", title: "Copy", url: "https://example.com/2", snippet: "same answer" },
+    { id: "result-3", title: "Maybe", url: "https://example.com/3", snippet: "ambiguous" },
+  ];
+  const out = await tools.kiln_filter_research_results({ question: "What is supported?", results });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.selectedIds, ["result-1", "result-3"], "uncertain results must remain in context");
+  assert.equal(out.assessments[1].assessment.probabilities.duplicate, 0.81);
+  assert.equal(out.originalCount, 3);
+  assert.equal(out.selectedCount, 2);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },

@@ -94,11 +94,21 @@ async function projectContext(deps = {}) {
  * the same reason none appears in the library's own contract.
  */
 async function defaultResearchTools() {
-  const [{ createResearchTools }, { createTavilyAdapter }] = await Promise.all([
+  const [{ createResearchTools }, { createTavilyAdapter }, permission] = await Promise.all([
     import("../../lib/research/tools.mjs"),
     import("../../lib/research/tavily-adapter.mjs"),
+    import("../../lib/decisioning/permission.mjs"),
   ]);
-  return createResearchTools(createTavilyAdapter());
+  let semanticFilter;
+  try {
+    if (permission.decisioningPermissionFromEnv()?.permitted) {
+      const decisioning = await defaultDecisioningTools();
+      semanticFilter = (input) => decisioning.kiln_filter_research_results(input);
+    }
+  } catch {
+    // Research remains usable when optional decisioning cannot be constructed.
+  }
+  return createResearchTools(createTavilyAdapter(), { semanticFilter });
 }
 
 /** Optional semantic decisions, constructed only after project and host permission have been proved. */
@@ -704,10 +714,14 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
     name: "research_search",
     label: "Research search",
     description:
-      "Discover candidate sources for a question. Returns titles, URLs and snippets. DISCOVERY ONLY - not evidence, and not an answer.",
+      "Discover candidate sources for a question. When separately permitted, semantic triage can omit duplicate or irrelevant snippets from downstream context. DISCOVERY ONLY - not evidence, and not an answer.",
     parameters: {
       type: "object",
-      properties: { query: { type: "string", minLength: 1 }, maxResults: { type: "integer", minimum: 1, maximum: 20 } },
+      properties: {
+        query: { type: "string", minLength: 1 },
+        maxResults: { type: "integer", minimum: 1, maximum: 20 },
+        semanticTriage: { type: "boolean" },
+      },
       required: ["query"],
       additionalProperties: false,
     },
