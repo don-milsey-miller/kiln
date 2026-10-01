@@ -720,7 +720,6 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
       properties: {
         query: { type: "string", minLength: 1 },
         maxResults: { type: "integer", minimum: 1, maximum: 20 },
-        semanticTriage: { type: "boolean" },
       },
       required: ["query"],
       additionalProperties: false,

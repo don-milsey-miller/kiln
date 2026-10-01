@@ -153,7 +153,7 @@ test("#64 semantic triage removes low-value snippets from downstream context and
   assert.equal(out.triage.selectedCount, 1);
   assert.deepEqual(out.triage.omitted.map((entry) => entry.id), ["result-2", "result-3"]);
   assert.equal(JSON.stringify(out.triage.omitted).includes("repeated answer"), false, "omitted snippets still consumed downstream context");
-  assert.match(out.triage.fallback, /semanticTriage:false/);
+  assert.match(out.triage.fallback, /Every original result/);
 });
 
 test("#64 invalid or disabled semantic triage returns every original result", async () => {

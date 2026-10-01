@@ -79,8 +79,7 @@ When both research and decisioning have been separately enabled, `research_searc
 triage after the authorized backend returns results. Results classified `essential`, `relevant`, or
 `uncertain` remain in downstream context; `duplicate` and `irrelevant` snippets are omitted while their
 titles, URLs, assessments, probabilities, and usage remain visible in `triage.omitted`. If the backend
-is unavailable or returns an invalid decision, every original result is returned. Pass
-`semanticTriage:false` to bypass triage and inspect the complete result set.
+is unavailable or returns an invalid decision, every original result is returned.
 
 Kiln intentionally ships no automatic-action confidence threshold. Thresholds must be calibrated against
 project-specific examples and a pinned Jev model before they can safely suppress context or automate a
