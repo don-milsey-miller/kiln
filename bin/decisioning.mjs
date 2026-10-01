@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { consentLocation } from "../lib/consent-record.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
-import { currentRoutingContext, readComparisonCandidates, readEvidenceRelationship, readTraceCandidates } from "../lib/decisioning/context.mjs";
+import { currentRoutingContext, readComparisonCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { configureDecisioning } from "../lib/decisioning-enablement.mjs";
 import { decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -36,6 +36,7 @@ function usage() {
     '  npm run decisioning:compare -- --project-root <dir> --type requirement --content "..." --candidates REQ-0001,REQ-0002 [--content-root <dir>]',
     "  npm run decisioning:trace -- --project-root <dir> --source CMP-0001 --field satisfies --candidates REQ-0001,REQ-0002 [--content-root <dir>]",
     "  npm run decisioning:evidence -- --project-root <dir> --assertion AST-0001 --evidence EVD-0001 [--content-root <dir>]",
+    "  npm run decisioning:review -- --project-root <dir> --artifacts REQ-0001,ACC-0001 [--content-root <dir>]",
     "",
     `${TYPESAFE.envVar} is read only after project choice and host consent permit an operation. It is never written or printed.`,
   ].join("\n");
@@ -193,6 +194,18 @@ async function evidence() {
   return out.ok ? 0 : 1;
 }
 
+async function review() {
+  const context = common();
+  if (!gate(context)) return 1;
+  const artifactIds = (flag("artifacts") ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (artifactIds.length === 0) throw new Error("A comma-separated --artifacts list is required.");
+  const ctx = planningContext(context);
+  const artifacts = readSemanticReviewArtifacts({ artifactIds }, ctx, artifactReader);
+  const out = await createDecisioningTools(createTypeSafeAdapter()).kiln_semantic_review({ artifacts });
+  console.log(JSON.stringify(out, null, 2));
+  return out.ok ? 0 : 1;
+}
+
 try {
   if (command === "configure") process.exitCode = await configure();
   else if (command === "probe") process.exitCode = await probe();
@@ -200,6 +213,7 @@ try {
   else if (command === "compare") process.exitCode = await compare();
   else if (command === "trace") process.exitCode = await trace();
   else if (command === "evidence") process.exitCode = await evidence();
+  else if (command === "review") process.exitCode = await review();
   else {
     console.error(usage());
     process.exitCode = 2;
