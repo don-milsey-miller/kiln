@@ -57,6 +57,7 @@ const REGISTERED_TOOLS = Object.freeze([
   "kiln_lint",
   "kiln_list_artifacts",
   "kiln_project_status",
+  "kiln_rank_trace_targets",
   "kiln_read_artifact",
   "kiln_read_stage_attestations",
   "kiln_resolve_question",

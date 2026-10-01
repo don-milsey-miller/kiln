@@ -788,6 +788,28 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
       additionalProperties: false,
     },
   },
+  {
+    name: "kiln_rank_trace_targets",
+    label: "Kiln rank trace targets",
+    description:
+      "Rank structurally legal trace targets by semantic relevance. Advisory only; this never creates a trace or changes graph legality.",
+    parameters: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" },
+        field: { type: "string", minLength: 1, maxLength: 100 },
+        candidateIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" },
+        },
+      },
+      required: ["sourceId", "field", "candidateIds"],
+      additionalProperties: false,
+    },
+  },
 ]);
 
 /**
@@ -1647,7 +1669,15 @@ export default function register(pi, deps = {}) {
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
-          const { readComparisonCandidates } = await import("../../lib/decisioning/context.mjs");
+          const { readComparisonCandidates, readTraceCandidates } = await import("../../lib/decisioning/context.mjs");
+          if (name === "kiln_rank_trace_targets") {
+            const bounded = readTraceCandidates(
+              { sourceId: params?.sourceId, field: params?.field, candidateIds: params?.candidateIds },
+              context.ctx,
+              reader
+            );
+            return rendered(await handler(bounded));
+          }
           const candidates = readComparisonCandidates(
             { type: params?.type, candidateIds: params?.candidateIds },
             context.ctx,

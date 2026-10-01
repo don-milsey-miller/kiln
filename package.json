@@ -37,6 +37,7 @@
     "decisioning:probe": "node bin/decisioning.mjs probe",
     "decisioning:route": "node bin/decisioning.mjs route",
     "decisioning:compare": "node bin/decisioning.mjs compare",
+    "decisioning:trace": "node bin/decisioning.mjs trace",
     "handoff": "node bin/handoff.mjs",
     "migrate:content": "node bin/migrate-content.mjs",
     "start": "node bin/start-shell.mjs"

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { consentLocation } from "../lib/consent-record.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
-import { currentRoutingContext, readComparisonCandidates } from "../lib/decisioning/context.mjs";
+import { currentRoutingContext, readComparisonCandidates, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { configureDecisioning } from "../lib/decisioning-enablement.mjs";
 import { decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -34,6 +34,7 @@ function usage() {
     "  npm run decisioning:probe -- --project-root <dir> [--local-state project|user]",
     '  npm run decisioning:route -- --project-root <dir> --request "..." [--content-root <dir>] [--local-state project|user]',
     '  npm run decisioning:compare -- --project-root <dir> --type requirement --content "..." --candidates REQ-0001,REQ-0002 [--content-root <dir>]',
+    "  npm run decisioning:trace -- --project-root <dir> --source CMP-0001 --field satisfies --candidates REQ-0001,REQ-0002 [--content-root <dir>]",
     "",
     `${TYPESAFE.envVar} is read only after project choice and host consent permit an operation. It is never written or printed.`,
   ].join("\n");
@@ -163,11 +164,27 @@ async function compare() {
   return out.ok ? 0 : 1;
 }
 
+async function trace() {
+  const context = common();
+  if (!gate(context)) return 1;
+  const sourceId = flag("source");
+  const field = flag("field");
+  const candidateIds = (flag("candidates") ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (!sourceId || !field || candidateIds.length === 0)
+    throw new Error("--source, --field, and a comma-separated --candidates list are required.");
+  const ctx = planningContext(context);
+  const bounded = readTraceCandidates({ sourceId, field, candidateIds }, ctx, artifactReader);
+  const out = await createDecisioningTools(createTypeSafeAdapter()).kiln_rank_trace_targets(bounded);
+  console.log(JSON.stringify(out, null, 2));
+  return out.ok ? 0 : 1;
+}
+
 try {
   if (command === "configure") process.exitCode = await configure();
   else if (command === "probe") process.exitCode = await probe();
   else if (command === "route") process.exitCode = await route();
   else if (command === "compare") process.exitCode = await compare();
+  else if (command === "trace") process.exitCode = await trace();
   else {
     console.error(usage());
     process.exitCode = 2;
