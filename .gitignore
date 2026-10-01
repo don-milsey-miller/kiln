@@ -47,6 +47,7 @@ yarn-error.log*
 # and become live only when a contributor explicitly runs `--self-host`.
 .pi/sessions/
 .pi/runtime/
+.pi/ingest/
 
 # --- OS -------------------------------------------------------------------
 .DS_Store

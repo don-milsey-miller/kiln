@@ -618,7 +618,7 @@ test("⚠️ an existing rule the operator wrote is OBSERVED, and never written 
 
     assert.equal(r.git.gitignore, GITIGNORE_STATUS.ADDED, rule);
     assert.ok(text.startsWith(existing), `${rule}: the operator's lines are untouched`);
-    assert.deepEqual(r.git.applied.wrote, [".pi/sessions/", ".pi/runtime/"], `${rule}: only what was missing`);
+    assert.deepEqual(r.git.applied.wrote, [".pi/sessions/", ".pi/runtime/", ".pi/ingest/"], `${rule}: only what was missing`);
     assert.equal(text.split(/\r?\n/).filter((l) => IGNORES_PLANNING.has(l.trim())).length, 1, `${rule}: not twice`);
     assert.equal(countBlocks(text), 1, rule);
   }

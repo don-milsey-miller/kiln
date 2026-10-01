@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/source.schema.json",
+  "title": "Source",
+  "description": "An ingested piece of project material and its provenance. A source records what was supplied and where its normalized representation lives; it does not interpret the material into planning decisions, requirements, assertions, or evidence.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "common.schema.json#/$defs/artifactEnvelope"
+    }
+  ],
+  "properties": {
+    "id": {
+      "pattern": "^SRC-[0-9]{4,}$"
+    },
+    "type": {
+      "const": "source"
+    },
+    "sourceKind": {
+      "enum": [
+        "text",
+        "document",
+        "audio",
+        "image"
+      ],
+      "description": "The broad class of supplied material, determined by inspection rather than trusted from its filename.",
+      "x-materiality": "semantic"
+    },
+    "relationship": {
+      "enum": [
+        "project-manager-input",
+        "external-reference"
+      ],
+      "description": "Whether the material expresses first-party project intent or is an external reference. Processors never infer this value.",
+      "x-materiality": "semantic"
+    },
+    "origin": {
+      "type": "object",
+      "description": "Portable provenance for the intake event. No absolute local path is permitted or stored.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "upload",
+            "inbox"
+          ]
+        },
+        "filename": {
+          "$ref": "common.schema.json#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "kind",
+        "filename"
+      ],
+      "additionalProperties": false,
+      "x-materiality": "structural"
+    },
+    "integrity": {
+      "type": "object",
+      "description": "Content-addressed identity and inspected media facts for the retained raw object.",
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mediaType": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+        }
+      },
+      "required": [
+        "sha256",
+        "bytes",
+        "mediaType"
+      ],
+      "additionalProperties": false,
+      "x-materiality": "structural"
+    },
+    "derivedPayload": {
+      "$ref": "common.schema.json#/$defs/payloadRef",
+      "description": "The normalized, human-readable representation consumed by the planning orchestrator. The path is relative to planning-content and never names the retained raw blob.",
+      "properties": {
+        "format": {
+          "const": "markdown"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^sources/SRC-[0-9]{4,}/[A-Za-z0-9._-]+\\.md$"
+        }
+      },
+      "x-materiality": "semantic"
+    },
+    "processor": {
+      "type": "object",
+      "description": "Reproducibility metadata for the extraction step; operational job state remains under .pi/ingest/jobs.",
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/nonEmptyString"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "x-materiality": "advisory"
+    },
+    "notes": {
+      "type": "string",
+      "x-materiality": "cosmetic"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true,
+      "x-materiality": "advisory",
+      "x-amendsApproval": false
+    }
+  },
+  "required": [
+    "sourceKind",
+    "relationship",
+    "origin",
+    "integrity",
+    "derivedPayload",
+    "processor"
+  ],
+  "unevaluatedProperties": false,
+  "x-artifactType": "source",
+  "x-stage": "01-intake",
+  "x-unresolvableTraceTargets": {
+    "description": "A source initially owns provenance only and declares no downstream trace fields.",
+    "targets": []
+  }
+}

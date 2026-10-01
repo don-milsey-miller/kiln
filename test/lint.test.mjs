@@ -416,6 +416,7 @@ test("#90: x-stage disagreeing with stages/ is an error, and stages/ is the auth
 
     // And with defs that agree, nothing fires.
     const right = {
+      "01-intake": { id: "01-intake", produces: ["source"] },
       "02-intent-decomposition": { id: "02-intent-decomposition", produces: ["requirement"] },
       "03-discovery": { id: "03-discovery", produces: ["assertion", "evidence"] },
       "04-requirement-gaps": { id: "04-requirement-gaps", produces: ["decision", "question"] },

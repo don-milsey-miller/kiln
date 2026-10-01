@@ -82,8 +82,10 @@ async function project({ traceTargets = false } = {}) {
   // `kiln_project_status` supplies the Stage 1 document and refuses without it (D19), as a real project has it.
   mkdirSync(join(contentRoot, "stages"), { recursive: true });
   mkdirSync(join(contentRoot, "payloads"), { recursive: true });
+  mkdirSync(join(contentRoot, "sources", "SRC-0001"), { recursive: true });
   writeFileSync(join(contentRoot, "payloads", "model.schema.json"), "{}\n");
   writeFileSync(join(contentRoot, "payloads", "openapi.json"), "{}\n");
+  writeFileSync(join(contentRoot, "sources", "SRC-0001", "content.md"), "Imported source\n");
   writeFileSync(
     join(contentRoot, "stages", "01-intake.md"),
     `# Stage 01 - Intake\n\n${intakeSection()}\n## Working notes\n\n_Nothing yet._\n`
@@ -207,6 +209,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_create_requirement",
       "kiln_create_runbook_step",
       "kiln_create_schema",
+      "kiln_create_source",
       "kiln_create_task",
       "kiln_create_wireframe",
       "kiln_decisioning_capability",
@@ -551,6 +554,15 @@ const MINIMAL = {
     implements: ["CMP-0001"],
     fulfils: ["REQ-0001"],
   },
+  kiln_create_source: {
+    title: "Imported notes",
+    sourceKind: "text",
+    relationship: "project-manager-input",
+    origin: { kind: "upload", filename: "notes.txt" },
+    integrity: { sha256: "a".repeat(64), bytes: 16, mediaType: "text/plain" },
+    derivedPayload: { format: "markdown", path: "sources/SRC-0001/content.md" },
+    processor: { id: "text/deterministic" },
+  },
 };
 
 const CREATED_TYPE = {
@@ -566,6 +578,7 @@ const CREATED_TYPE = {
   kiln_create_wireframe: "wireframe",
   kiln_create_acceptance_criterion: "acceptance-criterion",
   kiln_create_task: "task",
+  kiln_create_source: "source",
 };
 
 const creationTools = () => [...registered().keys()].filter((n) => n.startsWith("kiln_create_")).sort();
@@ -611,7 +624,7 @@ test("issue #17: every creation tool publishes its complete caller-owned authori
 
 test("⚠️ ACC-0065 every creation tool creates its own artifact type, through the typed registry", async () => {
   const { contentRoot } = await project({ traceTargets: true });
-  assert.deepEqual(creationTools(), Object.keys(CREATED_TYPE).sort(), "all twelve are registered, and only those");
+  assert.deepEqual(creationTools(), Object.keys(CREATED_TYPE).sort(), "all thirteen are registered, and only those");
 
   for (const name of creationTools()) {
     const tools = registered();
@@ -791,9 +804,9 @@ test("⚠️ ACC-0065 the wire names map to the registry entries they claim, one
   assert.deepEqual(
     Object.values(CREATED_TYPE).sort(),
     Object.keys(TYPED_TOOLS).sort(),
-    "the twelve tools and the registry's types are the same set"
+    "the thirteen tools and the registry's types are the same set"
   );
-  assert.equal(new Set(Object.values(CREATED_TYPE)).size, 12, "and no two tools claim the same type");
+  assert.equal(new Set(Object.values(CREATED_TYPE)).size, 13, "and no two tools claim the same type");
 });
 
 

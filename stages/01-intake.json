@@ -2,7 +2,9 @@
   "id": "01-intake",
   "name": "Intake",
   "decidedBy": "User",
-  "produces": [],
+  "produces": [
+    "source"
+  ],
   "producesProse": "Verbatim request, context, stakeholders, constraints stated up front.",
   "exitCriteria": [
     {
@@ -46,7 +48,7 @@
     ],
     "constraints": [
       "Do not propose, name or imply a solution, a technology or a design.",
-      "Do not author a typed artifact; this stage produces none."
+      "Do not interpret a source during extraction; source artifacts preserve supplied material and provenance only."
     ]
   },
   "delegations": [],
@@ -57,7 +59,7 @@
     ],
     "mayNotTouch": [
       "Another stage's document.",
-      "Any typed artifact, because this stage produces none."
+      "Any typed artifact other than source; source creation occurs only through the ingestion or typed-source boundary."
     ]
   },
   "approvalBoundary": {
