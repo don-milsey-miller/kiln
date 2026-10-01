@@ -50,9 +50,11 @@ npm run test:ci:consumer
 npm run test:pi-compat
 ```
 
-`npm test` remains the complete local suite. Group commands use the same Node test runner and print a
-ranked `[kiln-ci-profile]` table for the 15 slowest files plus group wall time. CI therefore records
-separate Ubuntu and Windows measurements in ordinary logs without a second profiling execution.
+`npm test` remains the complete local suite. It runs those five exhaustive groups serially, in separate
+Node processes, so setup or consumer journeys that install dependencies can never overlap a group that
+is importing or inspecting the checkout's `node_modules`. Group commands use the same Node test runner
+and print a ranked `[kiln-ci-profile]` table for the 15 slowest files plus group wall time. CI therefore
+records separate Ubuntu and Windows measurements in ordinary logs without a second profiling execution.
 
 When adding a test, place it in exactly one group based on what it exercises. The classification test
 will reject an unclassified file. Do not choose a broader group merely because it is convenient:
