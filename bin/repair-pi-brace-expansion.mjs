@@ -2,7 +2,7 @@
 /** Keep Pi's published shrinkwrap from reinstalling a vulnerable brace-expansion release. */
 
 import { cpSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PATCHED_BRACE_EXPANSION = "5.0.12";
@@ -62,7 +62,7 @@ export function repairPiBraceExpansion(root, { check = false } = {}) {
   return { repaired: current !== PATCHED_BRACE_EXPANSION, version: PATCHED_BRACE_EXPANSION };
 }
 
-const invoked = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+const invoked = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (invoked) {
   try {
     const root = join(dirname(fileURLToPath(import.meta.url)), "..");
