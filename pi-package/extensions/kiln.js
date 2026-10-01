@@ -858,6 +858,23 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
       additionalProperties: false,
     },
   },
+  {
+    name: "kiln_review_proposal",
+    label: "Kiln review proposal",
+    description:
+      "Review a stage-permitted material change before it is presented for operator approval. Advisory only; this cannot mutate state or record approval.",
+    parameters: {
+      type: "object",
+      properties: {
+        operation: { type: "string", pattern: "^(create|mutate):[a-z][a-zA-Z0-9-]*$" },
+        proposal: { type: "string", minLength: 1, maxLength: 24000 },
+        targetIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" } },
+        contextIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" } },
+      },
+      required: ["operation", "proposal"],
+      additionalProperties: false,
+    },
+  },
 ]);
 
 /**
@@ -1343,7 +1360,9 @@ const failClosedStageContext = (code) =>
 export const MATERIAL_CHANGE_RULE = [
   "Kiln rule, for every turn of this session, and nothing below replaces it:",
   "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say in a turn of its",
-  "own which artifact you propose to create or change and what the change would be, then stop and wait for",
+  "own which artifact you propose to create or change and what the change would be. When optional decisioning is available, call",
+  "`kiln_review_proposal` first and include any advisory concern in that proposal; an unavailable review does not replace or block",
+  "the existing approval path. Then stop and wait for",
   "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
   "rejects it, cancels, or does not reply, make no mutating tool call.",
   "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
@@ -1717,7 +1736,7 @@ export default function register(pi, deps = {}) {
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
-          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship, readSemanticReviewArtifacts } = await import("../../lib/decisioning/context.mjs");
+          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, currentProposalContext } = await import("../../lib/decisioning/context.mjs");
           if (name === "kiln_rank_trace_targets") {
             const bounded = readTraceCandidates(
               { sourceId: params?.sourceId, field: params?.field, candidateIds: params?.candidateIds },
@@ -1741,6 +1760,19 @@ export default function register(pi, deps = {}) {
               reader
             );
             return rendered(await handler({ artifacts }));
+          }
+          if (name === "kiln_review_proposal") {
+            const bounded = currentProposalContext(
+              {
+                operation: params?.operation,
+                targetIds: params?.targetIds ?? [],
+                contextIds: params?.contextIds ?? [],
+              },
+              context.ctx,
+              reader,
+              { toolRoot: context.toolRoot }
+            );
+            return rendered(await handler({ ...bounded, proposal: params?.proposal }));
           }
           const candidates = readComparisonCandidates(
             { type: params?.type, candidateIds: params?.candidateIds },

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { consentLocation } from "../lib/consent-record.mjs";
 import { readActivatedTypes } from "../lib/activation.mjs";
-import { currentRoutingContext, readComparisonCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, readTraceCandidates } from "../lib/decisioning/context.mjs";
+import { currentProposalContext, currentRoutingContext, readComparisonCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { configureDecisioning } from "../lib/decisioning-enablement.mjs";
 import { decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -37,6 +37,7 @@ function usage() {
     "  npm run decisioning:trace -- --project-root <dir> --source CMP-0001 --field satisfies --candidates REQ-0001,REQ-0002 [--content-root <dir>]",
     "  npm run decisioning:evidence -- --project-root <dir> --assertion AST-0001 --evidence EVD-0001 [--content-root <dir>]",
     "  npm run decisioning:review -- --project-root <dir> --artifacts REQ-0001,ACC-0001 [--content-root <dir>]",
+    '  npm run decisioning:proposal -- --project-root <dir> --operation mutate:reviseArtifact --proposal "..." [--targets REQ-0001] [--context DEC-0001]',
     "",
     `${TYPESAFE.envVar} is read only after project choice and host consent permit an operation. It is never written or printed.`,
   ].join("\n");
@@ -206,6 +207,25 @@ async function review() {
   return out.ok ? 0 : 1;
 }
 
+async function proposal() {
+  const context = common();
+  if (!gate(context)) return 1;
+  const operation = flag("operation");
+  const proposalText = flag("proposal");
+  if (!operation || !proposalText) throw new Error("--operation and --proposal are required.");
+  const split = (name) => (flag(name) ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  const ctx = planningContext(context);
+  const bounded = currentProposalContext(
+    { operation, targetIds: split("targets"), contextIds: split("context") },
+    ctx,
+    artifactReader,
+    { toolRoot: TOOL_ROOT }
+  );
+  const out = await createDecisioningTools(createTypeSafeAdapter()).kiln_review_proposal({ ...bounded, proposal: proposalText });
+  console.log(JSON.stringify(out, null, 2));
+  return out.ok ? 0 : 1;
+}
+
 try {
   if (command === "configure") process.exitCode = await configure();
   else if (command === "probe") process.exitCode = await probe();
@@ -214,6 +234,7 @@ try {
   else if (command === "trace") process.exitCode = await trace();
   else if (command === "evidence") process.exitCode = await evidence();
   else if (command === "review") process.exitCode = await review();
+  else if (command === "proposal") process.exitCode = await proposal();
   else {
     console.error(usage());
     process.exitCode = 2;

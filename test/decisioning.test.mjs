@@ -348,6 +348,34 @@ test("issue #66: semantic review is separate from deterministic lint and has no 
   assert.equal(out.policy.automaticAction, false);
 });
 
+test("issue #67: proposal review cannot mutate or record operator approval", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        proposal_concern: { type: "choice", choice: "broadens_scope", confidence: 0.84, probabilities: { clear: 0.05, broadens_scope: 0.84, wrong_stage: 0.11 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_review_proposal({
+    operation: "mutate:reviseArtifact",
+    proposal: "Add an unrelated analytics requirement.",
+    stage: { id: "04-requirement-gaps", purpose: "Close requirement gaps." },
+    targetArtifacts: [{ id: "REQ-0001", type: "requirement", artifact: { statement: "Authenticate users." } }],
+    contextArtifacts: [],
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-proposal-review");
+  assert.equal(out.assessment.choice, "broadens_scope");
+  assert.equal(out.mayMutate, false);
+  assert.equal(out.approvalRecorded, false);
+  assert.equal(out.policy.automaticAction, false);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },

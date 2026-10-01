@@ -170,6 +170,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "kiln_read_artifact",
           "kiln_read_stage_attestations",
           "kiln_resolve_question",
+          "kiln_review_proposal",
           "kiln_revise_artifact",
           "kiln_route_turn",
           "kiln_semantic_review",
