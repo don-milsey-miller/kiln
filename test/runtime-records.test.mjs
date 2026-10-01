@@ -1,7 +1,7 @@
 /**
- * The five persisted runtime records — schemas, and the rules that are load-bearing in them.
+ * The persisted runtime records — schemas, and the rules that are load-bearing in them.
  *
- * ⚠️ **THESE ARE CONTRACTS, NOT CONFIGURATION.** Kiln invents, writes, versions and reads all five,
+ * ⚠️ **THESE ARE CONTRACTS, NOT CONFIGURATION.** Kiln invents, writes, versions and reads all of them,
  * so a shape nobody validates is a comment. `.pi/settings.json` is the opposite case and is
  * deliberately NOT the precedent: Pi owns that file, the operator may hand-edit it, and Kiln merges
  * four keys into it defensively.
@@ -536,6 +536,7 @@ test("every record requires its own version, and versions are per record", () =>
     const minimal = {
       "kiln-project": { projectId: PROJECT_ID },
       consent: {},
+      "approved-model-pool-state": { entries: {} },
       "setup-transaction": { operation: "setup", startedAt: NOW, phases: [{ name: "x", status: "pending" }] },
       "kiln-session": { projectId: PROJECT_ID, sessionId: "x", stateMode: "project" },
       "model-compatibility": { key: COMPAT_KEY, result: { outcome: "passed", observedAt: NOW } },
@@ -559,6 +560,7 @@ test("no runtime schema permits an unknown property, at the top level OR nested"
   const TOP = {
     "kiln-project": { recordVersion: 1, projectId: PROJECT_ID },
     consent: { recordVersion: 1 },
+    "approved-model-pool-state": { recordVersion: 1, entries: {} },
     "setup-transaction": { recordVersion: 1, operation: "setup", startedAt: NOW, phases: [{ name: "x", status: "pending" }] },
     "kiln-session": { recordVersion: 1, projectId: PROJECT_ID, sessionId: "x", stateMode: "project" },
   };
@@ -570,6 +572,16 @@ test("no runtime schema permits an unknown property, at the top level OR nested"
     ["consent", { recordVersion: 1, inspection: { ...GRANT, sneaked: "x" } }],
     ["consent", { recordVersion: 1, modelUse: { ...GRANT, provider: "p", model: "m", sneaked: "x" } }],
     ["consent", { recordVersion: 1, research: { ...GRANT, provider: "tavily", sneaked: "x" } }],
+    ["approved-model-pool-state", {
+      recordVersion: 1,
+      entries: {
+        model: {
+          identity: { provider: "p", model: "m", thinkingLevel: "high", sneaked: "x" },
+          credentialRoute: { kind: "provider-default" },
+          grant: { ...GRANT },
+        },
+      },
+    }],
     ["setup-transaction", { ...TOP["setup-transaction"], phases: [{ name: "x", status: "pending", sneaked: "y" }] }],
     ["setup-transaction", { ...TOP["setup-transaction"], fileIdentities: [{ path: "a", state: "absent", sneaked: "y" }] }],
     ["setup-transaction", { ...TOP["setup-transaction"], recovery: { command: "c", sneaked: "y" } }],

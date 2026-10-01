@@ -59,10 +59,24 @@ closed set. The result is advisory, preserves all probabilities, and explicitly 
 execution nor billing authorization. The launch boundary must repeat every deterministic check before
 use; a transcript recommendation is never a capability token.
 
-## Integration decision
+## Host-local runtime prerequisite
 
-Do not wire dynamic routing into setup, Pi tools, delegation, or launch yet. The current consent schema
-holds one `modelUse` grant and the current compatibility location holds one record. Reusing either for a
-pool would let one approval or proof stand for another model. Runtime integration therefore requires a
-separate migration and setup UX, keyed host-local storage, atomic invalidation, and launch checks before
-the prototype can safely become reachable.
+Issue #82 adds `runtime/approved-model-pool-state.json`, a separately ignored and Git-checked host-local
+record. It keeps each exact pool entry's positive or negative decision, credential route name, and
+optional compatibility proof together. Removing an entry or changing its provider, model, or thinking
+level removes the decision and proof in one atomic replacement. Changing a credential route replaces
+that entry and clears its proof.
+
+`configureApprovedModelPool()` is the setup-facing flow: it reconciles the committed pool, confirms each
+new or changed entry independently, and allows a canary only after that entry receives an explicit yes.
+`approvedModelPoolLaunchState()` is the launch-facing gate: it recomputes the complete compatibility key
+from current runtime inputs for every positive entry and exports only exact, current proofs to the
+bounded router. Neither function accepts a transcript's claim as authority.
+
+The singleton migration is deliberately narrow. It moves an existing `modelUse` decision only when one
+pool entry matches, and copies the old proof only when its complete key names that same exact identity.
+Ambiguity migrates nothing. A clone receives none of these records.
+
+Dynamic routing remains unregistered as a Pi tool and cannot launch a model. A later integration may
+connect the guarded router only through these setup and launch boundaries; it must not reuse the legacy
+singleton records or weaken the current single-model path.
