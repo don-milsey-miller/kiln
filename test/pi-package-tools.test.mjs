@@ -50,8 +50,11 @@ const PROJECTLESS = new Set([
   // Permission is deliberately checked before either of these resolves planning content.
   "kiln_compare_artifacts",
   "kiln_decisioning_capability",
+  "kiln_prioritize_intake_uncertainty",
   "kiln_rank_trace_targets",
   "kiln_route_turn",
+  "kiln_route_specialist",
+  "kiln_review_proposal",
   "kiln_semantic_review",
   "kiln_verify_evidence_relationship",
   "research_capability",
@@ -212,12 +215,15 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_link_trace",
       "kiln_lint",
       "kiln_list_artifacts",
+      "kiln_prioritize_intake_uncertainty",
       "kiln_project_status",
       "kiln_rank_trace_targets",
       "kiln_read_artifact",
       "kiln_read_stage_attestations",
       "kiln_resolve_question",
+      "kiln_review_proposal",
       "kiln_revise_artifact",
+      "kiln_route_specialist",
       "kiln_route_turn",
       "kiln_semantic_review",
       "kiln_set_lifecycle",
@@ -1362,7 +1368,7 @@ const withDecisioning = ({ decisioningTools, artifactReader } = {}) => {
 test("issue #59: decisioning tools register with the vendor-neutral contract", async () => {
   const { DECISIONING_TOOL_SIGNATURES } = await import("../lib/decisioning/tools.mjs");
   const tools = registered();
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_prioritize_intake_uncertainty", "kiln_route_specialist", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review", "kiln_review_proposal"]) {
     const tool = tools.get(name);
     assert.ok(tool, `${name} is not registered`);
     assert.deepEqual(tool.parameters, DECISIONING_TOOL_SIGNATURES[name].input);
@@ -1379,6 +1385,14 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
       seen.push({ name: "route", input });
       return { tool: "kiln_route_turn", ok: true, stageId: input.stage.id };
     },
+    kiln_prioritize_intake_uncertainty: async (input) => {
+      seen.push({ name: "intake", input });
+      return { tool: "kiln_prioritize_intake_uncertainty", ok: true, stageId: input.stage.id, category: "objective" };
+    },
+    kiln_route_specialist: async (input) => {
+      seen.push({ name: "specialist", input });
+      return { tool: "kiln_route_specialist", ok: true, permittedRoles: input.permittedRoles };
+    },
     kiln_compare_artifacts: async (input) => {
       seen.push({ name: "compare", input });
       return { tool: "kiln_compare_artifacts", ok: true, ids: input.candidates.map((candidate) => candidate.id) };
@@ -1394,6 +1408,10 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
     kiln_semantic_review: async (input) => {
       seen.push({ name: "semantic-review", input });
       return { tool: "kiln_semantic_review", ok: true, ids: input.artifacts.map((artifact) => artifact.id), gateEffect: "none" };
+    },
+    kiln_review_proposal: async (input) => {
+      seen.push({ name: "proposal", input });
+      return { tool: "kiln_review_proposal", ok: true, operation: input.operation, stageId: input.stage.id };
     },
   };
   const artifactReader = {
@@ -1430,6 +1448,8 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
 
   const capability = await invoke(tools.get("kiln_decisioning_capability"), contentRoot);
   const route = await invoke(tools.get("kiln_route_turn"), contentRoot, { request: "Split authentication into its own requirement." });
+  const intakePriority = await invoke(tools.get("kiln_prioritize_intake_uncertainty"), contentRoot, { context: "The desired outcome is still unclear." });
+  const specialistRoute = await invoke(tools.get("kiln_route_specialist"), contentRoot, { task: "Research and validate the approach." });
   const compared = await invoke(tools.get("kiln_compare_artifacts"), contentRoot, {
     type: "requirement",
     content: "Authentication must use short-lived tokens.",
@@ -1447,27 +1467,50 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
   const reviewed = await invoke(tools.get("kiln_semantic_review"), contentRoot, {
     artifactIds: ["REQ-0001", "REQ-0002"],
   });
+  const proposal = await invoke(tools.get("kiln_review_proposal"), contentRoot, {
+    operation: "mutate:writeStageDocument",
+    proposal: "Record the operator's clarified objective.",
+    contextIds: ["REQ-0001"],
+  });
+  const outOfStageProposal = await invoke(tools.get("kiln_review_proposal"), contentRoot, {
+    operation: "create:requirement",
+    proposal: "Create a requirement before Stage 2.",
+  });
 
   assert.equal(capability.details.available, true);
   assert.equal(route.details.stageId, "01-intake");
+  assert.equal(intakePriority.details.stageId, "01-intake");
+  assert.equal(intakePriority.details.category, "objective");
+  assert.equal(specialistRoute.details.kind, "not-applicable");
+  assert.deepEqual(specialistRoute.details.permittedRoles, []);
+  assert.equal(specialistRoute.details.delegationAuthorized, false);
   assert.deepEqual(compared.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.deepEqual(ranked.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.equal(evidence.details.recordedRelationship, "support");
   assert.deepEqual(reviewed.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.equal(reviewed.details.gateEffect, "none");
+  assert.equal(proposal.details.operation, "mutate:writeStageDocument");
+  assert.equal(proposal.details.stageId, "01-intake");
+  assert.equal(outOfStageProposal.details.ok, false);
+  assert.match(outOfStageProposal.details.message, /not permitted by stage 01-intake/);
   assert.equal(seen[0].input.request, "Split authentication into its own requirement.");
   assert.ok(seen[0].input.stage.permittedActivities.includes("question"));
   assert.ok(seen[0].input.stage.permittedToolFamilies.includes("read"));
-  assert.deepEqual(seen[1].input.candidates.map((candidate) => candidate.artifact), [
+  assert.equal(seen[1].input.context, "The desired outcome is still unclear.");
+  assert.equal(seen[1].input.stage.id, "01-intake");
+  assert.deepEqual(seen[2].input.candidates.map((candidate) => candidate.artifact), [
     { id: "REQ-0001", type: "requirement", title: "Requirement REQ-0001", statement: "A bounded requirement." },
     { id: "REQ-0002", type: "requirement", title: "Requirement REQ-0002", statement: "A bounded requirement." },
   ]);
-  assert.deepEqual(seen[2].input.allowedTypes, ["requirement"]);
-  assert.deepEqual(seen[2].input.candidates.map((candidate) => candidate.id), ["REQ-0001", "REQ-0002"]);
-  assert.equal(seen[3].input.assertion.id, "AST-0001");
-  assert.equal(seen[3].input.evidence.id, "EVD-0001");
-  assert.equal(seen[3].input.recordedRelationship, "support");
-  assert.deepEqual(seen[4].input.artifacts.map((artifact) => artifact.id), ["REQ-0001", "REQ-0002"]);
+  assert.deepEqual(seen[3].input.allowedTypes, ["requirement"]);
+  assert.deepEqual(seen[3].input.candidates.map((candidate) => candidate.id), ["REQ-0001", "REQ-0002"]);
+  assert.equal(seen[4].input.assertion.id, "AST-0001");
+  assert.equal(seen[4].input.evidence.id, "EVD-0001");
+  assert.equal(seen[4].input.recordedRelationship, "support");
+  assert.deepEqual(seen[5].input.artifacts.map((artifact) => artifact.id), ["REQ-0001", "REQ-0002"]);
+  assert.equal(seen[6].input.proposal, "Record the operator's clarified objective.");
+  assert.deepEqual(seen[6].input.contextArtifacts.map((artifact) => artifact.id), ["REQ-0001"]);
+  assert.equal(seen.length, 7, "an out-of-stage proposal reached semantic decisioning");
 });
 
 test("issue #59: decisioning permission refuses before an adapter or project reader runs", async () => {
@@ -1482,7 +1525,7 @@ test("issue #59: decisioning permission refuses before an adapter or project rea
     }
   );
 
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_prioritize_intake_uncertainty", "kiln_route_specialist", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship", "kiln_semantic_review", "kiln_review_proposal"]) {
     const result = await invokeAnywhere(tools.get(name), {});
     assert.equal(result.details.ok, false);
     assert.equal(result.details.reason, "decisioning-not-granted");

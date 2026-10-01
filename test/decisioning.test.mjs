@@ -348,6 +348,180 @@ test("issue #66: semantic review is separate from deterministic lint and has no 
   assert.equal(out.policy.automaticAction, false);
 });
 
+test("issue #67: proposal review cannot mutate or record operator approval", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        proposal_concern: { type: "choice", choice: "broadens_scope", confidence: 0.84, probabilities: { clear: 0.05, broadens_scope: 0.84, wrong_stage: 0.11 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_review_proposal({
+    operation: "mutate:reviseArtifact",
+    proposal: "Add an unrelated analytics requirement.",
+    stage: { id: "04-requirement-gaps", purpose: "Close requirement gaps." },
+    targetArtifacts: [{ id: "REQ-0001", type: "requirement", artifact: { statement: "Authenticate users." } }],
+    contextArtifacts: [],
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-proposal-review");
+  assert.equal(out.assessment.choice, "broadens_scope");
+  assert.equal(out.mayMutate, false);
+  assert.equal(out.approvalRecorded, false);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #68: specialist verification is advisory and preserves full probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        specialist_result: {
+          type: "choice",
+          choice: "unsupported_claim",
+          confidence: 0.81,
+          probabilities: { aligned: 0.04, incomplete: 0.1, unsupported_claim: 0.81, conflicts_with_observation: 0.03, off_task: 0.02 },
+        },
+      },
+    }),
+  });
+  const out = await tools.kiln_verify_specialist_result({
+    task: "Identify which source supports the release date.",
+    role: "research",
+    output: "Every source proves the release is Friday.",
+    observation: { taskBindingObserved: true, activeTools: ["research_search"], timedOut: false },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-specialist-verification");
+  assert.equal(out.assessment.choice, "unsupported_claim");
+  assert.equal(out.assessment.probabilities.unsupported_claim, 0.81);
+  assert.equal(out.reviewRecommended, true);
+  assert.equal(out.mechanicalAcceptancePreserved, true);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #68: invalid or unavailable specialist verification cannot revoke execution", async () => {
+  const invalid = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({ ok: true, answers: { specialist_result: { type: "choice", choice: "invented", confidence: 1, probabilities: { invented: 1 } } } }),
+  });
+  const result = await invalid.kiln_verify_specialist_result({
+    task: "Check the plan.", role: "validation", output: "Checked.", observation: { taskBindingObserved: true },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "capability-unavailable");
+  assert.equal(result.reason, "invalid-response");
+});
+
+test("issue #69: intake prioritization is bounded and cannot author a question or satisfy a gate", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async ({ questions }) => {
+      assert.deepEqual(Object.keys(questions.highest_impact_uncertainty.criteria), [
+        "objective", "scope", "stakeholder", "constraint", "success_condition", "dependency",
+      ]);
+      return {
+        ok: true,
+        backend: "stand-in",
+        model: "jev-test",
+        answers: {
+          highest_impact_uncertainty: {
+            type: "choice",
+            choice: "success_condition",
+            confidence: 0.51,
+            probabilities: { objective: 0.08, scope: 0.12, stakeholder: 0.05, constraint: 0.1, success_condition: 0.51, dependency: 0.14 },
+          },
+        },
+      };
+    },
+  });
+  const out = await tools.kiln_prioritize_intake_uncertainty({
+    context: "We know the audience and scope, but not how success will be measured.",
+    stage: { id: "01-intake", purpose: "Clarify the problem.", blockers: [], nextAction: "Ask one question." },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.recommendation.choice, "success_condition");
+  assert.equal(out.recommendation.probabilities.dependency, 0.14);
+  assert.equal(out.questionText, null);
+  assert.equal(out.stageGateEffect, "none");
+  assert.match(out.fallback, /Pi/);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #69: an out-of-contract intake category falls back", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { highest_impact_uncertainty: { type: "choice", choice: "budget", confidence: 1, probabilities: { budget: 1 } } },
+    }),
+  });
+  const out = await tools.kiln_prioritize_intake_uncertainty({
+    context: "Clarify the project.", stage: { id: "01-intake" },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, "invalid-response");
+  assert.match(out.fallback, /Pi/);
+});
+
+test("issue #70: specialist routing is bounded to stage-permitted roles and preserves probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async ({ questions }) => {
+      assert.deepEqual(Object.keys(questions.specialist_role.criteria), ["research", "validation"]);
+      return {
+        ok: true, backend: "stand-in", model: "jev-test",
+        answers: { specialist_role: { type: "choice", choice: "validation", confidence: 0.72, probabilities: { research: 0.28, validation: 0.72 } } },
+      };
+    },
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Run the declared checks and compare the results with published guidance.",
+    stage: { id: "06-risk-feasibility", purpose: "Test feasibility." },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find external sources.", validation: "Run declared validation jobs." },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.recommendation.choice, "validation");
+  assert.equal(out.recommendation.probabilities.research, 0.28);
+  assert.deepEqual(out.permittedRoles, ["research", "validation"]);
+  assert.equal(out.delegationAuthorized, false);
+  assert.match(out.fallback, /Pi/);
+});
+
+test("issue #70: an out-of-policy specialist role is rejected", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      answers: { specialist_role: { type: "choice", choice: "security", confidence: 1, probabilities: { security: 1 } } },
+    }),
+  });
+  const out = await tools.kiln_route_specialist({
+    task: "Assess the risk.",
+    stage: { id: "06-risk-feasibility" },
+    permittedRoles: ["research", "validation"],
+    roleCriteria: { research: "Find sources.", validation: "Run checks." },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, "invalid-response");
+  assert.match(out.fallback, /Pi/);
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },

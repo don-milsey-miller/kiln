@@ -1,6 +1,6 @@
 # Optional semantic decisioning with TypeSafe Jev
 
-Kiln can use TypeSafe Jev for five bounded, advisory decisions:
+Kiln can use TypeSafe Jev for six bounded, advisory decisions:
 
 - classify a user request into an activity and tool family already permitted by the current stage;
 - compare a proposed artifact with selected existing artifacts as `distinct`, `duplicate`, `overlaps`,
@@ -8,6 +8,7 @@ Kiln can use TypeSafe Jev for five bounded, advisory decisions:
 - rank only the trace targets that Kiln has already proved structurally legal for a source field.
 - verify whether linked evidence semantically supports, contradicts, or says nothing about its assertion.
 - review validated planning artifacts for bounded quality concerns without affecting deterministic lint.
+- review a deterministically permitted material-change proposal before operator approval.
 
 Jev never grants a tool, changes project state, satisfies a stage gate, records an approval, or replaces
 Kiln's deterministic validation. If TypeSafe is unavailable or returns an answer outside the permitted
@@ -78,11 +79,28 @@ npm --prefix .planning run decisioning:evidence -- \
 npm --prefix .planning run decisioning:review -- \
   --project-root . \
   --artifacts REQ-0001,ACC-0001
+
+npm --prefix .planning run decisioning:proposal -- \
+  --project-root . \
+  --operation mutate:reviseArtifact \
+  --proposal "Add an authentication constraint" \
+  --targets REQ-0001 \
+  --context DEC-0001
+
+npm --prefix .planning run decisioning:intake -- \
+  --project-root . \
+  --context "The audience is known, but a measurable success condition is not."
+
+npm --prefix .planning run decisioning:specialist -- \
+  --project-root . \
+  --task "Compare the published constraint with the declared validation result."
 ```
 
 The Pi package exposes the same operations as `kiln_decisioning_capability`, `kiln_route_turn`,
+`kiln_prioritize_intake_uncertainty`,
+`kiln_route_specialist`,
 `kiln_compare_artifacts`, `kiln_rank_trace_targets`, `kiln_verify_evidence_relationship`, and
-`kiln_semantic_review`. Route results include full Choice probabilities and confidence plus the
+`kiln_semantic_review`, and `kiln_review_proposal`. Route results include full Choice probabilities and confidence plus the
 deterministic next action. Comparison results include one probability distribution per candidate.
 Trace recommendations preserve the same distributions but cannot create a trace or widen the target
 types declared by the source artifact's schema.
@@ -94,6 +112,22 @@ the evidence lifecycle, the derived verdict, or the confidence rung.
 `kiln_semantic_review` reports bounded concerns such as compound scope, subjectivity, misalignment,
 overlap, or excessive breadth. Its result is explicitly `advisory-semantic-review` with
 `gateEffect:"none"`; `kiln_lint` remains the deterministic, reproducible, gate-capable check.
+
+`kiln_review_proposal` runs only after Kiln proves that the named create or mutate operation is legal
+for the current stage. It can surface duplication, contradiction, scope expansion, non-goal conflict,
+wrong-target, or wrong-stage concerns before the proposal is presented. The result carries
+`mayMutate:false` and `approvalRecorded:false`; provider failure falls back to the existing operator
+approval path.
+
+`kiln_prioritize_intake_uncertainty` is available only while `01-intake` is current. It selects from
+Kiln's fixed objective, scope, stakeholder, constraint, success-condition, and dependency categories
+and returns the full probability distribution. It deliberately returns no question text and has no
+stage-gate effect: Pi still writes the natural-language question and may ignore a low-confidence result.
+
+`kiln_route_specialist` derives its closed role set from the current canonical stage definition. It
+avoids inference when zero or one role is permitted; when a future stage permits multiple roles, Jev
+may recommend only within that set. The result preserves role probabilities, sets
+`delegationAuthorized:false`, and never starts a child process.
 
 When both research and decisioning have been separately enabled, `research_search` performs semantic
 triage after the authorized backend returns results. Results classified `essential`, `relevant`, or
