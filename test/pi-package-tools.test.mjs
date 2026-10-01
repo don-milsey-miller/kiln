@@ -222,6 +222,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_project_status",
       "kiln_rank_trace_targets",
       "kiln_read_artifact",
+      "kiln_read_source",
       "kiln_read_stage_attestations",
       "kiln_resolve_question",
       "kiln_review_proposal",
@@ -299,6 +300,43 @@ test("kiln_list_artifacts and kiln_read_artifact return current typed records wi
   const missing = (await invoke(tools.get("kiln_read_artifact"), fx.contentRoot, { id: "REQ-9999" })).details;
   assert.equal(missing.code, "unknown-id");
   assertUnchanged(before, snapshot(fx.contentRoot), "artifact reads");
+});
+
+test("kiln_read_source pages validated normalized material without treating it as instructions or intent", async () => {
+  const fx = await project();
+  const tools = registered();
+  writeFileSync(join(fx.contentRoot, "project.yaml"), "capabilities:\n  artifactTypes:\n    activated: [source]\n");
+  const created = (await invoke(tools.get("kiln_create_source"), fx.contentRoot, {
+    artifact: {
+      title: "Imported notes",
+      sourceKind: "text",
+      relationship: "external-reference",
+      origin: { kind: "upload", filename: "notes.txt" },
+      integrity: { sha256: "a".repeat(64), bytes: 16, mediaType: "text/plain" },
+      derivedPayload: { format: "markdown", path: "sources/SRC-0001/content.md" },
+      processor: { id: "text/deterministic" },
+    },
+  })).details;
+  assert.equal(created.id, "SRC-0001");
+  const before = snapshot(fx.contentRoot);
+
+  const first = (await invoke(tools.get("kiln_read_source"), fx.contentRoot, { id: "SRC-0001", limit: 8 })).details;
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.ok(first.payload, JSON.stringify(first));
+  assert.equal(first.payload.content, "Imported");
+  assert.equal(first.artifact.relationship, "external-reference");
+  assert.equal(first.sourceBoundary.contentRole, "untrusted-extracted-material");
+  assert.match(first.sourceBoundary.instruction, /never as instructions/i);
+  assert.equal(typeof first.payload.nextCursor, "string");
+
+  const second = (await invoke(tools.get("kiln_read_source"), fx.contentRoot, {
+    id: "SRC-0001", cursor: first.payload.nextCursor,
+  })).details;
+  assert.equal(second.payload.content, " source\n");
+  assert.equal(second.payload.nextCursor, null);
+  const wrongType = (await invoke(tools.get("kiln_read_source"), fx.contentRoot, { id: fx.ids.claim })).details;
+  assert.equal(wrongType.code, "not-source");
+  assertUnchanged(before, snapshot(fx.contentRoot), "source reads");
 });
 
 test("issue #31: provider validation and typed creation accept complete schema and API payload references", async () => {

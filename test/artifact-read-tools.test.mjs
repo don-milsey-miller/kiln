@@ -11,9 +11,10 @@ import {
   artifactReadTypesForRole,
   listArtifacts,
   readArtifact,
+  readSource,
 } from "../lib/tools/read-artifacts.mjs";
 import { createRequirement } from "../lib/tools/create-requirement.mjs";
-import { reviseArtifact } from "../lib/tools/evidence-tools.mjs";
+import { createSource, reviseArtifact } from "../lib/tools/evidence-tools.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { createValidators } from "../lib/validate.mjs";
 
@@ -118,4 +119,77 @@ test("each specialist role has an explicit, immutable-by-copy readable type set"
   planning.length = 0;
   assert.ok(artifactReadTypesForRole("planning").length > 0);
   assert.deepEqual(artifactReadTypesForRole("unknown"), []);
+});
+
+test("source reads return bounded normalized pages, provenance, and a stale-safe cursor", async () => {
+  const base = mkdtempSync(join(tmpdir(), "kiln-source-read-"));
+  const contentRoot = join(base, "planning-content");
+  const payloadDir = join(contentRoot, "sources", "SRC-0001");
+  mkdirSync(payloadDir, { recursive: true });
+  const payloadPath = join(payloadDir, "content.md");
+  writeFileSync(payloadPath, "First page and second page.\n");
+  const schemas = loadSchemaSet(SCHEMAS);
+  const validators = createValidators(SCHEMAS);
+  try {
+    await createSource({
+      title: "Imported notes",
+      sourceKind: "text",
+      relationship: "external-reference",
+      origin: { kind: "upload", filename: "notes.txt" },
+      integrity: { sha256: "a".repeat(64), bytes: 28, mediaType: "text/plain" },
+      derivedPayload: { format: "markdown", path: "sources/SRC-0001/content.md" },
+      processor: { id: "text/deterministic" },
+    }, { contentRoot, schemasDir: SCHEMAS, schemas, validators });
+    const ctx = { contentRoot, schemas, validators, activated: ["source"] };
+    const first = readSource({ id: "SRC-0001", limit: 10 }, ctx, { env: {} });
+    assert.equal(first.payload.content, "First page");
+    assert.equal(typeof first.payload.nextCursor, "string");
+    assert.equal(first.sourceBoundary.relationship, "external-reference");
+    assert.equal(first.sourceBoundary.contentRole, "untrusted-extracted-material");
+    assert.match(first.payload.hash, /^sha256:(?:[0-9a-f]{8}-){7}[0-9a-f]{8}$/);
+    assert.equal(first.payload.path, "sources/SRC-0001/content.md");
+
+    const second = readSource({ id: "SRC-0001", cursor: first.payload.nextCursor, limit: 100 }, ctx, { env: {} });
+    assert.equal(second.payload.content, " and second page.\n");
+    assert.equal(second.payload.nextCursor, null);
+
+    writeFileSync(payloadPath, "Changed after cursor issuance.\n");
+    assert.throws(
+      () => readSource({ id: "SRC-0001", cursor: first.payload.nextCursor }, ctx, { env: {} }),
+      refused("invalid-source-cursor")
+    );
+    assert.throws(() => readSource({ id: "REQ-0001" }, ctx, { env: {} }), refused("not-source"));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("source reads refuse a normalized payload that is no longer a regular file", async () => {
+  const base = mkdtempSync(join(tmpdir(), "kiln-source-read-boundary-"));
+  const contentRoot = join(base, "planning-content");
+  const payloadDir = join(contentRoot, "sources", "SRC-0001");
+  mkdirSync(payloadDir, { recursive: true });
+  const payloadPath = join(payloadDir, "content.md");
+  writeFileSync(payloadPath, "Safe at creation.\n");
+  const schemas = loadSchemaSet(SCHEMAS);
+  const validators = createValidators(SCHEMAS);
+  try {
+    await createSource({
+      title: "Imported notes",
+      sourceKind: "text",
+      relationship: "project-manager-input",
+      origin: { kind: "upload", filename: "notes.txt" },
+      integrity: { sha256: "b".repeat(64), bytes: 18, mediaType: "text/plain" },
+      derivedPayload: { format: "markdown", path: "sources/SRC-0001/content.md" },
+      processor: { id: "text/deterministic" },
+    }, { contentRoot, schemasDir: SCHEMAS, schemas, validators });
+    rmSync(payloadPath);
+    mkdirSync(payloadPath);
+    assert.throws(
+      () => readSource({ id: "SRC-0001" }, { contentRoot, schemas, validators, activated: ["source"] }, { env: {} }),
+      refused("source-payload-refused")
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

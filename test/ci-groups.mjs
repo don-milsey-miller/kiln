@@ -35,6 +35,7 @@ export const CI_GROUPS = Object.freeze({
     "evidence-tools.test.mjs",
     "handoff.test.mjs",
     "ingest-audio.test.mjs",
+    "ingest-media.test.mjs",
     "ingest-registry.test.mjs",
     "ingest-service.test.mjs",
     "ingest-store.test.mjs",

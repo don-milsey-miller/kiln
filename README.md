@@ -93,10 +93,13 @@ or copy a file into `.pi/ingest/inbox/`. Kiln retains raw bytes locally under `.
 and commits a typed `SRC-*` record plus normalized Markdown to `planning-content/`. Repeated bytes
 share one retained blob, while separate import actions remain separate source records.
 
-Plain text is normalized locally. Audio transcription is optional and disabled unless both
+Plain text and PDFs with sufficient embedded text are normalized locally; PDF extraction is
+bounded by the configured page limit. Audio transcription, scanned-PDF extraction, and image
+extraction are optional and disabled unless both
 `OPENAI_API_KEY` is present and `KILN_INGEST_REMOTE_PROCESSING` is exactly `allow`; an API key alone
 does not authorize a remote upload. The default OpenAI adapter uses `gpt-transcribe` and refuses
-audio larger than 25,000,000 bytes before making a request. Material marked as an external
+audio larger than 25,000,000 bytes before making a request. PDF/image processing also requires an
+explicit `KILN_OPENAI_EXTRACTION_MODEL`; there is no silently chosen vision model. Material marked as an external
 reference remains external reference material—ingestion never converts its contents into approved
 project intent.
 
@@ -154,6 +157,13 @@ remain in Pi's authentication store or the host environment; do not place them i
 | `OPENAI_API_KEY` | Only for remote source processing | — | Authenticates optional OpenAI extraction providers. It has no effect unless remote processing is separately authorized. Treat it as a secret. |
 | `KILN_INGEST_REMOTE_PROCESSING` | No | disabled | Set exactly to `allow` to authorize configured source bytes to be sent to a remote extraction provider. |
 | `KILN_OPENAI_TRANSCRIPTION_MODEL` | No | `gpt-transcribe` | Overrides the OpenAI transcription model when remote processing is authorized. |
+| `KILN_OPENAI_EXTRACTION_MODEL` | For remote PDF/image extraction | — | Explicit vision-capable Responses API model for scanned PDFs and images. No model is guessed. |
+| `KILN_INGEST_MAX_UPLOAD_BYTES` / `KILN_INGEST_MAX_INBOX_BYTES` | No | `104857600` | Per-source byte ceilings for browser and inbox intake. |
+| `KILN_INGEST_MAX_NORMALIZED_BYTES` | No | `8388608` | Maximum UTF-8 size of committed normalized Markdown. |
+| `KILN_INGEST_MAX_REMOTE_AUDIO_BYTES` | No | `25000000` | Audio-provider ceiling; cannot exceed the provider limit. |
+| `KILN_INGEST_MAX_REMOTE_MEDIA_BYTES` | No | `49000000` | Scanned-PDF/image provider ceiling; cannot exceed the provider limit. |
+| `KILN_INGEST_MAX_PDF_PAGES` | No | `200` | Maximum pages inspected in one PDF (`2000` hard ceiling). |
+| `KILN_INGEST_PROCESSING_TIMEOUT_MS` | No | `600000` | Timeout for remote media processing (`3600000` hard ceiling). |
 
 `setup.mjs` also accepts explicit non-interactive answers for automation, including `--trust`,
 `--provider`, `--model`, `--thinking`, `--research`, and `--live-model-check`. Omitted decisions are
