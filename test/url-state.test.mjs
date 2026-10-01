@@ -52,8 +52,8 @@ test("⚠️ any client component must not hold the selection", () => {
   // upload panel, which holds transient file/progress/job-polling state; a reload loses no planning
   // record and the server-side job continues. Both correctness-critical selections stay in the URL.
   assert.deepEqual(
-    clients.map((f) => relative(ROOT, f).split("\\").join("/")),
-    ["app/ingest-panel.js", "app/_stream/watchdog.js"],
+    clients.map((f) => relative(ROOT, f).split("\\").join("/")).sort(),
+    ["app/_stream/watchdog.js", "app/ingest-panel.js"],
     "a new client component is a deliberate act; say why it needs to be one"
   );
 });
