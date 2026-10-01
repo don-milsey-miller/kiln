@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GRANT, consentLocation, recordGrant } from "../lib/consent-record.mjs";
-import { readTraceCandidates } from "../lib/decisioning/context.mjs";
+import { readEvidenceRelationship, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { DECISIONING_REFUSAL, decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { permittedToolFamilies } from "../lib/decisioning/policy.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -250,6 +250,177 @@ test("issue #63: Kiln refuses an illegal trace candidate before invoking decisio
     ),
     /not a legal target/
   );
+});
+
+test("issue #64: research triage batches authorized results and preserves full assessments", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      usage: { input_tokens: 20, output_tokens: 4 },
+      answers: {
+        result_0: { type: "choice", choice: "essential", confidence: 0.92, probabilities: { essential: 0.92, relevant: 0.05, uncertain: 0.02, duplicate: 0, irrelevant: 0.01 } },
+        result_1: { type: "choice", choice: "duplicate", confidence: 0.81, probabilities: { essential: 0.01, relevant: 0.05, uncertain: 0.1, duplicate: 0.81, irrelevant: 0.03 } },
+        result_2: { type: "choice", choice: "uncertain", confidence: 0.46, probabilities: { essential: 0.08, relevant: 0.2, uncertain: 0.46, duplicate: 0.06, irrelevant: 0.2 } },
+      },
+    }),
+  });
+  const results = [
+    { id: "result-1", title: "Primary", url: "https://example.com/1", snippet: "direct answer" },
+    { id: "result-2", title: "Copy", url: "https://example.com/2", snippet: "same answer" },
+    { id: "result-3", title: "Maybe", url: "https://example.com/3", snippet: "ambiguous" },
+  ];
+  const out = await tools.kiln_filter_research_results({ question: "What is supported?", results });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.selectedIds, ["result-1", "result-3"], "uncertain results must remain in context");
+  assert.equal(out.assessments[1].assessment.probabilities.duplicate, 0.81);
+  assert.equal(out.originalCount, 3);
+  assert.equal(out.selectedCount, 2);
+});
+
+test("issue #65: evidence verification surfaces semantic disagreement without changing the recorded link", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        semantic_relationship: { type: "choice", choice: "says_nothing", confidence: 0.91, probabilities: { supports: 0.04, contradicts: 0.05, says_nothing: 0.91 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_verify_evidence_relationship({
+    assertion: { id: "AST-0001", artifact: { statement: "Library X supports ARM64." } },
+    evidence: { id: "EVD-0001", artifact: { summary: "The page discusses Windows generally." } },
+    recordedRelationship: "support",
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.matchesRecorded, false);
+  assert.equal(out.reviewRecommended, true);
+  assert.equal(out.recordedRelationship, "support");
+  assert.equal(out.assessment.probabilities.says_nothing, 0.91);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #65: canonical evidence links are derived before semantic review", () => {
+  const records = {
+    "AST-0001": { type: "assertion", artifact: { id: "AST-0001", type: "assertion", supportedBy: ["EVD-0001"], refutedBy: [] } },
+    "EVD-0001": { type: "evidence", artifact: { id: "EVD-0001", type: "evidence", summary: "Observed." } },
+    "EVD-0002": { type: "evidence", artifact: { id: "EVD-0002", type: "evidence", summary: "Not linked." } },
+  };
+  const reader = { readArtifact: ({ id }) => records[id] };
+  const linked = readEvidenceRelationship({ assertionId: "AST-0001", evidenceId: "EVD-0001" }, {}, reader);
+  assert.equal(linked.recordedRelationship, "support");
+  assert.throws(
+    () => readEvidenceRelationship({ assertionId: "AST-0001", evidenceId: "EVD-0002" }, {}, reader),
+    /not canonically linked/
+  );
+});
+
+test("issue #66: semantic review is separate from deterministic lint and has no gate effect", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        artifact_0: { type: "choice", choice: "compound_scope", confidence: 0.86, probabilities: { clear: 0.04, compound_scope: 0.86, untestable_or_subjective: 0.1 } },
+        artifact_1: { type: "choice", choice: "clear", confidence: 0.78, probabilities: { clear: 0.78, overly_broad: 0.22 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_semantic_review({ artifacts: [
+    { id: "REQ-0001", type: "requirement", artifact: { statement: "Encrypt data and add SSO." } },
+    { id: "ACC-0001", type: "acceptance-criterion", artifact: { statement: "A request completes within 500 ms." } },
+  ] });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-semantic-review");
+  assert.equal(out.gateEffect, "none");
+  assert.deepEqual(out.findings.map((finding) => finding.artifactId), ["REQ-0001"]);
+  assert.equal(out.assessments[0].assessment.probabilities.compound_scope, 0.86);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #67: proposal review cannot mutate or record operator approval", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        proposal_concern: { type: "choice", choice: "broadens_scope", confidence: 0.84, probabilities: { clear: 0.05, broadens_scope: 0.84, wrong_stage: 0.11 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_review_proposal({
+    operation: "mutate:reviseArtifact",
+    proposal: "Add an unrelated analytics requirement.",
+    stage: { id: "04-requirement-gaps", purpose: "Close requirement gaps." },
+    targetArtifacts: [{ id: "REQ-0001", type: "requirement", artifact: { statement: "Authenticate users." } }],
+    contextArtifacts: [],
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-proposal-review");
+  assert.equal(out.assessment.choice, "broadens_scope");
+  assert.equal(out.mayMutate, false);
+  assert.equal(out.approvalRecorded, false);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #68: specialist verification is advisory and preserves full probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        specialist_result: {
+          type: "choice",
+          choice: "unsupported_claim",
+          confidence: 0.81,
+          probabilities: { aligned: 0.04, incomplete: 0.1, unsupported_claim: 0.81, conflicts_with_observation: 0.03, off_task: 0.02 },
+        },
+      },
+    }),
+  });
+  const out = await tools.kiln_verify_specialist_result({
+    task: "Identify which source supports the release date.",
+    role: "research",
+    output: "Every source proves the release is Friday.",
+    observation: { taskBindingObserved: true, activeTools: ["research_search"], timedOut: false },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-specialist-verification");
+  assert.equal(out.assessment.choice, "unsupported_claim");
+  assert.equal(out.assessment.probabilities.unsupported_claim, 0.81);
+  assert.equal(out.reviewRecommended, true);
+  assert.equal(out.mechanicalAcceptancePreserved, true);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #68: invalid or unavailable specialist verification cannot revoke execution", async () => {
+  const invalid = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({ ok: true, answers: { specialist_result: { type: "choice", choice: "invented", confidence: 1, probabilities: { invented: 1 } } } }),
+  });
+  const result = await invalid.kiln_verify_specialist_result({
+    task: "Check the plan.", role: "validation", output: "Checked.", observation: { taskBindingObserved: true },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "capability-unavailable");
+  assert.equal(result.reason, "invalid-response");
 });
 
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {

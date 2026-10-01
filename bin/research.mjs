@@ -109,6 +109,8 @@ async function search() {
   if (out.ok === false) return refuse(out);
 
   console.log(`discovery for: ${out.query}\n`);
+  if (out.triage?.applied)
+    console.log(`semantic triage: ${out.triage.selectedCount}/${out.triage.originalCount} results retained (${out.triage.model})\n`);
   out.results.forEach((r, i) => {
     console.log(`${i + 1}. ${r.title ?? "(untitled)"}`);
     console.log(`   ${r.url}`);
@@ -117,6 +119,8 @@ async function search() {
     console.log("");
   });
   console.log(out.note);
+  if (out.triage?.applied && out.triage.omitted.length)
+    console.log(`\n${out.triage.omitted.length} duplicate or irrelevant result(s) omitted. Re-run with semanticTriage:false through the typed tool to inspect all snippets.`);
   console.log(`\nTo record one as evidence:\n  npm run research:record -- <url> --claim "..." --quote "exact sentence from the page"`);
   return 0;
 }

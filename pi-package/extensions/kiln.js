@@ -94,11 +94,21 @@ async function projectContext(deps = {}) {
  * the same reason none appears in the library's own contract.
  */
 async function defaultResearchTools() {
-  const [{ createResearchTools }, { createTavilyAdapter }] = await Promise.all([
+  const [{ createResearchTools }, { createTavilyAdapter }, permission] = await Promise.all([
     import("../../lib/research/tools.mjs"),
     import("../../lib/research/tavily-adapter.mjs"),
+    import("../../lib/decisioning/permission.mjs"),
   ]);
-  return createResearchTools(createTavilyAdapter());
+  let semanticFilter;
+  try {
+    if (permission.decisioningPermissionFromEnv()?.permitted) {
+      const decisioning = await defaultDecisioningTools();
+      semanticFilter = (input) => decisioning.kiln_filter_research_results(input);
+    }
+  } catch {
+    // Research remains usable when optional decisioning cannot be constructed.
+  }
+  return createResearchTools(createTavilyAdapter(), { semanticFilter });
 }
 
 /** Optional semantic decisions, constructed only after project and host permission have been proved. */
@@ -382,6 +392,7 @@ const deliveredResult = (result) => ({
   role: result.role,
   output: result.output ?? null,
   observed: observedForModel(result.observation),
+  semanticVerification: result.semanticVerification ?? null,
 });
 
 /**
@@ -704,10 +715,13 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
     name: "research_search",
     label: "Research search",
     description:
-      "Discover candidate sources for a question. Returns titles, URLs and snippets. DISCOVERY ONLY - not evidence, and not an answer.",
+      "Discover candidate sources for a question. When separately permitted, semantic triage can omit duplicate or irrelevant snippets from downstream context. DISCOVERY ONLY - not evidence, and not an answer.",
     parameters: {
       type: "object",
-      properties: { query: { type: "string", minLength: 1 }, maxResults: { type: "integer", minimum: 1, maximum: 20 } },
+      properties: {
+        query: { type: "string", minLength: 1 },
+        maxResults: { type: "integer", minimum: 1, maximum: 20 },
+      },
       required: ["query"],
       additionalProperties: false,
     },
@@ -807,6 +821,58 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
         },
       },
       required: ["sourceId", "field", "candidateIds"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "kiln_verify_evidence_relationship",
+    label: "Kiln verify evidence relationship",
+    description:
+      "Assess whether canonically linked evidence supports, contradicts, or says nothing about an assertion. Advisory only; recorded evidence links remain authoritative.",
+    parameters: {
+      type: "object",
+      properties: {
+        assertionId: { type: "string", pattern: "^AST-[0-9]{4,}$" },
+        evidenceId: { type: "string", pattern: "^EVD-[0-9]{4,}$" },
+      },
+      required: ["assertionId", "evidenceId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "kiln_semantic_review",
+    label: "Kiln semantic review",
+    description:
+      "Review validated planning artifacts for bounded semantic-quality concerns. Separate from deterministic lint, advisory only, and never gate-capable.",
+    parameters: {
+      type: "object",
+      properties: {
+        artifactIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" },
+        },
+      },
+      required: ["artifactIds"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "kiln_review_proposal",
+    label: "Kiln review proposal",
+    description:
+      "Review a stage-permitted material change before it is presented for operator approval. Advisory only; this cannot mutate state or record approval.",
+    parameters: {
+      type: "object",
+      properties: {
+        operation: { type: "string", pattern: "^(create|mutate):[a-z][a-zA-Z0-9-]*$" },
+        proposal: { type: "string", minLength: 1, maxLength: 24000 },
+        targetIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" } },
+        contextIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "string", pattern: "^[A-Z]+-[0-9]{4,}$" } },
+      },
+      required: ["operation", "proposal"],
       additionalProperties: false,
     },
   },
@@ -1295,7 +1361,9 @@ const failClosedStageContext = (code) =>
 export const MATERIAL_CHANGE_RULE = [
   "Kiln rule, for every turn of this session, and nothing below replaces it:",
   "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say in a turn of its",
-  "own which artifact you propose to create or change and what the change would be, then stop and wait for",
+  "own which artifact you propose to create or change and what the change would be. When optional decisioning is available, call",
+  "`kiln_review_proposal` first and include any advisory concern in that proposal; an unavailable review does not replace or block",
+  "the existing approval path; then stop and wait for",
   "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
   "rejects it, cancels, or does not reply, make no mutating tool call.",
   "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
@@ -1669,7 +1737,7 @@ export default function register(pi, deps = {}) {
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
-          const { readComparisonCandidates, readTraceCandidates } = await import("../../lib/decisioning/context.mjs");
+          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship, readSemanticReviewArtifacts, currentProposalContext } = await import("../../lib/decisioning/context.mjs");
           if (name === "kiln_rank_trace_targets") {
             const bounded = readTraceCandidates(
               { sourceId: params?.sourceId, field: params?.field, candidateIds: params?.candidateIds },
@@ -1677,6 +1745,35 @@ export default function register(pi, deps = {}) {
               reader
             );
             return rendered(await handler(bounded));
+          }
+          if (name === "kiln_verify_evidence_relationship") {
+            const bounded = readEvidenceRelationship(
+              { assertionId: params?.assertionId, evidenceId: params?.evidenceId },
+              context.ctx,
+              reader
+            );
+            return rendered(await handler(bounded));
+          }
+          if (name === "kiln_semantic_review") {
+            const artifacts = readSemanticReviewArtifacts(
+              { artifactIds: params?.artifactIds },
+              context.ctx,
+              reader
+            );
+            return rendered(await handler({ artifacts }));
+          }
+          if (name === "kiln_review_proposal") {
+            const bounded = currentProposalContext(
+              {
+                operation: params?.operation,
+                targetIds: params?.targetIds ?? [],
+                contextIds: params?.contextIds ?? [],
+              },
+              context.ctx,
+              reader,
+              { toolRoot: context.toolRoot }
+            );
+            return rendered(await handler({ ...bounded, proposal: params?.proposal }));
           }
           const candidates = readComparisonCandidates(
             { type: params?.type, candidateIds: params?.candidateIds },
@@ -2007,6 +2104,31 @@ export default function register(pi, deps = {}) {
       } catch (e) {
         // ⚠️ A DEFECT IN THE RUNTIME IS NOT PROSE FOR A MODEL. Its message can carry a path.
         return refuse("delegation-failed", "The delegation could not be completed.");
+      }
+
+      if (result?.ok === true) {
+        let semanticVerification;
+        try {
+          const permission = await import("../../lib/decisioning/permission.mjs");
+          const gate = (deps.decisioningPermission ?? permission.decisioningPermissionFromEnv)();
+          if (!gate?.permitted) {
+            semanticVerification = permission.refusedDecisioning("kiln_verify_specialist_result", gate);
+          } else {
+            const decisioning = deps.decisioningTools ?? (await defaultDecisioningTools());
+            const verify = decisioning.kiln_verify_specialist_result;
+            semanticVerification = typeof verify === "function"
+              ? await verify({
+                  task: params?.task,
+                  role: result.role,
+                  output: result.output,
+                  observation: observedForModel(result.observation),
+                })
+              : refusal("decisioning-unavailable", "This host has no specialist-result verification implementation.");
+          }
+        } catch {
+          semanticVerification = refusal("decisioning-unavailable", "The specialist result could not be semantically verified.");
+        }
+        result = { ...result, semanticVerification };
       }
 
       // ⚠️ EVERY RESULT AND EVERY REFUSAL GOES THROUGH THE SAME CLEANER, and a refusal carries the
