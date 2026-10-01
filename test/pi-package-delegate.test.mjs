@@ -94,6 +94,21 @@ const deps = (rt, extra = {}) => ({
   ...extra,
 });
 
+const permittedDecisioning = (assessment = "aligned") => ({
+  decisioningPermission: () => ({ permitted: true, provider: "typesafe" }),
+  decisioningTools: {
+    kiln_verify_specialist_result: async (input) => ({
+      tool: "kiln_verify_specialist_result",
+      ok: true,
+      kind: "advisory-specialist-verification",
+      role: input.role,
+      assessment: { type: "choice", choice: assessment, confidence: 0.8, probabilities: { [assessment]: 0.8, aligned: assessment === "aligned" ? 0.8 : 0.2 } },
+      reviewRecommended: assessment !== "aligned",
+      mechanicalAcceptancePreserved: true,
+    }),
+  },
+});
+
 async function invoke(t, contentRoot, params, { ctx = liveCtx(), signal } = {}) {
   const saved = process.env.PLANNING_CONTENT_DIR;
   process.env.PLANNING_CONTENT_DIR = contentRoot;
@@ -203,13 +218,42 @@ test("⚠️ ACC-0111 the wrapper restates no rule of the runtime's", () => {
 test("⚠️ ACC-0111 a success renders as text content beside the structured result", async () => {
   const f = project();
   try {
-    const result = await invoke(tool(deps(runtime(accepted()))), f.contentRoot, { role: "research", task: TASK });
+    const result = await invoke(tool(deps(runtime(accepted()), permittedDecisioning())), f.contentRoot, { role: "research", task: TASK });
     assert.ok(Array.isArray(result.content) && result.content.length === 1, "no content array");
     assert.equal(result.content[0].type, "text");
     assert.ok(result.content[0].text.length > 0, "the text content is empty");
     assert.equal(result.output, JSON.stringify(result.details, null, 2), "the output and the details disagree");
     assert.equal(result.details.observed.taskBindingObserved, true);
-    assert.deepEqual(Object.keys(result.details).sort(), ["observed", "ok", "output", "role"]);
+    assert.deepEqual(Object.keys(result.details).sort(), ["observed", "ok", "output", "role", "semanticVerification"]);
+    assert.equal(result.details.semanticVerification.assessment.choice, "aligned");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("issue #68: semantic concern or backend failure never revokes a mechanically accepted delegation", async () => {
+  const f = project();
+  try {
+    const concern = await invoke(
+      tool(deps(runtime(accepted()), permittedDecisioning("incomplete"))),
+      f.contentRoot,
+      { role: "research", task: TASK }
+    );
+    assert.equal(concern.details.ok, true);
+    assert.equal(concern.details.semanticVerification.assessment.choice, "incomplete");
+    assert.equal(concern.details.semanticVerification.mechanicalAcceptancePreserved, true);
+
+    const unavailable = await invoke(
+      tool(deps(runtime(accepted()), {
+        decisioningPermission: () => ({ permitted: true, provider: "typesafe" }),
+        decisioningTools: { kiln_verify_specialist_result: async () => { throw new Error("offline"); } },
+      })),
+      f.contentRoot,
+      { role: "research", task: TASK }
+    );
+    assert.equal(unavailable.details.ok, true);
+    assert.equal(unavailable.details.semanticVerification.ok, false);
+    assert.equal(unavailable.details.semanticVerification.code, "decisioning-unavailable");
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }

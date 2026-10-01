@@ -392,6 +392,7 @@ const deliveredResult = (result) => ({
   role: result.role,
   output: result.output ?? null,
   observed: observedForModel(result.observation),
+  semanticVerification: result.semanticVerification ?? null,
 });
 
 /**
@@ -2103,6 +2104,31 @@ export default function register(pi, deps = {}) {
       } catch (e) {
         // ⚠️ A DEFECT IN THE RUNTIME IS NOT PROSE FOR A MODEL. Its message can carry a path.
         return refuse("delegation-failed", "The delegation could not be completed.");
+      }
+
+      if (result?.ok === true) {
+        let semanticVerification;
+        try {
+          const permission = await import("../../lib/decisioning/permission.mjs");
+          const gate = (deps.decisioningPermission ?? permission.decisioningPermissionFromEnv)();
+          if (!gate?.permitted) {
+            semanticVerification = permission.refusedDecisioning("kiln_verify_specialist_result", gate);
+          } else {
+            const decisioning = deps.decisioningTools ?? (await defaultDecisioningTools());
+            const verify = decisioning.kiln_verify_specialist_result;
+            semanticVerification = typeof verify === "function"
+              ? await verify({
+                  task: params?.task,
+                  role: result.role,
+                  output: result.output,
+                  observation: observedForModel(result.observation),
+                })
+              : refusal("decisioning-unavailable", "This host has no specialist-result verification implementation.");
+          }
+        } catch {
+          semanticVerification = refusal("decisioning-unavailable", "The specialist result could not be semantically verified.");
+        }
+        result = { ...result, semanticVerification };
       }
 
       // ⚠️ EVERY RESULT AND EVERY REFUSAL GOES THROUGH THE SAME CLEANER, and a refusal carries the

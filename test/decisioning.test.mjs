@@ -376,6 +376,53 @@ test("issue #67: proposal review cannot mutate or record operator approval", asy
   assert.equal(out.policy.automaticAction, false);
 });
 
+test("issue #68: specialist verification is advisory and preserves full probabilities", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        specialist_result: {
+          type: "choice",
+          choice: "unsupported_claim",
+          confidence: 0.81,
+          probabilities: { aligned: 0.04, incomplete: 0.1, unsupported_claim: 0.81, conflicts_with_observation: 0.03, off_task: 0.02 },
+        },
+      },
+    }),
+  });
+  const out = await tools.kiln_verify_specialist_result({
+    task: "Identify which source supports the release date.",
+    role: "research",
+    output: "Every source proves the release is Friday.",
+    observation: { taskBindingObserved: true, activeTools: ["research_search"], timedOut: false },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.kind, "advisory-specialist-verification");
+  assert.equal(out.assessment.choice, "unsupported_claim");
+  assert.equal(out.assessment.probabilities.unsupported_claim, 0.81);
+  assert.equal(out.reviewRecommended, true);
+  assert.equal(out.mechanicalAcceptancePreserved, true);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #68: invalid or unavailable specialist verification cannot revoke execution", async () => {
+  const invalid = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({ ok: true, answers: { specialist_result: { type: "choice", choice: "invented", confidence: 1, probabilities: { invented: 1 } } } }),
+  });
+  const result = await invalid.kiln_verify_specialist_result({
+    task: "Check the plan.", role: "validation", output: "Checked.", observation: { taskBindingObserved: true },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.kind, "capability-unavailable");
+  assert.equal(result.reason, "invalid-response");
+});
+
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {
   const families = permittedToolFamilies({
     nextActivity: { activities: ["question", "author", "delegate", "attest", "exit"] },
