@@ -1,11 +1,12 @@
 # Optional semantic decisioning with TypeSafe Jev
 
-Kiln can use TypeSafe Jev for three bounded, advisory decisions:
+Kiln can use TypeSafe Jev for four bounded, advisory decisions:
 
 - classify a user request into an activity and tool family already permitted by the current stage;
 - compare a proposed artifact with selected existing artifacts as `distinct`, `duplicate`, `overlaps`,
   `refines`, or `contradicts`.
 - rank only the trace targets that Kiln has already proved structurally legal for a source field.
+- verify whether linked evidence semantically supports, contradicts, or says nothing about its assertion.
 
 Jev never grants a tool, changes project state, satisfies a stage gate, records an approval, or replaces
 Kiln's deterministic validation. If TypeSafe is unavailable or returns an answer outside the permitted
@@ -67,13 +68,22 @@ npm --prefix .planning run decisioning:trace -- \
   --source CMP-0001 \
   --field satisfies \
   --candidates REQ-0012,REQ-0027
+
+npm --prefix .planning run decisioning:evidence -- \
+  --project-root . \
+  --assertion AST-0001 \
+  --evidence EVD-0001
 ```
 
 The Pi package exposes the same operations as `kiln_decisioning_capability`, `kiln_route_turn`,
-`kiln_compare_artifacts`, and `kiln_rank_trace_targets`. Route results include full Choice probabilities and confidence plus the
+`kiln_compare_artifacts`, `kiln_rank_trace_targets`, and `kiln_verify_evidence_relationship`. Route results include full Choice probabilities and confidence plus the
 deterministic next action. Comparison results include one probability distribution per candidate.
 Trace recommendations preserve the same distributions but cannot create a trace or widen the target
 types declared by the source artifact's schema.
+
+Evidence verification reads the canonical `supportedBy` or `refutedBy` edge first, then compares it
+with Jev's semantic assessment. Disagreement sets `reviewRecommended:true`; it never changes the edge,
+the evidence lifecycle, the derived verdict, or the confidence rung.
 
 When both research and decisioning have been separately enabled, `research_search` performs semantic
 triage after the authorized backend returns results. Results classified `essential`, `relevant`, or

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GRANT, consentLocation, recordGrant } from "../lib/consent-record.mjs";
-import { readTraceCandidates } from "../lib/decisioning/context.mjs";
+import { readEvidenceRelationship, readTraceCandidates } from "../lib/decisioning/context.mjs";
 import { DECISIONING_REFUSAL, decisioningPermission } from "../lib/decisioning/permission.mjs";
 import { permittedToolFamilies } from "../lib/decisioning/policy.mjs";
 import { createDecisioningTools } from "../lib/decisioning/tools.mjs";
@@ -279,6 +279,47 @@ test("issue #64: research triage batches authorized results and preserves full a
   assert.equal(out.assessments[1].assessment.probabilities.duplicate, 0.81);
   assert.equal(out.originalCount, 3);
   assert.equal(out.selectedCount, 2);
+});
+
+test("issue #65: evidence verification surfaces semantic disagreement without changing the recorded link", async () => {
+  const tools = createDecisioningTools({
+    name: "stand-in",
+    probe: async () => ({ ok: true }),
+    evaluate: async () => ({
+      ok: true,
+      backend: "stand-in",
+      model: "jev-test",
+      answers: {
+        semantic_relationship: { type: "choice", choice: "says_nothing", confidence: 0.91, probabilities: { supports: 0.04, contradicts: 0.05, says_nothing: 0.91 } },
+      },
+    }),
+  });
+  const out = await tools.kiln_verify_evidence_relationship({
+    assertion: { id: "AST-0001", artifact: { statement: "Library X supports ARM64." } },
+    evidence: { id: "EVD-0001", artifact: { summary: "The page discusses Windows generally." } },
+    recordedRelationship: "support",
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.matchesRecorded, false);
+  assert.equal(out.reviewRecommended, true);
+  assert.equal(out.recordedRelationship, "support");
+  assert.equal(out.assessment.probabilities.says_nothing, 0.91);
+  assert.equal(out.policy.automaticAction, false);
+});
+
+test("issue #65: canonical evidence links are derived before semantic review", () => {
+  const records = {
+    "AST-0001": { type: "assertion", artifact: { id: "AST-0001", type: "assertion", supportedBy: ["EVD-0001"], refutedBy: [] } },
+    "EVD-0001": { type: "evidence", artifact: { id: "EVD-0001", type: "evidence", summary: "Observed." } },
+    "EVD-0002": { type: "evidence", artifact: { id: "EVD-0002", type: "evidence", summary: "Not linked." } },
+  };
+  const reader = { readArtifact: ({ id }) => records[id] };
+  const linked = readEvidenceRelationship({ assertionId: "AST-0001", evidenceId: "EVD-0001" }, {}, reader);
+  assert.equal(linked.recordedRelationship, "support");
+  assert.throws(
+    () => readEvidenceRelationship({ assertionId: "AST-0001", evidenceId: "EVD-0002" }, {}, reader),
+    /not canonically linked/
+  );
 });
 
 test("issue #59: deterministic stage policy decides which families Jev may see", () => {

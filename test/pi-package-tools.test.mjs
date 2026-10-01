@@ -52,6 +52,7 @@ const PROJECTLESS = new Set([
   "kiln_decisioning_capability",
   "kiln_rank_trace_targets",
   "kiln_route_turn",
+  "kiln_verify_evidence_relationship",
   "research_capability",
   "research_search",
   "research_fetch",
@@ -222,6 +223,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
       "kiln_set_type_activation",
       "kiln_unlink_evidence",
       "kiln_unlink_trace",
+      "kiln_verify_evidence_relationship",
       "kiln_write_payload",
       "kiln_write_stage_attestation",
       "kiln_write_stage_document",
@@ -1358,7 +1360,7 @@ const withDecisioning = ({ decisioningTools, artifactReader } = {}) => {
 test("issue #59: decisioning tools register with the vendor-neutral contract", async () => {
   const { DECISIONING_TOOL_SIGNATURES } = await import("../lib/decisioning/tools.mjs");
   const tools = registered();
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship"]) {
     const tool = tools.get(name);
     assert.ok(tool, `${name} is not registered`);
     assert.deepEqual(tool.parameters, DECISIONING_TOOL_SIGNATURES[name].input);
@@ -1383,9 +1385,23 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
       seen.push({ name: "trace", input });
       return { tool: "kiln_rank_trace_targets", ok: true, ids: input.candidates.map((candidate) => candidate.id) };
     },
+    kiln_verify_evidence_relationship: async (input) => {
+      seen.push({ name: "evidence", input });
+      return { tool: "kiln_verify_evidence_relationship", ok: true, recordedRelationship: input.recordedRelationship };
+    },
   };
   const artifactReader = {
     readArtifact: ({ id }) => {
+      if (id.startsWith("AST-")) return {
+        ok: true,
+        type: "assertion",
+        artifact: { id, type: "assertion", schemaVersion: 1, title: "Assertion", statement: "Login works.", targetEnvironment: { facts: {} }, supportedBy: ["EVD-0001"], refutedBy: [], reviewStatus: "draft", lifecycle: "active" },
+      };
+      if (id.startsWith("EVD-")) return {
+        ok: true,
+        type: "evidence",
+        artifact: { id, type: "evidence", schemaVersion: 1, title: "Evidence", kind: "source", summary: "Login worked.", sources: [{ title: "Run", locator: "test" }], reviewStatus: "draft", lifecycle: "active" },
+      };
       const component = id.startsWith("CMP-");
       const type = component ? "component" : "requirement";
       return {
@@ -1418,11 +1434,16 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
     field: "satisfies",
     candidateIds: ["REQ-0001", "REQ-0002"],
   });
+  const evidence = await invoke(tools.get("kiln_verify_evidence_relationship"), contentRoot, {
+    assertionId: "AST-0001",
+    evidenceId: "EVD-0001",
+  });
 
   assert.equal(capability.details.available, true);
   assert.equal(route.details.stageId, "01-intake");
   assert.deepEqual(compared.details.ids, ["REQ-0001", "REQ-0002"]);
   assert.deepEqual(ranked.details.ids, ["REQ-0001", "REQ-0002"]);
+  assert.equal(evidence.details.recordedRelationship, "support");
   assert.equal(seen[0].input.request, "Split authentication into its own requirement.");
   assert.ok(seen[0].input.stage.permittedActivities.includes("question"));
   assert.ok(seen[0].input.stage.permittedToolFamilies.includes("read"));
@@ -1432,6 +1453,9 @@ test("issue #59: the wrappers inject only authoritative stage and artifact conte
   ]);
   assert.deepEqual(seen[2].input.allowedTypes, ["requirement"]);
   assert.deepEqual(seen[2].input.candidates.map((candidate) => candidate.id), ["REQ-0001", "REQ-0002"]);
+  assert.equal(seen[3].input.assertion.id, "AST-0001");
+  assert.equal(seen[3].input.evidence.id, "EVD-0001");
+  assert.equal(seen[3].input.recordedRelationship, "support");
 });
 
 test("issue #59: decisioning permission refuses before an adapter or project reader runs", async () => {
@@ -1446,7 +1470,7 @@ test("issue #59: decisioning permission refuses before an adapter or project rea
     }
   );
 
-  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets"]) {
+  for (const name of ["kiln_decisioning_capability", "kiln_route_turn", "kiln_compare_artifacts", "kiln_rank_trace_targets", "kiln_verify_evidence_relationship"]) {
     const result = await invokeAnywhere(tools.get(name), {});
     assert.equal(result.details.ok, false);
     assert.equal(result.details.reason, "decisioning-not-granted");

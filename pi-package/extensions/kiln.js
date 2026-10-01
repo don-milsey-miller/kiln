@@ -823,6 +823,21 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
       additionalProperties: false,
     },
   },
+  {
+    name: "kiln_verify_evidence_relationship",
+    label: "Kiln verify evidence relationship",
+    description:
+      "Assess whether canonically linked evidence supports, contradicts, or says nothing about an assertion. Advisory only; recorded evidence links remain authoritative.",
+    parameters: {
+      type: "object",
+      properties: {
+        assertionId: { type: "string", pattern: "^AST-[0-9]{4,}$" },
+        evidenceId: { type: "string", pattern: "^EVD-[0-9]{4,}$" },
+      },
+      required: ["assertionId", "evidenceId"],
+      additionalProperties: false,
+    },
+  },
 ]);
 
 /**
@@ -1682,10 +1697,18 @@ export default function register(pi, deps = {}) {
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
-          const { readComparisonCandidates, readTraceCandidates } = await import("../../lib/decisioning/context.mjs");
+          const { readComparisonCandidates, readTraceCandidates, readEvidenceRelationship } = await import("../../lib/decisioning/context.mjs");
           if (name === "kiln_rank_trace_targets") {
             const bounded = readTraceCandidates(
               { sourceId: params?.sourceId, field: params?.field, candidateIds: params?.candidateIds },
+              context.ctx,
+              reader
+            );
+            return rendered(await handler(bounded));
+          }
+          if (name === "kiln_verify_evidence_relationship") {
+            const bounded = readEvidenceRelationship(
+              { assertionId: params?.assertionId, evidenceId: params?.evidenceId },
               context.ctx,
               reader
             );
