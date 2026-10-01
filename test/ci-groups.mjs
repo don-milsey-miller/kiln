@@ -15,6 +15,7 @@ export const CI_GROUPS = Object.freeze({
   core: Object.freeze([
     "acc-0114-record.test.mjs",
     "activate-type.test.mjs",
+    "approved-model-pool.test.mjs",
     "artifact-read-tools.test.mjs",
     "artifact-review-choices.test.mjs",
     "attestations.test.mjs",
