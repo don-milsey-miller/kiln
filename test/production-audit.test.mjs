@@ -87,7 +87,7 @@ test("expired, overlong, mismatched, malformed and stale exceptions fail closed"
   }
 });
 
-test("the installed production graph is the patched graph declared by the manifest and lock", () => {
+test("the production manifest and lock declare the patched graph", () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
   const installed = (path) => JSON.parse(readFileSync(join(ROOT, "node_modules", ...path.split("/"), "package.json"), "utf8")).version;
@@ -105,7 +105,6 @@ test("the installed production graph is the patched graph declared by the manife
   assert.equal(installed("fast-uri"), "3.1.8");
   assert.equal(installed("@earendil-works/pi-coding-agent"), "0.87.1");
   assert.equal(installed("@earendil-works/pi-coding-agent/node_modules/undici"), "8.10.2");
-  assert.equal(installed("@earendil-works/pi-coding-agent/node_modules/brace-expansion"), "5.0.12");
 });
 
 test("#51 CI audits the locked production graph once on its deliberately clean install", () => {

@@ -44,6 +44,7 @@ export const CI_GROUPS = Object.freeze({
     "orchestrator-root.test.mjs",
     "orchestrator-state.test.mjs",
     "payload-write.test.mjs",
+    "pi-dependency-repair.test.mjs",
     "production-audit.test.mjs",
     "project-status.test.mjs",
     "question.test.mjs",
