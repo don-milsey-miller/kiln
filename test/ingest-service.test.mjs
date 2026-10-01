@@ -109,3 +109,34 @@ test("JSON is normalized deterministically as readable fenced Markdown", async (
   const artifact = JSON.parse(readFileSync(join(fx.contentRoot, "data", "sources", `${result.sourceId}.json`), "utf-8"));
   assert.equal(readFileSync(join(fx.contentRoot, artifact.derivedPayload.path), "utf-8"), '```json\n{\n  "b": 2,\n  "a": 1\n}\n```\n');
 });
+
+test("concurrent retries of one job share one processor run and create one source", async () => {
+  const fx = fixture();
+  let runs = 0;
+  const processor = {
+    id: "text/counting",
+    accepts: (metadata) => metadata.sourceKind === "text",
+    probe: async () => ({ available: true, mode: "test" }),
+    process: async () => {
+      runs += 1;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { sourceKind: "text", format: "markdown", filename: "content.md", content: "one source\n" };
+    },
+  };
+  const service = createIngestService({
+    contentRoot: fx.contentRoot,
+    registry: { select: async () => ({ processor, probe: { available: true }, probes: [] }) },
+  });
+  const queued = await service.enqueue(
+    { source: Buffer.from("same job"), filename: "same.txt", relationship: "project-manager-input" },
+    { process: false }
+  );
+  const results = await Promise.all([
+    service.processJob(queued.job.jobId),
+    service.retry(queued.job.jobId),
+    service.processJob(queued.job.jobId),
+  ]);
+  assert.equal(runs, 1);
+  assert.deepEqual(results.map((result) => result.sourceId), ["SRC-0001", "SRC-0001", "SRC-0001"]);
+  assert.deepEqual(readdirSync(join(fx.contentRoot, "data", "sources")), ["SRC-0001.json"]);
+});

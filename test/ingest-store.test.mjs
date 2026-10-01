@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { blobPath, ingestPaths, resolveInIngestRoot, storeBlob } from "../lib/ingest/store.mjs";
+import { blobPath, ingestLimitsFromEnv, ingestPaths, resolveInIngestRoot, storeBlob } from "../lib/ingest/store.mjs";
 import { INGEST_ERROR, IngestError } from "../lib/ingest/result.mjs";
 
 const made = [];
@@ -50,4 +50,15 @@ test("ingest paths cannot escape the approved local root", () => {
   const fx = fixture();
   for (const hostile of ["../outside", "jobs/../../outside", "C:\\outside", "/outside"])
     assert.throws(() => resolveInIngestRoot(hostile, { contentRoot: fx.contentRoot }), IngestError);
+});
+
+test("ingestion limits accept bounded explicit environment values and reject ambiguous ones", () => {
+  assert.deepEqual(ingestLimitsFromEnv({
+    KILN_INGEST_MAX_UPLOAD_BYTES: "4096",
+    KILN_INGEST_MAX_PDF_PAGES: "25",
+    KILN_INGEST_PROCESSING_TIMEOUT_MS: "30000",
+  }), { maxUploadBytes: 4096, maxPdfPages: 25, processingTimeoutMs: 30000 });
+  for (const value of ["0", "-1", "1.5", "10mb", "9007199254740992"])
+    assert.throws(() => ingestLimitsFromEnv({ KILN_INGEST_MAX_UPLOAD_BYTES: value }), /positive integer/);
+  assert.throws(() => ingestLimitsFromEnv({ KILN_INGEST_MAX_PDF_PAGES: "2001" }), /no greater than 2000/);
 });
