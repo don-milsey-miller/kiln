@@ -765,6 +765,18 @@ const DECISIONING_TOOL_TABLE = Object.freeze([
     },
   },
   {
+    name: "kiln_prioritize_intake_uncertainty",
+    label: "Kiln prioritize intake uncertainty",
+    description:
+      "Select the highest-impact unresolved intake uncertainty from Kiln's finite categories. Advisory only; Pi writes the question and no stage gate changes.",
+    parameters: {
+      type: "object",
+      properties: { context: { type: "string", minLength: 1, maxLength: 12000 } },
+      required: ["context"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "kiln_compare_artifacts",
     label: "Kiln compare artifacts",
     description:
@@ -1734,6 +1746,20 @@ export default function register(pi, deps = {}) {
                 detail: "Every stage is complete, so there is no current stage activity to route.",
               });
             return rendered(await handler({ request: params?.request, stage }));
+          }
+          if (name === "kiln_prioritize_intake_uncertainty") {
+            const { currentRoutingContext } = await import("../../lib/decisioning/context.mjs");
+            const stage = currentRoutingContext(context.ctx, { toolRoot: context.toolRoot });
+            if (stage.complete || stage.id !== "01-intake")
+              return rendered({
+                tool: name,
+                ok: true,
+                kind: "not-applicable",
+                recommendation: null,
+                stageId: stage.complete ? null : stage.id,
+                detail: "Intake uncertainty prioritization applies only while stage 01-intake is current.",
+              });
+            return rendered(await handler({ context: params?.context, stage }));
           }
 
           const reader = deps.artifactReader ?? (await import("../../lib/tools/read-artifacts.mjs"));
