@@ -113,6 +113,13 @@ The system default output is used unless `KILN_VOICE_OUTPUT_DEVICE` supplies a v
 audio device hint. Playback can be stopped immediately and a session shutdown terminates any
 remaining player process. Physical speaker validation is part of the final voice validation ticket.
 
+Before text reaches a speech provider, Kiln deterministically renders only finalized assistant prose.
+System prompts, tool calls, tool results, hidden reasoning, and non-text blocks are excluded. Markdown
+formatting is removed, link labels remain while destinations are omitted, and tables, structured data,
+code blocks, raw URLs, and file paths become short spoken markers. Requirement and artifact identifiers
+such as `REQ-0009` are spoken as `REQ 0009`. The renderer does not call a model or alter Pi's transcript,
+and its output is bounded by `KILN_TTS_MAX_CHARACTERS`.
+
 ### Opt-in live STT check
 
 The live check is excluded from CI. It sends an existing headerless, mono 16 kHz signed 16-bit
