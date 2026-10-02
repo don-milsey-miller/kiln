@@ -156,6 +156,7 @@ export const CI_GROUPS = Object.freeze({
     "supervisor.test.mjs",
     "validation-job.test.mjs",
     "voice-capture.test.mjs",
+    "voice-playback.test.mjs",
     "windows-job.test.mjs",
   ]),
   setup: Object.freeze([

@@ -105,6 +105,14 @@ confirmation dialog. The operator must review the transcript and submit it norma
 Ctrl+C retains its existing meaning: it stops the Kiln/Pi run. It is not a voice toggle. Voice
 failures affect the voice status only and do not add any model-visible tool.
 
+## Local speech playback
+
+Kiln's playback boundary uses `ffplay` on supported Windows and Linux hosts. Synthesized signed
+16-bit PCM is streamed directly to the player's standard input; Kiln does not create an audio file.
+The system default output is used unless `KILN_VOICE_OUTPUT_DEVICE` supplies a validated SDL/host
+audio device hint. Playback can be stopped immediately and a session shutdown terminates any
+remaining player process. Physical speaker validation is part of the final voice validation ticket.
+
 ### Opt-in live STT check
 
 The live check is excluded from CI. It sends an existing headerless, mono 16 kHz signed 16-bit
