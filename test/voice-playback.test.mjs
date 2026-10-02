@@ -78,6 +78,8 @@ test("FFplay receives in-memory PCM through stdin with a fixed shell-free comman
   assert.deepEqual(script.calls[0].options.stdio, ["pipe", "ignore", "pipe"]);
   assert.equal(script.calls[0].options.env.SDL_AUDIO_DEVICE_NAME, hostileDevice);
   assert.equal(script.calls[0].args.includes(hostileDevice), false);
+  assert.equal(script.calls[0].args.includes("-nostdin"), false);
+  assert.deepEqual(script.calls[0].args.slice(-4, -2), ["-ch_layout", "mono"]);
   assert.equal(script.calls[0].args.at(-1), "pipe:0");
   assert.equal(script.calls[0].args.some((arg) => /\.(wav|pcm|raw)$/i.test(arg)), false);
 });
