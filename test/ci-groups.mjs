@@ -90,6 +90,7 @@ export const CI_GROUPS = Object.freeze({
     "template.test.mjs",
     "tool-wire-names.test.mjs",
     "url-state.test.mjs",
+    "voice.test.mjs",
   ]),
   node: Object.freeze([
     "change-stream.test.mjs",
