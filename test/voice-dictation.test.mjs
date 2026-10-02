@@ -184,6 +184,7 @@ test("Pi registers one TUI-only command and shortcut, never a voice tool or subm
   const hooks = new Map();
   const tools = [];
   const calls = [];
+  const spoken = [];
   const subscribed = [];
   const unsubscribed = [];
   const keyboardListener = () => undefined;
@@ -194,6 +195,15 @@ test("Pi registers one TUI-only command and shortcut, never a voice tool or subm
     toggle: async () => calls.push("toggle"),
     status: async () => ({ state: "idle", stt: { status: "ready" }, tts: { status: "disabled" } }),
     devices: async () => [{ id: "mic", label: "Test mic" }],
+    outputOn: async () => {
+      calls.push("output on");
+      return { status: "ready" };
+    },
+    outputOff: async () => {
+      calls.push("output off");
+      return { status: "disabled" };
+    },
+    handleMessage: (message) => spoken.push(message),
     dispose: async () => calls.push("dispose"),
   };
   register({
@@ -233,13 +243,18 @@ test("Pi registers one TUI-only command and shortcut, never a voice tool or subm
   await commands.get("voice").handler("stop", ctx);
   await commands.get("voice").handler("status", ctx);
   await commands.get("voice").handler("devices", ctx);
+  await commands.get("voice").handler("output on", ctx);
+  await commands.get("voice").handler("output off", ctx);
   await shortcuts.get(VOICE_SHORTCUT).handler(ctx);
-  assert.deepEqual(calls, ["start", "stop", "toggle"]);
+  assert.deepEqual(calls, ["start", "stop", "output on", "output off", "toggle"]);
   assert.equal(creations, 1, "one session-scoped voice owner is reused");
   assert.equal(tui.notifications.some(({ message }) => message.includes("STT: ready")), true);
   assert.equal(tui.notifications.some(({ message }) => message === "Test mic"), true);
+  const finalized = { role: "assistant", content: [{ type: "text", text: "Final response." }] };
+  assert.equal(hooks.get("message_end")({ message: finalized }), undefined, "finalized-message hook must not return network work");
+  assert.deepEqual(spoken, [finalized]);
 
   await hooks.get("session_shutdown")({}, ctx);
   assert.deepEqual(unsubscribed, [keyboardListener]);
-  assert.deepEqual(calls, ["start", "stop", "toggle", "dispose"]);
+  assert.deepEqual(calls, ["start", "stop", "output on", "output off", "toggle", "dispose"]);
 });

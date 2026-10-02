@@ -107,7 +107,7 @@ async function loadedSkills(fx) {
 function hookFor(fx, toolRoot = fx.tool) {
   const hooks = [];
   register({ registerTool: () => {}, on: (event, handler) => hooks.push([event, handler]) }, { toolRoot });
-  assert.deepEqual(hooks.map(([event]) => event), ["session_start", "session_shutdown", "before_agent_start"], "exactly these hooks");
+  assert.deepEqual(hooks.map(([event]) => event), ["session_start", "message_end", "session_shutdown", "before_agent_start"], "exactly these hooks");
   return hooks.find(([event]) => event === "before_agent_start")[1];
 }
 
