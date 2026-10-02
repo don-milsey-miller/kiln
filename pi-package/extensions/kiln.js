@@ -1473,7 +1473,7 @@ export default function register(pi, deps = {}) {
     if (!voiceSession) {
       voiceSession = deps.createVoiceSession
         ? await deps.createVoiceSession({ ui: ctx.ui, ctx })
-        : (await import("../../lib/voice/dictation.mjs")).createPiVoiceDictation({ ui: ctx.ui });
+        : (await import("../../lib/voice/session.mjs")).createPiVoiceSession({ ui: ctx.ui });
     }
     return voiceSession;
   };
@@ -1490,6 +1490,16 @@ export default function register(pi, deps = {}) {
         await voice.stop();
         return;
       }
+      if (action === "output on") {
+        const output = await voice.outputOn();
+        ctx.ui.notify(`Voice output: ${output.status}.`, "info");
+        return;
+      }
+      if (action === "output off") {
+        const output = await voice.outputOff();
+        ctx.ui.notify(`Voice output: ${output.status}.`, "info");
+        return;
+      }
       if (action === "status") {
         const status = await voice.status();
         ctx.ui.notify(`Voice: ${status.state}; STT: ${status.stt.status}; TTS: ${status.tts.status}.`, "info");
@@ -1503,14 +1513,14 @@ export default function register(pi, deps = {}) {
         ctx.ui.notify(description, devices.length > 0 ? "info" : "warning");
         return;
       }
-      ctx.ui.notify("Usage: /voice start | stop | status | devices", "warning");
+      ctx.ui.notify("Usage: /voice start | stop | status | devices | output on | output off", "warning");
     } catch (error) {
       notifyVoiceFailure(ctx, error);
     }
   };
 
   pi?.registerCommand?.("voice", {
-    description: "Control Kiln voice dictation",
+    description: "Control Kiln voice dictation and speech output",
     handler: async (args, ctx) => runVoiceAction((args ?? "").trim().toLowerCase() || "status", ctx),
   });
 
@@ -1537,6 +1547,14 @@ export default function register(pi, deps = {}) {
     }
     if (!ctx?.hasUI) return;
 
+    if (ctx?.mode === "tui") {
+      try {
+        await voiceFor(ctx);
+      } catch (error) {
+        notifyVoiceFailure(ctx, error);
+      }
+    }
+
     // Pi's Loader only installs an interval when it has more than one frame. Keep this
     // before the keyboard-stop setup so every interactive Kiln session is bounded, even
     // when it was launched without the optional supervisor notice file.
@@ -1552,6 +1570,16 @@ export default function register(pi, deps = {}) {
     if (!listener) return;
     unsubscribeKeyboardStop?.();
     unsubscribeKeyboardStop = ctx.ui.onTerminalInput(listener);
+  });
+
+  // `message_end` is Pi's finalized-message boundary. Enqueue is deliberately synchronous: this
+  // hook never waits for ElevenLabs or speaker playback and returns no content to the session.
+  pi?.on?.("message_end", (event) => {
+    try {
+      voiceSession?.handleMessage?.(event?.message);
+    } catch {
+      // Voice output cannot interrupt or alter Pi's message lifecycle.
+    }
   });
 
   pi?.on?.("session_shutdown", async (_event, ctx) => {

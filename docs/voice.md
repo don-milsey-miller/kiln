@@ -92,6 +92,8 @@ The `/voice` command supports:
 /voice stop     stop capture and manually commit the transcript
 /voice status   show bounded STT/TTS and lifecycle status
 /voice devices  list FFmpeg/OpenAL microphone choices
+/voice output on   speak finalized assistant responses
+/voice output off  stop current speech and clear queued responses
 ```
 
 `Ctrl+Shift+V` toggles between start and stop. It is a toggle, not push-and-hold; terminal key-release
@@ -104,6 +106,14 @@ confirmation dialog. The operator must review the transcript and submit it norma
 
 Ctrl+C retains its existing meaning: it stops the Kiln/Pi run. It is not a voice toggle. Voice
 failures affect the voice status only and do not add any model-visible tool.
+
+Speech output defaults to off (`KILN_TTS_MODE=off`). An operator may enable it for the current Pi
+session with `/voice output on`, or opt in at startup with `KILN_TTS_MODE=on`; both require
+`KILN_TTS_VOICE_ID`. Only Pi's finalized assistant text is eligible. System content, user content,
+tool calls, tool results, and partial assistant tokens are never enqueued. Starting `/voice start`
+or using the voice shortcut first cancels current playback and its queue, then starts the microphone;
+it does not abort the Pi agent. `/voice output off` likewise affects output only, leaving STT and the
+session running.
 
 ## Local speech playback
 

@@ -92,6 +92,7 @@ export const CI_GROUPS = Object.freeze({
     "url-state.test.mjs",
     "voice-config.test.mjs",
     "voice-dictation.test.mjs",
+    "voice-output.test.mjs",
     "voice-speech-text.test.mjs",
     "voice-stt-elevenlabs.test.mjs",
     "voice-tts-elevenlabs.test.mjs",
