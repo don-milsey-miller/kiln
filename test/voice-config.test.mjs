@@ -18,6 +18,7 @@ test("voice configuration has deterministic, provider-independent defaults", () 
   assert.equal(config.enabled, false);
   assert.deepEqual(config.stt, { provider: "elevenlabs", model: "scribe_v2_realtime", language: null });
   assert.deepEqual(config.tts, { provider: "elevenlabs", model: "eleven_flash_v2_5", voiceId: null, mode: "off" });
+  assert.deepEqual(config.elevenLabs, { enableLogging: false });
   assert.deepEqual(config.limits, {
     maxRecordingMs: VOICE_DEFAULTS.maxRecordingMs,
     maxTtsCharacters: VOICE_DEFAULTS.maxTtsCharacters,
@@ -37,6 +38,7 @@ test("complete configuration is bounded and keeps credentials out of serializabl
     [VOICE_ENV.ttsMode]: "on",
     [VOICE_ENV.maxRecordingMs]: "90000",
     [VOICE_ENV.maxTtsCharacters]: "2500",
+    [VOICE_ENV.elevenLabsEnableLogging]: "true",
     [VOICE_ENV.elevenLabsApiKey]: SECRET,
     ANTHROPIC_API_KEY: "unrelated-pi-provider-secret",
   });
@@ -45,6 +47,7 @@ test("complete configuration is bounded and keeps credentials out of serializabl
   assert.equal(config.credentialPresent, true);
   assert.equal(config.stt.model, "scribe-custom");
   assert.equal(config.tts.voiceId, "voice-123");
+  assert.equal(config.elevenLabs.enableLogging, true);
   assert.deepEqual(config.limits, { maxRecordingMs: 90_000, maxTtsCharacters: 2_500 });
   assert.equal(voiceCredential(config), SECRET);
   assert.equal(JSON.stringify(config).includes(SECRET), false);
@@ -55,6 +58,7 @@ test("malformed settings are reported without copying their values", () => {
   const oversized = "x".repeat(VOICE_LIMITS.maxSettingCharacters + 1);
   const config = resolveVoiceConfig({
     [VOICE_ENV.enabled]: "perhaps",
+    [VOICE_ENV.elevenLabsEnableLogging]: "sometimes",
     [VOICE_ENV.sttProvider]: oversized,
     [VOICE_ENV.ttsMode]: "whenever-the-model-wants",
     [VOICE_ENV.maxRecordingMs]: String(VOICE_LIMITS.maxRecordingMs + 1),
@@ -69,6 +73,7 @@ test("malformed settings are reported without copying their values", () => {
     config.problems.map(({ name, reason }) => [name, reason]),
     [
       [VOICE_ENV.enabled, "invalid-boolean"],
+      [VOICE_ENV.elevenLabsEnableLogging, "invalid-boolean"],
       [VOICE_ENV.sttProvider, "invalid-string"],
       [VOICE_ENV.maxRecordingMs, "exceeds-hard-limit"],
       [VOICE_ENV.maxTtsCharacters, "invalid-positive-integer"],

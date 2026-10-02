@@ -6,6 +6,7 @@ import { VoiceError } from "../lib/voice/errors.mjs";
 import { SpeechQueue } from "../lib/voice/speech-queue.mjs";
 import {
   ELEVENLABS_TTS_ERROR,
+  ELEVENLABS_TTS_RETENTION,
   ElevenLabsTtsProvider,
   PCM_24000,
 } from "../lib/voice/tts/elevenlabs.mjs";
@@ -35,6 +36,7 @@ test("ElevenLabs receives only prepared text and returns provider-neutral PCM", 
       requests.push({ url, init });
       return response();
     },
+    enableLogging: true,
   });
 
   const synthesis = await provider.synthesize("Prepared assistant prose.");
@@ -44,12 +46,13 @@ test("ElevenLabs receives only prepared text and returns provider-neutral PCM", 
   const url = new URL(requests[0].url);
   assert.equal(url.pathname, "/v1/text-to-speech/voice_123");
   assert.equal(url.searchParams.get("output_format"), "pcm_24000");
-  assert.equal(url.searchParams.get("enable_logging"), "false");
+  assert.equal(url.searchParams.get("enable_logging"), "true");
   assert.equal(requests[0].init.headers["xi-api-key"], SECRET);
   assert.deepEqual(JSON.parse(requests[0].init.body), {
     text: "Prepared assistant prose.",
     model_id: "eleven_flash_v2_5",
   });
+  assert.equal(synthesis.retention, ELEVENLABS_TTS_RETENTION.LOGGING_ENABLED);
   assert.equal(requests[0].url.includes(SECRET), false);
 });
 
@@ -83,6 +86,26 @@ test("ElevenLabs synthesis is cancellable and provider failures never disclose c
     assert.equal(`${error.message}${JSON.stringify(error.details)}`.includes(SECRET), false);
     return true;
   });
+});
+
+test("ElevenLabs logging remains off by default and rejected response bodies are cancelled", async () => {
+  let cancelled = 0;
+  let requestedUrl;
+  const provider = new ElevenLabsTtsProvider({
+    apiKey: SECRET,
+    voiceId: "voice_123",
+    fetchImpl: async (url) => {
+      requestedUrl = url;
+      return {
+        ...response({ status: 400 }),
+        body: { async cancel() { cancelled += 1; } },
+      };
+    },
+  });
+
+  await assert.rejects(provider.synthesize("Privacy first."), { code: ELEVENLABS_TTS_ERROR.PROVIDER });
+  assert.equal(new URL(requestedUrl).searchParams.get("enable_logging"), "false");
+  assert.equal(cancelled, 1);
 });
 
 test("ElevenLabs enforces response and text bounds without persisting audio", async () => {
