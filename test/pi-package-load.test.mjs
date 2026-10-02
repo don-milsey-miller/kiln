@@ -193,10 +193,10 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
           "validation_capability",
           "validation_run",
         ],
-        commands: 0,
-        // ⚠️ EXACTLY TWO HOOKS: the keyboard stop's subscription at session start (F130), and the stage context (G4),
-        // added before each agent start. No other event is handled.
-        handlers: [["session_start", 1], ["before_agent_start", 1]],
+        commands: 1,
+        // Session start owns terminal setup, session shutdown releases voice/input resources, and
+        // stage context is added before each agent start.
+        handlers: [["session_start", 1], ["session_shutdown", 1], ["before_agent_start", 1]],
       },
     ]);
 

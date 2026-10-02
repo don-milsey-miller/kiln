@@ -75,6 +75,36 @@ as an Enterprise feature. Until the provider confirms otherwise, Kiln reports
 `zero-retention-requested-unconfirmed`; if ElevenLabs warns that the session is still logged, Kiln
 reports `logging-active` and surfaces a sanitized warning.
 
+## TUI dictation
+
+Voice is deliberately available only in Pi's interactive TUI. Enable it and provide an independent
+ElevenLabs credential before starting Kiln:
+
+```text
+KILN_VOICE_ENABLED=true
+ELEVENLABS_API_KEY=your-temporary-key
+```
+
+The `/voice` command supports:
+
+```text
+/voice start    begin microphone capture
+/voice stop     stop capture and manually commit the transcript
+/voice status   show bounded STT/TTS and lifecycle status
+/voice devices  list FFmpeg/OpenAL microphone choices
+```
+
+`Ctrl+Shift+V` toggles between start and stop. It is a toggle, not push-and-hold; terminal key-release
+events are not portable enough for hold-to-talk behavior.
+
+Partial recognition appears only in Kiln's voice widget. A committed transcript is appended to
+whatever is in Pi's editor when finalization completes, including text typed while recognition was
+running. It remains an editable draft: Kiln never presses Enter, sends the message, or answers a
+confirmation dialog. The operator must review the transcript and submit it normally.
+
+Ctrl+C retains its existing meaning: it stops the Kiln/Pi run. It is not a voice toggle. Voice
+failures affect the voice status only and do not add any model-visible tool.
+
 ### Opt-in live STT check
 
 The live check is excluded from CI. It sends an existing headerless, mono 16 kHz signed 16-bit

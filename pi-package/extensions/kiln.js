@@ -1404,6 +1404,21 @@ export const MATERIAL_CHANGE_RULE = [
 // indicators cause every frame to repaint the interactive transcript; PTY recorders then
 // retain each full repaint and can accumulate megabytes while an operator is deciding.
 export const KILN_WORKING_INDICATOR = Object.freeze({ frames: ["●"] });
+export const VOICE_SHORTCUT = "ctrl+shift+v";
+
+function safeVoiceCode(error) {
+  return typeof error?.code === "string" && /^[a-z0-9-]{1,80}$/.test(error.code)
+    ? error.code
+    : "voice-operation-failed";
+}
+
+function notifyVoiceFailure(ctx, error) {
+  try {
+    ctx?.ui?.notify?.(`Voice command failed (${safeVoiceCode(error)}).`, "error");
+  } catch {
+    // Operator feedback cannot turn an isolated voice failure into a Pi failure.
+  }
+}
 
 async function stageContextBlock(event, deps) {
   let stageContext;
@@ -1448,7 +1463,78 @@ export default function register(pi, deps = {}) {
   // The listener, and the one variable it needs, live in `lib/keyboard-stop.mjs`, imported when the hook fires; a package
   // loaded without Kiln's `lib/` beside it has no supervisor to tell, and leaves Ctrl+C to Pi.
   let unsubscribeKeyboardStop = null;
+  let voiceSession = null;
+
+  const voiceFor = async (ctx) => {
+    if (ctx?.mode !== "tui") {
+      ctx?.ui?.notify?.("Voice dictation is available only in Pi's TUI mode.", "warning");
+      return null;
+    }
+    if (!voiceSession) {
+      voiceSession = deps.createVoiceSession
+        ? await deps.createVoiceSession({ ui: ctx.ui, ctx })
+        : (await import("../../lib/voice/dictation.mjs")).createPiVoiceDictation({ ui: ctx.ui });
+    }
+    return voiceSession;
+  };
+
+  const runVoiceAction = async (action, ctx) => {
+    try {
+      const voice = await voiceFor(ctx);
+      if (!voice) return;
+      if (action === "start") {
+        await voice.start();
+        return;
+      }
+      if (action === "stop") {
+        await voice.stop();
+        return;
+      }
+      if (action === "status") {
+        const status = await voice.status();
+        ctx.ui.notify(`Voice: ${status.state}; STT: ${status.stt.status}; TTS: ${status.tts.status}.`, "info");
+        return;
+      }
+      if (action === "devices") {
+        const devices = await voice.devices();
+        const description = devices.length > 0
+          ? devices.map(({ label }) => label).join("\n")
+          : "No voice input devices were found.";
+        ctx.ui.notify(description, devices.length > 0 ? "info" : "warning");
+        return;
+      }
+      ctx.ui.notify("Usage: /voice start | stop | status | devices", "warning");
+    } catch (error) {
+      notifyVoiceFailure(ctx, error);
+    }
+  };
+
+  pi?.registerCommand?.("voice", {
+    description: "Control Kiln voice dictation",
+    handler: async (args, ctx) => runVoiceAction((args ?? "").trim().toLowerCase() || "status", ctx),
+  });
+
+  pi?.registerShortcut?.(VOICE_SHORTCUT, {
+    description: "Toggle Kiln voice dictation",
+    handler: async (ctx) => {
+      try {
+        const voice = await voiceFor(ctx);
+        if (voice) await voice.toggle();
+      } catch (error) {
+        notifyVoiceFailure(ctx, error);
+      }
+    },
+  });
+
   pi?.on?.("session_start", async (_event, ctx) => {
+    if (voiceSession) {
+      try {
+        await voiceSession.dispose();
+      } catch (error) {
+        notifyVoiceFailure(ctx, error);
+      }
+      voiceSession = null;
+    }
     if (!ctx?.hasUI) return;
 
     // Pi's Loader only installs an interval when it has more than one frame. Keep this
@@ -1466,6 +1552,23 @@ export default function register(pi, deps = {}) {
     if (!listener) return;
     unsubscribeKeyboardStop?.();
     unsubscribeKeyboardStop = ctx.ui.onTerminalInput(listener);
+  });
+
+  pi?.on?.("session_shutdown", async (_event, ctx) => {
+    try {
+      unsubscribeKeyboardStop?.();
+    } catch {
+      // Pi is already shutting down; listener cleanup remains best effort.
+    }
+    unsubscribeKeyboardStop = null;
+    if (voiceSession) {
+      try {
+        await voiceSession.dispose();
+      } catch (error) {
+        notifyVoiceFailure(ctx, error);
+      }
+      voiceSession = null;
+    }
   });
 
   pi?.on?.("before_agent_start", async (event) => {
