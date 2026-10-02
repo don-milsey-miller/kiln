@@ -250,6 +250,7 @@ async function setup(
     answer,
     answers,
     install,
+    repairDependencies,
     env = {},
     trust = "approve",
     verifyRuntime,
@@ -268,7 +269,7 @@ async function setup(
   const warned = [];
   const realError = console.error;
   console.error = (...args) => warned.push(args.join(" "));
-  const seen = { atInstall: null, installs: 0, asks: [] };
+  const seen = { atInstall: null, installs: 0, repairs: 0, asks: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
   const savedAgentDir = process.env.PI_CODING_AGENT_DIR;
   const savedTavily = process.env.TAVILY_API_KEY;
@@ -316,6 +317,13 @@ async function setup(
           // What the project looked like at the moment the bootstrap ran.
           seen.atInstall = { tree: tree(p.dir), printed: [...printed] };
           return { installed: true, why: "the test's bootstrap" };
+        }),
+      repairDependencies:
+        repairDependencies ??
+        (({ toolRoot }) => {
+          seen.repairs++;
+          assert.equal(toolRoot, ROOT, "the repair was pointed somewhere other than this checkout");
+          return { repaired: false, version: "5.0.12" };
         }),
     });
     return { code, printed, warned, seen };
@@ -454,6 +462,8 @@ test("⚠️ the bootstrap install is confined to this checkout, and a lockfile 
     });
     assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
     assert.ok(o.printed.some((l) => l.startsWith("dependencies installed")));
+    assert.equal(o.seen.repairs, 1, "setup did not verify the repaired dependency after its bootstrap install");
+    assert.ok(o.printed.some((l) => l === "Pi dependency 5.0.12 verified"));
 
     // A real install that rewrites the lockfile is not the locked install this command promised.
     const { installDependencies } = await import("../bin/setup.mjs");
@@ -481,6 +491,46 @@ test("⚠️ the bootstrap install is confined to this checkout, and a lockfile 
     }
   } finally {
     rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ #100 the script-free bootstrap repairs Pi before project mutation, and a repair refusal stays pre-transaction", async () => {
+  const p = project({ ignored: true });
+  try {
+    const before = tree(p.dir);
+    let installed = false;
+    const ok = await setup(p, [], {
+      install: ({ toolRoot }) => {
+        assert.equal(toolRoot, ROOT);
+        installed = true;
+        return { installed: true, why: "the test's bootstrap" };
+      },
+      repairDependencies: ({ toolRoot }) => {
+        assert.equal(installed, true, "the repair ran before the locked install");
+        assert.equal(toolRoot, ROOT);
+        assert.deepEqual(tree(p.dir), before, "project state changed before the dependency repair");
+        return { repaired: true, version: "5.0.12" };
+      },
+    });
+    assert.equal(ok.code, EXIT.OK, ok.printed.join("\n"));
+    assert.ok(ok.printed.some((l) => l === "Pi dependency 5.0.12 repaired"));
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+
+  const refused = project({ ignored: true });
+  try {
+    const before = tree(refused.dir);
+    const result = await setup(refused, [], {
+      repairDependencies: () => {
+        throw new SetupCommandRefusal(EXIT.INSTALL, "the trusted dependency repair refused");
+      },
+    });
+    assert.equal(result.code, EXIT.INSTALL);
+    assert.deepEqual(tree(refused.dir), before, "a refused dependency repair changed consumer project state");
+    assert.equal(existsSync(join(refused.dir, ".pi")), false, "a refused repair created runtime state");
+  } finally {
+    rmSync(refused.root, { recursive: true, force: true });
   }
 });
 

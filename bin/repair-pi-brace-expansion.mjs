@@ -21,7 +21,8 @@ export function installedPiBraceExpansion(root) {
 function repairLockfile(root, sourceEntry) {
   const path = join(root, "package-lock.json");
   if (!existsSync(path)) return;
-  const lock = readJson(path);
+  const before = readFileSync(path, "utf8");
+  const lock = JSON.parse(before);
   const entry = lock.packages?.[LOCK_ENTRY];
   if (!entry) throw new Error(`package-lock.json has no ${LOCK_ENTRY} entry.`);
   const source = lock.packages?.["node_modules/brace-expansion"] ?? sourceEntry;
@@ -31,7 +32,8 @@ function repairLockfile(root, sourceEntry) {
     resolved: source.resolved,
     integrity: source.integrity,
   };
-  writeFileSync(path, `${JSON.stringify(lock, null, 2)}\n`);
+  const after = `${JSON.stringify(lock, null, 2)}\n`;
+  if (after !== before) writeFileSync(path, after);
 }
 
 export function repairPiBraceExpansion(root, { check = false } = {}) {
