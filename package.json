@@ -17,6 +17,7 @@
     "test:ci:consumer": "node bin/run-test-group.mjs consumer",
     "test:voice:hardware": "node bin/voice-capture-check.mjs",
     "test:voice:stt:live": "node bin/voice-stt-live-check.mjs",
+    "test:voice:tts:live": "node bin/voice-tts-live-check.mjs",
     "test:pi-compat": "node --test test/pi-compat.test.mjs",
     "init:project": "node bin/init-project.mjs",
     "lint:plan": "node bin/lint-plan.mjs",

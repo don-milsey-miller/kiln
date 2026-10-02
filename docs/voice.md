@@ -120,6 +120,26 @@ code blocks, raw URLs, and file paths become short spoken markers. Requirement a
 such as `REQ-0009` are spoken as `REQ 0009`. The renderer does not call a model or alter Pi's transcript,
 and its output is bounded by `KILN_TTS_MAX_CHARACTERS`.
 
+ElevenLabs speech synthesis uses the configured `KILN_TTS_VOICE_ID` and defaults to
+`eleven_flash_v2_5`. Kiln requests mono 24 kHz signed 16-bit PCM and keeps the response in memory
+only long enough to pass it to the provider-neutral playback boundary. A bounded FIFO queue performs
+synthesis and playback outside Pi's event callback. Cancellation stops current work, disposal owns
+both provider and player cleanup, and one failed item does not prevent later queued speech.
+
+The live synthesis check is excluded from CI and never saves the returned audio:
+
+```powershell
+$env:KILN_VOICE_LIVE_TEST = "1"
+$env:ELEVENLABS_API_KEY = [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY", "User")
+$env:KILN_TTS_VOICE_ID = "your-voice-id"
+npm run test:voice:tts:live -- "Kiln live synthesis check."
+Remove-Item Env:KILN_VOICE_LIVE_TEST, Env:ELEVENLABS_API_KEY, Env:KILN_TTS_VOICE_ID
+```
+
+ElevenLabs accepts `enable_logging=false` only for eligible Zero Retention Mode accounts. Kiln asks
+for that mode, but operators must confirm their account policy rather than treating the request as a
+retention guarantee.
+
 ### Opt-in live STT check
 
 The live check is excluded from CI. It sends an existing headerless, mono 16 kHz signed 16-bit
