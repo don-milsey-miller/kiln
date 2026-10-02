@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { resolveVoiceConfig, VOICE_ENV, voiceCredential } from "../lib/voice/config.mjs";
+import { FfplayAudioPlayback } from "../lib/voice/audio/ffplay-playback.mjs";
 import { ElevenLabsTtsProvider } from "../lib/voice/tts/elevenlabs.mjs";
 
 if (process.env.KILN_VOICE_LIVE_TEST !== "1") {
@@ -18,11 +19,19 @@ if (process.env.KILN_VOICE_LIVE_TEST !== "1") {
       model: config.tts.model,
       maxTextCharacters: config.limits.maxTtsCharacters,
     });
+    let playback;
     try {
-      const text = process.argv.slice(2).join(" ").trim() || "Kiln voice synthesis is ready.";
+      const args = process.argv.slice(2);
+      const play = args.includes("--play");
+      const text = args.filter((arg) => arg !== "--play").join(" ").trim() || "Kiln voice synthesis is ready.";
       const result = await provider.synthesize(text);
-      console.log(`ElevenLabs returned ${result.audio.byteLength} bytes of ${result.format.encoding}; audio was not saved.`);
+      if (play) {
+        playback = new FfplayAudioPlayback({ device: config.audio.outputDevice });
+        await playback.play(result.format, result.audio);
+      }
+      console.log(`ElevenLabs returned ${result.audio.byteLength} bytes of ${result.format.encoding}; audio was not saved${play ? " and playback completed" : ""}.`);
     } finally {
+      await playback?.dispose();
       await provider.dispose();
     }
   }

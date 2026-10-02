@@ -86,6 +86,18 @@ npm --prefix .planning start
 Open <http://127.0.0.1:3000>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it. This command is not a
 substitute for `start-kiln.mjs` when you want the planning agent.
 
+### Use voice dictation and speech output
+
+Voice is an optional Pi TUI feature on Windows and Linux. It uses an independent ElevenLabs
+credential, an OpenAL-enabled `ffmpeg` for the microphone, and `ffplay` for the speaker. Pi's model
+provider login or API key is neither reused nor changed.
+
+Set `KILN_VOICE_ENABLED=true` and `ELEVENLABS_API_KEY`, then use `/voice start` and `/voice stop` to
+create editable draft text. Kiln never submits the draft or treats speech as confirmation input.
+Speech output is off by default; set `KILN_TTS_VOICE_ID` and use `/voice output on` to speak finalized
+assistant responses. See [Voice setup, privacy, validation, and limitations](docs/voice.md) before the
+first use.
+
 ### Add source material
 
 Activate the `source` artifact type for the project, then use **Add source material** in the browser
@@ -164,6 +176,15 @@ remain in Pi's authentication store or the host environment; do not place them i
 | `KILN_INGEST_MAX_REMOTE_MEDIA_BYTES` | No | `49000000` | Scanned-PDF/image provider ceiling; cannot exceed the provider limit. |
 | `KILN_INGEST_MAX_PDF_PAGES` | No | `200` | Maximum pages inspected in one PDF (`2000` hard ceiling). |
 | `KILN_INGEST_PROCESSING_TIMEOUT_MS` | No | `600000` | Timeout for remote media processing (`3600000` hard ceiling). |
+| `KILN_VOICE_ENABLED` | No | `false` | Enables operator-invoked voice features in Pi's TUI. |
+| `ELEVENLABS_API_KEY` | For voice STT/TTS | — | Independent ElevenLabs credential; never stored in Kiln configuration or reused from Pi. |
+| `KILN_STT_MODEL` | No | `scribe_v2_realtime` | ElevenLabs realtime transcription model. |
+| `KILN_TTS_MODEL` | No | `eleven_flash_v2_5` | ElevenLabs speech-synthesis model. |
+| `KILN_TTS_VOICE_ID` | For speech output | — | Explicit ElevenLabs voice ID; Kiln does not choose one. |
+| `KILN_TTS_MODE` | No | `off` | Startup speech-output opt-in; `/voice output on` can enable it for one session. |
+| `KILN_VOICE_INPUT_DEVICE` / `KILN_VOICE_OUTPUT_DEVICE` | No | System defaults | Exact host audio-device override. |
+| `KILN_VOICE_MAX_RECORDING_MS` | No | `120000` | Per-recording bound (`300000` hard ceiling). |
+| `KILN_TTS_MAX_CHARACTERS` | No | `4000` | Per-response speech-text bound (`20000` hard ceiling). |
 
 `setup.mjs` also accepts explicit non-interactive answers for automation, including `--trust`,
 `--provider`, `--model`, `--thinking`, `--research`, and `--live-model-check`. Omitted decisions are
