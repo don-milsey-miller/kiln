@@ -91,7 +91,9 @@ test("FFmpeg capture emits canonical in-memory PCM with a shell-free fixed comma
   assert.equal(script.calls[0].command, "ffmpeg");
   assert.equal(script.calls[0].options.shell, false);
   assert.deepEqual(script.calls[0].options.stdio, ["ignore", "pipe", "pipe"]);
-  assert.equal(script.calls[0].args.filter((arg) => arg === hostileDevice).length, 1);
+  assert.equal(script.calls[0].args.filter((arg) => arg === hostileDevice).length, 0);
+  assert.ok(script.calls[0].args.includes("dshow"));
+  assert.ok(script.calls[0].args.includes(`audio=${hostileDevice}`));
   assert.equal(script.calls[0].args.at(-1), "pipe:1");
   assert.equal(script.calls[0].args.some((arg) => /\.(wav|pcm|raw)$/i.test(arg)), false);
   assert.deepEqual(child.signals, ["SIGTERM"]);
@@ -173,19 +175,26 @@ test("missing FFmpeg and failed hardware remain voice-specific and sanitized", a
   assert.equal(JSON.stringify(result).includes("sensitive host detail"), false);
 });
 
-test("OpenAL devices are enumerable and dependency probing does not start capture", async () => {
+test("platform-native input devices are enumerable and dependency probing does not start capture", async () => {
+  const directShowListing = [
+    '[dshow @ abc] "Integrated Camera" (video)',
+    '[dshow @ abc] "Microphone Array" (audio)',
+    '[dshow @ abc]   Alternative name "@device_cm_private"',
+    '[dshow @ abc] "USB Headset" (audio)',
+    "Error opening input file dummy.",
+  ].join("\n");
   const listing = [
     "[openal @ abc] List of OpenAL capture devices on this system:",
     "[openal @ abc]   Default Microphone",
     "[openal @ abc]   USB Headset",
     "Error opening input file dummy.",
   ].join("\n");
-  const listChild = new FakeChild({ closeCode: 1, listOutput: listing });
+  const listChild = new FakeChild({ closeCode: 1, listOutput: directShowListing });
   const probeChild = new FakeChild({ closeCode: 1, listOutput: listing });
   const script = scriptedSpawn([listChild, probeChild]);
 
   assert.deepEqual(await listFfmpegInputDevices({ spawnImpl: script.spawn, platform: "win32" }), [
-    { id: "Default Microphone", label: "Default Microphone" },
+    { id: "Microphone Array", label: "Microphone Array" },
     { id: "USB Headset", label: "USB Headset" },
   ]);
   assert.deepEqual(await probeFfmpegAudioCapture({ spawnImpl: script.spawn, platform: "linux" }), {
@@ -194,6 +203,24 @@ test("OpenAL devices are enumerable and dependency probing does not start captur
   });
   assert.ok(script.calls.every((call) => call.args.includes("-list_devices")));
   assert.ok(script.calls.every((call) => !call.args.includes("pipe:1")));
+  assert.ok(script.calls[0].args.includes("dshow"));
+  assert.ok(script.calls[1].args.includes("openal"));
+});
+
+test("Windows capture selects the first enumerated DirectShow microphone when none is configured", async () => {
+  const listing = '[dshow @ abc] "Microphone Array" (audio)\nError opening input file dummy.';
+  const listChild = new FakeChild({ closeCode: 1, listOutput: listing });
+  const captureChild = new FakeChild();
+  const script = scriptedSpawn([listChild, captureChild]);
+  const capture = new FfmpegAudioCapture({ spawnImpl: script.spawn, platform: "win32", maxRecordingMs: 1_000 });
+
+  await capture.start();
+  await capture.stop();
+
+  assert.ok(script.calls[0].args.includes("dshow"));
+  assert.ok(script.calls[0].args.includes("-list_devices"));
+  assert.ok(script.calls[1].args.includes("dshow"));
+  assert.ok(script.calls[1].args.includes("audio=Microphone Array"));
 });
 
 test("an FFmpeg build without OpenAL is a dependency failure, not a missing microphone", async () => {

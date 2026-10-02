@@ -1,15 +1,15 @@
 # Voice development
 
-Kiln's first microphone backend uses the `ffmpeg` executable with its OpenAL input device. The
-backend is optional: if FFmpeg, OpenAL support, microphone permission, or an input device is absent,
-voice capture is unavailable while the rest of Kiln continues to operate.
+Kiln's microphone backend uses the `ffmpeg` executable with DirectShow on Windows and OpenAL on
+Linux. The backend is optional: if FFmpeg, the host capture backend, microphone permission, or an
+input device is absent, voice capture is unavailable while the rest of Kiln continues to operate.
 
 ## Configuration and clean setup
 
 Voice uses the ElevenLabs credential named by `ELEVENLABS_API_KEY`. This credential is independent
 of Pi's model provider authentication: Kiln neither reads a Pi credential for voice nor sends the
-ElevenLabs key to Pi. Install `ffmpeg` and `ffplay` on `PATH`, using an FFmpeg build with the OpenAL
-input device, then start Kiln from an environment containing the settings you want.
+ElevenLabs key to Pi. Install `ffmpeg` and `ffplay` on `PATH`, using an FFmpeg build with DirectShow
+on Windows or OpenAL on Linux, then start Kiln from an environment containing the settings you want.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -27,11 +27,18 @@ input device, then start Kiln from an environment containing the settings you wa
 PowerShell example:
 
 ```powershell
+$keySecure = Read-Host "Paste temporary ElevenLabs API key" -AsSecureString
+$keyCredential = New-Object System.Management.Automation.PSCredential("unused", $keySecure)
+$env:ELEVENLABS_API_KEY = $keyCredential.GetNetworkCredential().Password
+Remove-Variable keySecure, keyCredential
+
 $env:KILN_VOICE_ENABLED = "true"
-$env:ELEVENLABS_API_KEY = [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY", "User")
 $env:KILN_TTS_VOICE_ID = "your-voice-id"
 node .planning/bin/start-kiln.mjs
 ```
+
+The PowerShell key is scoped to that window and its child processes. Do not put the key directly in
+the command line, PowerShell history, a repository file, or chat.
 
 Linux shell example:
 
@@ -44,7 +51,7 @@ node .planning/bin/start-kiln.mjs
 
 `/voice status` reports STT and TTS independently. Missing credentials, provider failures, and
 input/output hardware failures remain voice-only errors; they do not end Pi or change the planning
-session. `/voice devices` lists microphone choices known to FFmpeg/OpenAL. Output-device discovery
+session. `/voice devices` lists microphone choices known to FFmpeg's host capture backend. Output-device discovery
 depends on the host audio backend, so use its exact device name when overriding the default.
 
 ## Audio contract
@@ -53,21 +60,22 @@ Capture is streamed through stdout as headerless `pcm_16000`: mono signed 16-bit
 at 16 kHz. Kiln does not create a recording file. The backend enforces both elapsed-time and byte
 bounds and terminates FFmpeg when capture is stopped, cancelled, or disposed.
 
-FFmpeg documents OpenAL capture, its default-device behavior, and device enumeration in the
-[input-device manual](https://ffmpeg.org/ffmpeg-devices.html#openal). Kiln invokes the fixed
+FFmpeg documents DirectShow and OpenAL capture and device enumeration in the
+[input-device manual](https://ffmpeg.org/ffmpeg-devices.html). Kiln invokes the fixed
 `ffmpeg` executable with an argument array and `shell: false`; a configured device name remains one
 argument and cannot become a shell command or an FFmpeg option.
 
 ## Supported hosts
 
-- Windows: validated with an OpenAL-enabled FFmpeg build. With no configured input, OpenAL chooses
-  its default capture device.
+- Windows: requires an FFmpeg build with the DirectShow input device. With no configured input,
+  Kiln selects the first audio device FFmpeg enumerates; use `KILN_VOICE_INPUT_DEVICE` to choose a
+  different device by its exact displayed name.
 - Linux: requires an FFmpeg build with the OpenAL input device and a working OpenAL capture backend
   (commonly PulseAudio or PipeWire compatibility). With no configured input, OpenAL chooses its
   default capture device.
 - macOS: intentionally deferred; the backend currently reports the platform as unsupported.
 
-Confirm that the installed executable advertises `D  openal`:
+Confirm that the installed executable advertises `D  dshow` on Windows or `D  openal` on Linux:
 
 ```text
 ffmpeg -hide_banner -devices
@@ -75,7 +83,13 @@ ffmpeg -hide_banner -devices
 
 List the device names FFmpeg exposes:
 
-```text
+```powershell
+# Windows
+ffmpeg -hide_banner -list_devices true -f dshow -i dummy
+```
+
+```bash
+# Linux
 ffmpeg -hide_banner -list_devices true -f openal -i dummy
 ```
 
@@ -183,7 +197,6 @@ The live synthesis check is excluded from CI and never saves the returned audio:
 
 ```powershell
 $env:KILN_VOICE_LIVE_TEST = "1"
-$env:ELEVENLABS_API_KEY = [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY", "User")
 $env:KILN_TTS_VOICE_ID = "your-voice-id"
 npm run test:voice:tts:live -- --play "Kiln live synthesis check."
 Remove-Item Env:KILN_VOICE_LIVE_TEST, Env:ELEVENLABS_API_KEY, Env:KILN_TTS_VOICE_ID
@@ -203,7 +216,6 @@ PowerShell on Windows:
 
 ```powershell
 $env:KILN_VOICE_LIVE_TEST = "1"
-$env:ELEVENLABS_API_KEY = [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY", "User")
 npm run test:voice:stt:live -- C:\path\to\sample.pcm
 Remove-Item Env:KILN_VOICE_LIVE_TEST, Env:ELEVENLABS_API_KEY
 ```
@@ -226,15 +238,15 @@ private project content. Both checks keep PCM in memory and do not create an aud
 
 ### Windows
 
-1. Confirm `ffmpeg -hide_banner -devices` includes `D  openal`, and confirm `ffplay -version` runs.
-2. Put a temporary ElevenLabs key in the user environment and open a new PowerShell window.
+1. Confirm `ffmpeg -hide_banner -devices` includes `D  dshow`, and confirm `ffplay -version` runs.
+2. Put a temporary ElevenLabs key in the current PowerShell process using the secure prompt in the
+   configuration example. Keep that window open for every live check.
 3. Run the microphone-to-STT check, speak a short phrase for five seconds, and confirm the committed
    transcript is intelligible:
 
    ```powershell
    $env:KILN_VOICE_LIVE_TEST = "1"
    $env:KILN_VOICE_HARDWARE_TEST = "1"
-   $env:ELEVENLABS_API_KEY = [Environment]::GetEnvironmentVariable("ELEVENLABS_API_KEY", "User")
    npm run test:voice:stt:hardware-live
    ```
 
