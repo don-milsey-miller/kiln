@@ -469,6 +469,29 @@ export function defaultInstall({ toolRoot, spawn = spawnSync }) {
 }
 
 /**
+ * Restore the one dependency Pi's published shrinkwrap can downgrade during the script-free bootstrap.
+ *
+ * ⚠️ **THIS IS EXPLICIT TRUSTED KILN CODE, NOT A LIFECYCLE SCRIPT.** `npm ci --ignore-scripts` remains the
+ * boundary above: no dependency gets to execute install-time code. The repair module is loaded only after the
+ * locked graph exists, then verifies and copies the root's pinned `brace-expansion` into Pi's nested slot.
+ * Keeping the import dynamic also preserves setup's Node-built-ins-only pre-install graph (ACC-0083).
+ */
+export async function repairInstalledDependencies({ toolRoot = TOOL_ROOT } = {}) {
+  try {
+    const { repairPiBraceExpansion } = await import("./repair-pi-brace-expansion.mjs");
+    return repairPiBraceExpansion(toolRoot);
+  } catch (error) {
+    throw new SetupCommandRefusal(
+      EXIT.INSTALL,
+      `The locked dependencies were installed, but Kiln could not verify its repaired Pi dependency ` +
+        `(${error?.message ?? "unknown"}). Nothing of the project was changed. Run npm install in ${toolRoot} ` +
+        `and retry setup.`,
+      { toolRoot }
+    );
+  }
+}
+
+/**
  * The exact command that continues an interrupted run, printed into the journal and on refusal.
  *
  * ⚠️ **THE PATH IS QUOTED WHEN IT NEEDS TO BE, because an operator copies this line into a shell.** A project
@@ -1463,12 +1486,14 @@ export function renderChoices(options) {
 
 /**
  * @param {string[]} argv
- * @param {object} [deps]  ⚠️ **SEAMS FOR WHAT THIS COMMAND CANNOT DO IN A TEST**: spawning npm, and asking the
- *   operator. Neither names a program or a path; the install still runs in this checkout and nowhere else.
+ * @param {object} [deps]  ⚠️ **SEAMS FOR WHAT THIS COMMAND CANNOT DO IN A TEST**: spawning npm, repairing its
+ *   installed tree, and asking the operator. Neither dependency seam names a program or destination; both remain
+ *   bound to this checkout, before consumer-project mutation.
  */
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const {
     install = installDependencies,
+    repairDependencies = repairInstalledDependencies,
     ask = askLine,
     print = say,
     nodeVersion = process.versions.node,
@@ -1552,6 +1577,12 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // 4. The locked dependencies, inside this checkout only.
       const installed = install({ toolRoot: paths.toolRoot });
       print(installed.installed ? "dependencies installed" : `dependencies present (${installed.why})`);
+
+      // Pi's own shrinkwrap can reinstall brace-expansion 5.0.9 even though this checkout pins 5.0.12. The
+      // bootstrap deliberately suppresses lifecycle scripts, so invoke only Kiln's reviewed repair before any
+      // installed module is imported or any consumer-project phase can begin.
+      const repaired = await repairDependencies({ toolRoot: paths.toolRoot });
+      print(repaired.repaired ? `Pi dependency ${repaired.version} repaired` : `Pi dependency ${repaired.version} verified`);
 
       // 5. Everything else, now that it exists.
       const modules = {

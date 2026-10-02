@@ -219,6 +219,21 @@ test(
         const contentRoot = join(project, "planning-content");
         assert.ok(existsSync(join(contentRoot, "stages", "01-intake.md")), "setup created the Stage 1 document beside the clone");
         assert.ok(existsSync(join(project, ".planning", "node_modules", "@earendil-works", "pi-coding-agent")), "setup installed the locked dependencies inside the clone");
+        const nestedBrace = JSON.parse(readFileSync(join(
+          project,
+          ".planning",
+          "node_modules",
+          "@earendil-works",
+          "pi-coding-agent",
+          "node_modules",
+          "brace-expansion",
+          "package.json"
+        ), "utf8"));
+        assert.equal(
+          nestedBrace.version,
+          "5.0.12",
+          "setup's trusted post-install repair did not replace Pi's vulnerable shrinkwrapped brace-expansion"
+        );
         const ignore = readFileSync(join(project, ".gitignore"), "utf8");
         assert.match(ignore, /^\/?\.planning\/?$/m, `setup did not ignore .planning: ${ignore}`);
 
