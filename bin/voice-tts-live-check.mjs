@@ -30,6 +30,10 @@ if (process.env.KILN_VOICE_LIVE_TEST !== "1") {
         await playback.play(result.format, result.audio);
       }
       console.log(`ElevenLabs returned ${result.audio.byteLength} bytes of ${result.format.encoding}; audio was not saved${play ? " and playback completed" : ""}.`);
+      console.log(`Provider retention request: ${result.retention}.`);
+    } catch (error) {
+      console.error(`Live synthesis failed (${error?.code ?? "voice-operation-failed"}).`);
+      process.exitCode = 1;
     } finally {
       await playback?.dispose();
       await provider.dispose();

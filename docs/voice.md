@@ -20,6 +20,7 @@ on Windows or OpenAL on Linux, then start Kiln from an environment containing th
 | `KILN_TTS_MODEL` | `eleven_flash_v2_5` | Speech-synthesis model. |
 | `KILN_TTS_VOICE_ID` | none | Required explicit ElevenLabs voice ID for output. |
 | `KILN_TTS_MODE` | `off` | Startup output mode. `/voice output on` is a session-only override. |
+| `KILN_ELEVENLABS_ENABLE_LOGGING` | `false` | Explicitly permit ElevenLabs request logging. Required for TTS on accounts without Zero Retention Mode. |
 | `KILN_VOICE_INPUT_DEVICE` / `KILN_VOICE_OUTPUT_DEVICE` | system defaults | Exact host device overrides. |
 | `KILN_VOICE_MAX_RECORDING_MS` | `120000` | Per-recording limit; hard maximum is 300000 ms. |
 | `KILN_TTS_MAX_CHARACTERS` | `4000` | Per-response renderer limit; hard maximum is 20000 characters. |
@@ -203,8 +204,9 @@ Remove-Item Env:KILN_VOICE_LIVE_TEST, Env:ELEVENLABS_API_KEY, Env:KILN_TTS_VOICE
 ```
 
 ElevenLabs accepts `enable_logging=false` only for eligible Zero Retention Mode accounts. Kiln asks
-for that mode, but operators must confirm their account policy rather than treating the request as a
-retention guarantee.
+for that mode by default. Set `KILN_ELEVENLABS_ENABLE_LOGGING=true` only when explicitly accepting
+provider-side request retention; operators must confirm their account policy rather than treating
+any request setting as a retention guarantee.
 
 ### Opt-in live STT check
 
@@ -254,6 +256,7 @@ private project content. Both checks keep PCM in memory and do not create an aud
    the expected output device:
 
    ```powershell
+   $env:KILN_ELEVENLABS_ENABLE_LOGGING = "true" # required unless the account has Zero Retention Mode
    $env:KILN_TTS_VOICE_ID = "your-voice-id"
    npm run test:voice:tts:live -- --play "Kiln Windows speaker check."
    ```
