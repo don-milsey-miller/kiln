@@ -42,10 +42,17 @@ export function Callout({ children }) {
 export function Table({ children }) {
   return createElement(
     "div",
-    { style: { maxWidth: "100%", overflowX: "auto", margin: "12px 0" } },
+    {
+      role: "region",
+      "aria-label": "Scrollable table",
+      tabIndex: 0,
+      style: { maxWidth: "100%", overflowX: "auto", margin: "12px 0", WebkitOverflowScrolling: "touch" },
+    },
     createElement(
       "table",
-      { style: { borderCollapse: "collapse", tableLayout: "fixed", width: "100%" } },
+      // `width: 100%` alone squeezed every column into a phone viewport. A content-sized minimum
+      // keeps words readable and lets the wrapper provide the horizontal scrolling it promises.
+      { style: { borderCollapse: "collapse", tableLayout: "auto", width: "max-content", minWidth: "100%" } },
       children
     )
   );
@@ -62,7 +69,9 @@ export function TableHead({ children }) {
         padding: "7px 9px",
         textAlign: "left",
         verticalAlign: "top",
-        overflowWrap: "anywhere",
+        overflowWrap: "break-word",
+        wordBreak: "normal",
+        minWidth: "9rem",
       },
     },
     children
@@ -77,7 +86,9 @@ export function TableCell({ children }) {
         border: "1px solid #d7d7d7",
         padding: "7px 9px",
         verticalAlign: "top",
-        overflowWrap: "anywhere",
+        overflowWrap: "break-word",
+        wordBreak: "normal",
+        minWidth: "9rem",
       },
     },
     children

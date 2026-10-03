@@ -1,4 +1,6 @@
-import { readArtifactSummaries, readArtifactSummary } from "../../_read/planning.js";
+import { redirect } from "next/navigation";
+
+import { readArtifactDetail, searchArtifactSummaries } from "../../_read/planning.js";
 import { submitReviewStatus } from "../../_write/review-action.js";
 import { REVIEW_MESSAGE } from "../../_write/review-logic.js";
 
@@ -32,12 +34,13 @@ const STATUS_TONE = {
   amended: { bg: "#f7f4fb", border: "#cfc2e0", fg: "#5b4380" },
 };
 
-export default async function ReviewPanel({ artifactId, stageId, reviewError }) {
-  const artifact = artifactId ? await readArtifactSummary(artifactId) : null;
+export default async function ReviewPanel({ artifactId, stageId, reviewError, reviewAttempt, query, type, status }) {
+  const detail = artifactId ? await readArtifactDetail(artifactId) : null;
+  const artifact = detail?.doc ?? null;
 
   if (!artifactId) {
-    const artifacts = await readArtifactSummaries();
-    if (artifacts.length === 0)
+    const search = await searchArtifactSummaries({ query, type, status });
+    if (search.total === 0)
       return (
         <section data-vpw-review="empty" style={{ color: "#666", fontSize: ".85rem" }}>
           This project has no active artifacts available for review yet.
@@ -45,20 +48,44 @@ export default async function ReviewPanel({ artifactId, stageId, reviewError }) 
       );
 
     return (
-      <section data-vpw-review="chooser" style={{ borderTop: "1px solid #eee", paddingTop: "14px" }}>
+      <section data-vpw-review="chooser" style={{ borderTop: "1px solid #eee", paddingTop: "14px", display: "flex", flexDirection: "column", gap: "14px" }}>
+        <form method="get" action={`/stage/${stageId}`} aria-label="Filter review artifacts" style={{ display: "flex", alignItems: "end", gap: "10px", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px", flex: "1 1 16rem", fontSize: ".82rem" }}>
+            <span style={{ color: "#666" }}>Search by ID or title</span>
+            <input name="q" type="search" defaultValue={search.filters.query} placeholder="REQ-0042 or onboarding" style={{ padding: ".35rem .45rem", fontSize: ".82rem", minWidth: 0 }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: ".82rem" }}>
+            <span style={{ color: "#666" }}>Type</span>
+            <select name="type" defaultValue={search.filters.type} style={{ padding: ".35rem .45rem", fontSize: ".82rem" }}>
+              <option value="">All types</option>
+              {search.types.map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}
+            </select>
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: ".82rem" }}>
+            <span style={{ color: "#666" }}>Status</span>
+            <select name="status" defaultValue={search.filters.status} style={{ padding: ".35rem .45rem", fontSize: ".82rem" }}>
+              <option value="">All statuses</option>
+              {search.statuses.map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}
+            </select>
+          </label>
+          <button type="submit" style={{ padding: ".35rem .8rem", fontSize: ".82rem", cursor: "pointer" }}>Find artifacts</button>
+        </form>
+
         <form method="get" action={`/stage/${stageId}`} style={{ display: "flex", alignItems: "end", gap: "10px", flexWrap: "wrap" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: "min(28rem, 100%)", fontSize: ".82rem" }}>
-            <span style={{ color: "#666" }}>Select an artifact to review</span>
-            <select name="artifact" defaultValue="" required style={{ padding: ".35rem .45rem", fontSize: ".82rem", maxWidth: "100%" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: "min(32rem, 100%)", fontSize: ".82rem" }}>
+            <span style={{ color: "#666" }}>
+              {search.matched === 0 ? "No matching artifacts" : `${search.matched} matching artifact${search.matched === 1 ? "" : "s"}${search.truncated ? " · first 50 shown" : ""}`}
+            </span>
+            <select name="artifact" defaultValue="" required disabled={search.items.length === 0} style={{ padding: ".35rem .45rem", fontSize: ".82rem", maxWidth: "100%" }}>
               <option value="" disabled>Choose an active artifact…</option>
-              {artifacts.map((candidate) => (
+              {search.items.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {`${candidate.id} · ${candidate.type} · ${candidate.title || "Untitled"} · ${candidate.reviewStatus}`}
                 </option>
               ))}
             </select>
           </label>
-          <button type="submit" style={{ padding: ".35rem .8rem", fontSize: ".82rem", cursor: "pointer" }}>
+          <button type="submit" disabled={search.items.length === 0} style={{ padding: ".35rem .8rem", fontSize: ".82rem", cursor: search.items.length ? "pointer" : "not-allowed" }}>
             Review artifact
           </button>
         </form>
@@ -76,6 +103,11 @@ export default async function ReviewPanel({ artifactId, stageId, reviewError }) 
   const tone = STATUS_TONE[artifact.reviewStatus] ?? STATUS_TONE.draft;
   // ⚠️ Looked up, never interpolated: an unrecognised code renders nothing rather than itself.
   const message = REVIEW_MESSAGE[reviewError] ?? null;
+  // A failed transition is encoded with its intended status. If a later successful write reached
+  // that status while the browser retained the old query string, canonicalize the URL instead of
+  // rendering a contradiction such as “approved” beside “Nothing was changed.”
+  if (message && reviewAttempt === artifact.reviewStatus)
+    redirect(`/stage/${stageId}?artifact=${artifact.id}`);
 
   return (
     <section
@@ -112,6 +144,28 @@ export default async function ReviewPanel({ artifactId, stageId, reviewError }) 
           {artifact.reviewStatus}
         </span>
       </div>
+
+      <details open style={{ borderTop: "1px solid #eee", paddingTop: "12px" }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: ".85rem" }}>Artifact content and provenance</summary>
+        <pre
+          data-vpw-review-content={artifact.id}
+          style={{ margin: "10px 0 0", padding: "12px", maxHeight: "28rem", overflow: "auto", background: "#f7f7f7", borderRadius: "4px", whiteSpace: "pre-wrap", overflowWrap: "break-word", fontSize: ".76rem", lineHeight: 1.45 }}
+        >
+          {JSON.stringify(detail.doc, null, 2)}
+        </pre>
+        {detail.sourcePreview ? (
+          <div style={{ marginTop: "12px" }}>
+            <div style={{ color: "#666", fontSize: ".78rem", marginBottom: "5px" }}>Normalized source preview</div>
+            {detail.sourcePreview.unavailable ? (
+              <p style={{ color: "#a01f1f", fontSize: ".82rem" }}>The normalized source preview is unavailable.</p>
+            ) : (
+              <pre data-vpw-source-preview style={{ margin: 0, padding: "12px", maxHeight: "22rem", overflow: "auto", background: "#fbfbfb", border: "1px solid #e2e2e2", borderRadius: "4px", whiteSpace: "pre-wrap", overflowWrap: "break-word", fontSize: ".8rem", lineHeight: 1.5 }}>
+                {detail.sourcePreview.content}{detail.sourcePreview.truncated ? "\n\n[Preview truncated]" : ""}
+              </pre>
+            )}
+          </div>
+        ) : null}
+      </details>
 
       {message ? (
         <div

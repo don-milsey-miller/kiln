@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { artifactReviewChoices } from "../app/_review/artifact-review-choices.js";
+import { artifactReviewChoices, artifactReviewSearch } from "../app/_review/artifact-review-choices.js";
 
 const record = (doc, overrides = {}) => ({
   doc,
@@ -65,4 +65,26 @@ test("choices are stable by type then id and fill safe display defaults", () => 
 
   assert.deepEqual(choices.map((choice) => choice.id), ["CMP-0001", "REQ-0001", "REQ-0002"]);
   assert.deepEqual(choices[2], { id: "REQ-0002", type: "requirement", title: "", reviewStatus: "draft" });
+});
+
+test("review search filters by id, title, type and status while bounding rendered choices", () => {
+  const records = Array.from({ length: 80 }, (_, i) =>
+    record({
+      id: `REQ-${String(i + 1).padStart(4, "0")}`,
+      type: "requirement",
+      title: i === 41 ? "Accessible volunteer onboarding" : `Requirement ${i + 1}`,
+      reviewStatus: i % 2 === 0 ? "draft" : "approved",
+      lifecycle: "active",
+    })
+  );
+  records.push(record({ id: "DEC-0001", type: "decision", title: "Volunteer access", reviewStatus: "approved", lifecycle: "active" }));
+
+  const bounded = artifactReviewSearch(records, ["requirement", "decision"]);
+  assert.deepEqual([bounded.total, bounded.matched, bounded.items.length, bounded.truncated], [81, 81, 50, true]);
+
+  const byTitle = artifactReviewSearch(records, ["requirement", "decision"], { query: "accessible volunteer" });
+  assert.deepEqual(byTitle.items.map((item) => item.id), ["REQ-0042"]);
+
+  const filtered = artifactReviewSearch(records, ["requirement", "decision"], { type: "decision", status: "approved" });
+  assert.deepEqual(filtered.items.map((item) => item.id), ["DEC-0001"]);
 });

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { createSource } from "../lib/tools/evidence-tools.mjs";
 import { TYPED_TOOLS } from "../lib/tools/registry.mjs";
+import { readSourcePreview } from "../lib/source-preview.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCHEMAS = join(ROOT, "schemas");
@@ -45,5 +46,15 @@ test("typed source creation refuses a missing normalized payload", () => {
   assert.throws(
     () => createSource({ ...input, derivedPayload: { format: "markdown", path: "sources/SRC-9999/content.md" } }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS }),
     /does not exist/
+  );
+});
+
+test("the review preview reads only a bounded normalized payload inside the content root", () => {
+  const fx = fixture();
+  const preview = readSourcePreview({ type: "source", derivedPayload: input.derivedPayload }, { contentRoot: fx.contentRoot, limit: 5 });
+  assert.deepEqual(preview, { content: "norma", truncated: true, format: "markdown" });
+  assert.deepEqual(
+    readSourcePreview({ type: "source", derivedPayload: { format: "markdown", path: "../outside.md" } }, { contentRoot: fx.contentRoot }),
+    { unavailable: true }
   );
 });

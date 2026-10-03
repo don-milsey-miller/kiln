@@ -466,9 +466,13 @@ test("the safely typed structures are persisted by value, and refuse unknown key
   );
   assert.throws(() => projectRequestProfile({ compat: { brandNewPiField: true } }, null), RequestProfileError);
 
-  // A declared identity with nothing to describe is refused too: it would sit in the key meaning
-  // nothing and would silently invalidate the proof whenever it changed.
-  assert.throws(() => projectRequestProfile({ reasoning: true }, null, { declaredIdentity: "x" }), RequestProfileError);
+  // An explicit project declaration remains a determinant even when this version of Kiln can
+  // otherwise bound the whole profile. A committed declaration must not make every later setup
+  // refuse; changing the name deliberately invalidates the proof.
+  assert.deepEqual(
+    projectRequestProfile({ reasoning: true }, null, { declaredIdentity: "qwen35-local-default" }).unboundedInputs,
+    { categories: [], declaredIdentity: "qwen35-local-default" }
+  );
 });
 
 test("the persisted compat field set has not fallen behind the pinned Pi package", () => {

@@ -522,6 +522,8 @@ async function runSmokeCheck(t) {
       !/name="type"/.test(formPage),
       "the form must not carry a type field — the type is derived from the id, never taken from the browser"
     );
+    assert.match(formPage, /data-vpw-review-content="AST-0021"/, "the reviewer must receive the artifact content, not identity alone");
+    assert.match(formPage, /The DEC-0019 read contract serves current planning content/, "the content being approved must be visible in the review surface");
 
     const submit = async (fields) => {
       const fd = new FormData();
@@ -577,7 +579,25 @@ async function runSmokeCheck(t) {
     // ---- approving with nobody attached
     const unattributed = await submit({ id: "AST-0021", path: `/stage/${STAGE}`, status: "approved", reviewedBy: "" });
     assert.match(unattributed.location, /reviewError=needs-reviewer/, "an approval nobody is attached to is refused");
+    assert.match(unattributed.location, /reviewAttempt=approved/, "the failed transition carries a bounded target so stale feedback can be recognized");
     assert.equal(JSON.parse(readFileSync(reviewTarget, "utf-8")).reviewStatus, "in-review", "and does not land");
+
+    // A later successful approval canonicalizes even an old failure URL. This is the real sequence
+    // a browser produces when its router retains the query string across a Server Action refresh.
+    const approved = await submit({ id: "AST-0021", path: `/stage/${STAGE}`, status: "approved", reviewedBy: "PM regression" });
+    assert.equal(approved.location, reviewUrl, "success returns to the clean artifact URL");
+    assert.equal(JSON.parse(readFileSync(reviewTarget, "utf-8")).reviewStatus, "approved");
+    const stale = await fetch(`http://127.0.0.1:${PORT}${unattributed.location}`, { redirect: "manual", signal: AbortSignal.timeout(15_000) });
+    if ([307, 308].includes(stale.status)) {
+      assert.equal(stale.headers.get("location"), reviewUrl, "the stale error URL is removed once its target status exists");
+    } else {
+      // A redirect thrown inside a streamed Suspense boundary is represented by Next as a client
+      // navigation instruction in a 200 response because headers have already been sent.
+      const stalePage = await stale.text();
+      assert.equal(stale.status, 200);
+      assert.ok(!/data-vpw-review-error=/.test(stalePage), "the obsolete error must not render while navigation is pending");
+      assert.match(stalePage, /reviewAttempt=approved|artifact=AST-0021/, "the streamed response retains enough route state to canonicalize");
+    }
 
     // ---- restore, so the rest of this test sees the content it expects
     writeFileSync(reviewTarget, JSON.stringify(startDoc, null, 2) + "\n");

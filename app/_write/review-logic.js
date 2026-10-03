@@ -57,11 +57,15 @@ const STAGE_PATH = /^\/stage\/[a-z0-9-]+$/;
 const ARTIFACT_ID = /^[A-Z]{3}-[0-9]{4,}$/;
 
 /** Rebuild the URL to return to, from parts that were each matched rather than trusted. */
-export function returnUrl({ path, artifactId, error }) {
+export function returnUrl({ path, artifactId, error, attemptedStatus }) {
   const base = STAGE_PATH.test(path ?? "") ? path : "/";
   const query = [];
   if (ARTIFACT_ID.test(artifactId ?? "")) query.push(`artifact=${artifactId}`);
   if (error && error !== REVIEW.OK) query.push(`reviewError=${error}`);
+  // A valid attempted status lets the fresh page recognize that the requested transition later
+  // succeeded and discard an obsolete error. Invalid browser input is never reflected into a URL.
+  if (error && error !== REVIEW.OK && ["draft", "in-review", "approved", "amended"].includes(attemptedStatus))
+    query.push(`reviewAttempt=${attemptedStatus}`);
   return query.length ? `${base}?${query.join("&")}` : base;
 }
 
@@ -77,7 +81,15 @@ export async function applyReviewSubmission(fields, deps) {
   const status = (fields.status ?? "").trim();
   const reviewedBy = (fields.reviewedBy ?? "").trim();
 
-  const fail = (code) => ({ code, redirectTo: returnUrl({ path: fields.path, artifactId: id, error: code }) });
+  const fail = (code) => ({
+    code,
+    redirectTo: returnUrl({
+      path: fields.path,
+      artifactId: id,
+      error: code,
+      attemptedStatus: deps.statuses.includes(status) ? status : undefined,
+    }),
+  });
 
   if (!ARTIFACT_ID.test(id)) return fail(REVIEW.NO_ID);
 

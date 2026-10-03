@@ -261,6 +261,24 @@ test("a configuration that cannot be identified is not checked at all, and a dec
   }
 });
 
+test("a committed request identity remains usable when the resolved profile is otherwise bounded", async () => {
+  const p = project();
+  try {
+    const pf = preflightFor(PLAIN);
+    const declared = { requestIdentity: "local-qwen-default" };
+    const first = await check(p, pf, { ask: () => true, canary: canaryStub().canary, declared });
+    assert.equal(first.outcome, LIVE_CHECK_OUTCOME.PASSED, first.message);
+    assert.deepEqual(
+      readCompatibility(p.where).record.key.effectiveRequestProfile.unboundedInputs,
+      { categories: [], declaredIdentity: "local-qwen-default" }
+    );
+    const reused = await check(p, pf, { canary: canaryStub().canary, declared });
+    assert.equal(reused.outcome, LIVE_CHECK_OUTCOME.REUSED);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ R9 an endpoint that cannot be established without the network is not checked, and one authentication replaces is the one keyed", async () => {
   const p = project();
   try {
@@ -268,6 +286,15 @@ test("⚠️ R9 an endpoint that cannot be established without the network is no
     const r = await check(p, { ...preflightFor(PLAIN), endpointUnestablished: true }, { ask: () => true, canary: c.canary });
     assert.deepEqual([r.outcome, r.ready, r.reason], [LIVE_CHECK_OUTCOME.UNCACHEABLE, false, "effective-endpoint-unestablished"]);
     assert.equal(c.runs.length, 0);
+
+    const declared = { endpointIdentity: { scheme: "https", hostname: "chatgpt.com", port: 443, pathname: "/backend-api" } };
+    const named = await check(
+      p,
+      { ...preflightFor(PLAIN), endpointUnestablished: true },
+      { ask: () => true, canary: canaryStub().canary, declared }
+    );
+    assert.equal(named.outcome, LIVE_CHECK_OUTCOME.PASSED, named.message);
+    assert.equal(readCompatibility(p.where).record.key.endpointIdentitySource, "declared");
 
     // Pi's own resolution decides the effective endpoint, with the network refused.
     const replaced = await resolveEffectiveBaseUrl({ getProviderAuth: async () => ({ auth: { baseUrl: "https://proxy.example/openai/v1" } }) }, PLAIN);

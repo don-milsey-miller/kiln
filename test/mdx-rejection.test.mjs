@@ -42,6 +42,18 @@ const build = (text) =>
     }
   );
 
+test("tables retain readable cell widths inside a keyboard-scrollable region", () => {
+  const region = components.table({ children: "rows" });
+  assert.equal(region.props.role, "region");
+  assert.equal(region.props.tabIndex, 0);
+  assert.equal(region.props.style.overflowX, "auto");
+  const table = region.props.children;
+  assert.equal(table.props.style.width, "max-content");
+  assert.equal(table.props.style.minWidth, "100%");
+  assert.equal(components.th({ children: "Heading" }).props.style.minWidth, "9rem");
+  assert.equal(components.td({ children: "Content" }).props.style.wordBreak, "normal");
+});
+
 /** Compile and fail, returning the message with its position. */
 async function rejected(text) {
   try {
@@ -110,10 +122,10 @@ test("GFM tables render as wrapped semantic tables instead of pipe-delimited par
   const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
   const html = renderToStaticMarkup(createElement(mod.default, { components }));
 
-  assert.match(html, /<table style="[^"]*table-layout:fixed/, "the document must contain a semantic table with bounded layout");
+  assert.match(html, /<table style="[^"]*table-layout:auto[^"]*width:max-content/, "the document must contain a semantic table with readable scrolling layout");
   assert.match(html, /<thead>/, "column headings must retain their native table structure");
   assert.match(html, /<th scope="col"/, "headers must be exposed as column headers");
-  assert.match(html, /<td style="[^"]*overflow-wrap:anywhere/, "long cell content must wrap");
+  assert.match(html, /<td style="[^"]*overflow-wrap:break-word/, "long unbroken cell content must wrap without collapsing normal words");
   assert.equal(html.includes("|---|---|"), false, "the GFM delimiter row must not render as text");
 });
 
