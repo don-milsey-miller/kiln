@@ -35,8 +35,10 @@ terminal, or model context.
 - Tavily probes `/usage` only after explicit approval and performs no search during setup.
 - OpenAI receives source bytes only when project intent and host consent both authorize remote
   processing. Local text and text-bearing PDF ingestion remain available when it is skipped.
-- ElevenLabs STT and TTS can be chosen independently. TTS requires an explicit voice ID. Missing
-  FFmpeg, FFplay, or physical audio hardware makes voice unavailable without failing core setup.
+- ElevenLabs STT and TTS can be chosen independently. TTS requires an explicit Voice ID, not the API
+  key. Find it in ElevenLabs by opening **Voices**, selecting the voice Kiln should use, and copying
+  its **Voice ID**. Missing FFmpeg, FFplay, or physical audio hardware makes voice unavailable without
+  failing core setup.
 - Jev uses its model-list authentication probe during setup. It remains advisory and gains no
   permission to write, approve, or bypass a deterministic gate.
 
