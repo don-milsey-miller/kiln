@@ -12,4 +12,4 @@ const deps = {
 };
 
 export const POST = (request) => handleIngestPost(request, deps);
-export const GET = (request) => handleIngestGet(request, deps);
+export const GET = async (request) => handleIngestGet(request, deps);

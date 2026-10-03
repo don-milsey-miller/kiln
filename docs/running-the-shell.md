@@ -1,4 +1,13 @@
-# Running the shell
+# Running Kiln
+
+For a consumer project, run the canonical launcher from the directory containing `.planning/`:
+
+```
+node .planning/bin/start-kiln.mjs
+```
+
+Guided setup offers this handoff when configuration is complete. The lower-level browser-only shell
+command below remains useful for inspection and contributor work.
 
 One command, from a clone with Node present:
 

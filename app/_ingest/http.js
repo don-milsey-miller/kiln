@@ -11,7 +11,7 @@ export async function handleIngestPost(request, deps) {
   const filename = request.headers.get("x-kiln-filename");
   const relationship = request.headers.get("x-kiln-relationship");
   const claimedLength = Number(request.headers.get("content-length"));
-  const limit = deps.uploadLimit();
+  const limit = await deps.uploadLimit();
   if (!filename || filename.length > 255) return json({ ok: false, error: { code: "invalid-source" } }, 400);
   if (!request.body) return json({ ok: false, error: { code: "invalid-source" } }, 400);
   if (Number.isFinite(claimedLength) && claimedLength > limit)
@@ -32,11 +32,11 @@ export async function handleIngestPost(request, deps) {
   }
 }
 
-export function handleIngestGet(request, deps) {
+export async function handleIngestGet(request, deps) {
   const id = new URL(request.url).searchParams.get("job");
-  if (!id) return json({ ok: true, jobs: deps.listJobs() });
+  if (!id) return json({ ok: true, jobs: await deps.listJobs() });
   try {
-    const job = deps.getJob(id);
+    const job = await deps.getJob(id);
     return job ? json({ ok: true, job }) : json({ ok: false, error: { code: "unknown-job" } }, 404);
   } catch {
     return json({ ok: false, error: { code: "invalid-job" } }, 400);

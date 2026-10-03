@@ -27,7 +27,6 @@
  */
 
 import { createHash } from "node:crypto";
-import { createInterface } from "node:readline";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -42,6 +41,10 @@ import { SETUP_LOCK_FILE, SetupRefusal, runTransaction } from "../lib/setup-tran
 import { initializeProject } from "../lib/initialize-project.mjs";
 import { CONTENT_DIR_NAME } from "../lib/project-scaffold.mjs";
 import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
+import { askForConfirmation, isConfirmationPrompt } from "../lib/setup-input.mjs";
+import { SETUP_EVENT, createSetupEngine } from "../lib/setup-engine.mjs";
+import { createPlainRenderer } from "../lib/setup-renderer-plain.mjs";
+import { createRendererDecisionProvider, setupProgressLabel } from "../lib/setup-renderer.mjs";
 
 const TOOL_ROOT = canonicalPath(resolve(join(dirname(fileURLToPath(import.meta.url)), "..")));
 
@@ -55,21 +58,8 @@ const NEWLINE = "\n";
  * ⚠️ **A CLOSED INPUT IS AN ANSWER, AND IT IS NOT A CHOICE.** End of input, an interrupt and a run with no
  * terminal all resolve `null`, and every caller treats that as "nobody chose" rather than defaulting.
  */
-const askLine = (question) =>
-  new Promise((resolveAnswer) => {
-    if (!process.stdin.isTTY) return resolveAnswer(null);
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    let answered = false;
-    const finish = (value) => {
-      if (answered) return;
-      answered = true;
-      rl.close();
-      resolveAnswer(value);
-    };
-    rl.on("SIGINT", () => finish(null));
-    rl.on("close", () => finish(null));
-    rl.question(question, (answer) => finish(answer));
-  });
+const bootstrapRenderer = createPlainRenderer();
+const askLine = bootstrapRenderer.ask;
 const warn = (msg) => console.error(`[kiln] ${msg}`);
 
 /**
@@ -217,7 +207,7 @@ const VALUED = new Set([
   "--request-identity",
   "--state-protection",
 ]);
-const FLAGS = new Set(["--non-interactive", "--resume", "--help", "-h"]);
+const FLAGS = new Set(["--non-interactive", "--plain", "--json", "--verbose", "--resume", "--help", "-h"]);
 
 export function parseArgs(argv) {
   const out = { localState: "project" };
@@ -228,6 +218,9 @@ export function parseArgs(argv) {
     if (FLAGS.has(flag) && inline === null) {
       if (flag === "--help" || flag === "-h") out.help = true;
       if (flag === "--non-interactive") out.nonInteractive = true;
+      if (flag === "--plain") out.plain = true;
+      if (flag === "--json") out.json = true;
+      if (flag === "--verbose") out.verbose = true;
       if (flag === "--resume") out.resume = true;
       continue;
     }
@@ -421,7 +414,7 @@ const digestOfFile = (path) => (existsSync(path) ? `sha256:${createHash("sha256"
  *
  * @param {{toolRoot: string, run?: Function}} opts
  */
-export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall } = {}) {
+export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall, verbose = false, print = () => {} } = {}) {
   const state = dependencyState(toolRoot);
   if (!state.install) return { installed: false, why: state.why };
 
@@ -432,7 +425,7 @@ export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall
     throw new SetupCommandRefusal(
       EXIT.INSTALL,
       `Installing this checkout's locked dependencies failed (${result?.why ?? "unknown"}). Nothing of the ` +
-        `project was changed: the install writes only inside ${toolRoot}. A locked install also refuses when ` +
+      `project was changed: the install writes only inside ${toolRoot}.${result?.detail ? `\n${result.detail}` : ""} A locked install also refuses when ` +
         `package-lock.json is missing or does not match package.json, which is repaired by running the install ` +
         `yourself and committing the lockfile it produces.`,
       { toolRoot }
@@ -445,7 +438,8 @@ export function installDependencies({ toolRoot = TOOL_ROOT, run = defaultInstall
         `Nothing of the project was changed. Restore the lockfile and run the install yourself to see what it wants to change.`,
       { lock }
     );
-  return { installed: true, why: state.why };
+  if (verbose && result.detail) for (const line of result.detail.split(/\r?\n/)) print(line);
+  return { installed: true, why: state.why, ...(result.advisories ? { advisories: result.advisories } : {}) };
 }
 
 /** The arguments that make the install a locked one; see `installDependencies` for why each is there. */
@@ -453,19 +447,34 @@ export const INSTALL_ARGS = Object.freeze(["ci", "--ignore-scripts"]);
 
 /**
  * ⚠️ **npm IS SPAWNED HERE AND NOWHERE ELSE**, the way `bin/start-shell.mjs` already does it: through the
- * `npm_execpath` this process was started with when there is one, and otherwise the platform's npm, which needs
- * a shell on Windows because it is a `.cmd`.
+ * `npm_execpath` this process was started with when there is one. On Windows the npm JavaScript CLI is invoked
+ * through Node rather than handing a `.cmd` file to a shell, so arguments never pass through shell parsing.
  */
 export function defaultInstall({ toolRoot, spawn = spawnSync }) {
-  const viaNode = process.env.npm_execpath;
-  const r = viaNode
-    ? spawn(process.execPath, [viaNode, ...INSTALL_ARGS], { cwd: toolRoot, stdio: "inherit" })
-    : spawn(process.platform === "win32" ? "npm.cmd" : "npm", [...INSTALL_ARGS], {
-        cwd: toolRoot,
-        stdio: "inherit",
-        shell: process.platform === "win32",
-      });
-  return r.status === 0 ? { ok: true } : { ok: false, why: r.status === null ? `signal ${r.signal}` : `exit ${r.status}` };
+  const bundledNpm = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+  const viaNode = process.env.npm_execpath || (process.platform === "win32" && existsSync(bundledNpm) ? bundledNpm : null);
+  const command = viaNode ? process.execPath : "npm";
+  const argv = viaNode ? [viaNode, ...INSTALL_ARGS] : [...INSTALL_ARGS];
+  const r = spawn(command, argv, {
+    cwd: toolRoot,
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+  });
+  const stdout = String(r.stdout ?? "");
+  const stderr = String(r.stderr ?? "");
+  if (r.status === 0) {
+    const audit = /(?:found\s+)?(\d+)(?:\s+(?:low|moderate|high|critical)\s+severity)?\s+vulnerabilit/i.exec(stdout + stderr);
+    const detail = (stdout + stderr).trim();
+    return { ok: true, ...(audit ? { advisories: Number(audit[1]) } : {}), ...(detail ? { detail } : {}) };
+  }
+  const diagnostic = stderr || stdout;
+  return {
+    ok: false,
+    why: r.status === null ? `signal ${r.signal}` : `exit ${r.status}`,
+    ...(diagnostic ? { detail: diagnostic.trim().slice(-4000) } : {}),
+  };
 }
 
 /**
@@ -528,9 +537,42 @@ export const shellName = (platform = process.platform) => (platform === "win32" 
  * The phases from the transaction plan onwards. Everything here runs after the install, so every module it
  * needs is imported dynamically.
  */
-async function runPhases({ paths, args, ask, print, modules, canary: injected = null, researchAdapter = null, terminal = { stdin: false, stdout: false }, loginInPi = runPiForLogin }) {
+async function runPhases({ paths, args, ask, print, engine, decisionProvider, reviewConnections = () => {}, connectionsEnabled = false, credentialBroker = null, decisioningAdapter = null, modules, canary: injected = null, researchAdapter = null, terminal = { stdin: false, stdout: false }, loginInPi = runPiForLogin, promptIdentity = true }) {
   const { STATE_MODE, coverageState, createStateRoot, ensureProjectId, projectRecordTarget, stateRootFor } = modules.localState;
   const { randomBytes } = modules.crypto;
+
+  // Project identity belongs to this one journey. The low-level initializer stays prompt-free, but a
+  // person running setup no longer has to discover and pass two initialization flags first.
+  if (!existsSync(paths.contentRoot)) {
+    if (args.name === undefined) {
+      if (args.nonInteractive)
+        throw new SetupCommandRefusal(
+          EXIT.SETUP,
+          "A new project needs --name in --non-interactive mode. Interactive setup asks for it.",
+          { missing: "name" }
+        );
+      while (args.name === undefined) {
+        const answer = await engine.decision(
+          { type: "project-name", options: ["provide", "cancel"] },
+          () => ask("Project name: ")
+        );
+        if (answer === null || answer === undefined)
+          throw new SetupCommandRefusal(EXIT.CONSENT, "Setup was cancelled before project identity was saved. Rerun setup to continue.");
+        const name = String(answer).trim();
+        if (name) args.name = name;
+        else print("A project name is required. You can change it later in planning-content/project.yaml.");
+      }
+    }
+    if (args.description === undefined && !args.nonInteractive && promptIdentity) {
+      const answer = await engine.decision(
+        { type: "project-purpose", options: ["provide", "skip", "cancel"] },
+        () => ask("What are you trying to accomplish? (optional; you can change this later) ")
+      );
+      if (answer === null || answer === undefined)
+        throw new SetupCommandRefusal(EXIT.CONSENT, "Setup was cancelled before project identity was saved. Rerun setup to continue.");
+      args.description = String(answer).trim();
+    }
+  }
 
   const stateMode = args.localState === "user" ? STATE_MODE.USER : STATE_MODE.PROJECT;
   const validators = modules.records.createRuntimeValidators();
@@ -596,7 +638,10 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
     } else {
       print(decided.refusal.message);
       print(renderChoices(options));
-      const answer = await ask(`Which? (${options.map((o) => o.id).join(", ")}) `);
+      const answer = await engine.decision(
+        { type: "state-protection", options: options.map((option) => option.id) },
+        () => ask(`Which? (${options.map((o) => o.id).join(", ")}) `)
+      );
       const chosen = options.find((o) => o.id === String(answer ?? "").trim());
       if (!chosen || chosen.id === "stop" || chosen.available !== true)
         throw new SetupCommandRefusal(EXIT.STATE, `Nothing was written. ${chosen?.unavailableBecause ?? "Setup stopped without protecting the runtime state."}`, {
@@ -649,17 +694,19 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
         "model",
         "credential-contract",
         "research",
+        ...(connectionsEnabled ? ["connections"] : []),
         "declared-identities",
         "preflight",
         "live-check",
         "read-back",
       ]);
+      const phase = (name, work) => engine.phase(name, () => tx.phase(name, work));
 
       // ⚠️ FIRST, BECAUSE EVERY LATER PHASE WRITES INTO THE PATHS IT PROTECTS (REQ-0027). The ignore owner does
       // its own classification against a fresh read — the plan above is a statement about the file as it was —
       // so this passes the transaction rather than the bytes.
       if (coverageFix)
-        await tx.phase("state-coverage", async () => {
+        await phase("state-coverage", async () => {
           await modules.gitignore.applyIgnoreBlock(coverageFix, { transaction: tx });
           print("added Kiln's block to .gitignore");
           const now = coverageState({ projectRoot: paths.projectRoot, mode: stateMode, roots });
@@ -667,7 +714,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
             throw new SetupCommandRefusal(EXIT.STATE, "The ignore block was applied and the runtime paths are still not ignored. Nothing else was written.", {});
         });
 
-      const initialized = await tx.phase("initialize", () =>
+      const initialized = await phase("initialize", () =>
         initializeProject({
           projectRoot: paths.projectRoot,
           contentRoot: paths.contentRoot,
@@ -684,7 +731,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // ⚠️ AFTER THE INITIALIZER, which may have just created these documents in their current form, and before
       // anything reads them. A run that needed no migration declares no phase at all.
       if (migrations.length > 0)
-        await tx.phase("stage-documents", async () => {
+        await phase("stage-documents", async () => {
           for (const m of migrations) {
             // ⚠️ THE MERGE RE-READS AND COMPARES: a document edited between the scan and this write is refused
             // rather than overwritten with bytes computed from what it used to say.
@@ -693,11 +740,11 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
           }
         });
 
-      await tx.phase("state-protection", () => createStateRoot(roots, { transaction: tx }));
+      await phase("state-protection", () => createStateRoot(roots, { transaction: tx }));
       // ⚠️ **THE ID THE RUN PRINTED IS THE ID IT COMMITS.** For an external state root the path was named from a
       // proposed id before anything was written; handing the identity phase its own generator would commit a
       // different one and leave the printed path describing a directory nothing uses.
-      const identity = await tx.phase("project-identity", () =>
+      const identity = await phase("project-identity", () =>
         ensureProjectId({ transaction: tx, randomBytes: proposedId === null ? randomBytes : () => Buffer.from(proposedId, "hex") })
       );
       print(`project id ${identity.created ? "created" : "reused"}`);
@@ -725,19 +772,19 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       // away — exists to gate. The child is started with an environment built from a fixed list of names, so
       // there is nothing of that kind in it to see, and this process loads no Pi until the operator has allowed
       // it. The agent directory the child resolved comes back in its report, for the phases that follow.
-      const trust = await tx.phase("trust", () => decideTrust({ paths, args, ask, print, modules }));
+      const trust = await phase("trust", () => decideTrust({ paths, args, ask, print, engine, modules }));
       const agentDir = trust.agentDir;
       if (trust.state !== modules.trust.TRUST.APPROVED) return { initialized, identity, trust, registered: null };
 
-      const registered = await tx.phase("registration", () => register({ tx, paths, print, modules }));
+      const registered = await phase("registration", () => register({ tx, paths, print, modules }));
 
       // ⚠️ **CONSENT FIRST, AND NOTHING OF THE HOST'S IS READ BEFORE IT.** Pi's authentication store, its
       // custom-model registry and the presence of any credential variable are all behind this one answer; the
       // phases below exist in this order because each needs what the one before it was allowed to look at.
       const location = modules.consent.consentLocation({ projectRoot: paths.projectRoot, stateMode, projectId });
-      const asking = interactively(args, ask);
+      const asking = interactively(args, ask, engine);
 
-      let inspection = await tx.phase("inspection", () =>
+      let inspection = await phase("inspection", () =>
         modules.inspection.inspectWithConsent({ location, ask: asking.grant, agentDir })
       );
       print(inspection.summary);
@@ -758,14 +805,14 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       if (!inspection.inspected) {
         // ⚠️ A DECLINED INSPECTION IS AN ANSWER, AND IT STOPS THE PHASES THAT DEPEND ON IT. The research choice
         // still runs, because "not-inspected" is a state it knows how to record without looking at anything.
-        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
+        const research = await phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter, credentialBroker }));
         return { initialized, identity, trust, registered, inspection, research, selection: null };
       }
 
-      const selection = await tx.phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators, selectionStateMode: stateMode }));
+      const selection = await phase("model", () => chooseModel({ tx, paths, location, inspection, agentDir, args, asking, print, modules, validators, selectionStateMode: stateMode }));
       if (selection.selection) print(`model ${selection.selection.provider} ${selection.selection.model} (${selection.selection.thinkingLevel})`);
       if (!READY_SELECTIONS.has(selection.outcome)) {
-        const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
+        const research = await phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter, credentialBroker }));
         return { initialized, identity, trust, registered, inspection, selection, research };
       }
 
@@ -778,7 +825,7 @@ async function runPhases({ paths, args, ask, print, modules, canary: injected = 
       const isCustom = !modules.credentials.supportedProviders().includes(selection.selection.provider);
       const credentialVar = isCustom ? (args.credentialVar ?? modules.consent.declaredCredentialVar(location, selection.selection, { validators })) : null;
       const custom = credentialVar ? { id: selection.selection.provider, apiKey: `$${credentialVar}` } : null;
-      const contract = await tx.phase("credential-contract", () => {
+      const contract = await phase("credential-contract", () => {
         const resolved = modules.credentials.resolveProviderCredentials(selection.selection.provider, { custom });
         if (custom) {
           const { CONTRACT_REFUSAL, CredentialContractRefusal } = modules.credentials;
@@ -809,13 +856,53 @@ ${selection.notRemembered}` : ""}`,
       });
       print(`credential contract ${contract.id}: ${contract.authSources.join(" or ")}`);
 
-      const research = await tx.phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter }));
+      const research = await phase("research", () => decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter, credentialBroker }));
+
+      let connections = null;
+      if (connectionsEnabled) {
+        connections = await phase("connections", async () => {
+          while (true) {
+            const collected = await modules.setupConnections.collectConnectionPlan({
+              broker: credentialBroker,
+              decide: (decision) => engine.decision(decision, decisionProvider),
+            });
+            if (collected.cancelled) return { cancelled: true, credentialStatus: collected.credentialStatus };
+            const lines = modules.setupConnections.CONNECTIONS.map((connection) => {
+              const choice = collected.plan[connection.id];
+              return `${connection.label.padEnd(25)} ${choice?.enabled ? "ready to enable" : "skipped"}`;
+            });
+            reviewConnections(lines.join("\n"));
+            const action = await engine.decision(
+              {
+                type: "connections-review",
+                message: "Review optional connections",
+                options: ["apply", "back", "cancel"],
+              },
+              decisionProvider
+            );
+            if (action === "back") continue;
+            if (action !== "apply") return { cancelled: true, credentialStatus: collected.credentialStatus };
+            const applied = await modules.setupConnections.applyConnectionPlan({
+              transaction: tx,
+              location,
+              plan: collected.plan,
+              validators,
+              configureDecisioning: modules.decisioningEnablement.configureDecisioning,
+              decisioningAdapter,
+              broker: credentialBroker,
+            });
+            return { cancelled: false, credentialStatus: collected.credentialStatus, statuses: applied };
+          }
+        });
+        if (connections.cancelled)
+          return { initialized, identity, trust, registered, inspection, selection, contract, research, connections };
+      }
 
       // ⚠️ **THE ZERO-COST CHECKS FIRST, AND THEY SEND NOTHING.** Everything a run can be refused for without
       // spending anything — the committed selection, this host's grant for it, the credential contract, Pi's
       // catalogue, the thinking level that model supports, the package — is settled before the one check that
       // costs money is even offered. A run that fails here has asked the provider for nothing.
-      const preflight = await tx.phase("preflight", () =>
+      const preflight = await phase("preflight", () =>
         modules.launch.zeroCostPreflight({ projectRoot: paths.projectRoot, location, agentDir, custom, validators })
       );
       print(`preflight passed: ${preflight.displayName} ${preflight.selection.model}, authentication ${preflight.authSource}, ${preflight.tools.length} package tools`);
@@ -838,10 +925,10 @@ ${selection.notRemembered}` : ""}`,
        * key and refusing the record this run wrote. A flag declares or changes it; a run without one uses what
        * the project has committed.
        */
-      const declared = await tx.phase("declared-identities", () => declareIdentities({ tx, paths, args, print, modules, validators }));
+      const declared = await phase("declared-identities", () => declareIdentities({ tx, paths, args, print, modules, validators }));
       const canary = (ctx) => (injected ? injected({ ...ctx, preflight }) : modules.canary.runLiveCanary(modules.launch.canaryRequest(ctx, preflight, custom)));
       const compatibility = modules.compatibility.compatibilityLocationFrom(location);
-      const live = await tx.phase("live-check", () =>
+      const live = await phase("live-check", () =>
         modules.liveCheck.runLiveModelCheck({
           preflight,
           location: compatibility,
@@ -853,20 +940,20 @@ ${selection.notRemembered}` : ""}`,
         })
       );
       if (live.message) for (const line of live.message.split("\n")) print(line);
-      if (!live.ready) return { initialized, identity, trust, registered, inspection, selection, contract, research, preflight, live };
+      if (!live.ready) return { initialized, identity, trust, registered, inspection, selection, contract, research, connections, preflight, live };
 
       // ⚠️ **READ BACK BEFORE REPORTING READY.** A write that reported success is not a record a later run can
       // use: the gate that refuses a tracked or unprotected record applies on read as well, and a record that
       // cannot be read back is one the next start will refuse. So readiness is what the file says now, checked
       // against the key this run computed, rather than what the writer said a moment ago.
-      const readBack = await tx.phase("read-back", () => verifyRecorded({ compatibility, preflight, declared, modules, validators }));
+      const readBack = await phase("read-back", () => verifyRecorded({ compatibility, preflight, declared, modules, validators }));
       // ⚠️ WHAT IS PRINTED COMES FROM THE RECORD THAT WAS READ, not from the fact that a write returned: a line
       // that could be printed without reading the file would report a readiness nobody checked.
       print(
         `compatibility recorded and read back for ${preflight.selection.provider} ${preflight.selection.model} ` +
           `(checked ${readBack.record.result.observedAt})`
       );
-      return { initialized, identity, trust, registered, inspection, selection, contract, research, preflight, live, readBack };
+      return { initialized, identity, trust, registered, inspection, selection, contract, research, connections, preflight, live, readBack };
     },
     { lock: { reuseHeld: true } }
   );
@@ -882,7 +969,7 @@ ${selection.notRemembered}` : ""}`,
  * ⚠️ **AND A DENIAL IS AN ANSWER, NOT A FAILURE.** The scaffold this run has already written stays, and it stays
  * valid; what the operator is told is that the agent is not ready and what would make it ready.
  */
-async function decideTrust({ paths, args, ask, print, modules }) {
+async function decideTrust({ paths, args, ask, print, engine, modules }) {
   const ask_ = (action) => trustDecision(action, paths, modules);
 
   // ⚠️ **AN EXPLICIT ANSWER OUTRANKS A RECORDED ONE, IN BOTH DIRECTIONS.** `--trust approve` is the operator
@@ -920,9 +1007,11 @@ async function decideTrust({ paths, args, ask, print, modules }) {
   // ⚠️ THE CANONICAL DIRECTORY IS IN THE QUESTION, because that is what the decision applies to.
   print(`Kiln needs this project trusted before its agent can load the project's package and tools:`);
   print(`  ${paths.projectRoot}`);
-  const raw = await ask("Trust this project? (yes/no) ");
-  const answer = String(raw ?? "").trim().toLowerCase();
-  if (answer === "yes" || answer === "y") {
+  const answer = await engine.decision(
+    { type: "project-trust", options: ["approve", "deny", "cancel"], context: { projectRoot: paths.projectRoot } },
+    () => askForConfirmation(ask, "Trust this project? (yes/no) ", { invalid: (message) => print(message) })
+  );
+  if (answer === true) {
     const granted = await ask_("approve");
     print(`trust approved for ${granted.recordedFor ?? granted.projectRoot}`);
     return granted;
@@ -931,21 +1020,21 @@ async function decideTrust({ paths, args, ask, print, modules }) {
   // "somebody said no" — so recording one for an answer nobody gave would put words in the operator's mouth and
   // make the next run stop without asking. A closed input, an empty line and an answer this does not understand
   // are all the same thing: no decision, nothing written, and a rerun that asks again.
-  if (answer === "no" || answer === "n") {
+  if (answer === false) {
     const denied = await ask_("deny");
     print(`trust denied for ${denied.recordedFor ?? denied.projectRoot}`);
     return denied;
   }
   throw new SetupCommandRefusal(
     EXIT.TRUST,
-    `${raw === null || answer.length === 0 ? "No answer was given" : "That answer was not yes or no"}, so this ` +
+    `Setup was cancelled, so this ` +
       `project's trust is still undecided and nothing was recorded.
 ` +
       `  project: ${paths.projectRoot}
 ` +
       `Rerun and answer yes or no, or pass --trust approve or --trust deny. Everything this run set up is ` +
       `already written and valid.`,
-    { projectRoot: paths.projectRoot, answered: raw !== null }
+    { projectRoot: paths.projectRoot, answered: false }
   );
 }
 
@@ -1106,18 +1195,30 @@ const READY_SELECTIONS = new Set(["selected", "confirmed", "reused"]);
  * it outranks the prompt in an interactive run for the same reason `--trust` does. What it is not is a default:
  * absent, the question is asked, or the run refuses.
  */
-function interactively(args, ask) {
+function semanticDecision(prompt) {
+  const message = String(prompt).trim();
+  if (/^Check this computer/i.test(message)) return { type: "connection-inspection", options: ["approve", "deny", "cancel"] };
+  if (/^Use this model for this project/i.test(message)) return { type: "model-use", options: ["approve", "change-model", "cancel"] };
+  if (/^Optional web research/i.test(message)) return { type: "research", options: ["enable", "skip", "cancel"] };
+  if (/^Run (?:a|one) live model check/i.test(message)) return { type: "live-model-check", options: ["approve", "deny", "cancel"] };
+  if (/^Which model should this project use/i.test(message)) return { type: "model-selection", options: ["select", "cancel"] };
+  if (/^Thinking level/i.test(message)) return { type: "reasoning-level", options: ["select", "back", "cancel"] };
+  return { type: "setup-choice", options: ["select", "back", "cancel"] };
+}
+
+function interactively(args, ask, engine) {
   const typed = async (prompt) => {
-    const line = await ask(prompt);
+    const decision = semanticDecision(prompt);
+    if (isConfirmationPrompt(prompt))
+      return engine.decision(decision, () => askForConfirmation(ask, prompt, { allowBack: decision.type === "model-use" }));
+    const line = await engine.decision(decision, () => ask(prompt));
     if (line === null || line === undefined) return null;
-    const said = String(line).trim();
-    if (/^(y|yes)$/i.test(said)) return true;
-    if (/^(n|no)$/i.test(said)) return false;
-    return said;
+    return String(line).trim();
   };
+  const grant = (prompt) => engine.decision(semanticDecision(prompt), () => askForConfirmation(ask, prompt));
   const declaredGrant = args.inspect === undefined ? null : async () => args.inspect === "approve";
   if (args.nonInteractive) return { grant: declaredGrant ?? (async () => null), choice: undefined };
-  return { grant: declaredGrant ?? typed, choice: typed };
+  return { grant: declaredGrant ?? grant, choice: typed };
 }
 
 /**
@@ -1133,27 +1234,34 @@ async function chooseModel({ tx, paths, location, inspection, agentDir, args, as
   // ⚠️ THE SELECTION'S WRITE CARRIES THE SAME SKILL ENTRY REGISTRATION WROTE, derived from the content root
   // rather than spelled again here: two writers of one key that disagree would leave the file with both.
   const { skillsEntry } = modules.settings.skillOverrideEntry({ projectRoot: paths.projectRoot, contentRoot: paths.contentRoot });
-  const selected = await modules.selection.selectModel({
-    transaction: tx,
-    location,
-    inspection,
-    thinkingSupport,
-    ask: asking.choice,
-    print,
-    requested: { provider: args.provider, model: args.model, thinking: args.thinking },
-    // ⚠️ **THE FLAG IS AN ANSWER, NOT A DEFAULT.** Absent, it is undefined and the model is confirmed at a
-    // prompt as before; present, it is the yes or no the operator gave in advance, and nothing else is inferred
-    // from --non-interactive.
-    confirmation: args.modelUse === undefined ? undefined : args.modelUse === "approve",
-    settings: { stateMode: selectionStateMode, skillsEntry },
-    validators,
-    // ⚠️ A CUSTOM PROVIDER'S VARIABLE IS CONFIRMED WITH THE MODEL (TSK-0072): the flag, else the one this host's grant
-    // was given through. A built-in provider has none.
-    credentialFor: (s) =>
-      modules.credentials.supportedProviders().includes(s.provider)
-        ? undefined
-        : (args.credentialVar ?? modules.consent.declaredCredentialVar(location, s, { validators })),
-  });
+  let selected;
+  do {
+    selected = await modules.selection.selectModel({
+      transaction: tx,
+      location,
+      inspection,
+      thinkingSupport,
+      ask: asking.choice,
+      print,
+      requested: { provider: args.provider, model: args.model, thinking: args.thinking },
+      // ⚠️ **THE FLAG IS AN ANSWER, NOT A DEFAULT.** Absent, it is undefined and the model is confirmed at a
+      // prompt as before; present, it is the yes or no the operator gave in advance, and nothing else is inferred
+      // from --non-interactive.
+      confirmation: args.modelUse === undefined ? undefined : args.modelUse === "approve",
+      settings: { stateMode: selectionStateMode, skillsEntry },
+      validators,
+      // ⚠️ A CUSTOM PROVIDER'S VARIABLE IS CONFIRMED WITH THE MODEL (TSK-0072): the flag, else the one this host's grant
+      // was given through. A built-in provider has none.
+      credentialFor: (s) =>
+        modules.credentials.supportedProviders().includes(s.provider)
+          ? undefined
+          : (args.credentialVar ?? modules.consent.declaredCredentialVar(location, s, { validators })),
+    });
+    if (selected.outcome === modules.selection.SELECTION_OUTCOME.BACK && args.provider === undefined)
+      print("Choose a different model. No model setting or consent was changed.");
+  } while (selected.outcome === modules.selection.SELECTION_OUTCOME.BACK && args.provider === undefined);
+  if (selected.outcome === modules.selection.SELECTION_OUTCOME.BACK)
+    selected = { ...selected, outcome: modules.selection.SELECTION_OUTCOME.CANCELLED };
 
   // Endpoint and request identities describe the selected model's resolved request. They cannot survive a
   // model change: doing so can redirect the compatibility canary to the old model's endpoint or attach a label
@@ -1274,18 +1382,32 @@ async function declareIdentities({ tx, paths, args, print, modules, validators }
 /**
  * The web-research decision, which is separate from the model's and asked on its own.
  *
- * ⚠️ **THE PRESENCE COMES FROM THE INSPECTION, NOT FROM A SECOND LOOK.** `researchCredential` is what the one
- * granted inspection saw — present, absent, or not-inspected — and passing it through is what keeps this
- * phase from reading the environment on its own.
+ * ⚠️ **THE BROKER IS ASKED ONLY AFTER INSPECTION IS GRANTED.** This preserves the one consent boundary while
+ * allowing the same exact Tavily identity to come from either the environment or the host credential vault.
+ * Resolving the secret and probing remain later operations, after explicit project permission.
  */
-async function decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter = null }) {
+async function decideResearch({ tx, location, inspection, args, asking, modules, validators, print, researchAdapter = null, credentialBroker = null }) {
+  let presence = inspection.researchCredential;
+  let adapter = researchAdapter;
+  if (inspection.inspected && credentialBroker) {
+    const status = await credentialBroker.status(modules.credentialBroker.CREDENTIAL_SERVICE.TAVILY);
+    presence = status.present ? "present" : "absent";
+    adapter ??= {
+      probe: async () => {
+        const credential = await credentialBroker.resolve(modules.credentialBroker.CREDENTIAL_SERVICE.TAVILY);
+        return modules.tavily.createTavilyAdapter({
+          env: credential.value ? { TAVILY_API_KEY: credential.value } : {},
+        }).probe();
+      },
+    };
+  }
   const result = await modules.research.setUpResearch({
     transaction: tx,
     location,
-    presence: inspection.researchCredential,
+    presence,
     ask: asking.choice,
     request: args.research,
-    adapter: researchAdapter ?? modules.tavily.createTavilyAdapter({}),
+    adapter: adapter ?? modules.tavily.createTavilyAdapter({}),
     validators,
   });
   print(result.message);
@@ -1305,8 +1427,8 @@ export function usage() {
     "node .planning/bin/setup.mjs [options]",
     "",
     "  --project-root <path>            the project to set up; must own the resolved content root",
-    "  --name <text>                    the project's name, on a first run",
-    "  --description <text>             the project's one-line description, on a first run",
+    "  --name <text>                    the project's name; interactive setup asks when omitted",
+    "  --description <text>             the project's purpose; interactive setup asks when omitted",
     "  --local-state project|user       where runtime state lives: the project's ignored .pi, or a per-user root",
     "  --trust approve|deny             answer the project trust question without a prompt",
     "  --inspect approve|deny           allow, or refuse, the one-time look at this computer's configured",
@@ -1327,6 +1449,9 @@ export function usage() {
     "  --state-protection fix-ignore    protect runtime state without a prompt by adding Kiln's marked block to",
     "                                   .gitignore; nothing is written when the project is already protected",
     "  --non-interactive                never ask; refuse rather than assume",
+    "  --plain                          use the dependency-free accessible line interface",
+    "  --json                           emit newline-delimited JSON without ANSI formatting",
+    "  --verbose                        include captured dependency-install diagnostics",
     "  --resume                         continue a run that was interrupted",
     "  --help                           this text",
     "",
@@ -1484,6 +1609,23 @@ export function renderChoices(options) {
     .join("\n");
 }
 
+function rendererFromInjectedAsk(ask, print, warning) {
+  const messageOf = (request) => (typeof request === "string" ? request : request?.message ?? request?.type ?? "Setup input");
+  const select = (request) => ask(`${messageOf(request)} (${request.options.map((option) => option.value).join(", ")}) `);
+  return {
+    mode: "test",
+    text: (request) => ask(`${messageOf(request)} `),
+    secret: (request) => ask(`${messageOf(request)} `),
+    confirm: (request) => ask(`${messageOf(request)} `),
+    select,
+    autocomplete: select,
+    progress: print,
+    warning,
+    cancel: warning,
+    review: print,
+  };
+}
+
 /**
  * @param {string[]} argv
  * @param {object} [deps]  ⚠️ **SEAMS FOR WHAT THIS COMMAND CANNOT DO IN A TEST**: spawning npm, repairing its
@@ -1491,11 +1633,15 @@ export function renderChoices(options) {
  *   bound to this checkout, before consumer-project mutation.
  */
 export async function main(argv = process.argv.slice(2), deps = {}) {
+  let ask = deps.ask ?? askLine;
+  let print = deps.print ?? say;
+  let warning = warn;
+  let renderer = null;
+  let engine = null;
+  let lastProgress = null;
   const {
     install = installDependencies,
     repairDependencies = repairInstalledDependencies,
-    ask = askLine,
-    print = say,
     nodeVersion = process.versions.node,
     verifyRuntime = checkPinnedRuntime,
     // ⚠️ **THE ONE SEAM THAT SENDS A REQUEST TO A PROVIDER.** A real run performs the canary; a test supplies its
@@ -1511,9 +1657,14 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     loginInPi = runPiForLogin,
   } = deps;
   const args = parseArgs(argv);
+  if (args.json && !Object.hasOwn(deps, "print")) {
+    const emit = (type, message) => process.stdout.write(`${JSON.stringify({ type, message })}\n`);
+    print = (message) => emit("message", message);
+    warning = (message) => emit("warning", message);
+  }
   if (args.error) {
-    warn(args.error);
-    for (const line of usage()) warn(line);
+    warning(args.error);
+    for (const line of usage()) warning(line);
     return EXIT.ARGUMENTS;
   }
   if (args.help) {
@@ -1521,9 +1672,21 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     return EXIT.OK;
   }
 
+  engine = createSetupEngine({
+    emit: (event) => {
+      deps.emit?.(event);
+      if (args.json && !Object.hasOwn(deps, "print")) process.stdout.write(`${JSON.stringify(event)}\n`);
+      else if (renderer && event.type === SETUP_EVENT.PHASE_START) {
+        const label = setupProgressLabel(event.phase);
+        if (label !== lastProgress) renderer.progress((lastProgress = label));
+      }
+    },
+  });
+
   try {
     // 1. Every path, printed before anything is mutated.
     const paths = resolvePaths({ projectRoot: args.projectRoot ?? null });
+    engine.start({ mode: args.nonInteractive ? "automation" : args.plain ? "plain" : "interactive" });
     print(`tool root     ${paths.toolRoot}`);
     print(`project root  ${paths.projectRoot}`);
     print(`content root  ${paths.contentRoot}`);
@@ -1575,14 +1738,24 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
 
     return await withLock(join(paths.projectRoot, SETUP_LOCK_FILE), async () => {
       // 4. The locked dependencies, inside this checkout only.
-      const installed = install({ toolRoot: paths.toolRoot });
+      const installed = await engine.phase("install", () => install({ toolRoot: paths.toolRoot, verbose: args.verbose === true, print }));
       print(installed.installed ? "dependencies installed" : `dependencies present (${installed.why})`);
+      if (installed.advisories) warning(`${installed.advisories} dependency advisor${installed.advisories === 1 ? "y" : "ies"} found — run npm --prefix .planning audit for details.`);
 
       // Pi's own shrinkwrap can reinstall brace-expansion 5.0.9 even though this checkout pins 5.0.12. The
       // bootstrap deliberately suppresses lifecycle scripts, so invoke only Kiln's reviewed repair before any
       // installed module is imported or any consumer-project phase can begin.
-      const repaired = await repairDependencies({ toolRoot: paths.toolRoot });
+      const repaired = await engine.phase("dependency-repair", () => repairDependencies({ toolRoot: paths.toolRoot }));
       print(repaired.repaired ? `Pi dependency ${repaired.version} repaired` : `Pi dependency ${repaired.version} verified`);
+
+      // Clack is a post-install presentation layer. Embedders keep their supplied adapter, while redirected
+      // terminals, automation and --plain remain on the dependency-free renderer.
+      if (!Object.hasOwn(deps, "ask") && !args.nonInteractive && !args.plain && !args.json && terminal.stdin && terminal.stdout) {
+        const { createClackRenderer } = await import("../lib/setup-renderer-clack.mjs");
+        renderer = createClackRenderer();
+        ask = renderer.ask;
+        print = renderer.print;
+      }
 
       // 5. Everything else, now that it exists.
       const modules = {
@@ -1606,6 +1779,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
         stages: await import("../lib/stages.mjs"),
         launch: await import("../lib/launch-checks.mjs"),
         liveCheck: await import("../lib/live-model-check.mjs"),
+        credentialBroker: await import("../lib/credential-broker.mjs"),
+        setupConnections: await import("../lib/setup-connections.mjs"),
+        decisioningEnablement: await import("../lib/decisioning-enablement.mjs"),
+        typeSafe: await import("../lib/decisioning/typesafe-adapter.mjs"),
         compatibility: await import("../lib/compatibility-record.mjs"),
         canary: await import("../lib/live-canary.mjs"),
         crypto: await import("node:crypto"),
@@ -1616,21 +1793,70 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // point is Pi's: the trust store, the package the settings register, the loader that reads them. A version
       // this checkout was never measured against is a fact about the install, known the moment the imports
       // resolve, and discovering it four phases later would mean refusing with the project already changed.
-      const pinned = verifyRuntime(modules, paths);
+      const pinned = await engine.phase("runtime-verification", () => verifyRuntime(modules, paths));
       print(`pinned runtime ${pinned.version}`);
+
+      const connectionsEnabled = deps.connections ?? (
+        !args.nonInteractive && terminal.stdin && terminal.stdout && !Object.hasOwn(deps, "ask")
+      );
+      const activeRenderer = deps.renderer ?? renderer ?? (
+        Object.hasOwn(deps, "ask") ? rendererFromInjectedAsk(ask, print, warning) : bootstrapRenderer
+      );
+      const decisionProvider = createRendererDecisionProvider(activeRenderer);
+      // Embedders supply their own store explicitly. In particular, unit harnesses that inject an
+      // answer function must not load a native vault module into the long-lived test process: later
+      // bootstrap tests replace node_modules, which Windows correctly refuses while a DLL is mapped.
+      const secureStore = deps.secureStore ?? (
+        Object.hasOwn(deps, "ask")
+          ? Object.freeze({ available: false })
+          : await modules.credentialBroker.createSystemSecureStore()
+      );
+      const credentialBroker = deps.credentialBroker ?? modules.credentialBroker.createCredentialBroker({
+        env: deps.connectionEnv ?? process.env,
+        secureStore,
+      });
+      let decisioningAdapter = null;
+      if (connectionsEnabled) {
+        decisioningAdapter = deps.connectionAdapters?.jev ?? {
+          probe: async () => {
+            const credential = await credentialBroker.resolve(modules.credentialBroker.CREDENTIAL_SERVICE.TYPESAFE_JEV);
+            return modules.typeSafe.createTypeSafeAdapter({
+              env: credential.value ? { TYPESAFE_API_KEY: credential.value } : {},
+            }).probe();
+          },
+        };
+      }
 
       // 6 to 12: the plan, the initializer, the identity and state protection, the journal, the trust decision
       // and the registration.
-      const done = await runPhases({ paths, args, ask, print, modules, canary, researchAdapter, terminal, loginInPi });
+      const done = await runPhases({
+        paths,
+        args,
+        ask,
+        print,
+        engine,
+        decisionProvider,
+        reviewConnections: (summary) => activeRenderer.review(summary),
+        connectionsEnabled,
+        credentialBroker,
+        decisioningAdapter,
+        modules,
+        canary,
+        researchAdapter,
+        terminal,
+        loginInPi,
+        promptIdentity: deps.promptIdentity ?? (!Object.hasOwn(deps, "ask") && terminal.stdin && terminal.stdout),
+      });
 
       // ⚠️ **A DENIAL LEAVES A WORKING PROJECT AND SAYS THE AGENT IS NOT READY (ACC-0108).** Everything written
       // before this point is valid and stays: the content scaffold, the ignore block, the project identity and
       // the protected runtime directory. What is missing is the one thing an operator can grant later, so the
       // exit code distinguishes it from a refusal and the message says what would change it.
       if (done.trust.state !== modules.trust.TRUST.APPROVED) {
-        warn(`This project is not trusted, so Kiln's agent is not ready. The project itself is set up and valid.`);
-        warn(`  project: ${paths.projectRoot}`);
-        warn(`Rerun setup with --trust approve to grant it. Kiln's planning content and its browser-only start are unaffected.`);
+        warning(`This project is not trusted, so Kiln's agent is not ready. The project itself is set up and valid.`);
+        warning(`  project: ${paths.projectRoot}`);
+        warning(`Rerun setup with --trust approve to grant it. Kiln's planning content and its browser-only start are unaffected.`);
+        engine.partial("trust-not-approved", { resumable: true });
         return EXIT.TRUST;
       }
 
@@ -1639,13 +1865,21 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // and none of them may be described as a ready agent. The project, its identity, its protected runtime
       // directory and its registered package all stand, and the operator can answer later.
       if (!done.inspection?.inspected || !READY_SELECTIONS.has(done.selection?.outcome)) {
-        warn(`Setup is partial: this project has no model it may use on this computer yet.`);
-        warn(
+        warning(`Setup is partial: this project has no model it may use on this computer yet.`);
+        warning(
           done.inspection?.inspected
             ? `  the model was ${done.selection?.outcome === "declined" ? "declined" : "not confirmed"}; rerun setup to choose one`
             : `  this computer's connections were not inspected, so no model could be offered; rerun setup to allow it`
         );
-        warn(`Everything else this run set up is written and valid.`);
+        warning(`Everything else this run set up is written and valid.`);
+        engine.partial("model-not-ready", { resumable: true });
+        return EXIT.CONSENT;
+      }
+
+      if (done.connections?.cancelled) {
+        warning(`Setup is partial: optional Connections & Capabilities onboarding was cancelled before any connection choice was applied.`);
+        warning(`Everything completed before that decision is written and valid; rerun setup to resume.`);
+        engine.partial("connections-cancelled", { resumable: true });
         return EXIT.CONSENT;
       }
 
@@ -1654,20 +1888,47 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // recorded, is a different fact about the same project and a script has to be able to tell them apart.
       if (!done.live?.ready) {
         const declined = done.live?.outcome === "declined";
-        warn(
+        warning(
           declined
             ? `Setup is partial: the live model check was not run.`
             : `Setup is partial: ${done.live?.message?.split(NEWLINE)[0] ?? "the model was not shown to work"}`
         );
-        warn(`Everything else this run set up is written and valid.`);
+        warning(`Everything else this run set up is written and valid.`);
+        engine.partial(declined ? "live-check-declined" : "model-not-proved", { resumable: true });
         return declined ? EXIT.CONSENT : EXIT.NOT_PROVED;
       }
 
       print("setup complete: the project is initialized, its state protected, its package registered, its model chosen and proved, and the agent is ready");
+      if (renderer) {
+        renderer.progress("[8/8] Start planning");
+        renderer.review(
+          [
+            `Project       ${args.name ?? "existing project"}`,
+            `Local files   ready`,
+            `AI model      ready`,
+            `Research      ${done.research?.outcome === "available" ? "ready" : "skipped"}`,
+            `Source AI     ${done.connections?.statuses?.["openai-source"]?.state ?? "skipped"}`,
+            `Voice         ${done.connections?.statuses?.elevenlabs?.state ?? "skipped"}`,
+            `Jev           ${done.connections?.statuses?.["typesafe-jev"]?.state ?? "skipped"}`,
+          ].join("\n")
+        );
+        const startNow = await renderer.confirm("Start Kiln now?");
+        if (startNow === true) {
+          const started = spawnSync(process.execPath, [join(paths.toolRoot, "bin", "start-kiln.mjs")], {
+            cwd: paths.projectRoot,
+            stdio: "inherit",
+            shell: false,
+          });
+          if (started.status !== 0) warning("Kiln did not start cleanly. Your setup is complete; run node .planning/bin/start-kiln.mjs to try again.");
+        } else renderer.complete("Kiln is ready. Start later with node .planning/bin/start-kiln.mjs.");
+      }
+      engine.complete({ ready: true });
       return EXIT.OK;
     });
   } catch (e) {
-    return reportFailure(e, print);
+    const exit = reportFailure(e, print, warning);
+    engine?.partial("refused", { exit, resumable: exit !== EXIT.ARGUMENTS && exit !== EXIT.PATHS });
+    return exit;
   }
 }
 
@@ -1682,20 +1943,20 @@ async function journalValidator() {
 }
 
 /** Every refusal prints as one and carries its own exit code; anything else is the error it is. */
-export function reportFailure(e, print = say) {
+export function reportFailure(e, print = say, warning = warn) {
   if (e instanceof SetupCommandRefusal) {
-    for (const line of e.message.split("\n")) warn(line);
+    for (const line of e.message.split("\n")) warning(line);
     return e.exit;
   }
   if (e instanceof ContentRootError) {
-    for (const line of e.message.split("\n")) warn(line);
+    for (const line of e.message.split("\n")) warning(line);
     return EXIT.PATHS;
   }
   // ⚠️ THE PINNED RUNTIME IS ITS OWN CLASS WHEREVER IT IS RAISED. `resolvePinnedAgent` and the agent-directory
   // resolver raise a supervisor refusal, and an operator whose install does not match the pin needs that told
   // apart from "setup could not write something".
   if (e?.name === "SupervisorRefusal") {
-    for (const line of String(e.message).split("\n")) warn(line);
+    for (const line of String(e.message).split("\n")) warning(line);
     return EXIT.RUNTIME;
   }
   // ⚠️ **KILN'S REFUSALS REACH THE OPERATOR AS REFUSALS, NOT AS STACK TRACES, AND EACH CLASS HAS ITS OWN CODE.**
@@ -1708,17 +1969,17 @@ export function reportFailure(e, print = say) {
   // script or a test can hold, where the message's wording is for a person and may change.
   const mapped = exitFor(e);
   if (mapped !== null) {
-    for (const line of String(e.message).split(NEWLINE)) warn(line);
-    if (typeof e?.reason === "string") warn(`reason: ${e.reason}`);
+    for (const line of String(e.message).split(NEWLINE)) warning(line);
+    if (typeof e?.reason === "string") warning(`reason: ${e.reason}`);
     return mapped;
   }
   if (typeof e?.reason === "string" && typeof e?.name === "string" && e.name.endsWith("Refusal")) {
-    for (const line of String(e.message).split(NEWLINE)) warn(line);
-    warn(`reason: ${e.reason}`);
+    for (const line of String(e.message).split(NEWLINE)) warning(line);
+    warning(`reason: ${e.reason}`);
     return EXIT.SETUP;
   }
   if (e instanceof SetupRefusal || e?.name === "LocalStateRefusal" || e?.name === "LockError") {
-    for (const line of String(e.message).split("\n")) warn(line);
+    for (const line of String(e.message).split("\n")) warning(line);
     return EXIT.SETUP;
   }
   console.error(e);

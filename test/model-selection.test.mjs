@@ -120,6 +120,19 @@ test("⚠️ ACC-0055 a single available model is shown and confirmed before it 
   }
 });
 
+test("Back from model confirmation mutates neither settings nor host consent", async () => {
+  const p = project();
+  try {
+    const a = answering("1", "high", "back");
+    const result = await select(p, { ask: a.ask });
+    assert.equal(result.outcome, SELECTION_OUTCOME.BACK);
+    assert.equal(existsSync(settingsPath(p.dir)), false);
+    assert.equal(readConsent(p.where).state, CONSENT_READ.ABSENT);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ ACC-0055 no default is adopted: the first entry is never taken, and no answer is no choice", async () => {
   for (const answer of [null, undefined, "", "q", "0", "4", "1.0", " first", "anthropic"]) {
     const p = project();

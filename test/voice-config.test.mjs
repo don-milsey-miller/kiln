@@ -9,6 +9,8 @@ import {
   VOICE_ENV,
   VOICE_LIMITS,
 } from "../lib/voice/config.mjs";
+import { resolveProjectVoiceConfig } from "../lib/voice/project-config.mjs";
+import { PROJECT_ROOT_ENV, STATE_MODE_ENV } from "../lib/research/permission.mjs";
 import register from "../pi-package/extensions/kiln.js";
 
 const SECRET = "throw-away-secret-for-tests";
@@ -16,6 +18,7 @@ const SECRET = "throw-away-secret-for-tests";
 test("voice configuration has deterministic, provider-independent defaults", () => {
   const config = resolveVoiceConfig({});
   assert.equal(config.enabled, false);
+  assert.deepEqual(config.features, { stt: true, tts: true });
   assert.deepEqual(config.stt, { provider: "elevenlabs", model: "scribe_v2_realtime", language: null });
   assert.deepEqual(config.tts, { provider: "elevenlabs", model: "eleven_flash_v2_5", voiceId: null, mode: "off" });
   assert.deepEqual(config.elevenLabs, { enableLogging: false });
@@ -24,6 +27,32 @@ test("voice configuration has deterministic, provider-independent defaults", () 
     maxTtsCharacters: VOICE_DEFAULTS.maxTtsCharacters,
   });
   assert.deepEqual(config.problems, []);
+});
+
+test("supervisor voice needs project intent and host consent, not only a credential", () => {
+  const env = {
+    [PROJECT_ROOT_ENV]: "C:\\project",
+    [STATE_MODE_ENV]: "project",
+    [VOICE_ENV.enabled]: "true",
+    [VOICE_ENV.elevenLabsApiKey]: SECRET,
+  };
+  const denied = resolveProjectVoiceConfig(env, {
+    permission: () => ({ permitted: false, reason: "not-granted" }),
+  });
+  assert.equal(denied.enabled, false);
+  assert.deepEqual(denied.features, { stt: false, tts: false });
+  assert.equal(denied.credentialPresent, true);
+
+  const permitted = resolveProjectVoiceConfig(env, {
+    permission: () => ({
+      permitted: true,
+      choice: { provider: "elevenlabs", stt: true, tts: false },
+    }),
+  });
+  assert.equal(permitted.enabled, true);
+  assert.deepEqual(permitted.features, { stt: true, tts: false });
+  assert.equal(permitted.credentialPresent, true);
+  assert.equal(JSON.stringify(permitted).includes(SECRET), false);
 });
 
 test("complete configuration is bounded and keeps credentials out of serializable state", () => {

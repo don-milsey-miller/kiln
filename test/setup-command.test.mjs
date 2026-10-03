@@ -261,6 +261,12 @@ async function setup(
     researchAdapter = null,
     terminal,
     loginInPi,
+    identity = true,
+    promptIdentity,
+    connections,
+    renderer,
+    connectionEnv,
+    connectionAdapters,
   } = {}
 ) {
   const printed = [];
@@ -291,8 +297,7 @@ async function setup(
       [
         "--project-root",
         p.dir,
-        "--name",
-        "Test Project",
+        ...(identity ? ["--name", "Test Project"] : []),
         ...(trust ? ["--trust", trust] : []),
         ...(liveCheck ? ["--live-model-check", liveCheck] : []),
         ...pick,
@@ -303,13 +308,22 @@ async function setup(
       // ⚠️ EVERY QUESTION IS RECORDED, not just answered: "did not ask" is the assertion a non-interactive run needs.
       ask: async (question) => {
         seen.asks.push(question);
-        return answer === undefined ? scriptedAnswer(question, answers) : answer;
+        return answer === undefined
+          ? scriptedAnswer(question, answers)
+          : typeof answer === "function"
+            ? answer(question)
+            : answer;
       },
       ...(verifyRuntime ? { verifyRuntime } : {}),
       ...(canary ? { canary } : {}),
       ...(researchAdapter ? { researchAdapter } : {}),
       ...(terminal ? { terminal } : {}),
       ...(loginInPi ? { loginInPi } : {}),
+      ...(promptIdentity === undefined ? {} : { promptIdentity }),
+      ...(connections === undefined ? {} : { connections }),
+      ...(renderer === undefined ? {} : { renderer }),
+      ...(connectionEnv === undefined ? {} : { connectionEnv }),
+      ...(connectionAdapters === undefined ? {} : { connectionAdapters }),
       install:
         install ??
         (() => {
@@ -658,6 +672,20 @@ test("the command line refuses what it does not take, and renders the choices it
   assert.match(renderChoices([{ id: "fix-ignore", summary: "add", available: false, block: "x\n" }]), /\(not available\)/);
 });
 
+test("--json help is valid newline-delimited JSON with no ANSI or credential values", () => {
+  const output = execFileSync(process.execPath, [join(ROOT, "bin", "setup.mjs"), "--help", "--json"], {
+    cwd: tmpdir(),
+    encoding: "utf8",
+    env: { ...process.env, OPENAI_API_KEY: SENTINEL_KEY },
+  });
+  assert.doesNotMatch(output, /\u001b\[/);
+  assert.equal(output.includes(SENTINEL_KEY), false);
+  const records = output.trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  assert.ok(records.length > 5);
+  assert.ok(records.every((record) => record.type === "message" && typeof record.message === "string"));
+  assert.ok(records.some((record) => record.message.includes("--non-interactive")));
+});
+
 test("⚠️ a runtime this checkout does not support refuses before the dependency install, having written nothing", async () => {
   const p = project({ ignored: true });
   try {
@@ -730,15 +758,112 @@ test("⚠️ the bootstrap install is `npm ci --ignore-scripts`, whichever npm i
 
     delete process.env.npm_execpath;
     defaultInstall({ toolRoot: "/tool", spawn });
-    assert.deepEqual(calls[1].argv, ["ci", "--ignore-scripts"]);
-    assert.match(calls[1].command, /^npm(\.cmd)?$/);
-    for (const c of calls) assert.equal(c.opts.cwd, "/tool", "the install ran outside this checkout");
+    if (process.platform === "win32") {
+      assert.equal(calls[1].command, process.execPath);
+      assert.match(calls[1].argv[0], /node_modules[\\/]npm[\\/]bin[\\/]npm-cli\.js$/);
+      assert.deepEqual(calls[1].argv.slice(1), ["ci", "--ignore-scripts"]);
+    } else {
+      assert.deepEqual(calls[1].argv, ["ci", "--ignore-scripts"]);
+      assert.equal(calls[1].command, "npm");
+    }
+    for (const c of calls) {
+      assert.equal(c.opts.cwd, "/tool", "the install ran outside this checkout");
+      assert.equal(c.opts.shell, false, "the install passed through a shell");
+      assert.deepEqual(c.opts.stdio, ["ignore", "pipe", "pipe"], "npm was allowed to own the terminal");
+    }
 
     // A failing install is a refusal naming what the runner reported, never a silent continue.
     assert.deepEqual(defaultInstall({ toolRoot: "/tool", spawn: () => ({ status: 1 }) }), { ok: false, why: "exit 1" });
   } finally {
     if (saved === undefined) delete process.env.npm_execpath;
     else process.env.npm_execpath = saved;
+  }
+});
+
+test("invalid model confirmation reprompts in place and approve grants only that decision", async () => {
+  const p = project();
+  try {
+    const modelAnswers = ["not a decision", "", "approve"];
+    const o = await setup(p, [], {
+      answer: (question) =>
+        /^Use this model for this project/i.test(question)
+          ? modelAnswers.shift()
+          : scriptedAnswer(question),
+    });
+    assert.equal(o.code, EXIT.OK, [...o.printed, ...o.warned].join("\n"));
+    const modelPrompts = o.seen.asks
+      .map((question, index) => ({ question, index }))
+      .filter(({ question }) => /^Use this model for this project/i.test(question));
+    assert.equal(modelPrompts.length, 3, "invalid and blank answers did not reprompt");
+    assert.deepEqual(modelPrompts.map(({ index }) => index), [modelPrompts[0].index, modelPrompts[0].index + 1, modelPrompts[0].index + 2]);
+    assert.equal(consentOf(p).modelUse.granted, true);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("setup collects a missing project name and purpose in the guided journey", async () => {
+  const p = project();
+  try {
+    const o = await setup(p, [], {
+      identity: false,
+      promptIdentity: true,
+      answer: (question) => {
+        if (/^Project name/i.test(question)) return "Guided Project";
+        if (/^What are you trying/i.test(question)) return "Turn an idea into an implementation plan";
+        return scriptedAnswer(question);
+      },
+    });
+    assert.equal(o.code, EXIT.OK, [...o.printed, ...o.warned].join("\n"));
+    const manifest = readFileSync(join(p.contentRoot, "project.yaml"), "utf8");
+    assert.match(manifest, /^name: "Guided Project"$/m);
+    assert.match(manifest, /^description: "Turn an idea into an implementation plan"$/m);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
+  }
+});
+
+test("guided Connections applies reviewed choices without persisting credential values", async () => {
+  const p = project();
+  const sentinel = "kiln-CONNECTION-SECRET-SENTINEL";
+  try {
+    const choices = ["use-existing", "skip", "use-existing", "stt", "use-existing", "apply"];
+    const reviews = [];
+    const renderer = {
+      mode: "test",
+      text: async () => null,
+      secret: async () => null,
+      confirm: async () => null,
+      select: async () => choices.shift(),
+      autocomplete: async () => null,
+      progress: () => {},
+      warning: () => {},
+      cancel: () => {},
+      review: (summary) => reviews.push(summary),
+    };
+    const o = await setup(p, [], {
+      connections: true,
+      renderer,
+      connectionEnv: {
+        OPENAI_API_KEY: sentinel,
+        ELEVENLABS_API_KEY: sentinel,
+        TYPESAFE_API_KEY: sentinel,
+      },
+      connectionAdapters: {
+        jev: { probe: async () => ({ ok: true, model: "jev-fixture", models: ["jev-fixture"], checkedWithoutInference: true }) },
+      },
+    });
+    assert.equal(o.code, EXIT.OK, [...o.printed, ...o.warned].join("\n"));
+    assert.equal(choices.length, 0, "not every connection decision was consumed");
+    assert.equal(reviews.length, 1);
+    const projectRecord = readFileSync(join(p.dir, ".pi", "kiln.json"), "utf8");
+    const consentRecord = readFileSync(join(p.dir, ".pi", "runtime", "consent.json"), "utf8");
+    assert.match(projectRecord, /"sourceProcessing"/);
+    assert.match(projectRecord, /"voice"/);
+    assert.match(projectRecord, /"decisioning"/);
+    assert.equal(`${projectRecord}${consentRecord}${o.printed.join("\n")}${o.warned.join("\n")}`.includes(sentinel), false);
+  } finally {
+    rmSync(p.root, { recursive: true, force: true });
   }
 });
 
@@ -970,20 +1095,20 @@ test("⚠️ ACC-0108 trust is obtained and never assumed, and a denial leaves a
     rmSync(r.root, { recursive: true, force: true });
   }
 
-  // ⚠️ **ONLY A NO IS A NO.** A closed input, an empty line and an answer nobody can read are not decisions, and
-  // recording any of them as a denial would make every later run stop without asking — on a decision the
-  // operator never made.
+  // ⚠️ **ONLY A NO IS A NO.** Closed input cancels. Empty or unreadable input is invalid and reprompts; the
+  // second closed input below then cancels. None may be recorded as a denial.
   const { readTrust, TRUST } = await import("../lib/pi-trust.mjs");
-  for (const [what, answer] of [
-    ["a closed input", null],
-    ["an empty line", "   "],
-    ["an answer that is neither", "maybe later"],
+  for (const [what, answers, expectedPrompts] of [
+    ["a closed input", [null], 1],
+    ["an empty line", ["   ", null], 2],
+    ["an answer that is neither", ["maybe later", null], 2],
   ]) {
     const t = project({ ignored: true });
     try {
-      const o = await setup(t, [], { trust: null, answer });
+      const queue = [...answers];
+      const o = await setup(t, [], { trust: null, answer: () => queue.shift() });
       assert.equal(o.code, EXIT.TRUST, `${what} did not stop the run`);
-      assert.ok(o.seen.asks.some((q2) => /trust/i.test(q2)), `${what} was never asked about`);
+      assert.equal(o.seen.asks.filter((q2) => /trust/i.test(q2)).length, expectedPrompts, `${what} did not follow the confirmation contract`);
       assert.equal(
         (await readTrust({ projectRoot: t.dir, agentDir: t.agentDir, toolRoot: ROOT })).state,
         TRUST.MISSING,

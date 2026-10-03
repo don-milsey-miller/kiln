@@ -32,23 +32,26 @@ rule Kiln uses to find your content, and it is why tool updates can never touch 
 
 ## Starting a new project
 
+For a person setting up Kiln, the guided setup command is the canonical path. It collects project
+identity, protects local state, configures the planning model and optional capabilities, reviews the
+result, and offers to start Kiln:
+
 From an empty project directory:
 
 ```sh
 git init
 git clone https://github.com/don-milsey-miller/kiln.git .planning
-
-node .planning/bin/init-project.mjs \
-  --project-root . \
-  --name "My Project" \
-  --description "What this project is intended to accomplish"
-
-npm --prefix .planning start
+node .planning/bin/setup.mjs
 ```
 
-Open <http://127.0.0.1:3000>.
+`init-project.mjs` remains a dependency-free, low-level initializer for automation or advanced
+workflows that need only the content scaffold. It does not configure or start Kiln:
 
-The same command is also available as a package script, which is useful when you are already inside
+```sh
+node .planning/bin/init-project.mjs --project-root . --name "My Project"
+```
+
+The initializer is also available as a package script, which is useful when you are already inside
 `.planning/`:
 
 ```sh
@@ -57,7 +60,8 @@ npm --prefix .planning run init:project -- \
   --name "My Project"
 ```
 
-Prefer the direct `node` form in documentation and scripts. `--project-root .` reads as "the
+Prefer the guided `setup.mjs` command for normal use. For initializer scripts, the direct `node`
+form makes `--project-root .` read as "the
 directory I am in", which is easier to check at a glance than `..` relative to a directory the
 `--prefix` flag put you in.
 
@@ -228,11 +232,15 @@ A failed run leaves no `planning-content/` directory at all. The tree is built i
 directory and moved into place only after it has been read back off disk and validated, so an
 interrupted run costs you a rerun rather than a half-written content root to clean up by hand.
 
-## What this command does not do
+## What the low-level initializer does not do
 
 It creates planning content, and stops there. It does not install dependencies, configure an LLM or
 research provider, choose artifact types, write an intake document for you, initialize Git, or start
 the server.
+
+The canonical `setup.mjs` command composes this initializer with state protection, model selection,
+optional connections, validation, and the start handoff. Use `init-project.mjs` directly only when
+you deliberately want the scaffold and none of the guided setup work.
 
 Those belong to a later `setup` command that will compose this one with the packaged planning-agent
 roster, once that package exists. Keeping them apart is what lets this command be complete and useful
