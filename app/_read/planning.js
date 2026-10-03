@@ -15,7 +15,8 @@ import {
   evaluateStageGate,
   readStageDocs,
 } from "../server/stages.js";
-import { artifactReviewChoices } from "../_review/artifact-review-choices.js";
+import { artifactReviewChoices, artifactReviewSearch } from "../_review/artifact-review-choices.js";
+import { readSourcePreview } from "../server/content.js";
 
 /**
  * The single application reader — CMP-0012, TSK-0005.
@@ -257,10 +258,31 @@ export async function readArtifactSummary(id) {
   };
 }
 
+/** Full validated artifact content for an informed review, plus a bounded source preview. */
+export async function readArtifactDetail(id) {
+  await connection();
+  const { projectRoot, contentRoot } = planningRoots();
+  const ctx = context(projectRoot, contentRoot);
+  const { records } = lintProject(ctx);
+  const doc = records.map((r) => r.doc).find((candidate) => candidate?.id === id);
+  if (!doc) return null;
+  let sourcePreview = null;
+  if (doc.type === "source") sourcePreview = readSourcePreview(doc, { contentRoot });
+  return { doc, sourcePreview };
+}
+
 /** Reviewable artifacts for the no-selection state; inactive and retired records stay absent. */
 export async function readArtifactSummaries() {
   await connection();
   const { projectRoot, contentRoot } = planningRoots();
   const ctx = context(projectRoot, contentRoot);
   return artifactReviewChoices(lintProject(ctx).records, ctx.activated);
+}
+
+/** Bounded review choices with server-side search/filtering for realistic project sizes. */
+export async function searchArtifactSummaries(filters = {}) {
+  await connection();
+  const { projectRoot, contentRoot } = planningRoots();
+  const ctx = context(projectRoot, contentRoot);
+  return artifactReviewSearch(lintProject(ctx).records, ctx.activated, filters);
 }

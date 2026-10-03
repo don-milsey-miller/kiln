@@ -270,6 +270,10 @@ test("⚠️ the return path is MATCHED against a shape, never sanitised", () =>
   assert.equal(returnUrl({ path: "/stage/01-intake", artifactId: "REQ-0001" }), "/stage/01-intake?artifact=REQ-0001");
   assert.equal(returnUrl({ path: "/stage/01-intake", artifactId: "REQ-0001", error: REVIEW.BAD_STATUS }),
     "/stage/01-intake?artifact=REQ-0001&reviewError=bad-status");
+  assert.equal(
+    returnUrl({ path: "/stage/01-intake", artifactId: "REQ-0001", error: REVIEW.NEEDS_REVIEWER, attemptedStatus: "approved" }),
+    "/stage/01-intake?artifact=REQ-0001&reviewError=needs-reviewer&reviewAttempt=approved"
+  );
 
   // Anything that is not exactly a stage path falls back to a real page. Sanitising means removing
   // what is dangerous and hoping the list was complete; matching means none of these can be a target.

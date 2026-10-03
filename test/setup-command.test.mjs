@@ -2488,13 +2488,13 @@ test("⚠️ a project proved with a declared identity passes the launch checks,
   }
 });
 
-test("⚠️ D22 a built-in provider with unbounded configuration fails closed: the boundary is declared, not worked around", async () => {
+test("⚠️ D22 a built-in provider with unbounded configuration still fails closed when the child resolves a different profile", async () => {
   // ⚠️ **WHAT DECLARING AN IDENTITY DOES NOT FIX.** The canary proves a request by making it in an isolated
   // agent directory. A CUSTOM provider's non-credential configuration crosses into that directory, so the child
   // makes the same request this project makes. A BUILT-IN provider's does not: the child resolves the model from
   // Pi's own catalogue, so an operator's `samplingParams` for `openai gpt-4o` never reach it. The parent's key
-  // then describes a request the child did not make, and this is what must happen next — a refusal, with
-  // nothing recorded — rather than a record vouching for a request nobody made.
+  // then describes a request the child did not make. Both sides can compute a key from the deliberate
+  // declaration, but the differing category set still refuses the proof and records nothing.
   const { computeCompatibilityKey, proofProblem } = await import("../lib/compatibility-record.mjs");
   const { canaryRequest } = await import("../lib/launch-checks.mjs");
 
@@ -2517,16 +2517,25 @@ test("⚠️ D22 a built-in provider with unbounded configuration fails closed: 
   });
   assert.deepEqual(key.effectiveRequestProfile.unboundedInputs, { categories: ["samplingParams"], declaredIdentity: "house-style-v2" });
 
-  // What the child computes from the catalogue's model, which carries none of that configuration.
+  // What the child computes from the catalogue's model, which carries none of that configuration. The
+  // declaration remains a determinant even though the child's bounded category set is empty (#131), so
+  // this is computable rather than self-refusing.
   const inTheChild = { ...asConfigured, samplingParams: undefined };
-  assert.throws(
-    () => computeCompatibilityKey({ selection, model: inTheChild, piVersion: "0.84.4", declared: { requestIdentity: "house-style-v2" }, effectiveBaseUrl: asConfigured.baseUrl }),
-    (e) => e.name === "CompatibilityKeyRefusal",
-    "the child computed a key for a request it was not given"
-  );
+  const childKey = computeCompatibilityKey({
+    selection,
+    model: inTheChild,
+    piVersion: "0.84.4",
+    declared: { requestIdentity: "house-style-v2" },
+    effectiveBaseUrl: asConfigured.baseUrl,
+  });
+  assert.deepEqual(childKey.effectiveRequestProfile.unboundedInputs, { categories: [], declaredIdentity: "house-style-v2" });
 
-  // ⚠️ SO THE CHECK CANNOT PASS, AND SAYS SO. A child that reports no key is not a proof of anything.
-  assert.deepEqual(proofProblem(key, { observed: { keyError: "request-profile-uncacheable" }, requests: [] }), { reason: "canary-key-unavailable" });
+  // ⚠️ SO THE CHECK CANNOT PASS, AND SAYS SO. A computed key about a different profile is not proof
+  // of the parent's request.
+  assert.deepEqual(proofProblem(key, { observed: childKey, requests: [] }), {
+    reason: "canary-inputs-differ",
+    fields: ["effectiveRequestProfile"],
+  });
 
   // ⚠️ AND THE REASON IT CANNOT REACH THE CHILD IS STRUCTURAL, NOT AN OVERSIGHT: only a declared custom
   // provider's configuration crosses, because only that provider's credential is a declared variable name.
