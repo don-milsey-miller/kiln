@@ -67,8 +67,7 @@ export default async function StagePage({ params, searchParams }) {
         </div>
 
         <Suspense fallback={<p data-vpw-loading="review" style={{ color: "#666" }}>Reading the artifact…</p>}>
-          <ReviewPanel
-            artifactId={artifactId}
+          <ReviewPanel artifactId={artifactId}
             stageId={stageId}
             reviewError={reviewErrorCode}
             reviewAttempt={reviewAttemptStatus}
