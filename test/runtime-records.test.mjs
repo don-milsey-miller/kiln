@@ -119,7 +119,7 @@ test("a generated project id satisfies its own schema and is not derived from an
 
 const GRANT = { granted: true, decidedAt: NOW };
 
-test("consent records four separate grants, each dated, and refuses credential material", () => {
+test("consent records six separate grants, each dated, and refuses credential material", () => {
   ok("consent", { recordVersion: 1, inspection: GRANT });
   ok("consent", {
     recordVersion: 1,
@@ -127,6 +127,8 @@ test("consent records four separate grants, each dated, and refuses credential m
     modelUse: { ...GRANT, provider: "openai", model: "gpt-5" },
     research: { ...GRANT, provider: "tavily" },
     decisioning: { ...GRANT, provider: "typesafe" },
+    sourceProcessing: { ...GRANT, provider: "openai" },
+    voice: { ...GRANT, provider: "elevenlabs" },
   });
 
   // ⚠️ A REFUSAL IS A RECORDED DECISION. Treating `granted: false` as "not yet asked" is how a

@@ -28,21 +28,28 @@ Run these commands from an empty project directory:
 ```sh
 git init
 git clone --branch v26.9.0 --depth 1 https://github.com/don-milsey-miller/kiln.git .planning
-node .planning/bin/setup.mjs --name "My Project" --description "What this project should accomplish"
-node .planning/bin/start-kiln.mjs
+node .planning/bin/setup.mjs
 ```
 
 Setup installs the locked dependencies, creates `planning-content/`, protects Kiln's local state
-from Git, registers the bundled Pi package, and guides you through trust, model, and optional web
-research choices. It does not silently inspect provider credentials or send a model request.
+from Git, asks for the project's name and purpose, registers the bundled Pi package, and guides you
+through trust, model, and optional capability choices. It does not silently inspect provider
+credentials or send a model request. At the final review, choose **Start Kiln now** or start later:
+
+```sh
+node .planning/bin/start-kiln.mjs
+```
 
 When startup completes, Kiln prints a loopback URL such as <http://127.0.0.1:3000> and opens Pi in
 the terminal. A new session begins with `/kiln-start`; answer its project question, then follow the
 plan in the browser. Enter `/quit` in Pi to stop both processes. Run the same start command later to
 resume the project.
 
-Use `node .planning/bin/setup.mjs --help` to see every setup option and its refusal-safe exit code.
+Use `node .planning/bin/setup.mjs --help` to see automation options such as `--non-interactive`,
+`--json`, `--name`, and `--description`, plus every refusal-safe exit code.
 Rerunning completed setup with the same choices does not rewrite the project.
+See [Connections and capabilities](docs/connections.md) for credential storage, project intent,
+host-local consent, and recovery behavior.
 
 ## What Kiln creates
 
@@ -92,11 +99,11 @@ Voice is an optional Pi TUI feature on Windows and Linux. It uses an independent
 credential, an OpenAL-enabled `ffmpeg` for the microphone, and `ffplay` for the speaker. Pi's model
 provider login or API key is neither reused nor changed.
 
-Set `KILN_VOICE_ENABLED=true` and `ELEVENLABS_API_KEY`, then use `/voice start` and `/voice stop` to
-create editable draft text. Kiln never submits the draft or treats speech as confirmation input.
-Speech output is off by default; set `KILN_TTS_VOICE_ID` and use `/voice output on` to speak finalized
-assistant responses. See [Voice setup, privacy, validation, and limitations](docs/voice.md) before the
-first use.
+Choose ElevenLabs during guided setup (or use the documented environment settings for advanced
+operation), then use `/voice start` and `/voice stop` to create editable draft text. Kiln never
+submits the draft or treats speech as confirmation input. Speech output remains session-controlled
+with `/voice output on`. See [Voice setup, privacy, validation, and limitations](docs/voice.md) before
+the first use.
 
 ### Add source material
 
@@ -107,9 +114,9 @@ share one retained blob, while separate import actions remain separate source re
 
 Plain text and PDFs with sufficient embedded text are normalized locally; PDF extraction is
 bounded by the configured page limit. Audio transcription, scanned-PDF extraction, and image
-extraction are optional and disabled unless both
-`OPENAI_API_KEY` is present and `KILN_INGEST_REMOTE_PROCESSING` is exactly `allow`; an API key alone
-does not authorize a remote upload. The default OpenAI adapter uses `gpt-transcribe` and refuses
+extraction are optional and disabled unless guided setup records both project intent and this host's
+consent and an OpenAI credential is available; an API key alone does not authorize a remote upload.
+The default OpenAI adapter uses `gpt-transcribe` and refuses
 audio larger than 25,000,000 bytes before making a request. PDF/image processing also requires an
 explicit `KILN_OPENAI_EXTRACTION_MODEL`; there is no silently chosen vision model. Material marked as an external
 reference remains external reference material—ingestion never converts its contents into approved
@@ -167,7 +174,7 @@ remain in Pi's authentication store or the host environment; do not place them i
 | `TAVILY_API_KEY` | Only for Tavily research | — | Enables the optional public-web research adapter after the project and this computer approve research. Treat it as a secret. |
 | `TYPESAFE_API_KEY` | Only for TypeSafe decisioning | — | Enables optional Jev routing and artifact comparison after the project and this computer explicitly opt in. Treat it as a secret. |
 | `OPENAI_API_KEY` | Only for remote source processing | — | Authenticates optional OpenAI extraction providers. It has no effect unless remote processing is separately authorized. Treat it as a secret. |
-| `KILN_INGEST_REMOTE_PROCESSING` | No | disabled | Set exactly to `allow` to authorize configured source bytes to be sent to a remote extraction provider. |
+| `KILN_INGEST_REMOTE_PROCESSING` | Advanced adapter input | disabled | Guided setup derives the effective value from project intent plus host consent; setting it alone cannot authorize browser ingestion. |
 | `KILN_OPENAI_TRANSCRIPTION_MODEL` | No | `gpt-transcribe` | Overrides the OpenAI transcription model when remote processing is authorized. |
 | `KILN_OPENAI_EXTRACTION_MODEL` | For remote PDF/image extraction | — | Explicit vision-capable Responses API model for scanned PDFs and images. No model is guessed. |
 | `KILN_INGEST_MAX_UPLOAD_BYTES` / `KILN_INGEST_MAX_INBOX_BYTES` | No | `104857600` | Per-source byte ceilings for browser and inbox intake. |
@@ -200,10 +207,8 @@ TypeSafe Jev can optionally classify a turn into a stage-permitted activity/tool
 proposed artifact with selected existing artifacts. It is advisory: Kiln still owns permissions, gates,
 approvals, validation, and canonical state.
 
-```sh
-TYPESAFE_API_KEY="..." npm --prefix .planning run decisioning:configure -- \
-  --project-root . --provider typesafe
-```
+Choose TypeSafe Jev in guided setup. For advanced automation, the separate
+`decisioning:configure` command remains available.
 
 See [Optional semantic decisioning with TypeSafe Jev](docs/decisioning.md) for consent, privacy, CLI,
 fallback, and architecture details.

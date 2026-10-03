@@ -9,7 +9,9 @@ import { CI_GROUPS } from "../test/ci-groups.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const group = process.argv[2];
-const serial = process.argv.includes("--serial");
+// Setup tests include real locked-install controls that replace this checkout's node_modules.
+// They must not overlap another setup file on Windows, where loaded native modules are locked.
+const serial = process.argv.includes("--serial") || group === "setup";
 
 if (!Object.hasOwn(CI_GROUPS, group)) {
   console.error(`[ci-tests] choose one group: ${Object.keys(CI_GROUPS).join(", ")}`);

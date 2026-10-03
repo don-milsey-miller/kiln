@@ -1,8 +1,6 @@
 import { Suspense } from "react";
-import StagesPanel from "./stages-panel.js";
-import DiagnosticsPanel from "./diagnostics-panel.js";
 import ProjectIdentity from "./project-identity.js";
-import IngestPanel from "./ingest-panel.js";
+import Workspace from "./workspace.js";
 
 /**
  * The project view — `/`.
@@ -24,34 +22,17 @@ export default function Page() {
         <Suspense fallback={<div style={{ color: "#666" }}>Reading project identity…</div>}>
           <ProjectIdentity />
         </Suspense>
-        <div style={{ color: "#666", fontSize: ".85rem" }}>
-          Stage position is derived on every read. Nothing about it is stored.
-        </div>
       </header>
-
-      <IngestPanel />
 
       <Suspense
         fallback={
-          <p data-vpw-loading="stages" style={{ color: "#666" }}>
-            Reading stage definitions and attestations…
+          <p data-vpw-loading="workspace" style={{ color: "#666" }}>
+            Reading the project workspace…
           </p>
         }
       >
-        <StagesPanel />
+        <Workspace />
       </Suspense>
-
-      <div style={{ marginTop: "28px" }}>
-        <Suspense
-          fallback={
-            <p data-vpw-loading="diagnostics" style={{ color: "#666" }}>
-              Counting artifacts and reading lint findings…
-            </p>
-          }
-        >
-          <DiagnosticsPanel />
-        </Suspense>
-      </div>
     </main>
   );
 }

@@ -54,6 +54,64 @@
         }
       }
     },
+    "sourceProcessing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "remoteProcessing"],
+      "description": "The project's non-secret source-processing choice. A provider choice is intent only; this host must separately grant remote processing before source bytes may leave the machine.",
+      "properties": {
+        "provider": {
+          "enum": ["openai", "none"]
+        },
+        "remoteProcessing": {
+          "type": "boolean"
+        },
+        "extractionModel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\r\\n\\u0000]+$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "provider": { "const": "none" } }, "required": ["provider"] },
+          "then": { "properties": { "remoteProcessing": { "const": false } }, "not": { "required": ["extractionModel"] } }
+        }
+      ]
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "stt", "tts"],
+      "description": "The project's non-secret voice capability choice. The ElevenLabs credential and this host's permission stay outside the committed project record.",
+      "properties": {
+        "provider": {
+          "enum": ["elevenlabs", "none"]
+        },
+        "stt": { "type": "boolean" },
+        "tts": { "type": "boolean" },
+        "voiceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\r\\n\\u0000]+$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "provider": { "const": "none" } }, "required": ["provider"] },
+          "then": {
+            "properties": { "stt": { "const": false }, "tts": { "const": false } },
+            "not": { "required": ["voiceId"] }
+          }
+        },
+        {
+          "if": { "properties": { "tts": { "const": true } }, "required": ["tts"] },
+          "then": { "required": ["voiceId"] }
+        }
+      ]
+    },
     "declaredIdentities": {
       "type": "object",
       "additionalProperties": false,

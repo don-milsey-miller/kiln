@@ -93,31 +93,42 @@ async function projectContext(deps = {}) {
  * `lib/research/`'s decision to expose and this file's to pass on; no vendor name appears here, for
  * the same reason none appears in the library's own contract.
  */
-async function defaultResearchTools() {
+async function connectionEnvironment(service, deps = {}) {
+  if (typeof deps.resolveCredentialEnv === "function")
+    return deps.resolveCredentialEnv(service);
+  const { runtimeCredentialEnv } = await import("../../lib/credential-broker.mjs");
+  return runtimeCredentialEnv(service);
+}
+
+async function defaultResearchTools(deps = {}) {
   const [{ createResearchTools }, { createTavilyAdapter }, permission] = await Promise.all([
     import("../../lib/research/tools.mjs"),
     import("../../lib/research/tavily-adapter.mjs"),
     import("../../lib/decisioning/permission.mjs"),
   ]);
+  const { CREDENTIAL_SERVICE } = await import("../../lib/connection-services.mjs");
+  const env = await connectionEnvironment(CREDENTIAL_SERVICE.TAVILY, deps);
   let semanticFilter;
   try {
     if (permission.decisioningPermissionFromEnv()?.permitted) {
-      const decisioning = await defaultDecisioningTools();
+      const decisioning = await defaultDecisioningTools(deps);
       semanticFilter = (input) => decisioning.kiln_filter_research_results(input);
     }
   } catch {
     // Research remains usable when optional decisioning cannot be constructed.
   }
-  return createResearchTools(createTavilyAdapter(), { semanticFilter });
+  return createResearchTools(createTavilyAdapter({ env }), { semanticFilter });
 }
 
 /** Optional semantic decisions, constructed only after project and host permission have been proved. */
-async function defaultDecisioningTools() {
+async function defaultDecisioningTools(deps = {}) {
   const [{ createDecisioningTools }, { createTypeSafeAdapter }] = await Promise.all([
     import("../../lib/decisioning/tools.mjs"),
     import("../../lib/decisioning/typesafe-adapter.mjs"),
   ]);
-  return createDecisioningTools(createTypeSafeAdapter());
+  const { CREDENTIAL_SERVICE } = await import("../../lib/connection-services.mjs");
+  const env = await connectionEnvironment(CREDENTIAL_SERVICE.TYPESAFE_JEV, deps);
+  return createDecisioningTools(createTypeSafeAdapter({ env }));
 }
 
 /**
@@ -1473,7 +1484,14 @@ export default function register(pi, deps = {}) {
     if (!voiceSession) {
       voiceSession = deps.createVoiceSession
         ? await deps.createVoiceSession({ ui: ctx.ui, ctx })
-        : (await import("../../lib/voice/session.mjs")).createPiVoiceSession({ ui: ctx.ui });
+        : await (async () => {
+            const [{ createPiVoiceSession }, { CREDENTIAL_SERVICE }] = await Promise.all([
+              import("../../lib/voice/session.mjs"),
+              import("../../lib/connection-services.mjs"),
+            ]);
+            const env = await connectionEnvironment(CREDENTIAL_SERVICE.ELEVENLABS, deps);
+            return createPiVoiceSession({ ui: ctx.ui, env });
+          })();
     }
     return voiceSession;
   };
@@ -1810,7 +1828,7 @@ export default function register(pi, deps = {}) {
           gate = { permitted: false, reason: permission.RESEARCH_REFUSAL.CONSENT_UNREADABLE, detail: scrub(e?.message ?? String(e), "") };
         }
         if (!gate?.permitted) return rendered(permission.refusedResearch(name, gate));
-        const tools = deps.researchTools ?? (await defaultResearchTools());
+        const tools = deps.researchTools ?? (await defaultResearchTools(deps));
         const handler = tools[name];
         if (typeof handler !== "function")
           return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
@@ -1854,7 +1872,7 @@ export default function register(pi, deps = {}) {
         }
         if (!gate?.permitted) return rendered(permission.refusedDecisioning(name, gate));
 
-        const tools = deps.decisioningTools ?? (await defaultDecisioningTools());
+        const tools = deps.decisioningTools ?? (await defaultDecisioningTools(deps));
         const handler = tools[name];
         if (typeof handler !== "function")
           return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
@@ -2336,7 +2354,7 @@ export default function register(pi, deps = {}) {
           if (!gate?.permitted) {
             semanticVerification = permission.refusedDecisioning("kiln_verify_specialist_result", gate);
           } else {
-            const decisioning = deps.decisioningTools ?? (await defaultDecisioningTools());
+            const decisioning = deps.decisioningTools ?? (await defaultDecisioningTools(deps));
             const verify = decisioning.kiln_verify_specialist_result;
             semanticVerification = typeof verify === "function"
               ? await verify({

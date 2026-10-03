@@ -60,6 +60,24 @@
         }
       },
       "required": ["provider"]
+    },
+    "sourceProcessing": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "This host's permission to send explicitly supplied source bytes to the selected remote processing provider. Credential presence and committed project intent do not imply this grant.",
+      "properties": {
+        "provider": { "enum": ["openai"] }
+      },
+      "required": ["provider"]
+    },
+    "voice": {
+      "allOf": [{ "$ref": "#/$defs/grant" }],
+      "unevaluatedProperties": false,
+      "description": "This host's permission to use its ElevenLabs credential for the project's independently selected STT and TTS capabilities.",
+      "properties": {
+        "provider": { "enum": ["elevenlabs"] }
+      },
+      "required": ["provider"]
     }
   },
   "$defs": {

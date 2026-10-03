@@ -16,7 +16,18 @@ contract, Kiln returns a structured fallback to its existing Pi reasoning path.
 
 ## Enable it
 
-Set the credential in the host environment, then explicitly configure the project.
+The normal path is guided setup:
+
+```sh
+node .planning/bin/setup.mjs
+```
+
+Choose TypeSafe Jev in Connections & Capabilities. Setup checks authentication with the model-list
+endpoint, records non-secret project intent separately from host-local consent, and stores a newly
+entered credential only in the operating system vault.
+
+For automation or Jev-only administration, set the credential in the host environment and use the
+advanced command below.
 
 PowerShell:
 
