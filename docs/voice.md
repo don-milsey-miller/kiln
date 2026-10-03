@@ -12,10 +12,11 @@ ElevenLabs key to Pi. Install `ffmpeg` and `ffplay` on `PATH`, using an FFmpeg b
 on Windows or OpenAL on Linux, then start Kiln from an environment containing the settings you want.
 
 The normal path is `node .planning/bin/setup.mjs`: choose ElevenLabs, select STT, TTS, or both, and
-provide a voice ID when TTS is selected. Setup stores a pasted credential only in the operating
-system credential vault. In a supervisor-owned run, project intent and this host's consent gate voice
-even when `ELEVENLABS_API_KEY` is present. The environment table below remains the advanced and CI
-configuration contract.
+provide a Voice ID when TTS is selected. The Voice ID is not an API key: in ElevenLabs, open
+**Voices**, select the voice Kiln should use for speech output, and copy its **Voice ID**. Setup stores
+a pasted credential only in the operating system credential vault. In a supervisor-owned run,
+project intent and this host's consent gate voice even when `ELEVENLABS_API_KEY` is present. The
+environment table below remains the advanced and CI configuration contract.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

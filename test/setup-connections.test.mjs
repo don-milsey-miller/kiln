@@ -103,6 +103,39 @@ test("Connect now stores a secret only after review and keeps it out of the plan
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("correcting connection details does not ask for the OpenAI API key again", async () => {
+  const secureStore = { available: true, get: async () => null, set: async () => {}, delete: async () => false };
+  const broker = createCredentialBroker({ env: {}, secureStore });
+  const answers = ["connect", SENTINELS.OPENAI_API_KEY, "provide", "", "gpt-4.1-mini", "skip", "skip"];
+  const seen = [];
+  const collected = await collectConnectionPlan({
+    broker,
+    decide: async (decision) => (seen.push(decision), answers.shift()),
+  });
+  assert.equal(collected.cancelled, false);
+  assert.deepEqual(collected.plan[CREDENTIAL_SERVICE.OPENAI_SOURCE], { enabled: true, extractionModel: "gpt-4.1-mini" });
+  assert.equal(seen.filter(({ type }) => type === "connection:openai-source:credential-secret").length, 1);
+  assert.equal(seen.filter(({ type }) => type === "connection:openai-source:extraction-model-value").length, 2);
+  assert.match(seen.find(({ type }) => type === "connection:openai-source:extraction-model-value").message, /model name.*not an API key/i);
+});
+
+test("speech output explains where to find the ElevenLabs Voice ID", async () => {
+  const secureStore = { available: true, get: async () => null, set: async () => {}, delete: async () => false };
+  const broker = createCredentialBroker({ env: {}, secureStore });
+  const answers = ["skip", "connect", SENTINELS.ELEVENLABS_API_KEY, "tts", "voice-123", "skip"];
+  const seen = [];
+  const collected = await collectConnectionPlan({
+    broker,
+    decide: async (decision) => (seen.push(decision), answers.shift()),
+  });
+  assert.equal(collected.cancelled, false);
+  assert.deepEqual(collected.plan[CREDENTIAL_SERVICE.ELEVENLABS], { enabled: true, stt: false, tts: true, voiceId: "voice-123" });
+  const prompt = seen.find(({ type }) => type === "connection:elevenlabs:voice-id-value");
+  assert.match(prompt.message, /not your API key/i);
+  assert.match(prompt.message, /open Voices/i);
+  assert.match(prompt.message, /copy its Voice ID/i);
+});
 test("applying a reviewed plan persists non-secret intent and separate host consent", async () => {
   const root = mkdtempSync(join(tmpdir(), "kiln-connections-"));
   try {
