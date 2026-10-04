@@ -81,6 +81,7 @@ export const CI_GROUPS = Object.freeze({
     "stage-derivation.test.mjs",
     "stage-docs-in-package.test.mjs",
     "stage-documents.test.mjs",
+    "stage-presentation.test.mjs",
     "stage-scope.test.mjs",
     "stage-skill-operating-instructions.test.mjs",
     "stage-skill-overrides.test.mjs",

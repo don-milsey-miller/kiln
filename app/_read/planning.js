@@ -188,7 +188,15 @@ export async function readStageContext(stageId) {
     .map((def) => {
       const attestations = loadStageAttestations(contentRoot, def.id) ?? {};
       const gate = evaluateStageGate(ctx, def.id, { lint, stageDefinitions: defs, attestations });
-      return { id: def.id, title: def.name ?? def.title ?? def.id, ready: gate.ready === true };
+      return {
+        id: def.id,
+        title: def.name ?? def.title ?? def.id,
+        ready: gate.ready === true,
+        criteria: (def.exitCriteria ?? []).map((criterion) => ({
+          id: criterion.id,
+          result: attestations[criterion.id]?.result ?? "unattested",
+        })),
+      };
     });
   const at = stages.findIndex((stage) => stage.id === stageId);
   if (at < 0) return null;
@@ -197,6 +205,7 @@ export async function readStageContext(stageId) {
     stageId,
     title: stages[at].title,
     ready: stages[at].ready,
+    criteria: stages[at].criteria,
     position: at + 1,
     total: stages.length,
     isCurrent: currentStage === stageId,
