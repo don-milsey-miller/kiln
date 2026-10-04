@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import remarkGfm from "remark-gfm";
 import remarkRejectJs from "../app/_mdx/reject-js.js";
+import remarkIntakeProjection from "../app/_mdx/intake-projection.js";
 import { PERMITTED, components } from "../app/_mdx/components.js";
 
 // ⚠️ A `.md` PATH ON PURPOSE. If `format: "mdx"` is ever dropped from the options below, MDX infers
@@ -108,6 +109,42 @@ test("a permitted document compiles and its mapped component renders", async () 
   assert.match(html, /<h1>/, "markdown must still render");
   assert.match(html, /data-vpw-mdx="Callout"/, "the mapped component must render, not be dropped");
   assert.match(html, /the mapped component rendered/);
+});
+
+test("the app-owned intake projection is injected only after authored MDX is rejected", async () => {
+  await assert.rejects(
+    build("# Stage\n\n<IntakeReview />\n"),
+    /Component <IntakeReview> is not in the permitted set/,
+    "an author must not be able to invoke the application-owned projection"
+  );
+
+  const text = "# Stage\n\n## Intake\n\nraw answer lists\n\n## Working notes\n";
+  const start = text.indexOf("## Intake");
+  const end = text.indexOf("## Working notes");
+  const compiled = await compile(
+    { path: PATH, value: text },
+    {
+      format: "mdx",
+      outputFormat: "function-body",
+      development: false,
+      remarkPlugins: [
+        remarkGfm,
+        [remarkRejectJs, { allow: PERMITTED }],
+        [remarkIntakeProjection, { intake: { start, end } }],
+      ],
+    }
+  );
+  const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
+  const html = renderToStaticMarkup(createElement(mod.default, {
+    components: {
+      ...components,
+      IntakeReview: () => createElement("section", { "data-projected-intake": "true" }, "paired review"),
+      CurrentUnderstanding: ({ children }) => createElement("aside", null, children),
+    },
+  }));
+  assert.match(html, /data-projected-intake="true"/);
+  assert.equal(html.includes("raw answer lists"), false, "the raw two-list projection must not remain beside the paired view");
+  assert.match(html, /<h2>Working notes<\/h2>/, "narrative after Intake must remain in the restricted document");
 });
 
 test("GFM tables render as wrapped semantic tables instead of pipe-delimited paragraphs", async () => {

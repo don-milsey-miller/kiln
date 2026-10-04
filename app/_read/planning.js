@@ -14,6 +14,11 @@ import {
   loadStageAttestations,
   evaluateStageGate,
   readStageDocs,
+  INTAKE_HEADING,
+  WORKING_NOTES_HEADING,
+  StageDocumentRefusal,
+  parseIntakeSection,
+  parseWorkingNotes,
 } from "../server/stages.js";
 import { artifactReviewChoices, artifactReviewSearch } from "../_review/artifact-review-choices.js";
 import { readSourcePreview } from "../server/content.js";
@@ -263,6 +268,55 @@ export async function readStageDocument(stageId) {
   const docs = readStageDocs(contentRoot);
   for (const [name, text] of docs) if (name.replace(/\.mdx?$/, "") === stageId) return { name, text };
   return null;
+}
+
+/**
+ * Pair the canonical intake frames for review without altering or reparsing their payloads as
+ * Markdown. Source offsets let the restricted compiler replace the raw two-list projection with an
+ * application-owned component after the authored MDX has passed its normal rejection boundary.
+ */
+export async function readStageIntakeReview(stageId) {
+  await connection();
+  const { contentRoot } = planningRoots();
+  const docs = readStageDocs(contentRoot);
+  let doc = null;
+  for (const [name, text] of docs) if (name.replace(/\.mdx?$/, "") === stageId) doc = { name, text };
+  if (!doc) return null;
+
+  const hasHeading = (heading) => doc.text.split(/\r?\n/).some((line) => line.trimEnd() === heading);
+  if (!hasHeading(INTAKE_HEADING)) return { state: "absent", doc };
+
+  let intake;
+  let workingNotes = null;
+  try {
+    intake = parseIntakeSection(doc.text);
+    if (hasHeading(WORKING_NOTES_HEADING)) workingNotes = parseWorkingNotes(doc.text);
+  } catch (error) {
+    if (!(error instanceof StageDocumentRefusal)) throw error;
+    return { state: "invalid", doc, problem: error.code, message: error.message };
+  }
+
+  const current = workingNotes?.subsections.find((subsection) => subsection.name === "current-understanding") ?? null;
+  const removeWholeWorkingNotes = current && workingNotes.subsections.length === 1;
+  return {
+    state: "valid",
+    doc,
+    entries: intake.answers.map((answer, index) => ({
+      label: answer.label,
+      verbatim: answer.text,
+      interpretation: intake.readings[index].text,
+    })),
+    currentUnderstanding: current
+      ? { name: current.name, title: current.title, revision: current.revision, content: current.content }
+      : null,
+    projection: {
+      intake: { start: intake.intakeStart, end: intake.intakeEnd },
+      summary: current ? { start: current.start, end: current.end } : null,
+      workingNotes: removeWholeWorkingNotes
+        ? { start: workingNotes.workingNotesStart, end: workingNotes.regionEnd }
+        : null,
+    },
+  };
 }
 
 /**

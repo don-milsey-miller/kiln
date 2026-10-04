@@ -21,3 +21,12 @@ export { loadStageDefinitions } from "../../lib/stages.mjs";
 export { loadStageAttestations } from "../../lib/attestations.mjs";
 export { evaluateStageGate } from "../../lib/lint.mjs";
 export { readStageDocs } from "../../lib/handoff/publish.mjs";
+// Parsers and refusal types are read-only projections. No writer or lock-taking function crosses
+// this adapter; the browser can interpret the canonical framing but cannot mutate it.
+export {
+  INTAKE_HEADING,
+  WORKING_NOTES_HEADING,
+  StageDocumentRefusal,
+  parseIntakeSection,
+  parseWorkingNotes,
+} from "../../lib/stage-documents.mjs";

@@ -95,7 +95,8 @@ After an answer:
 1. Record the operator's answer with `kiln_write_stage_document`: their exact words in `verbatim`, unchanged, and your own reading of them in `interpretation`. Never edit the document any other way.
 2. Run `kiln_lint` after that write, so the project's findings reflect what was just recorded.
 3. Call `kiln_project_status` again and read the `intake` block it returns, which is the state your next question is chosen from.
-4. Ask exactly one question: the one that most reduces the highest-impact uncertainty the recorded intake still leaves open.
+4. After a material correction or clarification, call `kiln_write_stage_document` with `action` `read-working-notes`, then append or replace the named `current-understanding` subsection using the returned revision; summarize only the current objective, active constraints, and deferred questions.
+5. Ask exactly one question: the one that most reduces the highest-impact uncertainty the recorded intake still leaves open.
 
 Always:
 

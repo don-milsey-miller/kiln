@@ -114,11 +114,11 @@ test("⚠️ no synchronous export offers a way around the contract", () => {
   assert.deepEqual(Object.keys(PERMITTED).sort(), ["planningRoots"], "the exception list itself is pinned");
 });
 
-test("the workflow context, criteria and document reads are separate exports", () => {
+test("the workflow context, criteria and document review reads are separate exports", () => {
   // ACC-0016 needs them behind INDEPENDENT Suspense boundaries; one combined call would make that
   // impossible. This checks the shape the boundary requires, not the boundary itself.
   const src = files().map((f) => readFileSync(f, "utf-8")).join("\n");
-  for (const name of ["readStageContext", "readStageCriteria", "readStageDocument"])
+  for (const name of ["readStageContext", "readStageCriteria", "readStageDocument", "readStageIntakeReview"])
     assert.match(src, new RegExp(`export\\s+async\\s+function\\s+${name}\\b`), `${name} must be its own read`);
 });
 
