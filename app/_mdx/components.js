@@ -95,8 +95,29 @@ export function TableCell({ children }) {
   );
 }
 
+/**
+ * Verbatim intake answers are deliberately stored in fenced code blocks so their contents cannot
+ * become document structure. Browsers give `<pre>` an unwrappable `white-space: pre` default,
+ * though, which lets a long answer widen the stage page past the viewport. Preserve whitespace and
+ * line breaks while allowing the display line to wrap at the document column's edge.
+ */
+export function Preformatted({ children }) {
+  return createElement(
+    "pre",
+    {
+      style: {
+        maxWidth: "100%",
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+      },
+    },
+    children
+  );
+}
+
 /** The permitted set, as names. The plugin refuses every capitalised element outside it. */
 export const PERMITTED = ["Callout"];
 
 /** What `run()` is handed as the document's component scope. */
-export const components = { Callout, table: Table, th: TableHead, td: TableCell };
+export const components = { Callout, pre: Preformatted, table: Table, th: TableHead, td: TableCell };
