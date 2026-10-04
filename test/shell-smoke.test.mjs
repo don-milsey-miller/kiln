@@ -36,6 +36,7 @@ import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { reapLater, installReaper } from "./helpers/reap.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
+import { readWorkingNotes, writeStageDocumentEntry, writeWorkingNotes } from "../lib/stage-documents.mjs";
 
 installReaper();
 
@@ -129,6 +130,28 @@ async function runSmokeCheck(t) {
   const manifest = join(contentCopy, "planning-content", "project.yaml");
   writeFileSync(manifest, readFileSync(manifest, "utf-8").replace(/^name: .*$/m, `name: "${consumerName}"`));
 
+  // Give the production page a real framed intake transcript and one explicit current summary. The
+  // writes target only the disposable content copy and use the same typed writer as the product.
+  const stageOnePath = join(contentCopy, "planning-content", "stages", "01-intake.md");
+  writeFileSync(stageOnePath, `${readFileSync(stageOnePath, "utf-8").trimEnd()}\n\n## Working notes\n\n_No stage-specific narrative has been recorded._\n`);
+  await writeStageDocumentEntry(join(contentCopy, "planning-content"), "01-intake", {
+    verbatim: "Keep <script>alert('x')</script> and {state} literal.\n### This is still operator text.\n```nested```",
+    interpretation: "HTML-like text, braces, headings, and fences are operator wording rather than document structure",
+  });
+  await writeStageDocumentEntry(join(contentCopy, "planning-content"), "01-intake", {
+    verbatim: "Correction: HSI should remain allowed.",
+    interpretation: "The operator withdrew the earlier HSI restriction",
+  });
+  const notes = readWorkingNotes(join(contentCopy, "planning-content"), "01-intake");
+  await writeWorkingNotes(join(contentCopy, "planning-content"), "01-intake", {
+    action: "append-working-note",
+    subsection: "current-understanding",
+    title: "Current understanding",
+    content: "- Current objective: review intake safely.\n- Active constraints: operator wording stays verbatim.\n- Deferred questions: none.",
+    expectedRevision: notes.revision,
+  });
+  const stageOneBeforeBrowserRead = readFileSync(stageOnePath, "utf-8");
+
   let server = null;
   try {
     server = spawn(process.execPath, [NEXT_CLI, "start", "--hostname", "127.0.0.1", "--port", String(PORT)], {
@@ -180,6 +203,33 @@ async function runSmokeCheck(t) {
     assert.match(firstStage, new RegExp(`data-vpw-stage-position="1/${STAGE_IDS.length}"`));
     assert.equal(firstStage.includes("data-vpw-stage-prev="), false, "the first stage must not invent a previous link");
     assert.ok(firstStage.includes(`data-vpw-stage-next="${STAGE_IDS[1]}"`), "the first stage must link forward");
+    assert.match(firstStage, /data-vpw-intake-review="2"/);
+    assert.match(firstStage, /data-vpw-intake-entry="A1"/);
+    assert.match(firstStage, /data-vpw-intake-entry="A2"/);
+    assert.match(firstStage, /data-vpw-operator-words="A1"/);
+    assert.match(firstStage, /data-vpw-kiln-interpretation="A1"/);
+    assert.ok(!firstStage.includes("<script>alert('x')</script>"), "verbatim HTML-like text became live markup");
+    assert.match(firstStage, /&lt;script&gt;alert/);
+    assert.equal(firstStage.includes("<h3>Recorded answers</h3>"), false, "the raw two-list answer view remains beside the pairs");
+    assert.ok(
+      firstStage.indexOf("data-vpw-current-understanding=") < firstStage.indexOf('data-vpw-intake-entry="A1"'),
+      "the explicit current understanding must precede the historical transcript"
+    );
+    assert.match(firstStage, /Kiln-authored current understanding/);
+    assert.equal(readFileSync(stageOnePath, "utf-8"), stageOneBeforeBrowserRead, "a browser read changed the authoritative document");
+
+    const withoutSummary = await stagePage(STAGE_IDS[1]);
+    assert.equal(withoutSummary.includes("data-vpw-current-understanding="), false, "a missing summary must not be invented");
+
+    const malformedStageOne = stageOneBeforeBrowserRead.replace("### Kiln's reading", "### Broken reading anchor");
+    writeFileSync(stageOnePath, malformedStageOne);
+    await sleep(1500);
+    const malformedIntake = await stagePage(STAGE_IDS[0]);
+    assert.match(malformedIntake, /data-vpw-document="invalid-intake"/);
+    assert.match(malformedIntake, /data-vpw-intake-problem="stage-document-anchor-missing"/);
+    assert.equal(malformedIntake.includes("data-vpw-intake-entry="), false, "an invalid transcript must not render partially");
+    writeFileSync(stageOnePath, stageOneBeforeBrowserRead);
+    await sleep(1500);
 
     const middleAt = STAGE_IDS.indexOf(STAGE);
     const middleStage = await stagePage(STAGE);
