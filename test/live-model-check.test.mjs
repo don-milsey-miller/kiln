@@ -117,11 +117,12 @@ test("⚠️ ACC-0060 the approval names the provider, the exact model and the c
     const r = await check(p, pf, { ask: (q) => (a.ask(q), assert.equal(c.runs.length, 0, "the canary ran before approval"), true), canary: c.canary });
     assert.equal(r.outcome, LIVE_CHECK_OUTCOME.PASSED);
     assert.equal(r.ready, true);
-    const [prompt] = a.asked;
-    assert.match(prompt, /^Live model check/);
-    assert.ok(prompt.includes(`to ${pf.displayName} using ${PLAIN.id}.`));
-    assert.match(prompt, /contains no project content and cannot change planning files/);
-    assert.match(prompt, /Your provider may charge for\nthis request/);
+    const [request] = a.asked;
+    assert.equal(request.type, "live-model-check");
+    assert.match(request.message, /^Live model check/);
+    assert.ok(request.message.includes(`to ${pf.displayName} using ${PLAIN.id}.`));
+    assert.match(request.message, /contains no project content and cannot change planning files/);
+    assert.match(request.message, /Your provider may charge for\nthis request/);
     assert.deepEqual(c.runs, [pf.selection]);
 
     // The record is exactly the passed result under the key computed for this selection.

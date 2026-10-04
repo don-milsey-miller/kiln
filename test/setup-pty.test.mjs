@@ -88,3 +88,17 @@ test("guided confirmation accepts a pasted literal Yes", async () => {
     if (!pty.exit()) pty.kill();
   }
 });
+
+test("the real live-check request routes through Clack confirmation and returns a boolean", async () => {
+  const pty = startPty(guidedPromptFixture, ["live-check"]);
+  try {
+    await pty.waitFor(/Live model check/);
+    pty.write("yes\r");
+    const result = await pty.exited();
+    const output = stripVTControlCharacters(result.output);
+    assert.equal(result.exitCode, 0, output);
+    assert.match(output, /RESULT:true/);
+  } finally {
+    if (!pty.exit()) pty.kill();
+  }
+});

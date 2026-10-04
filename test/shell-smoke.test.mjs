@@ -36,6 +36,7 @@ import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { reapLater, installReaper } from "./helpers/reap.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
+import { readWorkingNotes, writeStageDocumentEntry, writeWorkingNotes } from "../lib/stage-documents.mjs";
 
 installReaper();
 
@@ -59,10 +60,10 @@ const ROUTES = [
   {
     path: `/stage/${STAGE}?artifact=AST-0021`,
     marker: 'data-vpw-route="/stage"',
-    // Each of the three independent boundaries must RESOLVE, not merely ship its fallback. A page
+    // Each independent boundary must RESOLVE, not merely ship its fallback. A page
     // whose reads never completed streams the shell and stops, which looks identical to success from
     // the status line.
-    also: [`data-vpw-criteria="${STAGE}"`, "data-vpw-criterion=", "data-vpw-document=", 'data-vpw-review="AST-0021"'],
+    also: [`data-vpw-stage-context="${STAGE}"`, `data-vpw-criteria="${STAGE}"`, "data-vpw-criterion=", "data-vpw-document=", 'data-vpw-review="AST-0021"'],
   },
   {
     path: "/",
@@ -129,6 +130,28 @@ async function runSmokeCheck(t) {
   const manifest = join(contentCopy, "planning-content", "project.yaml");
   writeFileSync(manifest, readFileSync(manifest, "utf-8").replace(/^name: .*$/m, `name: "${consumerName}"`));
 
+  // Give the production page a real framed intake transcript and one explicit current summary. The
+  // writes target only the disposable content copy and use the same typed writer as the product.
+  const stageOnePath = join(contentCopy, "planning-content", "stages", "01-intake.md");
+  writeFileSync(stageOnePath, `${readFileSync(stageOnePath, "utf-8").trimEnd()}\n\n## Working notes\n\n_No stage-specific narrative has been recorded._\n`);
+  await writeStageDocumentEntry(join(contentCopy, "planning-content"), "01-intake", {
+    verbatim: "Keep <script>alert('x')</script> and {state} literal.\n### This is still operator text.\n```nested```",
+    interpretation: "HTML-like text, braces, headings, and fences are operator wording rather than document structure",
+  });
+  await writeStageDocumentEntry(join(contentCopy, "planning-content"), "01-intake", {
+    verbatim: "Correction: HSI should remain allowed.",
+    interpretation: "The operator withdrew the earlier HSI restriction",
+  });
+  const notes = readWorkingNotes(join(contentCopy, "planning-content"), "01-intake");
+  await writeWorkingNotes(join(contentCopy, "planning-content"), "01-intake", {
+    action: "append-working-note",
+    subsection: "current-understanding",
+    title: "Current understanding",
+    content: "- Current objective: review intake safely.\n- Active constraints: operator wording stays verbatim.\n- Deferred questions: none.",
+    expectedRevision: notes.revision,
+  });
+  const stageOneBeforeBrowserRead = readFileSync(stageOnePath, "utf-8");
+
   let server = null;
   try {
     server = spawn(process.execPath, [NEXT_CLI, "start", "--hostname", "127.0.0.1", "--port", String(PORT)], {
@@ -173,6 +196,53 @@ async function runSmokeCheck(t) {
         }
       }
     }
+
+    const stagePage = async (stageId) =>
+      (await (await fetch(`http://127.0.0.1:${PORT}/stage/${stageId}`, { signal: AbortSignal.timeout(15_000) })).text());
+    const firstStage = await stagePage(STAGE_IDS[0]);
+    assert.match(firstStage, new RegExp(`data-vpw-stage-position="1/${STAGE_IDS.length}"`));
+    assert.equal(firstStage.includes("data-vpw-stage-prev="), false, "the first stage must not invent a previous link");
+    assert.ok(firstStage.includes(`data-vpw-stage-next="${STAGE_IDS[1]}"`), "the first stage must link forward");
+    assert.match(firstStage, /data-vpw-intake-review="2"/);
+    assert.match(firstStage, /data-vpw-intake-entry="A1"/);
+    assert.match(firstStage, /data-vpw-intake-entry="A2"/);
+    assert.match(firstStage, /data-vpw-operator-words="A1"/);
+    assert.match(firstStage, /data-vpw-kiln-interpretation="A1"/);
+    assert.ok(!firstStage.includes("<script>alert('x')</script>"), "verbatim HTML-like text became live markup");
+    assert.match(firstStage, /&lt;script&gt;alert/);
+    assert.equal(firstStage.includes("<h3>Recorded answers</h3>"), false, "the raw two-list answer view remains beside the pairs");
+    assert.ok(
+      firstStage.indexOf("data-vpw-current-understanding=") < firstStage.indexOf('data-vpw-intake-entry="A1"'),
+      "the explicit current understanding must precede the historical transcript"
+    );
+    assert.match(firstStage, /Kiln-authored current understanding/);
+    assert.equal(readFileSync(stageOnePath, "utf-8"), stageOneBeforeBrowserRead, "a browser read changed the authoritative document");
+
+    const withoutSummary = await stagePage(STAGE_IDS[1]);
+    assert.equal(withoutSummary.includes("data-vpw-current-understanding="), false, "a missing summary must not be invented");
+
+    const malformedStageOne = stageOneBeforeBrowserRead.replace("### Kiln's reading", "### Broken reading anchor");
+    writeFileSync(stageOnePath, malformedStageOne);
+    await sleep(1500);
+    const malformedIntake = await stagePage(STAGE_IDS[0]);
+    assert.match(malformedIntake, /data-vpw-document="invalid-intake"/);
+    assert.match(malformedIntake, /data-vpw-intake-problem="stage-document-anchor-missing"/);
+    assert.equal(malformedIntake.includes("data-vpw-intake-entry="), false, "an invalid transcript must not render partially");
+    writeFileSync(stageOnePath, stageOneBeforeBrowserRead);
+    await sleep(1500);
+
+    const middleAt = STAGE_IDS.indexOf(STAGE);
+    const middleStage = await stagePage(STAGE);
+    assert.ok(middleStage.includes(`data-vpw-stage-position="${middleAt + 1}/${STAGE_IDS.length}"`));
+    assert.ok(middleStage.includes(`data-vpw-stage-prev="${STAGE_IDS[middleAt - 1]}"`));
+    assert.ok(middleStage.includes(`data-vpw-stage-next="${STAGE_IDS[middleAt + 1]}"`));
+    assert.match(middleStage, /Stage attestation is completed in the Kiln terminal/);
+    assert.match(middleStage, /<details[^>]*data-vpw-criteria=/, "criterion detail must be keyboard-disclosable and collapsed by default");
+
+    const lastStage = await stagePage(STAGE_IDS.at(-1));
+    assert.match(lastStage, new RegExp(`data-vpw-stage-position="${STAGE_IDS.length}/${STAGE_IDS.length}"`));
+    assert.ok(lastStage.includes(`data-vpw-stage-prev="${STAGE_IDS.at(-2)}"`), "the last stage must link backward");
+    assert.equal(lastStage.includes("data-vpw-stage-next="), false, "the last stage must not invent a next link");
 
     const chooser = await (await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}`, { signal: AbortSignal.timeout(15_000) })).text();
     assert.ok(chooser.includes('data-vpw-review="chooser"'), "the no-selection state must offer project-derived review choices");
@@ -293,8 +363,10 @@ async function runSmokeCheck(t) {
 
     /* ---------------------------------------------------------- the freshness regression */
 
+    const overviewOf = async () =>
+      (await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text());
     const currentOf = async () => {
-      const html = await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text();
+      const html = await overviewOf();
       return (html.match(/data-vpw-current="([^"]*)"/) ?? [])[1] ?? null;
     };
 
@@ -322,6 +394,29 @@ async function runSmokeCheck(t) {
         `That is a page frozen into the build, which is what AST-0019 measured and DEC-0019 forbids.`
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
+
+    const blockedHome = await overviewOf();
+    assert.match(blockedHome, /data-vpw-current="01-intake" data-vpw-gate-state="blocked"/);
+    assert.match(blockedHome, /BLOCKED/);
+    assert.match(blockedHome, new RegExp(`Blocked on: [^<]*${firstCriterion}`));
+
+    // Remove the explicit negative decision. The same closed gate is now waiting for a human
+    // attestation, which must not retain the failure state merely because both states are non-ready.
+    delete doc.attestations[firstCriterion];
+    writeFileSync(attestations, JSON.stringify(doc, null, 2) + "\n");
+    await sleep(1500);
+
+    const awaitingHome = await overviewOf();
+    assert.match(awaitingHome, /data-vpw-current="01-intake" data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingHome, /AWAITING ATTESTATION/);
+    assert.match(awaitingHome, new RegExp(`Awaiting: [^<]*${firstCriterion}`));
+
+    const awaitingStage = await (
+      await fetch(`http://127.0.0.1:${PORT}/stage/01-intake`, { signal: AbortSignal.timeout(15_000) })
+    ).text();
+    assert.match(awaitingStage, /data-vpw-stage-context="01-intake"[^>]*data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingStage, /data-vpw-criteria="01-intake" data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingStage, /AWAITING ATTESTATION/, "project and stage views must use the same vocabulary");
 
     /* ------------------------------------------------- the change stream (ACC-0028) */
 
