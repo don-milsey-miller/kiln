@@ -12,7 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { createResearchTools, RESEARCH_TOOL_SIGNATURES, researchToolRegistrations } from "../lib/research/tools.mjs";
+import { createResearchTools, RESEARCH_FETCH_LIMITS, RESEARCH_TOOL_SIGNATURES, researchToolRegistrations } from "../lib/research/tools.mjs";
 import { createTavilyAdapter, sanitise, TAVILY } from "../lib/research/tavily-adapter.mjs";
 import { checkUrl, addressIsBlocked } from "../lib/research/url-guard.mjs";
 import { guardedFetch } from "../lib/research/guarded-fetch.mjs";
@@ -41,6 +41,9 @@ test("three tools are registered, with declared input schemas", () => {
   }
   // The signatures are readable WITHOUT a backend — a contract writer and #81's check both need that.
   assert.ok(RESEARCH_TOOL_SIGNATURES.research_search.input.required.includes("query"));
+  assert.equal(RESEARCH_TOOL_SIGNATURES.research_fetch.input.properties.maxBytes.maximum, RESEARCH_FETCH_LIMITS.maximumBytes);
+  assert.ok(RESEARCH_TOOL_SIGNATURES.research_fetch.input.properties.offsetBytes);
+  assert.ok(RESEARCH_TOOL_SIGNATURES.research_fetch.input.properties.refresh);
 });
 
 test("the contract layer names no vendor", async () => {
@@ -283,6 +286,56 @@ test("a successful fetch records what promotion to evidence needs", async () => 
   assert.ok(out.retrievedAt, "retrieval time is required by DEC-0004 for evidence(kind: source)");
   assert.deepEqual(out.redirectChain, ["https://example.com/page"]);
   assert.equal(mustRecordGap(out), false);
+});
+
+test("#172 multi-megabyte fetches return deterministic UTF-8 chunks and suppress duplicate context", async () => {
+  const source = `${"🧪".repeat(520_000)}END`;
+  let requests = 0;
+  const fetchImpl = async () => {
+    requests++;
+    return new Response(source, { status: 200, headers: { "content-type": "text/plain" } });
+  };
+  const tools = createResearchTools(
+    { name: "stand-in", envVar: "NONE", probe: async () => ({ ok: true }), search: async () => ({ ok: true, results: [] }) },
+    { fetchImpl, resolve: publicResolve }
+  );
+
+  const first = await tools.research_fetch({ url: "https://EXAMPLE.com:443/large", maxBytes: 4097 });
+  assert.equal(first.ok, true);
+  assert.equal(first.bytesRetrieved, Buffer.byteLength(source));
+  assert.ok(first.bytesReturned <= 4097);
+  assert.equal(Buffer.from(first.body, "utf8").toString("utf8"), first.body, "the first chunk split a UTF-8 code point");
+  assert.equal(first.body.includes("�"), false);
+  assert.equal(first.truncated, true);
+  assert.deepEqual(first.continuation, { offsetBytes: first.bytesReturned, maxBytes: 4097 });
+  assert.equal(requests, 1);
+
+  const duplicate = await tools.research_fetch({ url: "https://example.com/large", maxBytes: 4097 });
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(duplicate.body, null);
+  assert.equal(duplicate.bytesReturned, 0);
+  assert.equal(duplicate.cacheStatus, "duplicate-suppressed");
+  assert.equal(requests, 1, "a normalized duplicate URL reached the network");
+
+  const next = await tools.research_fetch({
+    url: "https://example.com/large",
+    offsetBytes: first.continuation.offsetBytes,
+    maxBytes: 4097,
+  });
+  assert.equal(next.ok, true);
+  assert.equal(next.cacheStatus, "hit");
+  assert.equal(next.offsetBytes, first.continuation.offsetBytes);
+  assert.equal(next.body.includes("�"), false);
+  assert.equal(requests, 1, "continuation downloaded the page again instead of using the session cache");
+
+  const refreshed = await tools.research_fetch({ url: "https://example.com/large", maxBytes: 4097, refresh: true });
+  assert.equal(refreshed.cacheStatus, "refresh");
+  assert.equal(requests, 2);
+
+  const overLimit = await tools.research_fetch({ url: "https://example.com/large", maxBytes: RESEARCH_FETCH_LIMITS.maximumBytes + 1 });
+  assert.equal(overLimit.kind, "invalid-input");
+  assert.match(overLimit.detail, /maxBytes/);
+  assert.equal(requests, 2, "invalid output limits must be rejected before retrieval");
 });
 
 test("the CLIs never call process.exit, because it crashes after fetch on this platform", async () => {
