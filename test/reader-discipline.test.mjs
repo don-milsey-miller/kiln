@@ -114,11 +114,11 @@ test("⚠️ no synchronous export offers a way around the contract", () => {
   assert.deepEqual(Object.keys(PERMITTED).sort(), ["planningRoots"], "the exception list itself is pinned");
 });
 
-test("the criteria and document reads are separate exports", () => {
+test("the workflow context, criteria and document reads are separate exports", () => {
   // ACC-0016 needs them behind INDEPENDENT Suspense boundaries; one combined call would make that
   // impossible. This checks the shape the boundary requires, not the boundary itself.
   const src = files().map((f) => readFileSync(f, "utf-8")).join("\n");
-  for (const name of ["readStageCriteria", "readStageDocument"])
+  for (const name of ["readStageContext", "readStageCriteria", "readStageDocument"])
     assert.match(src, new RegExp(`export\\s+async\\s+function\\s+${name}\\b`), `${name} must be its own read`);
 });
 
@@ -128,16 +128,28 @@ test("⚠️ the stage view's reads sit behind DISTINCT boundaries with distinct
   // half — that a failure in one region leaves the other rendered.
   const src = readFileSync(join(ROOT, "app", "stage", "[stageId]", "page.js"), "utf-8");
   const opens = src.match(/<Suspense\b/g) ?? [];
-  assert.ok(opens.length >= 3, `expected a boundary per read, found ${opens.length}`);
+  assert.ok(opens.length >= 4, `expected a boundary per read, found ${opens.length}`);
 
   const fallbacks = [...src.matchAll(/data-vpw-loading="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     [...fallbacks].sort(),
-    ["criteria", "document", "review"],
+    ["context", "criteria", "document", "review"],
     "each fallback must name the content it stands in for, and they must differ"
   );
 
   // ...and each panel is rendered literally, which the boundary check also enforces.
-  for (const name of ["CriteriaPanel", "DocumentPanel", "ReviewPanel"])
+  for (const name of ["StageContextPanel", "CriteriaPanel", "DocumentPanel", "ReviewPanel"])
     assert.ok(src.includes(`<${name} `), `${name} must be rendered by its declared name`);
+
+  assert.ok(
+    src.indexOf("<DocumentPanel ") < src.indexOf("<CriteriaPanel "),
+    "the review document must appear before expandable attestation detail"
+  );
+});
+
+test("the live criteria panel reports attestation state without repeating canonical definitions", () => {
+  const src = readFileSync(join(ROOT, "app", "stage", "[stageId]", "criteria-panel.js"), "utf-8");
+  assert.doesNotMatch(src, /c[.]describe/, "criterion descriptions already appear in the canonical stage document");
+  assert.match(src, /<details\b/, "attestation detail must use a native keyboard-accessible disclosure");
+  assert.match(src, /data-vpw-criteria-summary/, "the collapsed disclosure must retain a stable live-state summary");
 });
