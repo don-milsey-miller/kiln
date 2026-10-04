@@ -630,12 +630,12 @@ async function proveCapabilitySignature({ dir, tool, agentDir, CLI, resolved, ca
   // two projects identical, and the refusal below would then be caused by something else.
   const extension = join(driftedDir, ".planning", "pi-package", "extensions", "kiln.js");
   const shipped = readFileSync(extension, "utf8");
-  const anchor = /properties: \{ url: \{ type: "string" \}, maxBytes: \{ type: "integer", minimum: 1024 \} \},(\r?\n\s*)required: \["url"\],/g;
+  const anchor = /(\s+refresh: \{ type: "boolean", description: "Fetch again instead of using this session's cached retrieval\." \},\r?\n)(\s+)\},(\r?\n\s*)required: \["url"\],/g;
   const occurrences = [...shipped.matchAll(anchor)].length;
   if (occurrences !== 1)
     throw new Error(`The ${DRIFT_TOOL} schema anchor occurs ${occurrences} times in the Kiln extension; the drift row cannot place its change.`);
   writeFileSync(extension, shipped.replace(anchor,
-    `properties: { url: { type: "string" }, maxBytes: { type: "integer", minimum: 1024 }, ${DRIFT_PROPERTY}: { type: "string" } },$1required: ["url", "${DRIFT_PROPERTY}"],`));
+    `$1$2  ${DRIFT_PROPERTY}: { type: "string" },\n$2},$3required: ["url", "${DRIFT_PROPERTY}"],`));
 
   const contract = contractFor("research");
   const held = { taskBindingObserved: true, timedOut: false, output: HELD_OUTPUT };

@@ -25,6 +25,7 @@ import { createValidators } from "../lib/validate.mjs";
 import { readHighWaterMarks } from "../lib/id-allocator.mjs";
 import { loadSchemaSet } from "../lib/schema-resolver.mjs";
 import { ARTIFACT_AUTHORING, buildArtifactAuthoringSchemas } from "../lib/tools/artifact-authoring.mjs";
+import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 import * as stageDocuments from "../lib/stage-documents.mjs";
 import { intakeSection, parseIntakeSection } from "../lib/stage-documents.mjs";
 import register, { SIGNATURE } from "../pi-package/extensions/kiln.js";
@@ -43,6 +44,7 @@ installReaper();
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_ROOT = join(ROOT, "pi-package");
 const DECLARATION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "signature.json"), "utf-8"));
+const piSdk = await import(resolvePinnedSdk(ROOT).url);
 
 /** The tools whose subject is not the project: the package's own declaration, and the public web. */
 const PROJECTLESS = new Set([
@@ -1650,6 +1652,206 @@ test("⚠️ ACC-0110 each research tool hands its parameters to the implementat
   assert.deepEqual(searched.details, { tool: "research_search", ok: true, kind: "discovery", marker: "answered-by-research_search" });
   assert.equal(fetched.details.marker, "answered-by-research_fetch");
   assert.equal(probed.details.marker, "answered-by-research_capability");
+});
+
+test("#172 research_fetch has one bounded body representation and metadata-only details", async () => {
+  const body = `unique-body-marker-${"🧪\n".repeat(600_000)}`;
+  const bytes = Buffer.byteLength(body);
+  const tools = withResearch({
+    research_fetch: async () => ({
+      tool: "research_fetch",
+      ok: true,
+      kind: "retrieval",
+      url: "https://example.invalid/large",
+      requestedUrl: "https://example.invalid/large",
+      redirectChain: ["https://example.invalid/large"],
+      status: 200,
+      contentType: "text/plain",
+      retrievedAt: "2026-10-04T00:00:00.000Z",
+      body,
+      bytesRetrieved: bytes,
+      bytesReturned: bytes,
+      offsetBytes: 0,
+      truncated: false,
+      continuation: null,
+      modelVisibleLimitBytes: 50_000,
+      duplicate: false,
+      cacheStatus: "miss",
+      note: "Not yet evidence.",
+    }),
+  });
+
+  const result = await invokeAnywhere(tools.get("research_fetch"), { url: "https://example.invalid/large" });
+  const visibleText = result.content[0].text;
+  const visible = JSON.parse(visibleText);
+  assert.ok(Buffer.byteLength(visibleText) <= 50_000, `model-visible result was ${Buffer.byteLength(visibleText)} bytes`);
+  assert.equal(visible.body.includes("�"), false, "the final renderer split a UTF-8 code point");
+  assert.equal(visible.truncated, true);
+  assert.equal(visible.bytesReturned, Buffer.byteLength(visible.body));
+  assert.equal(visible.continuation.offsetBytes, visible.bytesReturned);
+  assert.equal((visibleText.match(/unique-body-marker/g) ?? []).length, 1);
+  assert.equal(Object.hasOwn(result, "output"), false, "the result retained a redundant output copy");
+  assert.equal(Object.hasOwn(result.details, "body"), false, "details retained a second body copy");
+  assert.equal(result.details.bytesRetrieved, bytes);
+  assert.ok(result.details.diagnostics.modelVisibleBytes <= 50_000);
+  assert.equal(result.details.diagnostics.modelVisibleBytes, Buffer.byteLength(visibleText));
+  assert.ok(result.details.diagnostics.estimatedTokens > 0);
+});
+
+test("#172 Pi session serialization persists one bounded research body and no duplicate output", async () => {
+  const marker = "serialized-body-marker-45d1";
+  const body = `${marker}${"x".repeat(2_500_000)}`;
+  const tools = withResearch({
+    research_fetch: async () => ({
+      tool: "research_fetch",
+      ok: true,
+      kind: "retrieval",
+      url: "https://example.invalid/session",
+      requestedUrl: "https://example.invalid/session",
+      redirectChain: ["https://example.invalid/session"],
+      status: 200,
+      contentType: "text/plain",
+      retrievedAt: "2026-10-04T00:00:00.000Z",
+      body,
+      bytesRetrieved: Buffer.byteLength(body),
+      bytesReturned: Buffer.byteLength(body),
+      offsetBytes: 0,
+      truncated: false,
+      continuation: null,
+      modelVisibleLimitBytes: 50_000,
+      duplicate: false,
+      cacheStatus: "miss",
+      note: "Not yet evidence.",
+    }),
+  });
+  const result = await invokeAnywhere(tools.get("research_fetch"), { url: "https://example.invalid/session" });
+
+  const sessionDir = reapLater(mkdtempSync(join(tmpdir(), "kiln-research-session-")));
+  const manager = piSdk.SessionManager.create(ROOT, sessionDir);
+  manager.appendMessage({
+    role: "assistant",
+    content: [{ type: "toolCall", id: "call-research-1", name: "research_fetch", arguments: { url: "https://example.invalid/session" } }],
+    api: "openai-completions",
+    provider: "session-test",
+    model: "session-test",
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: "toolUse",
+    timestamp: Date.now(),
+  });
+  manager.appendMessage({
+    role: "toolResult",
+    toolCallId: "call-research-1",
+    toolName: "research_fetch",
+    content: result.content,
+    details: result.details,
+    isError: false,
+    timestamp: Date.now(),
+  });
+
+  const sessionFile = manager.getSessionFile();
+  assert.ok(sessionFile, "the pinned Pi serializer did not create a session file");
+  const serialized = readFileSync(sessionFile, "utf8");
+  assert.ok(Buffer.byteLength(serialized) < 60_000, `serialized session was ${Buffer.byteLength(serialized)} bytes`);
+  assert.equal((serialized.match(new RegExp(marker, "g")) ?? []).length, 1, "the fetched body was serialized more than once");
+  const entries = serialized.trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  const toolEntry = entries.find((entry) => entry?.message?.role === "toolResult");
+  assert.ok(toolEntry, "the serialized session has no tool-result entry");
+  assert.equal(Object.hasOwn(toolEntry.message, "output"), false);
+  assert.equal(Object.hasOwn(toolEntry.message.details ?? {}, "body"), false);
+  assert.equal(toolEntry.message.content[0].text.includes(marker), true);
+  assert.equal(toolEntry.message.details.diagnostics.modelVisibleBytes, Buffer.byteLength(toolEntry.message.content[0].text));
+});
+
+test("#172 research diagnostics restore compactions, track the largest result, and warn on context pressure", async () => {
+  const tools = new Map();
+  const handlers = new Map();
+  let fetchCalls = 0;
+  register(
+    {
+      registerTool: (tool) => tools.set(tool.name, providerVisible(tool)),
+      on: (name, handler) => handlers.set(name, handler),
+    },
+    {
+      researchPermission: () => ({ permitted: true }),
+      researchTools: {
+        research_fetch: async (input) => {
+          fetchCalls++;
+          return {
+            tool: "research_fetch",
+            ok: true,
+            kind: "retrieval",
+            url: input.url,
+            requestedUrl: input.url,
+            redirectChain: [input.url],
+            status: 200,
+            contentType: "text/plain",
+            retrievedAt: "2026-10-04T00:00:00.000Z",
+            body: "diagnostic body",
+            bytesRetrieved: 15,
+            bytesReturned: 15,
+            offsetBytes: 0,
+            truncated: false,
+            continuation: null,
+            modelVisibleLimitBytes: 50_000,
+            duplicate: false,
+            cacheStatus: "miss",
+            note: "Not yet evidence.",
+          };
+        },
+      },
+    }
+  );
+  const ctx = {
+    hasUI: false,
+    sessionManager: {
+      getBranch: () => [
+        { type: "compaction", tokensBefore: 80_000 },
+        { type: "compaction", tokensBefore: 90_000 },
+        { type: "message", message: { details: { diagnostics: { modelVisibleBytes: 1_234 } } } },
+        {
+          type: "message",
+          message: {
+            role: "toolResult",
+            toolName: "research_fetch",
+            details: {
+              tool: "research_fetch",
+              ok: true,
+              kind: "retrieval",
+              requestedUrl: "https://example.invalid/already-read",
+              url: "https://example.invalid/already-read",
+              offsetBytes: 0,
+              continuation: null,
+            },
+          },
+        },
+      ],
+    },
+    getContextUsage: () => ({ tokens: 99_500, contextWindow: 100_000, percent: 99.5 }),
+  };
+  await handlers.get("session_start")({ type: "session_start", reason: "resume" }, ctx);
+
+  const first = await tools.get("research_fetch").execute("call-1", { url: "https://example.invalid/diagnostics" }, undefined, undefined, ctx);
+  assert.equal(first.details.diagnostics.compactionCount, 2);
+  assert.equal(first.details.diagnostics.lastCompactionTokensBefore, 90_000);
+  assert.ok(first.details.diagnostics.largestToolResultBytes >= 1_234);
+  assert.match(first.details.diagnostics.warning, /remaining model context/);
+
+  const resumedDuplicate = await tools.get("research_fetch").execute(
+    "call-resumed",
+    { url: "https://EXAMPLE.invalid:443/already-read" },
+    undefined,
+    undefined,
+    ctx
+  );
+  assert.equal(resumedDuplicate.details.duplicate, true);
+  assert.equal(resumedDuplicate.details.cacheStatus, "duplicate-suppressed");
+  assert.equal(fetchCalls, 1, "a URL restored from session metadata reached the research backend");
+
+  handlers.get("session_compact")({ type: "session_compact", compactionEntry: { tokensBefore: 100_000 } }, ctx);
+  const second = await tools.get("research_fetch").execute("call-2", { url: "https://example.invalid/other" }, undefined, undefined, ctx);
+  assert.equal(second.details.diagnostics.compactionCount, 3);
+  assert.equal(second.details.diagnostics.lastCompactionTokensBefore, 100_000);
+  assert.ok(second.details.diagnostics.largestToolResultBytes >= first.details.diagnostics.modelVisibleBytes);
 });
 
 test("⚠️ ACC-0110 a capability refusal reaches the caller as the library's own data, not as the wrapper's", async () => {

@@ -29,7 +29,7 @@
  * 1 cleanly. **A refusal that cannot be told apart from a failure defeats the clause it implements.**
  */
 
-import { createResearchTools } from "../lib/research/tools.mjs";
+import { createResearchTools, RESEARCH_FETCH_LIMITS } from "../lib/research/tools.mjs";
 import { createTavilyAdapter } from "../lib/research/tavily-adapter.mjs";
 import { createEvidence, linkEvidence } from "../lib/tools/evidence-tools.mjs";
 import { resolveContentRoot, resolveProjectRoot } from "../lib/content-root.mjs";
@@ -88,6 +88,31 @@ function refuse(result) {
   if (result.mustRecordGap)
     console.error("\nThis is a capability refusal. Record the gap; do NOT answer from model memory (DEC-0004).");
   return 1;
+}
+
+/**
+ * The terminal-only evidence command needs the whole bounded download to verify an exact quote. It
+ * follows the same deterministic continuation contract the model uses, but the chunks never enter a
+ * model turn. The network ceiling remains guardedFetch's independent limit.
+ */
+async function fetchCompleteForQuote(tools, url) {
+  const bodies = [];
+  let first = null;
+  let offsetBytes = 0;
+  for (;;) {
+    const got = await tools.research_fetch({ url, offsetBytes, maxBytes: RESEARCH_FETCH_LIMITS.maximumBytes });
+    if (got.ok === false) return got;
+    if (typeof got.body !== "string")
+      return { ok: false, reason: "retrieval-incomplete", detail: "A research chunk was returned without text." };
+    first ??= got;
+    bodies.push(got.body);
+    if (!got.continuation) break;
+    if (got.continuation.offsetBytes <= offsetBytes)
+      return { ok: false, reason: "retrieval-incomplete", detail: "The research continuation did not advance." };
+    offsetBytes = got.continuation.offsetBytes;
+  }
+  const body = bodies.join("");
+  return { ...first, body, bytesReturned: Buffer.byteLength(body), truncated: false, continuation: null };
 }
 
 async function search() {
@@ -167,7 +192,7 @@ async function record() {
     return 2;
   }
 
-  const got = await tools.research_fetch({ url });
+  const got = await fetchCompleteForQuote(tools, url);
   if (got.ok === false) return refuse(got);
 
   if (!quoteIsPresent(got.body, quote)) {

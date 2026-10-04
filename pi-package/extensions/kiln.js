@@ -715,6 +715,8 @@ const MUTATION_TOOL_TABLE = Object.freeze([
  * `RESEARCH_TOOL_SIGNATURES` in a test is the same trade the signature version already makes: two
  * independent statements that a test compares, rather than one statement agreeing with itself.
  */
+const RESEARCH_FETCH_LIMITS = Object.freeze({ minimumBytes: 4_096, defaultBytes: 50_000, maximumBytes: 100_000 });
+
 const RESEARCH_TOOL_TABLE = Object.freeze([
   {
     name: "research_capability",
@@ -742,10 +744,20 @@ const RESEARCH_TOOL_TABLE = Object.freeze([
     name: "research_fetch",
     label: "Research fetch",
     description:
-      "Retrieve one public web page as text, through the public-web boundary. Rejects non-HTTP(S) schemes, URL credentials, private and link-local destinations, oversized bodies and unsupported media types, and revalidates every redirect.",
+      "Retrieve one bounded UTF-8 chunk of a public web page. Continue with offsetBytes, and set refresh:true only to fetch the URL again. Rejects unsafe destinations, oversized downloads and unsupported media types.",
     parameters: {
       type: "object",
-      properties: { url: { type: "string" }, maxBytes: { type: "integer", minimum: 1024 } },
+      properties: {
+        url: { type: "string" },
+        maxBytes: {
+          type: "integer",
+          minimum: RESEARCH_FETCH_LIMITS.minimumBytes,
+          maximum: RESEARCH_FETCH_LIMITS.maximumBytes,
+          description: "Maximum UTF-8 bytes in the complete model-visible result. Defaults to 50000.",
+        },
+        offsetBytes: { type: "integer", minimum: 0, description: "Byte offset returned by the previous chunk's continuation." },
+        refresh: { type: "boolean", description: "Fetch again instead of using this session's cached retrieval." },
+      },
       required: ["url"],
       additionalProperties: false,
     },
@@ -1000,6 +1012,106 @@ const rendered = (result) => {
   const output = JSON.stringify(result, null, 2);
   return { content: [{ type: "text", text: output }], output, details: result };
 };
+
+/**
+ * Render `research_fetch` without putting its body in three parallel representations.
+ *
+ * Pi persists and sends `content`; `details` is renderer/state metadata. The ordinary Kiln renderer
+ * predates that distinction and repeats one JSON string through content, output and details. A fetched
+ * page is the one result large enough for that compatibility shape to become a context hazard, so its
+ * body lives only in content and details carries metadata only. The final loop measures the exact JSON
+ * that Pi receives and trims on UTF-8 boundaries until even JSON escaping fits the caller's ceiling.
+ */
+function renderedResearchFetch(result, session, ctx) {
+  const visible = { ...result };
+  const limit = Number.isInteger(visible.modelVisibleLimitBytes)
+    ? visible.modelVisibleLimitBytes
+    : RESEARCH_FETCH_LIMITS.defaultBytes;
+  visible.diagnostics = {
+    compactionCount: session.compactionCount,
+    lastCompactionTokensBefore: session.lastCompactionTokensBefore,
+    largestToolResultBytes: session.largestToolResultBytes,
+    modelVisibleBytes: 0,
+    estimatedTokens: 0,
+  };
+
+  let output = "";
+  for (let pass = 0; pass < 12; pass++) {
+    output = JSON.stringify(visible, null, 2);
+    const outputBytes = utf8.encode(output).length;
+    if (outputBytes > limit && typeof visible.body === "string" && visible.body.length > 0) {
+      // JSON escaping is not proportional to source bytes (`\n` doubles, other controls can grow
+      // sixfold), so subtracting the overflow can discard a useful prefix. Find the largest prefix
+      // whose actual serialized representation fits instead.
+      const originalBody = visible.body;
+      let low = 0;
+      let high = utf8.encode(originalBody).length;
+      let best = "";
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        const candidate = capUtf8(originalBody, middle).text;
+        visible.body = candidate;
+        visible.bytesReturned = utf8.encode(candidate).length;
+        visible.truncated = true;
+        visible.continuation = {
+          offsetBytes: (visible.offsetBytes ?? 0) + visible.bytesReturned,
+          maxBytes: limit,
+        };
+        if (utf8.encode(JSON.stringify(visible, null, 2)).length <= limit) {
+          best = candidate;
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
+      }
+      visible.body = best;
+      visible.bytesReturned = utf8.encode(best).length;
+      visible.truncated = true;
+      visible.continuation = {
+        offsetBytes: (visible.offsetBytes ?? 0) + visible.bytesReturned,
+        maxBytes: limit,
+      };
+      continue;
+    }
+
+    const estimatedTokens = Math.ceil(outputBytes / 4);
+    const largest = Math.max(session.largestToolResultBytes, outputBytes);
+    const usage = ctx?.getContextUsage?.();
+    const remainingTokens = Number.isFinite(usage?.contextWindow) && Number.isFinite(usage?.tokens)
+      ? Math.max(0, usage.contextWindow - usage.tokens)
+      : null;
+    const contextShare = remainingTokens > 0 ? estimatedTokens / remainingTokens : null;
+    const diagnostics = {
+      compactionCount: session.compactionCount,
+      lastCompactionTokensBefore: session.lastCompactionTokensBefore,
+      largestToolResultBytes: largest,
+      modelVisibleBytes: outputBytes,
+      estimatedTokens,
+      ...(contextShare !== null && contextShare >= 0.1
+        ? { warning: `This result is estimated to use ${Math.ceil(contextShare * 100)}% of the remaining model context.` }
+        : {}),
+    };
+    if (JSON.stringify(visible.diagnostics) === JSON.stringify(diagnostics)) {
+      session.largestToolResultBytes = largest;
+      break;
+    }
+    visible.diagnostics = diagnostics;
+  }
+
+  output = JSON.stringify(visible, null, 2);
+  session.largestToolResultBytes = Math.max(session.largestToolResultBytes, utf8.encode(output).length);
+  // The library's session cache keeps this result object for duplicate suppression. Feed the final
+  // boundary and continuation back into that object so a later duplicate cannot advertise the wider
+  // pre-render chunk and skip bytes the model never received.
+  if (result && typeof result === "object" && typeof visible.body === "string") {
+    result.body = visible.body;
+    result.bytesReturned = visible.bytesReturned;
+    result.truncated = visible.truncated;
+    result.continuation = visible.continuation;
+  }
+  const { body: _body, ...details } = visible;
+  return { content: [{ type: "text", text: output }], details };
+}
 
 /**
  * A validation result as a model may see it.
@@ -1475,6 +1587,29 @@ export default function register(pi, deps = {}) {
   // loaded without Kiln's `lib/` beside it has no supervisor to tell, and leaves Ctrl+C to Pi.
   let unsubscribeKeyboardStop = null;
   let voiceSession = null;
+  let researchToolsPromise = null;
+  const researchSession = {
+    compactionCount: 0,
+    lastCompactionTokensBefore: null,
+    largestToolResultBytes: 0,
+    servedRanges: new Map(),
+  };
+
+  const researchRangeKey = (url, offset = 0) => {
+    try {
+      return `${new URL(url).href}#${offset}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const rememberResearchRange = (metadata) => {
+    if (!metadata?.ok || metadata?.kind !== "retrieval" || metadata?.duplicate) return;
+    for (const url of [metadata.requestedUrl, metadata.url]) {
+      const key = researchRangeKey(url, metadata.offsetBytes ?? 0);
+      if (key) researchSession.servedRanges.set(key, metadata);
+    }
+  };
 
   const voiceFor = async (ctx) => {
     if (ctx?.mode !== "tui") {
@@ -1555,6 +1690,22 @@ export default function register(pi, deps = {}) {
   });
 
   pi?.on?.("session_start", async (_event, ctx) => {
+    // The default research tool owns an in-memory page cache. A session replacement must start with a
+    // fresh cache, while reload/resume reconstructs only bounded metrics from the active branch.
+    researchToolsPromise = null;
+    const branch = ctx?.sessionManager?.getBranch?.() ?? [];
+    const compactions = branch.filter((entry) => entry?.type === "compaction");
+    researchSession.compactionCount = compactions.length;
+    researchSession.lastCompactionTokensBefore = compactions.at(-1)?.tokensBefore ?? null;
+    researchSession.largestToolResultBytes = branch.reduce((largest, entry) => {
+      const bytes = entry?.message?.details?.diagnostics?.modelVisibleBytes;
+      return Number.isFinite(bytes) ? Math.max(largest, bytes) : largest;
+    }, 0);
+    researchSession.servedRanges.clear();
+    for (const entry of branch) {
+      if (entry?.message?.toolName === "research_fetch") rememberResearchRange(entry.message.details);
+    }
+
     if (voiceSession) {
       try {
         await voiceSession.dispose();
@@ -1615,6 +1766,13 @@ export default function register(pi, deps = {}) {
       }
       voiceSession = null;
     }
+  });
+
+  pi?.on?.("session_compact", (event) => {
+    // The event is emitted once for each successful compaction. No summary or retrieved page content
+    // enters this diagnostic.
+    researchSession.compactionCount += 1;
+    researchSession.lastCompactionTokensBefore = event?.compactionEntry?.tokensBefore ?? null;
   });
 
   pi?.on?.("before_agent_start", async (event) => {
@@ -1816,7 +1974,10 @@ export default function register(pi, deps = {}) {
       label,
       description,
       parameters,
-      execute: async (_toolCallId, params) => {
+      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+        const render = (value) => name === "research_fetch"
+          ? renderedResearchFetch(value, researchSession, ctx)
+          : rendered(value);
         // ⚠️ **ASKED FIRST, BEFORE ANY KEY IS READ OR ANY ADAPTER BUILT (F4, ACC-0120).** Research runs only when the
         // project chose Tavily and this computer granted it; the project is the one the supervisor named, and an
         // unreadable record of either kind refuses rather than permits.
@@ -1827,18 +1988,36 @@ export default function register(pi, deps = {}) {
         } catch (e) {
           gate = { permitted: false, reason: permission.RESEARCH_REFUSAL.CONSENT_UNREADABLE, detail: scrub(e?.message ?? String(e), "") };
         }
-        if (!gate?.permitted) return rendered(permission.refusedResearch(name, gate));
-        const tools = deps.researchTools ?? (await defaultResearchTools(deps));
+        if (!gate?.permitted) return render(permission.refusedResearch(name, gate));
+        const tools = deps.researchTools ?? (await (researchToolsPromise ??= defaultResearchTools(deps)));
         const handler = tools[name];
         if (typeof handler !== "function")
-          return rendered(refusal("unknown-operation", `This host has no ${name} implementation.`));
+          return render(refusal("unknown-operation", `This host has no ${name} implementation.`));
 
         try {
-          return rendered(await handler(params ?? {}));
+          if (name === "research_fetch" && params?.refresh !== true) {
+            const key = researchRangeKey(params?.url, params?.offsetBytes ?? 0);
+            const prior = key ? researchSession.servedRanges.get(key) : null;
+            if (prior) {
+              return render({
+                ...prior,
+                body: null,
+                bytesReturned: 0,
+                duplicate: true,
+                cacheStatus: "duplicate-suppressed",
+                note:
+                  "This normalized URL and byte offset were already returned in this session, so the body was omitted. Use its continuation for the next chunk or set refresh:true to retrieve it again.",
+              });
+            }
+          }
+          const result = await handler(params ?? {});
+          const response = render(result);
+          if (name === "research_fetch") rememberResearchRange(response.details);
+          return response;
         } catch (e) {
           // ⚠️ THE MESSAGE IS SCRUBBED OF THIS MACHINE, and of nothing else: the library's own
           // sanitiser has already taken the credential out of anything it emits.
-          return rendered(refusal("refused", scrub(e?.message ?? String(e), "")));
+          return render(refusal("refused", scrub(e?.message ?? String(e), "")));
         }
       },
     });

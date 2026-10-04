@@ -4,8 +4,9 @@
  *
  * ⚠️ **PI SENDS A TOOL'S `content` TO THE PROVIDER, AND NOTHING ELSE.** Reading `output` or `details` from a handler
  * proves what Kiln returned, not what a model receives, and every Kiln result once reached models as
- * `(no tool output)` while both looked complete. So each exercised result and refusal must carry exactly one text
- * item equal to `output`, and `output` must still be the rendering of `details`.
+ * `(no tool output)` while both looked complete. Ordinary results retain the compatibility triplet. The large
+ * `research_fetch` result deliberately has one text item plus metadata-only details so its body is not serialized
+ * three times; both shapes are checked here at the provider boundary.
  */
 
 import assert from "node:assert/strict";
@@ -14,6 +15,19 @@ import assert from "node:assert/strict";
 export const exercised = new Map();
 
 export function assertProviderVisible(name, result) {
+  if (name === "research_fetch") {
+    assert.deepEqual(Object.keys(result ?? {}).sort(), ["content", "details"], `${name}: the large result has one model representation plus metadata`);
+    assert.ok(Array.isArray(result.content) && result.content.length === 1, `${name}: exactly one content item`);
+    assert.equal(result.content[0]?.type, "text", `${name}: the one content item is text`);
+    const visible = JSON.parse(result.content[0].text);
+    assert.equal(Object.hasOwn(result.details ?? {}, "body"), false, `${name}: details must not duplicate the retrieved body`);
+    assert.deepEqual(
+      result.details,
+      Object.fromEntries(Object.entries(visible).filter(([key]) => key !== "body")),
+      `${name}: details are metadata only`
+    );
+    return;
+  }
   assert.deepEqual(Object.keys(result ?? {}).sort(), ["content", "details", "output"], `${name}: a result carries content, output and details, and nothing else`);
   assert.ok(Array.isArray(result.content) && result.content.length === 1, `${name}: exactly one content item`);
   assert.deepEqual(result.content[0], { type: "text", text: result.output }, `${name}: the one content item is text equal to output`);
