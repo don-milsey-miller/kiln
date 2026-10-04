@@ -54,6 +54,19 @@ test("tables retain readable cell widths inside a keyboard-scrollable region", (
   assert.equal(components.td({ children: "Content" }).props.style.wordBreak, "normal");
 });
 
+test("fenced verbatim answers wrap inside the stage-document column", async () => {
+  const pre = components.pre({ children: "a long verbatim answer" });
+  assert.equal(pre.type, "pre", "the semantic preformatted element must be retained");
+  assert.equal(pre.props.style.maxWidth, "100%");
+  assert.equal(pre.props.style.whiteSpace, "pre-wrap", "authored whitespace remains visible while display lines may wrap");
+  assert.equal(pre.props.style.overflowWrap, "anywhere", "an uninterrupted value must not widen the page");
+
+  const compiled = await build("# Intake\n\n```text\n" + "answer".repeat(80) + "\n```\n");
+  const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
+  const html = renderToStaticMarkup(createElement(mod.default, { components }));
+  assert.match(html, /<pre style="[^"]*max-width:100%[^"]*white-space:pre-wrap[^"]*overflow-wrap:anywhere/, "the wrapping component must reach rendered fenced answers");
+});
+
 /** Compile and fail, returning the message with its position. */
 async function rejected(text) {
   try {
@@ -133,7 +146,7 @@ test("the permitted set is the only vocabulary, and it is small", () => {
   // ⚠️ Pinned deliberately. Widening the set widens what agent-authored content can invoke, and this
   // line is what makes that a visible act rather than an edit nobody reviews.
   assert.deepEqual(PERMITTED, ["Callout"]);
-  assert.deepEqual(Object.keys(components).sort(), ["Callout", "table", "td", "th"]);
+  assert.deepEqual(Object.keys(components).sort(), ["Callout", "pre", "table", "td", "th"]);
 });
 
 test("⚠️ a stripping plugin would pass a render check — which is why this suite asserts refusals", async () => {

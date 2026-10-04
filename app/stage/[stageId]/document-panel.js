@@ -115,7 +115,7 @@ export default async function DocumentPanel({ stageId }) {
 
   const { Content, components } = compiled;
   return (
-    <section data-vpw-document={doc.name}>
+    <section data-vpw-document={doc.name} style={{ maxWidth: "100%", minWidth: 0, overflowWrap: "anywhere" }}>
       <Content components={components} />
     </section>
   );
