@@ -105,9 +105,11 @@ const ANSWERS = [
   [/^Use this model for this project/i, "yes"],
   [/^Optional web research/i, "no"],
 ];
+const promptMessage = (question) => typeof question === "string" ? question : question?.message ?? question?.type ?? "";
 const scriptedAnswer = (question, overrides) => {
-  for (const [pattern, answer] of overrides ?? []) if (pattern.test(question)) return answer;
-  for (const [pattern, answer] of ANSWERS) if (pattern.test(question)) return answer;
+  const message = promptMessage(question);
+  for (const [pattern, answer] of overrides ?? []) if (pattern.test(message)) return answer;
+  for (const [pattern, answer] of ANSWERS) if (pattern.test(message)) return answer;
   return null;
 };
 
@@ -275,7 +277,7 @@ async function setup(
   const warned = [];
   const realError = console.error;
   console.error = (...args) => warned.push(args.join(" "));
-  const seen = { atInstall: null, installs: 0, repairs: 0, asks: [] };
+  const seen = { atInstall: null, installs: 0, repairs: 0, asks: [], events: [] };
   const saved = process.env.PLANNING_CONTENT_DIR;
   const savedAgentDir = process.env.PI_CODING_AGENT_DIR;
   const savedTavily = process.env.TAVILY_API_KEY;
@@ -314,6 +316,7 @@ async function setup(
             ? answer(question)
             : answer;
       },
+      emit: (event) => seen.events.push(event),
       ...(verifyRuntime ? { verifyRuntime } : {}),
       ...(canary ? { canary } : {}),
       ...(researchAdapter ? { researchAdapter } : {}),
@@ -1616,11 +1619,27 @@ test("⚠️ the billable check needs its own approval, which is separate from e
     const c = countingCanary();
     const o = await setup(q, [], { liveCheck: null, canary: c.canary, answers: [[/^Live model check/i, "no"]] });
     assert.equal(o.code, EXIT.CONSENT, o.printed.join("\n"));
-    assert.ok(o.seen.asks.some((a) => /^Live model check/i.test(a)), o.seen.asks.join(" | "));
+    assert.ok(o.seen.asks.some((a) => a?.type === "live-model-check"), o.seen.asks.map(promptMessage).join(" | "));
     assert.deepEqual(c.runs, []);
     assert.equal(existsSync(recordPath(q)), false);
   } finally {
     rmSync(q.root, { recursive: true, force: true });
+  }
+
+  // Asked interactively and answered yes: the typed consent reaches the canary once and is emitted semantically.
+  const approved = project({ ignored: true });
+  try {
+    const c = countingCanary();
+    const o = await setup(approved, [], { liveCheck: null, canary: c.canary, answers: [[/^Live model check/i, "yes"]] });
+    assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+    assert.equal(c.runs.length, 1, "an interactive yes did not run the canary exactly once");
+    assert.ok(
+      o.seen.events.some((event) => event.type === "decision:required" && event.decision.type === "live-model-check"),
+      JSON.stringify(o.seen.events)
+    );
+    assert.equal(o.printed.some((line) => /not run, by your choice/.test(line)), false);
+  } finally {
+    rmSync(approved.root, { recursive: true, force: true });
   }
 
   // ⚠️ NOBODY TO ASK, AND NO FLAG: it refuses rather than assuming approval for something billable. The project is

@@ -1196,11 +1196,11 @@ const READY_SELECTIONS = new Set(["selected", "confirmed", "reused"]);
  * absent, the question is asked, or the run refuses.
  */
 function semanticDecision(prompt) {
-  const message = String(prompt).trim();
+  if (prompt?.type === "live-model-check") return { type: "live-model-check", options: ["approve", "deny", "cancel"] };
+  const message = String(prompt?.message ?? prompt).trim();
   if (/^Check this computer/i.test(message)) return { type: "connection-inspection", options: ["approve", "deny", "cancel"] };
   if (/^Use this model for this project/i.test(message)) return { type: "model-use", options: ["approve", "change-model", "cancel"] };
   if (/^Optional web research/i.test(message)) return { type: "research", options: ["enable", "skip", "cancel"] };
-  if (/^Run (?:a|one) live model check/i.test(message)) return { type: "live-model-check", options: ["approve", "deny", "cancel"] };
   if (/^Which model should this project use/i.test(message)) return { type: "model-selection", options: ["select", "cancel"] };
   if (/^Thinking level/i.test(message)) return { type: "reasoning-level", options: ["select", "back", "cancel"] };
   return { type: "setup-choice", options: ["select", "back", "cancel"] };

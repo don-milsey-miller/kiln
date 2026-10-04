@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { ANSWER, askForConfirmation, parseConfirmation } from "../lib/setup-input.mjs";
+import { liveCheckPrompt, liveCheckRequest } from "../lib/live-canary.mjs";
+import { ANSWER, askForConfirmation, isConfirmationPrompt, parseConfirmation } from "../lib/setup-input.mjs";
 
 test("plain confirmation aliases distinguish yes, no, invalid and cancellation", () => {
   for (const value of ["yes", "y", "approve", " YES ", true]) assert.equal(parseConfirmation(value), ANSWER.YES);
@@ -9,6 +10,15 @@ test("plain confirmation aliases distinguish yes, no, invalid and cancellation",
   assert.equal(parseConfirmation("back"), ANSWER.BACK);
   for (const value of ["", "maybe", "approved", 1]) assert.equal(parseConfirmation(value), ANSWER.INVALID);
   for (const value of [null, undefined]) assert.equal(parseConfirmation(value), ANSWER.CANCEL);
+});
+
+test("the live model check is classified by request type instead of prompt wording", () => {
+  const context = { displayName: "OpenAI Codex", model: "gpt-6-sol" };
+  const request = liveCheckRequest(context);
+  assert.equal(request.message, liveCheckPrompt(context));
+  assert.equal(isConfirmationPrompt(request), true);
+  assert.equal(isConfirmationPrompt({ ...request, message: "Completely different consent wording" }), true);
+  assert.equal(isConfirmationPrompt(request.message), false);
 });
 
 test("Back is available only to decision screens that explicitly support it", async () => {
