@@ -1,4 +1,6 @@
 import { readProjectOverview } from "./_read/planning.js";
+import { deriveStagePresentation, STAGE_PRESENTATION } from "./_review/stage-presentation.js";
+import StageStateMark from "./_review/stage-state-mark.js";
 
 /**
  * The project view's stage navigation — CMP-0015, TSK-0007.
@@ -18,34 +20,21 @@ import { readProjectOverview } from "./_read/planning.js";
  * one. Keeping them apart means each gets reviewed for the way it actually breaks.
  */
 
-const STATE = {
-  ready: { label: "ready", colour: "#2e7d32" },
-  blocked: { label: "blocked", colour: "#c62828" },
-};
-
-function Icon({ ready }) {
-  return ready ? (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12l5 5L20 6" />
-    </svg>
-  ) : (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-      <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
-
 export default async function StagesPanel() {
   const { stages, currentStage } = await readProjectOverview();
   const current = stages.find((s) => s.id === currentStage) ?? null;
+  const currentPresentation = current
+    ? deriveStagePresentation(current.criteria, current.ready)
+    : STAGE_PRESENTATION.ready;
 
   return (
     <div data-vpw-stages={String(stages.length)} style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
       <section
         data-vpw-current={currentStage ?? "none"}
+        data-vpw-gate-state={currentPresentation.state}
         style={{
           border: "1px solid #ccc",
-          borderLeft: `6px solid ${current ? STATE.blocked.colour : STATE.ready.colour}`,
+          borderLeft: `6px solid ${currentPresentation.colour}`,
           borderRadius: "4px",
           padding: "16px 20px",
           display: "flex",
@@ -60,25 +49,22 @@ export default async function StagesPanel() {
           <>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <span style={{ fontSize: "1.35rem", fontWeight: 600 }}>{current.title}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".8rem", fontWeight: 700, color: STATE.blocked.colour }}>
-                <Icon ready={false} />
-                NOT READY
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".8rem", fontWeight: 700, color: currentPresentation.colour }}>
+                <StageStateMark state={currentPresentation.state} />
+                {currentPresentation.label}
               </span>
             </div>
             <div style={{ color: "#444" }}>
-              Blocked on{" "}
-              {current.criteria
-                .filter((c) => c.result !== "satisfied" && c.result !== "n/a")
-                .map((c) => c.id)
-                .join(", ") || "an unattested criterion"}
+              {currentPresentation.state === "awaiting-attestation" ? "Awaiting: " : "Blocked on: "}
+              {currentPresentation.criterionIds.join(", ") || "another gate requirement"}
               .
             </div>
           </>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "1.35rem", fontWeight: 600 }}>Every gate is ready</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".8rem", fontWeight: 700, color: STATE.ready.colour }}>
-              <Icon ready />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".8rem", fontWeight: 700, color: STAGE_PRESENTATION.ready.colour }}>
+              <StageStateMark state="ready" />
               READY
             </span>
           </div>
@@ -91,20 +77,21 @@ export default async function StagesPanel() {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {stages.map((s) => {
-            const state = s.ready ? STATE.ready : STATE.blocked;
+            const presentation = deriveStagePresentation(s.criteria, s.ready);
             return (
               <a
                 key={s.id}
                 href={`/stage/${s.id}`}
                 data-vpw-stage={s.id}
                 data-vpw-ready={String(s.ready)}
+                data-vpw-gate-state={presentation.state}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "32px minmax(0, 1fr) 116px",
                   gap: "12px",
                   alignItems: "center",
                   border: "1px solid #e2e2e2",
-                  borderLeft: `4px solid ${state.colour}`,
+                  borderLeft: `4px solid ${presentation.colour}`,
                   borderRadius: "4px",
                   padding: "9px 14px",
                   textDecoration: "none",
@@ -121,11 +108,11 @@ export default async function StagesPanel() {
                     gap: "5px",
                     fontSize: ".78rem",
                     whiteSpace: "nowrap",
-                    color: state.colour,
+                    color: presentation.colour,
                   }}
                 >
-                  <Icon ready={s.ready} />
-                  {state.label}
+                  <StageStateMark state={presentation.state} />
+                  {presentation.shortLabel}
                 </span>
               </a>
             );

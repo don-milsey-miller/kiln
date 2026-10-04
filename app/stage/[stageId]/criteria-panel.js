@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { readStageCriteria } from "../../_read/planning.js";
+import { deriveStagePresentation } from "../../_review/stage-presentation.js";
 
 /**
  * A stage's exit criteria with their recorded attestations — the first of the stage view's two
@@ -35,6 +36,13 @@ function Mark({ result }) {
         <path d="M5 12h14" />
       </svg>
     );
+  if (result === "unattested")
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v5l3 2" />
+      </svg>
+    );
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" />
@@ -46,15 +54,16 @@ export default async function CriteriaPanel({ stageId }) {
   const stage = await readStageCriteria(stageId);
   if (!stage) notFound();
   const attested = stage.criteria.filter((criterion) => criterion.result !== "unattested").length;
+  const presentation = deriveStagePresentation(stage.criteria, stage.ready);
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      <details data-vpw-criteria={stage.stageId} style={{ border: "1px solid #dedbd4", borderRadius: "8px", background: "#faf9f6" }}>
+      <details data-vpw-criteria={stage.stageId} data-vpw-gate-state={presentation.state} style={{ border: "1px solid #dedbd4", borderRadius: "8px", background: "#faf9f6" }}>
         <summary
           data-vpw-criteria-summary={`${attested}/${stage.criteria.length}`}
           style={{ cursor: "pointer", padding: "12px 14px", fontWeight: 650 }}
         >
-          Exit criteria · {attested} of {stage.criteria.length} attested · {stage.ready ? "Ready" : "Not ready"}
+          Exit criteria · {attested} of {stage.criteria.length} attested · {presentation.label}
         </summary>
         <div data-vpw-criteria-details style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <p style={{ margin: 0, color: "#666", fontSize: ".82rem" }}>

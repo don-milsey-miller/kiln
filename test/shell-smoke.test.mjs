@@ -313,8 +313,10 @@ async function runSmokeCheck(t) {
 
     /* ---------------------------------------------------------- the freshness regression */
 
+    const overviewOf = async () =>
+      (await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text());
     const currentOf = async () => {
-      const html = await (await fetch(`http://127.0.0.1:${PORT}/`, { signal: AbortSignal.timeout(15_000) })).text();
+      const html = await overviewOf();
       return (html.match(/data-vpw-current="([^"]*)"/) ?? [])[1] ?? null;
     };
 
@@ -342,6 +344,29 @@ async function runSmokeCheck(t) {
         `That is a page frozen into the build, which is what AST-0019 measured and DEC-0019 forbids.`
     );
     assert.equal(after, "01-intake", `expected the first stage to become current, got ${after}`);
+
+    const blockedHome = await overviewOf();
+    assert.match(blockedHome, /data-vpw-current="01-intake" data-vpw-gate-state="blocked"/);
+    assert.match(blockedHome, /BLOCKED/);
+    assert.match(blockedHome, new RegExp(`Blocked on: [^<]*${firstCriterion}`));
+
+    // Remove the explicit negative decision. The same closed gate is now waiting for a human
+    // attestation, which must not retain the failure state merely because both states are non-ready.
+    delete doc.attestations[firstCriterion];
+    writeFileSync(attestations, JSON.stringify(doc, null, 2) + "\n");
+    await sleep(1500);
+
+    const awaitingHome = await overviewOf();
+    assert.match(awaitingHome, /data-vpw-current="01-intake" data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingHome, /AWAITING ATTESTATION/);
+    assert.match(awaitingHome, new RegExp(`Awaiting: [^<]*${firstCriterion}`));
+
+    const awaitingStage = await (
+      await fetch(`http://127.0.0.1:${PORT}/stage/01-intake`, { signal: AbortSignal.timeout(15_000) })
+    ).text();
+    assert.match(awaitingStage, /data-vpw-stage-context="01-intake"[^>]*data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingStage, /data-vpw-criteria="01-intake" data-vpw-gate-state="awaiting-attestation"/);
+    assert.match(awaitingStage, /AWAITING ATTESTATION/, "project and stage views must use the same vocabulary");
 
     /* ------------------------------------------------- the change stream (ACC-0028) */
 

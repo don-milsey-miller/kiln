@@ -1,28 +1,20 @@
 import { notFound } from "next/navigation";
 import { readStageContext } from "../../_read/planning.js";
-
-function GateMark({ ready }) {
-  return ready ? (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12l5 5L20 6" />
-    </svg>
-  ) : (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-      <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
+import { deriveStagePresentation } from "../../_review/stage-presentation.js";
+import StageStateMark from "../../_review/stage-state-mark.js";
 
 /** Derived workflow position and review guidance; this component never writes project state. */
 export default async function StageContextPanel({ stageId }) {
   const stage = await readStageContext(stageId);
   if (!stage) notFound();
+  const presentation = deriveStagePresentation(stage.criteria, stage.ready);
 
   return (
     <section
       data-vpw-stage-context={stage.stageId}
       data-vpw-stage-position={`${stage.position}/${stage.total}`}
       data-vpw-stage-current={String(stage.isCurrent)}
+      data-vpw-gate-state={presentation.state}
       style={{ display: "flex", flexDirection: "column", gap: "12px" }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
@@ -31,10 +23,10 @@ export default async function StageContextPanel({ stageId }) {
         </p>
         <span
           data-vpw-stage-ready={String(stage.ready)}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: stage.ready ? "#2e7d32" : "#a01f1f", fontSize: ".8rem", fontWeight: 700 }}
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: presentation.colour, fontSize: ".8rem", fontWeight: 700 }}
         >
-          <GateMark ready={stage.ready} />
-          {stage.ready ? "READY" : "NOT READY"}
+          <StageStateMark state={presentation.state} size={14} />
+          {presentation.label}
         </span>
       </div>
 
