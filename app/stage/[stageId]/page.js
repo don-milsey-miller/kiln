@@ -2,12 +2,13 @@ import { Suspense } from "react";
 import CriteriaPanel from "./criteria-panel.js";
 import DocumentPanel from "./document-panel.js";
 import ReviewPanel from "./review-panel.js";
+import StageContextPanel from "./stage-context-panel.js";
 import ProjectIdentity from "../../project-identity.js";
 
 /**
  * The stage view — `/stage/[stageId]`.
  *
- * ⚠️ THREE READS, THREE BOUNDARIES. The criteria, the document and the review panel resolve
+ * ⚠️ FOUR READS, FOUR BOUNDARIES. Workflow context, criteria, the document and artifact review resolve
  * independently: a slow document must not hold up the criteria, and a refused document must not take
  * them down with it. One boundary around the lot would make the whole page the fallback and satisfy
  * DEC-0019 on paper while buying nothing.
@@ -53,8 +54,8 @@ export default async function StagePage({ params, searchParams }) {
       </header>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-        <Suspense fallback={<p data-vpw-loading="criteria" style={{ color: "#666" }}>Reading attestations…</p>}>
-          <CriteriaPanel stageId={stageId} />
+        <Suspense fallback={<p data-vpw-loading="context" style={{ color: "#666" }}>Reading workflow position…</p>}>
+          <StageContextPanel stageId={stageId} />
         </Suspense>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -65,6 +66,10 @@ export default async function StagePage({ params, searchParams }) {
             <DocumentPanel stageId={stageId} />
           </Suspense>
         </div>
+
+        <Suspense fallback={<p data-vpw-loading="criteria" style={{ color: "#666" }}>Reading attestations…</p>}>
+          <CriteriaPanel stageId={stageId} />
+        </Suspense>
 
         <Suspense fallback={<p data-vpw-loading="review" style={{ color: "#666" }}>Reading the artifact…</p>}>
           <ReviewPanel artifactId={artifactId}

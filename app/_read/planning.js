@@ -124,12 +124,12 @@ export async function readProjectOverview() {
   const lint = lintProject(ctx);
   const defs = loadStageDefinitions(projectRoot) ?? {};
 
-  const stages = Object.values(defs).map((def) => {
+  const stages = Object.values(defs).sort((a, b) => a.id.localeCompare(b.id)).map((def) => {
     const attestations = loadStageAttestations(contentRoot, def.id) ?? {};
     const gate = evaluateStageGate(ctx, def.id, { lint, stageDefinitions: defs, attestations });
     return {
       id: def.id,
-      title: def.title ?? def.id,
+      title: def.name ?? def.title ?? def.id,
       ready: gate.ready === true,
       criteria: (def.exitCriteria ?? []).map((c) => ({
         id: c.id,
@@ -174,6 +174,38 @@ export async function readProjectOverview() {
 }
 
 /**
+ * A route-safe workflow position for one exact stage id. Order and current position are derived
+ * from the canonical definitions and current gates on every request; neither is persisted.
+ */
+export async function readStageContext(stageId) {
+  await connection();
+  const { projectRoot, contentRoot } = planningRoots();
+  const ctx = context(projectRoot, contentRoot);
+  const defs = loadStageDefinitions(projectRoot) ?? {};
+  const lint = lintProject(ctx);
+  const stages = Object.values(defs)
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((def) => {
+      const attestations = loadStageAttestations(contentRoot, def.id) ?? {};
+      const gate = evaluateStageGate(ctx, def.id, { lint, stageDefinitions: defs, attestations });
+      return { id: def.id, title: def.name ?? def.title ?? def.id, ready: gate.ready === true };
+    });
+  const at = stages.findIndex((stage) => stage.id === stageId);
+  if (at < 0) return null;
+  const currentStage = stages.find((stage) => !stage.ready)?.id ?? null;
+  return {
+    stageId,
+    title: stages[at].title,
+    ready: stages[at].ready,
+    position: at + 1,
+    total: stages.length,
+    isCurrent: currentStage === stageId,
+    previous: at > 0 ? stages[at - 1] : null,
+    next: at + 1 < stages.length ? stages[at + 1] : null,
+  };
+}
+
+/**
  * One stage's exit criteria with their recorded attestations.
  *
  * ⚠️ Separate from `readStageDocument` so the stage view can put each behind its own boundary. They
@@ -193,7 +225,7 @@ export async function readStageCriteria(stageId) {
 
   return {
     stageId,
-    title: def.title ?? stageId,
+    title: def.name ?? def.title ?? stageId,
     ready: gate.ready === true,
     criteria: (def.exitCriteria ?? []).map((c) => ({
       id: c.id,

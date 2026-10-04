@@ -59,10 +59,10 @@ const ROUTES = [
   {
     path: `/stage/${STAGE}?artifact=AST-0021`,
     marker: 'data-vpw-route="/stage"',
-    // Each of the three independent boundaries must RESOLVE, not merely ship its fallback. A page
+    // Each independent boundary must RESOLVE, not merely ship its fallback. A page
     // whose reads never completed streams the shell and stops, which looks identical to success from
     // the status line.
-    also: [`data-vpw-criteria="${STAGE}"`, "data-vpw-criterion=", "data-vpw-document=", 'data-vpw-review="AST-0021"'],
+    also: [`data-vpw-stage-context="${STAGE}"`, `data-vpw-criteria="${STAGE}"`, "data-vpw-criterion=", "data-vpw-document=", 'data-vpw-review="AST-0021"'],
   },
   {
     path: "/",
@@ -173,6 +173,26 @@ async function runSmokeCheck(t) {
         }
       }
     }
+
+    const stagePage = async (stageId) =>
+      (await (await fetch(`http://127.0.0.1:${PORT}/stage/${stageId}`, { signal: AbortSignal.timeout(15_000) })).text());
+    const firstStage = await stagePage(STAGE_IDS[0]);
+    assert.match(firstStage, new RegExp(`data-vpw-stage-position="1/${STAGE_IDS.length}"`));
+    assert.equal(firstStage.includes("data-vpw-stage-prev="), false, "the first stage must not invent a previous link");
+    assert.ok(firstStage.includes(`data-vpw-stage-next="${STAGE_IDS[1]}"`), "the first stage must link forward");
+
+    const middleAt = STAGE_IDS.indexOf(STAGE);
+    const middleStage = await stagePage(STAGE);
+    assert.ok(middleStage.includes(`data-vpw-stage-position="${middleAt + 1}/${STAGE_IDS.length}"`));
+    assert.ok(middleStage.includes(`data-vpw-stage-prev="${STAGE_IDS[middleAt - 1]}"`));
+    assert.ok(middleStage.includes(`data-vpw-stage-next="${STAGE_IDS[middleAt + 1]}"`));
+    assert.match(middleStage, /Stage attestation is completed in the Kiln terminal/);
+    assert.match(middleStage, /<details[^>]*data-vpw-criteria=/, "criterion detail must be keyboard-disclosable and collapsed by default");
+
+    const lastStage = await stagePage(STAGE_IDS.at(-1));
+    assert.match(lastStage, new RegExp(`data-vpw-stage-position="${STAGE_IDS.length}/${STAGE_IDS.length}"`));
+    assert.ok(lastStage.includes(`data-vpw-stage-prev="${STAGE_IDS.at(-2)}"`), "the last stage must link backward");
+    assert.equal(lastStage.includes("data-vpw-stage-next="), false, "the last stage must not invent a next link");
 
     const chooser = await (await fetch(`http://127.0.0.1:${PORT}/stage/${STAGE}`, { signal: AbortSignal.timeout(15_000) })).text();
     assert.ok(chooser.includes('data-vpw-review="chooser"'), "the no-selection state must offer project-derived review choices");
