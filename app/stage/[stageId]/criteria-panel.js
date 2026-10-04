@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { readStageCriteria } from "../../_read/planning.js";
+import { deriveStagePresentation } from "../../_review/stage-presentation.js";
 
 /**
  * A stage's exit criteria with their recorded attestations — the first of the stage view's two
@@ -35,6 +36,13 @@ function Mark({ result }) {
         <path d="M5 12h14" />
       </svg>
     );
+  if (result === "unattested")
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v5l3 2" />
+      </svg>
+    );
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" />
@@ -45,66 +53,50 @@ function Mark({ result }) {
 export default async function CriteriaPanel({ stageId }) {
   const stage = await readStageCriteria(stageId);
   if (!stage) notFound();
+  const attested = stage.criteria.filter((criterion) => criterion.result !== "unattested").length;
+  const presentation = deriveStagePresentation(stage.criteria, stage.ready);
 
   return (
-    <section data-vpw-criteria={stage.stageId} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: "1.35rem", fontWeight: 600, margin: 0 }}>{stage.title}</h1>
-        <span
-          data-vpw-stage-ready={String(stage.ready)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "5px",
-            fontSize: ".8rem",
-            fontWeight: 700,
-            color: stage.ready ? "#2e7d32" : "#c62828",
-          }}
+    <section style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <details data-vpw-criteria={stage.stageId} data-vpw-gate-state={presentation.state} style={{ border: "1px solid #dedbd4", borderRadius: "8px", background: "#faf9f6" }}>
+        <summary
+          data-vpw-criteria-summary={`${attested}/${stage.criteria.length}`}
+          style={{ cursor: "pointer", padding: "12px 14px", fontWeight: 650 }}
         >
-          <Mark result={stage.ready ? "satisfied" : "not-satisfied"} />
-          {stage.ready ? "READY" : "NOT READY"}
-        </span>
-      </div>
-
-      <p style={{ margin: 0, fontSize: ".8rem", textTransform: "uppercase", letterSpacing: ".04em", color: "#666" }}>
-        Exit criteria
-      </p>
-
-      {stage.criteria.map((c) => {
-        const v = VERDICT[c.result] ?? VERDICT.unattested;
-        return (
-          <div
-            key={c.id}
-            data-vpw-criterion={c.id}
-            style={{
-              border: "1px solid #e2e2e2",
-              borderLeft: `4px solid ${v.colour}`,
-              borderRadius: "4px",
-              padding: "12px 14px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
-              <code style={{ background: "#f6f6f6", padding: "0 .25rem", borderRadius: "3px", fontSize: ".85em", overflowWrap: "anywhere", fontWeight: 500 }}>
-                {c.id}
-              </code>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".78rem", whiteSpace: "nowrap", color: v.colour }}>
-                <Mark result={c.result} />
-                {v.label}
-                {c.decidedBy ? ` · ${c.decidedBy}` : ""}
-              </span>
-            </div>
-            {c.describe ? <div style={{ color: "#444", fontSize: ".9rem" }}>{c.describe}</div> : null}
-            {c.reason ? (
-              <div style={{ borderLeft: "2px solid #e2e2e2", paddingLeft: "10px", color: "#555", fontSize: ".85rem" }}>
-                {c.reason.length > 320 ? `${c.reason.slice(0, 320)}…` : c.reason}
+          Exit criteria · {attested} of {stage.criteria.length} attested · {presentation.label}
+        </summary>
+        <div data-vpw-criteria-details style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <p style={{ margin: 0, color: "#666", fontSize: ".82rem" }}>
+            Live attestation status is shown here. Canonical criterion definitions remain in the stage document above.
+          </p>
+          {stage.criteria.map((c) => {
+            const v = VERDICT[c.result] ?? VERDICT.unattested;
+            return (
+              <div
+                key={c.id}
+                data-vpw-criterion={c.id}
+                style={{ borderLeft: `4px solid ${v.colour}`, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: "5px" }}
+              >
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
+                  <code style={{ background: "#f6f6f6", padding: "0 .25rem", borderRadius: "3px", fontSize: ".85em", overflowWrap: "anywhere", fontWeight: 500 }}>
+                    {c.id}
+                  </code>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".78rem", whiteSpace: "nowrap", color: v.colour }}>
+                    <Mark result={c.result} />
+                    {v.label}
+                    {c.decidedBy ? ` · ${c.decidedBy}` : ""}
+                  </span>
+                </div>
+                {c.reason ? (
+                  <div style={{ borderLeft: "2px solid #e2e2e2", paddingLeft: "10px", color: "#555", fontSize: ".85rem" }}>
+                    {c.reason.length > 320 ? `${c.reason.slice(0, 320)}…` : c.reason}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      </details>
     </section>
   );
 }

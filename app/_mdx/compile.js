@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import * as runtime from "react/jsx-runtime";
 
 import remarkRejectJs from "./reject-js.js";
+import remarkIntakeProjection from "./intake-projection.js";
 import { PERMITTED, components } from "./components.js";
 
 /**
@@ -15,9 +16,11 @@ import { PERMITTED, components } from "./components.js";
  * because the absence of an MDX integration there is the other half of this decision.
  *
  * ⚠️ THE COMPILER AND ITS PLUGIN CHAIN ARE PINNED (`@mdx-js/mdx` and `remark-gfm` at exact versions,
- * the GFM syntax plugin followed by the rejection plugin, no rehype or recma stage). DEC-0020's first obligation: changing the version or adding a
- * plugin reopens security validation BEFORE it ships. The rejection was measured at the remark stage
- * only, and a later stage could reintroduce what it refused.
+ * the GFM syntax plugin followed by the rejection plugin, no rehype or recma stage). A structured
+ * intake request adds one app-owned projection AFTER rejection; it may remove parser-owned source
+ * ranges and inject two fixed components, but cannot make authored syntax permissible. DEC-0020's
+ * first obligation still applies: changing a version or adding another plugin reopens security
+ * validation BEFORE it ships.
  *
  * ⚠️ REJECTION IS THE CONTRACT; STRIPPING IS DEFENCE IN DEPTH BENEATH IT. The plugin fails the
  * compile with a path and a line:column. `development: false` and the absence of any provider are
@@ -58,7 +61,7 @@ export const compileCount = () => compiles;
  * @returns {Promise<{Content: Function, components: object}>}
  * @throws {StageDocumentRejected} with the document path and a line:column
  */
-export async function compileStageDocument({ name, text }) {
+export async function compileStageDocument({ name, text }, { intakeProjection = null } = {}) {
   let compiled;
   compiles += 1;
   try {
@@ -73,9 +76,14 @@ export async function compileStageDocument({ name, text }) {
         format: "mdx",
         outputFormat: "function-body",
         development: false,
-        // GFM contributes syntax only. The rejecting security plugin still sees the complete tree
-        // after parsing and remains the final remark transform before code generation.
-        remarkPlugins: [remarkGfm, [remarkRejectJs, { allow: PERMITTED }]],
+        // GFM contributes syntax only. Rejection always sees the complete AUTHORED tree. The
+        // optional transform after it can project parser-owned ranges, but cannot pardon authored
+        // syntax because the compile has already failed if any is forbidden.
+        remarkPlugins: [
+          remarkGfm,
+          [remarkRejectJs, { allow: PERMITTED }],
+          ...(intakeProjection ? [[remarkIntakeProjection, intakeProjection.ranges]] : []),
+        ],
         // ⚠️ No rehype or recma plugins. The pinning obligation is about the CHAIN, not the version.
       }
     );
@@ -89,5 +97,14 @@ export async function compileStageDocument({ name, text }) {
   }
 
   const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
-  return { Content: mod.default, components };
+  return {
+    Content: mod.default,
+    components: intakeProjection
+      ? {
+          ...components,
+          IntakeReview: intakeProjection.IntakeReview,
+          CurrentUnderstanding: intakeProjection.CurrentUnderstanding,
+        }
+      : components,
+  };
 }

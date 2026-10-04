@@ -202,11 +202,13 @@ test("⚠️ ACC-0069 the canonical question rule reaches the skill, every line 
     "the section carries a line the definition did not declare"
   );
 
-  // The sequence is the definition's order: record, lint, re-read, then ask.
+  // The sequence is exactly the definition's order, however many declared steps it gains.
   declared.afterAnswer.forEach((step, i) => assert.ok(section.includes(`${i + 1}. ${step}`), `step ${i + 1} is out of order or reworded`));
-  assert.ok(section.indexOf(declared.afterAnswer[0]) < section.indexOf(declared.afterAnswer[1]));
-  assert.ok(section.indexOf(declared.afterAnswer[1]) < section.indexOf(declared.afterAnswer[2]));
-  assert.ok(section.indexOf(declared.afterAnswer[2]) < section.indexOf(declared.afterAnswer[3]));
+  for (let i = 1; i < declared.afterAnswer.length; i += 1)
+    assert.ok(section.indexOf(declared.afterAnswer[i - 1]) < section.indexOf(declared.afterAnswer[i]));
+
+  assert.match(section, /`current-understanding`/, "the browser summary has no authoring instruction");
+  assert.match(section, /current objective, active constraints, and deferred questions/, "the summary's scope is not bounded");
 
   // The tools the rule names are the ones that do those things.
   for (const tool of ["kiln_write_stage_document", "kiln_lint", "kiln_project_status"])

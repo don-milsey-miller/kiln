@@ -81,6 +81,7 @@
       "Record the operator's answer with `kiln_write_stage_document`: their exact words in `verbatim`, unchanged, and your own reading of them in `interpretation`. Never edit the document any other way.",
       "Run `kiln_lint` after that write, so the project's findings reflect what was just recorded.",
       "Call `kiln_project_status` again and read the `intake` block it returns, which is the state your next question is chosen from.",
+      "After a material correction or clarification, call `kiln_write_stage_document` with `action` `read-working-notes`, then append or replace the named `current-understanding` subsection using the returned revision; summarize only the current objective, active constraints, and deferred questions.",
       "Ask exactly one question: the one that most reduces the highest-impact uncertainty the recorded intake still leaves open."
     ],
     "constraints": [

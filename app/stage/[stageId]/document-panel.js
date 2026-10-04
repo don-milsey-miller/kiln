@@ -1,5 +1,6 @@
-import { readStageDocument } from "../../_read/planning.js";
+import { readStageIntakeReview } from "../../_read/planning.js";
 import { compileStageDocument, StageDocumentRejected, compileCount } from "../../_mdx/compile.js";
+import IntakeReview, { CurrentUnderstanding } from "./intake-review.js";
 
 /**
  * ⚠️ ACC-0020'S INSTRUMENT, silent unless `VPW_BENCH` is set. The protocol's timing boundary starts
@@ -13,8 +14,8 @@ import { compileStageDocument, StageDocumentRejected, compileCount } from "../..
 const benching = process.env.VPW_BENCH === "1";
 
 /**
- * A stage's document, compiled at request time under the restricted contract — the second of the
- * stage view's two independent reads.
+ * A stage's document, compiled at request time under the restricted contract. Its structured intake
+ * projection remains independent from workflow context, live criteria, and artifact review.
  *
  * ⚠️ THE REJECTION IS CAUGHT HERE, BEFORE IT ESCAPES INTO THE STREAM. AST-0039 measured what happens
  * otherwise: React's production error boundary replaces the compiler's exact diagnostic with an
@@ -32,7 +33,8 @@ const benching = process.env.VPW_BENCH === "1";
  */
 export default async function DocumentPanel({ stageId }) {
   const started = benching ? { wall: Date.now(), mono: performance.now() } : null;
-  const doc = await readStageDocument(stageId);
+  const review = await readStageIntakeReview(stageId);
+  const doc = review?.doc ?? null;
   const readDone = started ? performance.now() : 0;
 
   if (!doc)
@@ -44,10 +46,31 @@ export default async function DocumentPanel({ stageId }) {
 
   const relPath = `planning-content/stages/${doc.name}`;
 
+  if (review.state === "invalid")
+    return (
+      <section data-vpw-document="invalid-intake" data-vpw-intake-problem={review.problem} style={{ border: "1px solid #d9a3a3", borderLeft: "6px solid #c62828", background: "#fdf6f6", borderRadius: "4px", padding: "15px 18px" }}>
+        <strong style={{ color: "#a01f1f" }}>This stage document&rsquo;s review structure is invalid</strong>
+        <p style={{ marginBottom: 0 }}><code>{review.problem}</code>: {review.message}</p>
+      </section>
+    );
+
   let compiled = null;
   let rejection = null;
   try {
-    compiled = await compileStageDocument(doc);
+    compiled = await compileStageDocument(
+      doc,
+      review.state === "valid"
+        ? {
+            intakeProjection: {
+              ranges: review.projection,
+              IntakeReview: () => <IntakeReview entries={review.entries} />,
+              CurrentUnderstanding: ({ children }) => review.currentUnderstanding
+                ? <CurrentUnderstanding review={review.currentUnderstanding}>{children}</CurrentUnderstanding>
+                : null,
+            },
+          }
+        : undefined
+    );
   } catch (e) {
     if (!(e instanceof StageDocumentRejected)) throw e;
     rejection = e;
@@ -115,7 +138,7 @@ export default async function DocumentPanel({ stageId }) {
 
   const { Content, components } = compiled;
   return (
-    <section data-vpw-document={doc.name}>
+    <section data-vpw-document={doc.name} style={{ maxWidth: "100%", minWidth: 0, overflowWrap: "anywhere" }}>
       <Content components={components} />
     </section>
   );

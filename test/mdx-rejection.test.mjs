@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import remarkGfm from "remark-gfm";
 import remarkRejectJs from "../app/_mdx/reject-js.js";
+import remarkIntakeProjection from "../app/_mdx/intake-projection.js";
 import { PERMITTED, components } from "../app/_mdx/components.js";
 
 // ⚠️ A `.md` PATH ON PURPOSE. If `format: "mdx"` is ever dropped from the options below, MDX infers
@@ -52,6 +53,19 @@ test("tables retain readable cell widths inside a keyboard-scrollable region", (
   assert.equal(table.props.style.minWidth, "100%");
   assert.equal(components.th({ children: "Heading" }).props.style.minWidth, "9rem");
   assert.equal(components.td({ children: "Content" }).props.style.wordBreak, "normal");
+});
+
+test("fenced verbatim answers wrap inside the stage-document column", async () => {
+  const pre = components.pre({ children: "a long verbatim answer" });
+  assert.equal(pre.type, "pre", "the semantic preformatted element must be retained");
+  assert.equal(pre.props.style.maxWidth, "100%");
+  assert.equal(pre.props.style.whiteSpace, "pre-wrap", "authored whitespace remains visible while display lines may wrap");
+  assert.equal(pre.props.style.overflowWrap, "anywhere", "an uninterrupted value must not widen the page");
+
+  const compiled = await build("# Intake\n\n```text\n" + "answer".repeat(80) + "\n```\n");
+  const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
+  const html = renderToStaticMarkup(createElement(mod.default, { components }));
+  assert.match(html, /<pre style="[^"]*max-width:100%[^"]*white-space:pre-wrap[^"]*overflow-wrap:anywhere/, "the wrapping component must reach rendered fenced answers");
 });
 
 /** Compile and fail, returning the message with its position. */
@@ -110,6 +124,42 @@ test("a permitted document compiles and its mapped component renders", async () 
   assert.match(html, /the mapped component rendered/);
 });
 
+test("the app-owned intake projection is injected only after authored MDX is rejected", async () => {
+  await assert.rejects(
+    build("# Stage\n\n<IntakeReview />\n"),
+    /Component <IntakeReview> is not in the permitted set/,
+    "an author must not be able to invoke the application-owned projection"
+  );
+
+  const text = "# Stage\n\n## Intake\n\nraw answer lists\n\n## Working notes\n";
+  const start = text.indexOf("## Intake");
+  const end = text.indexOf("## Working notes");
+  const compiled = await compile(
+    { path: PATH, value: text },
+    {
+      format: "mdx",
+      outputFormat: "function-body",
+      development: false,
+      remarkPlugins: [
+        remarkGfm,
+        [remarkRejectJs, { allow: PERMITTED }],
+        [remarkIntakeProjection, { intake: { start, end } }],
+      ],
+    }
+  );
+  const mod = await run(String(compiled), { ...runtime, baseUrl: import.meta.url });
+  const html = renderToStaticMarkup(createElement(mod.default, {
+    components: {
+      ...components,
+      IntakeReview: () => createElement("section", { "data-projected-intake": "true" }, "paired review"),
+      CurrentUnderstanding: ({ children }) => createElement("aside", null, children),
+    },
+  }));
+  assert.match(html, /data-projected-intake="true"/);
+  assert.equal(html.includes("raw answer lists"), false, "the raw two-list projection must not remain beside the paired view");
+  assert.match(html, /<h2>Working notes<\/h2>/, "narrative after Intake must remain in the restricted document");
+});
+
 test("GFM tables render as wrapped semantic tables instead of pipe-delimited paragraphs", async () => {
   const text = `# Handoff
 
@@ -133,7 +183,7 @@ test("the permitted set is the only vocabulary, and it is small", () => {
   // ⚠️ Pinned deliberately. Widening the set widens what agent-authored content can invoke, and this
   // line is what makes that a visible act rather than an edit nobody reviews.
   assert.deepEqual(PERMITTED, ["Callout"]);
-  assert.deepEqual(Object.keys(components).sort(), ["Callout", "table", "td", "th"]);
+  assert.deepEqual(Object.keys(components).sort(), ["Callout", "pre", "table", "td", "th"]);
 });
 
 test("⚠️ a stripping plugin would pass a render check — which is why this suite asserts refusals", async () => {
