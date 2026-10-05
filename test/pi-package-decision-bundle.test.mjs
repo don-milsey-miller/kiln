@@ -332,3 +332,154 @@ test("⚠️ a failure is reported in full, cleaned of this machine, and the jou
   const stored = readFileSync(fx.journal.path, "utf-8");
   assert.ok(!stored.includes(SECRET) && !stored.includes(homedir()) && !stored.includes("could not write"));
 });
+
+/* ============================================================ compaction ====================== */
+
+/** A compaction as Pi prepares it, with a tool result, a fetched page, a credential and a path in what would be discarded. */
+const preparation = (fx) => ({
+  firstKeptEntryId: "entry-0042",
+  tokensBefore: 245_351,
+  isSplitTurn: false,
+  previousSummary: `Earlier the operator described the export feature. Notes live at ${join(fx.base, "notes.md")}.`,
+  messagesToSummarize: [
+    { role: "user", content: [{ type: "text", text: "CSV only, please." }] },
+    { role: "assistant", content: [{ type: "text", text: `Recording that. The key was ${SECRET}.` }, { type: "toolCall", name: "research_fetch", arguments: { url: "https://example.test/page" } }] },
+    { role: "toolResult", toolName: "research_fetch", content: [{ type: "text", text: "RETRIEVED-PAGE-BODY lorem ipsum" }] },
+    { role: "toolResult", toolName: TOOL, content: [{ type: "text", text: "TOOL-RESULT-PROSE bundle-interrupted" }] },
+  ],
+  turnPrefixMessages: [],
+});
+
+const compact = (handlers, fx, over = {}) => handlers.get("session_before_compact")({ type: "session_before_compact", preparation: { ...preparation(fx), ...over }, branchEntries: [], reason: "threshold", willRetry: false }, {});
+
+test("with no bundle in flight, compaction is left to Pi", async () => {
+  const fx = await project();
+  const { tool, handlers } = session(fx);
+  assert.equal(await compact(handlers, fx), undefined, "no journal");
+  assertApplied(fx, await invoke(tool, fx, request(fx), { ctx: channel(true).ctx }));
+  assert.equal(await compact(handlers, fx), undefined, "a completed journal");
+  assert.equal(await compact(session(fx, { decisionBundleJournal: () => null }).handlers, fx), undefined, "no runtime state");
+});
+
+for (const [index, kind] of KINDS.entries()) {
+  test(`⚠️ a forced compaction and restart before operation ${index + 1} (${kind}) resumes there with no confirmation`, async () => {
+    const fx = await project();
+    const stop = stoppingAfter(index);
+    const first = channel(true);
+    const stopped = await invoke(session(fx, stop.deps).tool, fx, request(fx), { ctx: first.ctx, signal: stop.signal });
+    assert.equal(stopped.code, "bundle-interrupted");
+
+    // A new process: nothing but the journal and the compaction entry carries over.
+    const restarted = session(fx);
+    const { compaction } = await compact(restarted.handlers, fx);
+
+    // ⚠️ THE BOUNDARY IS PI'S, COPIED AND NOT RECALCULATED.
+    assert.equal(compaction.firstKeptEntryId, "entry-0042");
+    assert.equal(compaction.tokensBefore, 245_351);
+
+    // ⚠️ `details` IS IDENTIFIERS, STATUSES AND CODES. Exactly these keys, at every level.
+    const checkpoint = compaction.details.kilnCheckpoint;
+    assert.deepEqual(Object.keys(compaction.details), ["kilnCheckpoint"]);
+    assert.deepEqual(checkpoint, {
+      checkpointVersion: 1,
+      stage: STAGE,
+      digest: stopped.digest,
+      status: "authorized",
+      ids: { question: "QST-0001", decision: "DEC-0001" },
+      firstIncomplete: index,
+      operations: KINDS.map((k, i) => ({
+        index: i,
+        kind: k,
+        target: ["QST-0001", "DEC-0001", "QST-0001", fx.requirementId, fx.requirementId, "DEC-0001", `stage:${STAGE}`][i],
+        status: i < index ? "completed" : "pending",
+      })),
+    });
+
+    // The summary carries the current question, where the bundle stopped, and the one next action.
+    const { summary } = compaction;
+    assert.ok(summary.includes("Current question: Which export formats are in scope for the first release?"));
+    assert.ok(summary.includes(`Operations completed: ${index} of 7.`));
+    assert.ok(summary.includes(`First incomplete operation: ${index + 1}. ${kind} ${checkpoint.operations[index].target} (pending).`));
+    assert.ok(summary.includes(`Next action: call ${TOOL} with only resumeDigest set to that digest.`));
+    assert.ok(summary.includes("CSV only, please."), "what the operator said is kept");
+
+    // ⚠️ AND NOTHING IT MUST NOT: no tool result, no retrieved page, no credential, no path.
+    const whole = JSON.stringify(compaction);
+    for (const forbidden of ["RETRIEVED-PAGE-BODY", "TOOL-RESULT-PROSE", SECRET, fx.base, fx.base.split("\\").join("/"), homedir(), "END-OF-STATEMENT"])
+      assert.ok(!whole.includes(forbidden), `the compaction entry carries ${forbidden}`);
+    assert.ok(Buffer.byteLength(summary) < 16 * 1024, "the summary is bounded");
+
+    // The frame says the same on the next turn, so a restart with no compaction resumes too.
+    const framed = await restarted.handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {});
+    assert.ok(framed.systemPrompt.includes(`Approved decision bundle: ${stopped.digest} (authorized).`));
+
+    // The resume is driven by the compaction entry alone.
+    const later = channel(true);
+    assertApplied(fx, await invoke(restarted.tool, fx, { resumeDigest: checkpoint.digest }, { ctx: later.ctx }));
+    assert.equal(later.asked.length, 0, "no repeated confirmation");
+    assert.equal(first.asked.length, 1);
+
+    assert.equal(await compact(restarted.handlers, fx), undefined, "once complete, compaction is Pi's again");
+    const after = await restarted.handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {});
+    assert.ok(!after.systemPrompt.includes("Kiln workflow checkpoint"));
+  });
+}
+
+test("⚠️ a compaction after a project-state mismatch does not offer a resume", async () => {
+  const fx = await project();
+  const stop = stoppingAfter(3);
+  const stopped = await invoke(session(fx, stop.deps).tool, fx, request(fx), { ctx: channel(true).ctx, signal: stop.signal });
+  await MUTATION_TOOLS.reviseArtifact("requirement", fx.requirementId, { notes: "edited meanwhile" }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+
+  const { tool, handlers } = session(fx);
+  const later = channel(true);
+  const refused = await invoke(tool, fx, { resumeDigest: stopped.digest }, { ctx: later.ctx });
+  assert.equal(refused.status, "blocked");
+  assert.equal(refused.code, "bundle-state-mismatch");
+  assert.deepEqual(refused.failed, [{ operation: "revise-artifact", target: fx.requirementId, code: "bundle-state-mismatch" }]);
+  assert.ok(refused.next.startsWith("The approval is spent."));
+  assert.equal(later.asked.length, 0);
+  assert.equal(artifact(fx, "requirements", fx.requirementId).statement, "The system exports results.", "the mismatched target was left alone");
+
+  // The authorisation is spent, so there is nothing for a compaction to preserve or a frame to announce.
+  assert.equal(await compact(handlers, fx), undefined);
+
+  // The next proposal is asked afresh, and its dialog says what the earlier bundle already did.
+  const again = channel(true);
+  const fresh = await invoke(tool, fx, request(fx), { ctx: again.ctx });
+  assert.equal(fresh.ok, true, JSON.stringify(fresh));
+  assert.equal(again.asked.length, 1, "a safe re-approval request");
+  assert.ok(again.asked[0].message.includes("An earlier approved bundle is blocked and unfinished."));
+  assert.ok(again.asked[0].message.includes("create-question QST-0001"));
+});
+
+test("⚠️ an unreadable journal becomes a blocked checkpoint, never a generic compaction", async () => {
+  const fx = await project();
+  const stop = stoppingAfter(2);
+  await invoke(session(fx, stop.deps).tool, fx, request(fx), { ctx: channel(true).ctx, signal: stop.signal });
+  writeFileSync(fx.journal.path, `{ "recordVersion": 1, "note": "${SECRET}"`);
+
+  const { tool, handlers } = session(fx);
+  const { compaction } = await compact(handlers, fx);
+  assert.deepEqual(compaction.details, { kilnCheckpoint: { checkpointVersion: 1, stage: STAGE, status: "blocked", code: "bundle-journal-unreadable" } });
+  assert.ok(compaction.summary.includes("could not be read or validated (bundle-journal-unreadable)"));
+  assert.ok(compaction.summary.includes("Next action: tell the operator"));
+  assert.ok(!JSON.stringify(compaction).includes(SECRET), "nothing is copied out of a journal that failed validation");
+
+  const framed = await handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {});
+  assert.ok(framed.systemPrompt.includes("bundle-journal-unreadable"));
+
+  const ui = channel(true);
+  assert.equal((await invoke(tool, fx, request(fx), { ctx: ui.ctx })).code, "bundle-journal-unreadable");
+  assert.equal(ui.asked.length, 0);
+});
+
+test("⚠️ when the checkpoint cannot be attached, the compaction is cancelled rather than lost", async () => {
+  const fx = await project();
+  const stop = stoppingAfter(2);
+  await invoke(session(fx, stop.deps).tool, fx, request(fx), { ctx: channel(true).ctx, signal: stop.signal });
+  const { handlers } = session(fx);
+  for (const over of [{ firstKeptEntryId: undefined }, { firstKeptEntryId: "" }, { tokensBefore: undefined }, { tokensBefore: "many" }])
+    assert.deepEqual(await compact(handlers, fx, over), { cancel: true }, JSON.stringify(over));
+  assert.deepEqual(await handlers.get("session_before_compact")({ type: "session_before_compact" }, {}), { cancel: true });
+});

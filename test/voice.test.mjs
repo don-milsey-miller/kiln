@@ -121,5 +121,5 @@ test("Kiln registration remains voice-free and does not expose model-callable vo
   assert.deepEqual(tools.sort(), [...signature.tools].sort());
   assert.equal(tools.some((name) => name.startsWith("kiln_voice_")), false);
   assert.equal(signature.tools.some((name) => name.startsWith("kiln_voice_")), false);
-  assert.deepEqual(hooks, ["session_start", "message_end", "session_shutdown", "session_compact", "before_agent_start"]);
+  assert.deepEqual(hooks, ["session_start", "message_end", "session_shutdown", "session_before_compact", "session_compact", "before_agent_start"]);
 });

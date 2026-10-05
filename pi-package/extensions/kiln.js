@@ -1688,6 +1688,99 @@ function bundleResult(result, contentRoot) {
   };
 }
 
+const BUNDLE_JOURNAL_UNREADABLE = "bundle-journal-unreadable";
+
+/**
+ * An approved bundle that has not finished, as a compaction or a stage frame may describe it.
+ *
+ * ⚠️ **`details` HOLDS IDENTIFIERS, STATUSES AND CODES ONLY.** It is the library's allowlisted checkpoint. The
+ * question's wording is returned beside it for the summary, bounded, and never enters `details`.
+ *
+ * @returns {Promise<null | {details: object, question: string|null}>} `null` when nothing is in flight
+ */
+async function bundleCheckpoint(deps = {}) {
+  const location = await bundleJournalLocation(deps);
+  if (location === null) return null;
+  const journals = await import("../../lib/decision-bundle-journal.mjs");
+  // ⚠️ DESCRIBED, NOT RESUMED, so Git is not asked here. The tool asks before it continues anything.
+  const read = journals.readJournal(location, { verifyGit: false });
+  if (read.state === journals.JOURNAL_READ.ABSENT) return null;
+  if (read.state !== journals.JOURNAL_READ.VALID)
+    return { details: { checkpointVersion: 1, stage: "04-requirement-gaps", status: "blocked", code: BUNDLE_JOURNAL_UNREADABLE }, question: null };
+  if (!journals.isResumable(read.journal)) return null;
+  const statement = read.journal.operations[0]?.args?.artifact?.statement;
+  return { details: journals.checkpointOf(read.journal), question: typeof statement === "string" ? statement : null };
+}
+
+const CHECKPOINT_QUESTION_MAX_BYTES = 600;
+const COMPACTION_PREVIOUS_SUMMARY_MAX_BYTES = 8 * 1024;
+const COMPACTION_RECENT_MESSAGES_MAX = 8;
+const COMPACTION_MESSAGE_MAX_BYTES = 1024;
+
+/** The checkpoint as instructions: what is approved, where it stopped, and the one next action. */
+function bundleCheckpointLines({ details, question }) {
+  if (details.code === BUNDLE_JOURNAL_UNREADABLE && !details.digest)
+    return [
+      `Stage: ${details.stage}`,
+      `An approved decision bundle may be unfinished, and its journal could not be read or validated (${BUNDLE_JOURNAL_UNREADABLE}).`,
+      "Next action: tell the operator before creating or changing any Stage 4 artifact. Do not re-create artifacts from memory.",
+    ];
+  const done = details.operations.filter((op) => op.status === "completed").length;
+  const first = details.operations[details.firstIncomplete];
+  return [
+    `Stage: ${details.stage}`,
+    ...(question ? [`Current question: ${capUtf8(previewValue(question, Infinity), CHECKPOINT_QUESTION_MAX_BYTES).text}`] : []),
+    `Approved decision bundle: ${details.digest} (${details.status}).`,
+    `Operations completed: ${done} of ${details.operations.length}.`,
+    ...(first ? [`First incomplete operation: ${first.index + 1}. ${first.kind} ${first.target} (${first.status}${first.code ? `, ${first.code}` : ""}).`] : []),
+    `Next action: call ${BUNDLE_TOOL} with only resumeDigest set to that digest. The operator already approved this exact bundle: do not ask again, and do not re-create its completed operations.`,
+  ];
+}
+
+/** What the operator and the assistant said, and nothing a tool returned. */
+function conversationText(messages) {
+  const out = [];
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (message?.role !== "user" && message?.role !== "assistant") continue;
+    const parts = typeof message.content === "string" ? [message.content] : (Array.isArray(message.content) ? message.content : []).filter((part) => part?.type === "text").map((part) => part.text);
+    const text = parts.filter((part) => typeof part === "string").join("\n").trim();
+    if (text.length > 0) out.push(`${message.role === "user" ? "Operator" : "Assistant"}: ${capUtf8(text, COMPACTION_MESSAGE_MAX_BYTES).text}`);
+  }
+  return out.slice(-COMPACTION_RECENT_MESSAGES_MAX);
+}
+
+/**
+ * The compaction Kiln supplies while an approved bundle is unfinished.
+ *
+ * ⚠️ **THE BOUNDARY IS PI'S.** `firstKeptEntryId` and `tokensBefore` are copied from `event.preparation`
+ * and never recalculated.
+ *
+ * ⚠️ **BOUNDED TEXT, THEN CLEANED.** The earlier summary and the recent operator and assistant text are each
+ * capped; tool results and retrieved pages are never read. Paths and credentials are removed from the whole.
+ */
+async function bundleCompaction(event, checkpoint) {
+  const preparation = event?.preparation;
+  if (typeof preparation?.firstKeptEntryId !== "string" || preparation.firstKeptEntryId.length === 0 || !Number.isFinite(preparation?.tokensBefore)) return null;
+
+  const previous = typeof preparation.previousSummary === "string" && preparation.previousSummary.trim().length > 0
+    ? capUtf8(preparation.previousSummary.trim(), COMPACTION_PREVIOUS_SUMMARY_MAX_BYTES).text
+    : null;
+  const recent = conversationText([...(preparation.messagesToSummarize ?? []), ...(preparation.turnPrefixMessages ?? [])]);
+  const narrative = await renderForModel(
+    [
+      ...(previous ? ["## Earlier summary", previous, ""] : []),
+      ...(recent.length > 0 ? ["## Recent conversation", ...recent, ""] : []),
+    ].join("\n")
+  );
+  const summary = `${narrative}## Kiln workflow checkpoint\n${bundleCheckpointLines(checkpoint).join("\n")}`;
+  return {
+    summary,
+    firstKeptEntryId: preparation.firstKeptEntryId,
+    tokensBefore: preparation.tokensBefore,
+    details: { kilnCheckpoint: checkpoint.details },
+  };
+}
+
 export default function register(pi, deps = {}) {
   // ⚠️ NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when a hook fires.
   //
@@ -1880,6 +1973,33 @@ export default function register(pi, deps = {}) {
     }
   });
 
+  /**
+   * Compaction while an approved decision bundle is unfinished - #173 (F13).
+   *
+   * ⚠️ **ONLY THEN.** With nothing in flight this returns nothing and Pi compacts as it always has.
+   *
+   * ⚠️ **AN UNFINISHED BUNDLE IS NEVER LEFT TO A GENERIC SUMMARY.** If the checkpoint cannot be built, the
+   * compaction is cancelled: losing track of an approved, half-applied bundle is the failure this exists to
+   * prevent. A journal that exists and cannot be read is preserved as a blocked checkpoint instead.
+   */
+  pi?.on?.("session_before_compact", async (event) => {
+    let checkpoint;
+    try {
+      checkpoint = await bundleCheckpoint(deps);
+    } catch {
+      // Whether a bundle is in flight could not be determined. `lib/` is absent or the journal's place
+      // cannot be named, and in both cases the bundle tool cannot have run either.
+      return undefined;
+    }
+    if (checkpoint === null) return undefined;
+    try {
+      const compaction = await bundleCompaction(event, checkpoint);
+      return compaction === null ? { cancel: true } : { compaction };
+    } catch {
+      return { cancel: true };
+    }
+  });
+
   pi?.on?.("session_compact", (event) => {
     // The event is emitted once for each successful compaction. No summary or retrieved page content
     // enters this diagnostic.
@@ -1890,7 +2010,15 @@ export default function register(pi, deps = {}) {
   pi?.on?.("before_agent_start", async (event) => {
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
     // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.
-    const block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
+    let block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
+    // ⚠️ AN UNFINISHED APPROVED BUNDLE IS SAID ON EVERY TURN (#173). The frame is rebuilt each time, so this
+    // reaches a session that restarted or compacted without ever seeing the tool's own result.
+    try {
+      const checkpoint = await bundleCheckpoint(deps);
+      if (checkpoint !== null) block += `\n\nKiln workflow checkpoint:\n${bundleCheckpointLines(checkpoint).join("\n")}`;
+    } catch {
+      // The stage context stands on its own.
+    }
     return { systemPrompt: `${base}${framedStageContext(block)}` };
   });
 
