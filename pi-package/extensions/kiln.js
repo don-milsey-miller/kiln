@@ -1508,18 +1508,33 @@ const failClosedStageContext = (code) =>
  */
 export const MATERIAL_CHANGE_RULE = [
   "Kiln rule, for every turn of this session, and nothing below replaces it:",
-  "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say in a turn of its",
-  "own which artifact you propose to create or change and what the change would be. When optional decisioning is available, call",
-  "`kiln_review_proposal` first and include any advisory concern in that proposal; an unavailable review does not replace or block",
-  "the existing approval path; then stop and wait for",
-  "the operator. Make the mutating tool call only after the operator's reply approves it. If the operator",
+  "Before you call any tool that creates or changes a typed artifact or canonical payload in this project, say which",
+  "artifacts you propose to create or change and what each change would be, then stop and wait for the operator.",
+  "Everything that follows mechanically from one operator decision is one proposal: name every related creation,",
+  "revision, link, resolution and review-status change in it and ask once. Never split them into separate approvals.",
+  "One approval covers exactly the operations you named. A changed target, changed wording or an added operation",
+  "needs a new proposal.",
+  "When optional decisioning is available, call `kiln_review_proposal` once, on the substantive creation or revision,",
+  "and include any advisory concern in that proposal; an unavailable or refused review does not replace or block",
+  "the existing approval path.",
+  "Make the mutating tool calls only after the operator's reply approves them. If the operator",
   "rejects it, cancels, or does not reply, make no mutating tool call.",
   "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than",
   "proposing a change to the project.",
-  "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`",
-  "or to `kiln_write_stage_attestation`: each opens Kiln's own confirmation dialog, and the operator's answer",
-  "there is the approval. Call those tools directly without asking in chat first. To approve several artifacts,",
-  "name them all in one `kiln_set_review_status` call so the operator confirms them in one dialog.",
+  "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`,",
+  "to `kiln_write_stage_attestation` or to `kiln_apply_stage4_decision_bundle`: each opens Kiln's own confirmation",
+  "dialog, and the operator's answer there is the approval. Call those tools directly without asking in chat first.",
+  "To approve several artifacts, name them all in one `kiln_set_review_status` call so the operator confirms them in one dialog.",
+  // ⚠️ DELTA-FIRST REPORTING (#173, F12). A target, not a truncator: the last sentence keeps a failure whole.
+  "Report in deltas. Every reply to the operator is one of four kinds:",
+  "`decision-needed`: the decision, the options, your recommendation and the consequence.",
+  "`action-completed`: only what changed, and any failure.",
+  "`stage-transition`: what is completed, what remains and what is next, briefly.",
+  "`blocked`: the blocker and the least input that would clear it.",
+  "Do not restate requirements, scope or stage summaries that have not changed. Do not mention a clean lint, a",
+  "passed internal check, or an advisory review that was non-blocking or refused, unless it changes the next action.",
+  "A routine completion fits in four short bullets. A failure, a refusal, a blocker or a safety concern is always",
+  "reported in full, however long that is. End with one next action or one question.",
   "A stage skill may add to this rule and may not relax it.",
 ].join("\n");
 
@@ -1574,6 +1589,282 @@ async function stageContextBlock(event, deps) {
     content,
     "</stage-skill>",
   ].join("\n");
+}
+
+/**
+ * The Stage 4 decision bundle - #173.
+ *
+ * ⚠️ **THE WRAPPER ASKS AND RENDERS; `lib/decision-bundle.mjs` PLANS AND APPLIES.** What an operation may
+ * contain, which ids it uses, what the digest covers and how a journal is resumed are the library's. What
+ * is here is the dialog the operator reads and the compact result a model reports from.
+ */
+const BUNDLE_TOOL = "kiln_apply_stage4_decision_bundle";
+const BUNDLE_BOUNDARY_OPERATION = "apply-stage4-decision-bundle";
+
+/** Where this session's bundle journal lives, or `null` when no protected runtime state can be named. */
+async function bundleJournalLocation(deps = {}) {
+  try {
+    if (typeof deps.decisionBundleJournal === "function") return (await deps.decisionBundleJournal()) ?? null;
+    return (await import("../../lib/decision-bundle-journal.mjs")).journalLocationFromEnv();
+  } catch {
+    return null;
+  }
+}
+
+/** Model-supplied text as dialog lines. Each stays one line and is marked, so it cannot pass for one of Kiln's own. */
+const quoted = (value) =>
+  String(typeof value === "string" ? value : JSON.stringify(value))
+    .split(/\r?\n/)
+    .map((line) => `     | ${previewValue(line, Infinity)}`);
+
+const quotedFields = (record) => Object.entries(record ?? {}).flatMap(([key, value]) => [`   ${previewValue(key)}:`, ...quoted(value)]);
+
+/**
+ * Everything one confirmation authorises, in full.
+ *
+ * ⚠️ **NOTHING IS SHORTENED (D35).** The operator approves the wording that will be stored, so every field of
+ * every operation is shown whole. The bundle's size is bounded by the library, not by this preview.
+ */
+function bundlePreview(plan) {
+  const { ids } = plan;
+  const lines = [`Kiln wants to apply one decision bundle: ${plan.operations.length} operations, in this order, under this one confirmation.`, ""];
+
+  if (plan.replaces?.unreadable) lines.push("An earlier bundle journal could not be read. Confirming discards it.", "");
+  else if (plan.replaces) {
+    const done = plan.replaces.operations.filter((op) => op.status === "completed").map((op) => `${op.kind} ${op.target}`);
+    lines.push(
+      `An earlier approved bundle is ${plan.replaces.status} and unfinished. Confirming abandons the rest of it.`,
+      done.length > 0 ? `What it already did stays: ${done.join(", ")}.` : "It had changed nothing.",
+      ""
+    );
+  }
+
+  plan.operations.forEach((op, index) => {
+    const n = `${index + 1}.`;
+    const { args } = op;
+    if (op.kind === "create-question") lines.push(`${n} Create question ${op.target}`, ...quotedFields(args.artifact));
+    else if (op.kind === "create-decision") lines.push(`${n} Create decision ${op.target}, addressing ${ids.question}`, ...quotedFields(args.artifact));
+    else if (op.kind === "resolve-question")
+      lines.push(
+        `${n} Resolve ${plan.question ? "existing question " : ""}${op.target} as answered by ${ids.decision}`,
+        ...(plan.question ? ["   question:", ...quoted(plan.question.statement)] : []),
+        "   answer:",
+        ...quoted(args.answer)
+      );
+    else if (op.kind === "revise-artifact") lines.push(`${n} Revise ${previewValue(args.type)} ${op.target}`, ...quotedFields(args.changes));
+    else if (op.kind === "link-trace" || op.kind === "unlink-trace")
+      lines.push(`${n} ${op.kind === "link-trace" ? "Link" : "Unlink"} ${previewValue(args.type)} ${op.target}, field ${previewValue(args.field)}`, ...quoted(args.targets.join(", ")));
+    else if (op.kind === "approve-decision") lines.push(`${n} Approve decision ${op.target}`);
+    else if (op.kind === "write-stage-note")
+      lines.push(
+        `${n} ${args.action === "replace-working-note" ? "Replace" : "Append"} working note ${previewValue(args.subsection)} in stage ${plan.stage}`,
+        "   title:",
+        ...quoted(args.title),
+        "   content:",
+        ...quoted(args.content)
+      );
+    lines.push("");
+  });
+
+  for (const effect of plan.effects) lines.push(`${effect.target} is ${effect.from} and becomes ${effect.to}.`);
+  lines.push(
+    "Nothing else in this project will change.",
+    "Nothing but this confirmation authorises these changes.",
+    "The decision records the approved status; it does not record an approver.",
+    "",
+    `Bundle digest: ${plan.digest}`
+  );
+  return lines;
+}
+
+const bundleOperations = (checkpoint, statuses) =>
+  (checkpoint?.operations ?? [])
+    .filter((op) => statuses.includes(op.status))
+    .map((op) => ({ operation: op.kind, target: op.target, ...(op.code ? { code: op.code } : {}) }));
+
+const BUNDLE_NEXT = Object.freeze({
+  resume: (digest) => `Call ${BUNDLE_TOOL} with only resumeDigest set to ${digest}. The operator already approved this bundle; do not ask again.`,
+  repropose: "The approval is spent. Tell the operator what changed, then propose the remaining work as a new bundle.",
+});
+
+/**
+ * The bundle's result as a model reports it: its class, then only what changed, failed or is still pending.
+ *
+ * ⚠️ **A FAILURE IS NEVER SHORTENED.** `message` carries the writer's own refusal, cleaned of this machine.
+ */
+function bundleResult(result, contentRoot) {
+  const { checkpoint } = result;
+  const resumable = checkpoint?.status === "authorized" || checkpoint?.status === "failed";
+  return {
+    ok: result.ok === true,
+    status: result.status,
+    ...(result.code ? { code: result.code } : {}),
+    ...(typeof result.detail === "string" ? { message: scrub(result.detail, contentRoot) } : {}),
+    digest: checkpoint?.digest ?? null,
+    ids: checkpoint?.ids ?? null,
+    changed: bundleOperations(checkpoint, ["completed"]),
+    failed: bundleOperations(checkpoint, ["failed", "blocked"]),
+    pending: bundleOperations(checkpoint, ["pending"]),
+    ...(result.ok === true ? {} : { next: resumable ? BUNDLE_NEXT.resume(checkpoint.digest) : BUNDLE_NEXT.repropose }),
+  };
+}
+
+const BUNDLE_JOURNAL_UNREADABLE = "bundle-journal-unreadable";
+
+/**
+ * An approved bundle that has not finished, as a compaction or a stage frame may describe it.
+ *
+ * ⚠️ **`details` HOLDS IDENTIFIERS, STATUSES AND CODES ONLY.** It is the library's allowlisted checkpoint. The
+ * question's wording is returned beside it for the summary, bounded, and never enters `details`.
+ *
+ * @returns {Promise<null | {details: object, question: string|null}>} `null` when nothing is in flight
+ */
+async function bundleCheckpoint(deps = {}) {
+  const location = await bundleJournalLocation(deps);
+  if (location === null) return null;
+  const journals = await import("../../lib/decision-bundle-journal.mjs");
+  // ⚠️ DESCRIBED, NOT RESUMED, so Git is not asked here. The tool asks before it continues anything.
+  const read = journals.readJournal(location, { verifyGit: false });
+  if (read.state === journals.JOURNAL_READ.ABSENT) return null;
+  if (read.state !== journals.JOURNAL_READ.VALID)
+    return { details: { checkpointVersion: 1, stage: "04-requirement-gaps", status: "blocked", code: BUNDLE_JOURNAL_UNREADABLE }, question: null };
+  if (!journals.isResumable(read.journal)) return null;
+  let statement = read.journal.operations.find((op) => op.kind === "create-question")?.args?.artifact?.statement;
+  if (typeof statement !== "string") {
+    // The bundle resolves a question an earlier stage raised, so its wording is the artifact's own.
+    try {
+      const [context, { questionStatement }] = await Promise.all([projectContext(deps), import("../../lib/decision-bundle.mjs")]);
+      statement = questionStatement(context.contentRoot, read.journal.ids.question);
+    } catch {
+      statement = null;
+    }
+  }
+  return { details: journals.checkpointOf(read.journal), question: typeof statement === "string" ? statement : null };
+}
+
+/**
+ * The workflow state an ordinary compaction keeps, when no approved bundle is in flight - #173 (F13).
+ *
+ * The stage comes from Kiln's own derivation, never from the transcript. Throws when this session has no
+ * readable Kiln project, and the caller then leaves the compaction to Pi.
+ */
+async function workflowCheckpoint(deps = {}) {
+  const context = await projectContext(deps);
+  const { currentRoutingContext } = await import("../../lib/decisioning/context.mjs");
+  const stage = currentRoutingContext(context.ctx, { toolRoot: context.toolRoot });
+  return { details: { checkpointVersion: 1, stage: stage.complete ? null : stage.id, status: "none" }, stageName: stage.complete ? null : (stage.name ?? null) };
+}
+
+const textOf = (message) => {
+  const parts = typeof message?.content === "string" ? [message.content] : (Array.isArray(message?.content) ? message.content : []).filter((part) => part?.type === "text").map((part) => part.text);
+  return parts.filter((part) => typeof part === "string").join("\n").trim();
+};
+
+/**
+ * The assistant's latest message that this compaction would discard, if it is the latest one at all.
+ *
+ * ⚠️ **A QUESTION PI KEEPS VERBATIM IS NOT COPIED.** Entries from `firstKeptEntryId` onward stay in the
+ * session as they are. Only when the assistant's last words fall before that boundary would an open
+ * question or proposal be lost to a summary, and only then is it carried here.
+ *
+ * @returns {{where: "kept"|"none"} | {where: "summarized", text: string}}
+ */
+function pendingMessage(event) {
+  const preparation = event.preparation;
+  const entries = Array.isArray(event.branchEntries) ? event.branchEntries : [];
+  const keptFrom = entries.findIndex((entry) => entry?.id === preparation.firstKeptEntryId);
+  if (keptFrom !== -1 && entries.slice(keptFrom).some((entry) => entry?.type === "message" && entry.message?.role === "assistant" && textOf(entry.message).length > 0))
+    return { where: "kept" };
+  const discarded = [...(preparation.messagesToSummarize ?? []), ...(preparation.turnPrefixMessages ?? [])];
+  const last = discarded.filter((message) => message?.role === "assistant" && textOf(message).length > 0).at(-1);
+  return last ? { where: "summarized", text: capUtf8(textOf(last), WORKFLOW_PENDING_MAX_BYTES).text } : { where: "none" };
+}
+
+const WORKFLOW_PENDING_MAX_BYTES = 4 * 1024;
+const CHECKPOINT_QUESTION_MAX_BYTES = 600;
+const COMPACTION_PREVIOUS_SUMMARY_MAX_BYTES = 8 * 1024;
+const COMPACTION_RECENT_MESSAGES_MAX = 8;
+const COMPACTION_MESSAGE_MAX_BYTES = 1024;
+
+/** The checkpoint as instructions: what is approved, where it stopped, and the one next action. */
+function bundleCheckpointLines({ details, question }) {
+  if (details.code === BUNDLE_JOURNAL_UNREADABLE && !details.digest)
+    return [
+      `Stage: ${details.stage}`,
+      `An approved decision bundle may be unfinished, and its journal could not be read or validated (${BUNDLE_JOURNAL_UNREADABLE}).`,
+      "Next action: tell the operator before creating or changing any Stage 4 artifact. Do not re-create artifacts from memory.",
+    ];
+  const done = details.operations.filter((op) => op.status === "completed").length;
+  const first = details.operations[details.firstIncomplete];
+  return [
+    `Stage: ${details.stage}`,
+    ...(question ? [`Current question: ${capUtf8(previewValue(question, Infinity), CHECKPOINT_QUESTION_MAX_BYTES).text}`] : []),
+    `Approved decision bundle: ${details.digest} (${details.status}).`,
+    `Operations completed: ${done} of ${details.operations.length}.`,
+    ...(first ? [`First incomplete operation: ${first.index + 1}. ${first.kind} ${first.target} (${first.status}${first.code ? `, ${first.code}` : ""}).`] : []),
+    `Next action: call ${BUNDLE_TOOL} with only resumeDigest set to that digest. The operator already approved this exact bundle: do not ask again, and do not re-create its completed operations.`,
+  ];
+}
+
+/** What the operator and the assistant said, and nothing a tool returned. */
+function conversationText(messages) {
+  const out = [];
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (message?.role !== "user" && message?.role !== "assistant") continue;
+    const text = textOf(message);
+    if (text.length > 0) out.push(`${message.role === "user" ? "Operator" : "Assistant"}: ${capUtf8(text, COMPACTION_MESSAGE_MAX_BYTES).text}`);
+  }
+  return out.slice(-COMPACTION_RECENT_MESSAGES_MAX);
+}
+
+/**
+ * The compaction Kiln supplies: for an unfinished approved bundle, or for the ordinary workflow state.
+ *
+ * ⚠️ **THE BOUNDARY IS PI'S.** `firstKeptEntryId` and `tokensBefore` are copied from `event.preparation`
+ * and never recalculated.
+ *
+ * ⚠️ **BOUNDED TEXT, THEN CLEANED.** The earlier summary and the recent operator and assistant text are each
+ * capped; tool results and retrieved pages are never read. Paths and credentials are removed from the whole.
+ */
+async function kilnCompaction(event, checkpoint) {
+  const preparation = event?.preparation;
+  if (typeof preparation?.firstKeptEntryId !== "string" || preparation.firstKeptEntryId.length === 0 || !Number.isFinite(preparation?.tokensBefore)) return null;
+
+  const previous = typeof preparation.previousSummary === "string" && preparation.previousSummary.trim().length > 0
+    ? capUtf8(preparation.previousSummary.trim(), COMPACTION_PREVIOUS_SUMMARY_MAX_BYTES).text
+    : null;
+  const recent = conversationText([...(preparation.messagesToSummarize ?? []), ...(preparation.turnPrefixMessages ?? [])]);
+  // An unfinished bundle states its own next action. Otherwise the open question or proposal is what must survive.
+  const ordinary = checkpoint.details.status === "none";
+  const pending = ordinary ? pendingMessage(event) : null;
+  const narrative = await renderForModel(
+    [
+      ...(previous ? ["## Earlier summary", previous, ""] : []),
+      ...(recent.length > 0 ? ["## Recent conversation", ...recent, ""] : []),
+      ...(pending?.where === "summarized" ? ["## Pending question or proposal", pending.text, ""] : []),
+    ].join("\n")
+  );
+  const lines = ordinary ? workflowCheckpointLines(checkpoint, pending) : bundleCheckpointLines(checkpoint);
+  return {
+    summary: `${narrative}## Kiln workflow checkpoint\n${lines.join("\n")}`,
+    firstKeptEntryId: preparation.firstKeptEntryId,
+    tokensBefore: preparation.tokensBefore,
+    details: { kilnCheckpoint: ordinary ? { ...checkpoint.details, pending: pending.where } : checkpoint.details },
+  };
+}
+
+/** The ordinary checkpoint as instructions: the stage, and what to do about anything left open. */
+function workflowCheckpointLines({ details, stageName }, pending) {
+  return [
+    details.stage === null ? "Stage: every planning stage is complete." : `Stage: ${details.stage}${stageName ? ` (${previewValue(stageName)})` : ""}`,
+    "No approved decision bundle is in flight.",
+    pending.where === "summarized"
+      ? "The assistant's latest message is under Pending question or proposal above. If it asked the operator something or proposed a change, that is still open."
+      : pending.where === "kept"
+        ? "The assistant's latest message follows this summary unchanged. If it asked the operator something or proposed a change, that is still open."
+        : "No assistant message was pending.",
+    "Next action: answer from the operator's latest reply. Do not repeat a question they have answered, and do not treat a proposal as approved unless they approved it.",
+  ];
 }
 
 export default function register(pi, deps = {}) {
@@ -1768,6 +2059,43 @@ export default function register(pi, deps = {}) {
     }
   });
 
+  /**
+   * Compaction while an approved decision bundle is unfinished - #173 (F13).
+   *
+   * With no bundle in flight it still supplies the compaction, so the current stage and an open question or
+   * proposal survive: a bounded earlier summary, bounded operator and assistant text, and a checkpoint. Only
+   * a session with no readable Kiln project is left to Pi's own compaction.
+   *
+   * ⚠️ **AN UNFINISHED BUNDLE IS NEVER LEFT TO A GENERIC SUMMARY.** If the checkpoint cannot be built, the
+   * compaction is cancelled: losing track of an approved, half-applied bundle is the failure this exists to
+   * prevent. A journal that exists and cannot be read is preserved as a blocked checkpoint instead.
+   */
+  pi?.on?.("session_before_compact", async (event) => {
+    let checkpoint;
+    try {
+      checkpoint = await bundleCheckpoint(deps);
+    } catch {
+      // Whether a bundle is in flight could not be determined. `lib/` is absent or the journal's place
+      // cannot be named, and in both cases the bundle tool cannot have run either.
+      return undefined;
+    }
+    if (checkpoint === null) {
+      // Nothing approved is at risk, so any failure here falls back to Pi rather than blocking compaction.
+      try {
+        const compaction = await kilnCompaction(event, await workflowCheckpoint(deps));
+        return compaction === null ? undefined : { compaction };
+      } catch {
+        return undefined;
+      }
+    }
+    try {
+      const compaction = await kilnCompaction(event, checkpoint);
+      return compaction === null ? { cancel: true } : { compaction };
+    } catch {
+      return { cancel: true };
+    }
+  });
+
   pi?.on?.("session_compact", (event) => {
     // The event is emitted once for each successful compaction. No summary or retrieved page content
     // enters this diagnostic.
@@ -1778,7 +2106,15 @@ export default function register(pi, deps = {}) {
   pi?.on?.("before_agent_start", async (event) => {
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
     // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.
-    const block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
+    let block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
+    // ⚠️ AN UNFINISHED APPROVED BUNDLE IS SAID ON EVERY TURN (#173). The frame is rebuilt each time, so this
+    // reaches a session that restarted or compacted without ever seeing the tool's own result.
+    try {
+      const checkpoint = await bundleCheckpoint(deps);
+      if (checkpoint !== null) block += `\n\nKiln workflow checkpoint:\n${bundleCheckpointLines(checkpoint).join("\n")}`;
+    } catch {
+      // The stage context stands on its own.
+    }
     return { systemPrompt: `${base}${framedStageContext(block)}` };
   });
 
@@ -1949,6 +2285,163 @@ export default function register(pi, deps = {}) {
       },
     });
 
+  /**
+   * One approval for everything one Stage 4 decision causes - #173 (F11).
+   *
+   * ⚠️ **ONE DIALOG, AND IT IS THE APPROVAL.** The plan is validated in full before the operator is asked,
+   * the dialog shows every operation whole, and its digest is what the journal authorises. A request that
+   * matches an unfinished journal resumes it without asking; one that differs is refused, not merged.
+   */
+  pi?.registerTool?.({
+    name: BUNDLE_TOOL,
+    executionMode: "sequential",
+    label: "Kiln apply Stage 4 decision bundle",
+    description:
+      "Apply one Stage 4 operator decision as one approved bundle: create the question or name an existing " +
+      "unresolved one with `questionId`, create the decision that addresses it, resolve the question by that decision, apply any related revisions and link changes, approve " +
+      "the decision, and optionally write one working note. Kiln assigns both ids and opens one confirmation dialog " +
+      "covering every operation, so do not ask the operator in chat first. To continue an approved bundle that " +
+      "stopped part way, pass only `resumeDigest`; no new confirmation is asked.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          ...artifactAuthoringSchemas.question,
+          description: "The new question's caller-owned fields. Omit resolution, answer and answeredBy: the bundle settles it.",
+        },
+        questionId: {
+          type: "string",
+          pattern: "^QST-[0-9]{4}$",
+          description: "An existing, unanswered question this decision settles, in place of `question`. Supply exactly one of the two.",
+        },
+        decision: {
+          ...artifactAuthoringSchemas.decision,
+          description: "The new decision's caller-owned fields. Kiln adds the question to `addresses`.",
+        },
+        answer: { type: "string", minLength: 1, description: "What the operator decided, recorded as the question's answer." },
+        revisions: {
+          type: "array",
+          maxItems: 10,
+          description: "Existing artifacts this decision changes. One entry per artifact.",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "The artifact's type." },
+              id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+              changes: { type: "object", description: "The fields to change, as that type's schema defines them. Trace fields go in `links`." },
+            },
+            required: ["type", "id", "changes"],
+            additionalProperties: false,
+          },
+        },
+        links: {
+          type: "array",
+          maxItems: 10,
+          description: "Trace references this decision adds to or removes from existing artifacts. One entry per artifact field.",
+          items: {
+            type: "object",
+            properties: {
+              action: { type: "string", enum: ["link", "unlink"] },
+              type: { type: "string", description: "The artifact's type." },
+              id: { type: "string", pattern: "^[A-Z]{3}-[0-9]{4}$", description: "An artifact id, such as REQ-0001." },
+              field: { type: "string", description: "The trace field, such as openQuestions." },
+              targets: {
+                type: "array",
+                minItems: 1,
+                items: { type: "string", pattern: "^(?:[A-Z]{3}-[0-9]{4}|\\$question|\\$decision)$" },
+                description: "Artifact ids. Use $question or $decision for the two artifacts this bundle creates.",
+              },
+            },
+            required: ["action", "type", "id", "field", "targets"],
+            additionalProperties: false,
+          },
+        },
+        stageNote: {
+          type: "object",
+          description: "One Working-notes subsection for stage 04-requirement-gaps, written last.",
+          properties: {
+            action: { type: "string", enum: ["append-working-note", "replace-working-note"] },
+            subsection: { type: "string", pattern: "^[a-z0-9][a-z0-9-]{0,63}$", description: "Stable subsection name." },
+            title: { type: "string", minLength: 1, maxLength: 120, pattern: "^[^\\r\\n]+$", description: "Rendered level-three heading." },
+            content: { type: "string", minLength: 1, description: "Markdown body." },
+            expectedRevision: { type: "string", pattern: "^sha256:[a-f0-9]{64}$", description: "Full-document revision returned by read-working-notes." },
+          },
+          required: ["action", "subsection", "title", "content", "expectedRevision"],
+          additionalProperties: false,
+        },
+        replaceIncomplete: {
+          type: "boolean",
+          description: "Set only after a bundle-digest-mismatch or bundle-journal-unreadable refusal, to ask the operator to approve this bundle in place of the unfinished one.",
+        },
+        resumeDigest: {
+          type: "string",
+          pattern: "^sha256:[a-f0-9]{64}$",
+          description: "The digest of an approved, unfinished bundle. Pass it alone to continue at the first incomplete operation.",
+        },
+      },
+      oneOf: [
+        { required: ["question", "decision", "answer"], not: { anyOf: [{ required: ["questionId"] }, { required: ["resumeDigest"] }] } },
+        { required: ["questionId", "decision", "answer"], not: { anyOf: [{ required: ["question"] }, { required: ["resumeDigest"] }] } },
+        {
+          required: ["resumeDigest"],
+          not: { anyOf: ["question", "questionId", "decision", "answer", "revisions", "links", "stageNote", "replaceIncomplete"].map((name) => ({ required: [name] })) },
+        },
+      ],
+      additionalProperties: false,
+    },
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+      let context;
+      try {
+        context = await projectContext(deps);
+      } catch (e) {
+        return toolContentRefused(e, ctx) ?? rendered(refusal("no-content-root", `This project's planning content could not be resolved (${e?.code ?? "unresolved"}).`));
+      }
+
+      const bundle = deps.decisionBundle ?? (await import("../../lib/decision-bundle.mjs"));
+      const documents = deps.stageDocuments ?? (await import("../../lib/stage-documents.mjs"));
+      const options = {
+        ...context.options,
+        journal: await bundleJournalLocation(deps),
+        reviewedBy: OPERATOR_ACTOR,
+        signal,
+        TYPED_TOOLS: deps.TYPED_TOOLS,
+        MUTATION_TOOLS: deps.MUTATION_TOOLS,
+        stageDocuments: documents,
+        journalWriteFile: deps.decisionBundleJournalWriteFile,
+        currentStage: async () => {
+          const { currentRoutingContext } = await import("../../lib/decisioning/context.mjs");
+          const stage = currentRoutingContext(context.ctx, { toolRoot: context.toolRoot });
+          return stage.complete ? null : stage.id;
+        },
+      };
+
+      try {
+        const planned = await bundle.planDecisionBundle(params ?? {}, options);
+        if (planned.mode === "resume") return rendered(bundleResult(await bundle.resumeDecisionBundle(planned.digest, options), context.contentRoot));
+
+        const confirmation = await operatorConfirmed(ctx, signal, "Apply this Stage 4 decision bundle?", bundlePreview(planned.plan), deps.confirmTimeoutMs ?? CONFIRM_TIMEOUT_MS);
+        if (confirmation !== "granted") return refuseUnconfirmed(context, deps, BUNDLE_BOUNDARY_OPERATION, { stageId: planned.plan.stage }, confirmation);
+        return rendered(bundleResult(await bundle.executeDecisionBundle(planned.plan, options), context.contentRoot));
+      } catch (e) {
+        const message = scrub(e?.message ?? String(e), context.contentRoot);
+        if (e instanceof bundle.BundleRefusal)
+          return rendered({
+            ...refusal(e.code, message),
+            status: "blocked",
+            ...(e.checkpoint
+              ? {
+                  digest: e.checkpoint.digest,
+                  changed: bundleOperations(e.checkpoint, ["completed"]),
+                  failed: bundleOperations(e.checkpoint, ["failed", "blocked"]),
+                  pending: bundleOperations(e.checkpoint, ["pending"]),
+                }
+              : {}),
+          });
+        if (e instanceof documents.StageDocumentRefusal) return rendered({ ...refusal(e.code, message), status: "blocked" });
+        return rendered({ ...refusal(REFUSAL_CODES[e?.name] ?? "refused", message), status: "blocked" });
+      }
+    },
+  });
 
   /**
    * The three research tools, each delegating to the implementation that already exists.

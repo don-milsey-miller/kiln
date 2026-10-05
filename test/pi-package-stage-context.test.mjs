@@ -109,7 +109,7 @@ function hookFor(fx, toolRoot = fx.tool) {
   register({ registerTool: () => {}, on: (event, handler) => hooks.push([event, handler]) }, { toolRoot });
   assert.deepEqual(
     hooks.map(([event]) => event),
-    ["session_start", "message_end", "session_shutdown", "session_compact", "before_agent_start"],
+    ["session_start", "message_end", "session_shutdown", "session_before_compact", "session_compact", "before_agent_start"],
     "exactly these hooks"
   );
   return hooks.find(([event]) => event === "before_agent_start")[1];
@@ -458,13 +458,16 @@ test("⚠️ ACC-0068 registering the hook reads nothing, and running it writes 
 
 /** The sentences ACC-0115 turns on, stated here rather than imported, so the two must agree. */
 const RULE_MUST_SAY = Object.freeze({
-  "a turn of its own": "say in a turn of its\nown which artifact you propose to create or change and what the change would be",
-  "and then waits": "then stop and wait for\nthe operator",
-  "only after approval": "Make the mutating tool call only after the operator's reply approves it.",
+  // #173: the proposal is no longer one mutation per turn. One operator decision is one proposal.
+  "says what it proposes": "say which\nartifacts you propose to create or change and what each change would be",
+  "and then waits": "then stop and wait for the operator.",
+  "one decision is one proposal": "Never split them into separate approvals.",
+  "an approval is exact": "One approval covers exactly the operations you named. A changed target, changed wording or an added operation\nneeds a new proposal.",
+  "only after approval": "Make the mutating tool calls only after the operator's reply approves them.",
   "no reply is a no": "If the operator\nrejects it, cancels, or does not reply, make no mutating tool call.",
   "answer capture is excluded": "This does not apply to `kiln_write_stage_document`, which records the operator's own answer rather than\nproposing a change to the project.",
   "dialog-gated acts are excluded":
-    "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`\nor to `kiln_write_stage_attestation`: each opens Kiln's own confirmation dialog, and the operator's answer\nthere is the approval.",
+    "It also does not apply to approving an artifact with `kiln_set_review_status`, to `kiln_set_type_activation`,\nto `kiln_write_stage_attestation` or to `kiln_apply_stage4_decision_bundle`: each opens Kiln's own confirmation\ndialog, and the operator's answer there is the approval.",
   "a stage may not relax it":"A stage skill may add to this rule and may not relax it.",
 });
 

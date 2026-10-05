@@ -535,6 +535,43 @@ test("nothing outside `key` can become a determinant by accident", () => {
     rejects("model-compatibility", { ...COMPAT, key: { ...COMPAT_KEY, [noise]: "x" } }, `${noise} is not a determinant`);
 });
 
+/* ================================================================ decision-bundle-journal ====== */
+
+/** A legal journal: one authorised bundle of the four core operations of a new question, none run yet (#173). */
+const BUNDLE_JOURNAL = {
+  stage: "04-requirement-gaps",
+  digest: `sha256:${"a".repeat(64)}`,
+  status: "authorized",
+  authorizedAt: NOW,
+  ids: { question: "QST-0001", decision: "DEC-0001" },
+  targets: { "QST-0001": null, "DEC-0001": null },
+  operations: [
+    { kind: "create-question", target: "QST-0001", args: {}, status: "pending" },
+    { kind: "create-decision", target: "DEC-0001", args: {}, status: "pending" },
+    { kind: "resolve-question", target: "QST-0001", args: {}, status: "pending" },
+    { kind: "approve-decision", target: "DEC-0001", args: {}, status: "pending" },
+  ],
+};
+
+test("the bundle journal holds identifiers, statuses and codes, and refuses anything shaped like a message or a path", () => {
+  const journal = { recordVersion: 1, ...BUNDLE_JOURNAL };
+  ok("decision-bundle-journal", journal);
+  ok("decision-bundle-journal", { ...journal, status: "failed", code: "bundle-operation-failed", targets: { "QST-0001": `sha256:${"b".repeat(64)}`, "stage:04-requirement-gaps": null } });
+
+  const withOperation = (change) => ({ ...journal, operations: [{ ...journal.operations[0], ...change }, ...journal.operations.slice(1)] });
+  rejects("decision-bundle-journal", { ...journal, code: "The write to C:/Users/someone failed" }, "a code is not a message");
+  rejects("decision-bundle-journal", withOperation({ status: "failed", code: "ENOENT: no such file, open /home/someone/x" }), "an operation code is not an error message");
+  rejects("decision-bundle-journal", withOperation({ error: "anything" }), "an operation has no free-text field");
+  rejects("decision-bundle-journal", withOperation({ target: "../../somewhere" }), "a target is an artifact id or the stage");
+  rejects("decision-bundle-journal", withOperation({ kind: "delete-artifact" }), "the operation vocabulary is fixed");
+  rejects("decision-bundle-journal", { ...journal, targets: { "C:/Users/someone/x.json": null } }, "a target key is an artifact id or the stage");
+  rejects("decision-bundle-journal", { ...journal, stage: "05-solution-design" }, "the journal belongs to Stage 4");
+  rejects("decision-bundle-journal", { ...journal, status: "rolled-back" }, "there is no rollback status");
+  ok("decision-bundle-journal", { ...journal, operations: journal.operations.slice(1) });
+  rejects("decision-bundle-journal", { ...journal, operations: journal.operations.slice(2) }, "a bundle has at least the three core operations of an existing question");
+  rejects("decision-bundle-journal", { ...journal, ids: { ...journal.ids, path: "x" } }, "ids are the two reserved ids");
+});
+
 /* ================================================================ shared rules ================= */
 
 test("every record requires its own version, and versions are per record", () => {
@@ -546,6 +583,7 @@ test("every record requires its own version, and versions are per record", () =>
       "setup-transaction": { operation: "setup", startedAt: NOW, phases: [{ name: "x", status: "pending" }] },
       "kiln-session": { projectId: PROJECT_ID, sessionId: "x", stateMode: "project" },
       "model-compatibility": { key: COMPAT_KEY, result: { outcome: "passed", observedAt: NOW } },
+      "decision-bundle-journal": BUNDLE_JOURNAL,
     }[kind];
     rejects(kind, minimal, `${kind} must require recordVersion`);
     ok(kind, { recordVersion: 1, ...minimal });

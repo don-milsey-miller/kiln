@@ -199,6 +199,7 @@ test("⚠️ ACC-0065 the package registers exactly its declared tools, each wit
   assert.deepEqual(
     [...tools.keys()].sort(),
     [
+      "kiln_apply_stage4_decision_bundle",
       "kiln_capability",
       "kiln_compare_artifacts",
       "kiln_create_acceptance_criterion",

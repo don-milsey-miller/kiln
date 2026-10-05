@@ -30,14 +30,18 @@ Typed artifact capability envelope for this stage (author only the types activat
 
 ## Method
 
-Register each gap with its options and tradeoffs, ask, and record the decision.
+Register each gap with its options and tradeoffs, ask, and record each decision as one approved bundle.
 
 1. Read the unknowns Stage 3 classified here and the requirements they block.
 2. Author one register entry per blocking gap, with its options and their tradeoffs.
 3. Ask the operator to decide one gap at a time.
-4. Record each decision, resolve the question it answers, and revise any artifact the decision changes.
-5. Set each recorded decision to approved once the operator has confirmed its wording.
-6. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
+4. Record the operator's answer with `kiln_write_stage_document`, then call `kiln_apply_stage4_decision_bundle` directly with the new question or the id of the existing unresolved question, the decision, the answer, and every revision, link change and working note the decision causes.
+5. Do not ask for approval in chat before that call: its one confirmation dialog shows every operation and is the approval for all of them.
+6. Do not create the question, create the decision, resolve the question or approve the decision as separate calls or separate approvals.
+7. Run optional advisory review at most once, on the decision's wording, and never on the question's resolution or the approval.
+8. Report the result as `action-completed` or `blocked`, naming only the changed, failed and pending operations.
+9. When a bundle is `blocked` and its result gives a digest to resume, call the tool again with only `resumeDigest`; do not ask the operator to approve completed operations again.
+10. Ask the operator to confirm the attestation, record an attestation against each exit criterion, then exit.
 
 ## Next activity
 
@@ -63,6 +67,7 @@ Always:
 
 This stage may perform these non-creation operations:
 
+- `applyStage4DecisionBundle`
 - `resolveQuestion`
 - `reviseArtifact`
 - `setReviewStatus`
