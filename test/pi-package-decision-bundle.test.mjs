@@ -31,7 +31,7 @@ import { createRequirement } from "../lib/tools/create-requirement.mjs";
 import { MUTATION_TOOLS, TYPED_TOOLS } from "../lib/tools/registry.mjs";
 import { setReviewStatus } from "../lib/tools/review-status.mjs";
 import { createValidators } from "../lib/validate.mjs";
-import register from "../pi-package/extensions/kiln.js";
+import register, { MATERIAL_CHANGE_RULE } from "../pi-package/extensions/kiln.js";
 
 installReaper();
 
@@ -482,4 +482,69 @@ test("⚠️ when the checkpoint cannot be attached, the compaction is cancelled
   for (const over of [{ firstKeptEntryId: undefined }, { firstKeptEntryId: "" }, { tokensBefore: undefined }, { tokensBefore: "many" }])
     assert.deepEqual(await compact(handlers, fx, over), { cancel: true }, JSON.stringify(over));
   assert.deepEqual(await handlers.get("session_before_compact")({ type: "session_before_compact" }, {}), { cancel: true });
+});
+
+/* ============================================================ delta-first reporting =========== */
+
+test("⚠️ the rule names the four response kinds and what each carries", () => {
+  const kinds = {
+    "decision-needed": "`decision-needed`: the decision, the options, your recommendation and the consequence.",
+    "action-completed": "`action-completed`: only what changed, and any failure.",
+    "stage-transition": "`stage-transition`: what is completed, what remains and what is next, briefly.",
+    blocked: "`blocked`: the blocker and the least input that would clear it.",
+  };
+  for (const [kind, sentence] of Object.entries(kinds)) assert.ok(MATERIAL_CHANGE_RULE.includes(sentence), `${kind}: the rule no longer says it`);
+  assert.ok(MATERIAL_CHANGE_RULE.includes("Every reply to the operator is one of four kinds:"));
+});
+
+test("⚠️ the rule suppresses clean checks and non-blocking reviews, and never shortens a failure", () => {
+  for (const sentence of [
+    "Do not restate requirements, scope or stage summaries that have not changed.",
+    "Do not mention a clean lint, a\npassed internal check, or an advisory review that was non-blocking or refused, unless it changes the next action.",
+    "A failure, a refusal, a blocker or a safety concern is always\nreported in full, however long that is.",
+    "End with one next action or one question.",
+  ])
+    assert.ok(MATERIAL_CHANGE_RULE.includes(sentence), sentence);
+});
+
+test("⚠️ the rule makes one decision one proposal, and the bundle tool its own approval", () => {
+  for (const sentence of [
+    "Everything that follows mechanically from one operator decision is one proposal",
+    "Never split them into separate approvals.",
+    "One approval covers exactly the operations you named.",
+    "call `kiln_review_proposal` once, on the substantive creation or revision",
+    "to `kiln_write_stage_attestation` or to `kiln_apply_stage4_decision_bundle`: each opens Kiln's own confirmation\ndialog, and the operator's answer there is the approval.",
+  ])
+    assert.ok(MATERIAL_CHANGE_RULE.includes(sentence), sentence);
+  assert.ok(!MATERIAL_CHANGE_RULE.includes("turn of its"), "the rule that forced one approval turn per mutation is gone");
+});
+
+test("the tool's results are the two response kinds a bundle can end in", async () => {
+  const fx = await project();
+  const done = await invoke(session(fx).tool, fx, request(fx), { ctx: channel(true).ctx });
+  assert.deepEqual(Object.keys(done), ["ok", "status", "digest", "ids", "changed", "failed", "pending"]);
+  assert.equal(done.status, "action-completed");
+
+  const fx2 = await project();
+  const stop = stoppingAfter(1);
+  const blocked = await invoke(session(fx2, stop.deps).tool, fx2, request(fx2), { ctx: channel(true).ctx, signal: stop.signal });
+  assert.deepEqual(Object.keys(blocked), ["ok", "status", "code", "digest", "ids", "changed", "failed", "pending", "next"]);
+  assert.equal(blocked.status, "blocked");
+});
+
+test("Stage 4 tells the model to call the bundle directly, and the generated skill says the same", () => {
+  const stage = JSON.parse(readFileSync(join(ROOT, "stages", `${STAGE}.json`), "utf-8"));
+  const skill = readFileSync(join(ROOT, "pi-package", "skills", `kiln-stage-${STAGE}`, "SKILL.md"), "utf-8");
+  assert.ok(stage.mutationBoundary.mayMutate.includes("applyStage4DecisionBundle"));
+  for (const step of stage.method.steps) assert.ok(skill.includes(step), `the skill lacks: ${step}`);
+  const steps = stage.method.steps.join("\n");
+  for (const said of [
+    `call \`${TOOL}\` directly`,
+    "Do not ask for approval in chat before that call",
+    "Do not create the question, create the decision, resolve the question or approve the decision as separate calls or separate approvals.",
+    "never on the question's resolution or the approval",
+    "`action-completed` or `blocked`",
+    "only `resumeDigest`",
+  ])
+    assert.ok(steps.includes(said), said);
 });
