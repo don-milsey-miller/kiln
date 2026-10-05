@@ -532,6 +532,139 @@ test("⚠️ a journal Git would carry is not this computer's to resume", async 
   await assert.rejects(resumeDecisionBundle(stopped.checkpoint.digest, optionsFor(fx)), (e) => e.code === BUNDLE_REFUSAL.JOURNAL_UNAVAILABLE);
 });
 
+/* ============================================================ an existing question ============ */
+
+const EXISTING_KINDS = KINDS.slice(1);
+
+/** The same bundle, settling a question an earlier stage already raised. */
+async function withExistingQuestion(fx) {
+  const made = await TYPED_TOOLS.question({ title: "Export format", statement: "Which export formats are in scope?" }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+  const { question: _new, ...rest } = fullRequest(fx);
+  return { questionId: made.id, request: { ...rest, questionId: made.id } };
+}
+
+function assertAppliedToExisting(fx, result, questionId) {
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.checkpoint.operations.map((op) => op.kind), EXISTING_KINDS);
+  assert.deepEqual(statuses(result), EXISTING_KINDS.map(() => "completed"));
+  assert.equal(result.checkpoint.ids.question, questionId);
+  const question = artifact(fx, "questions", questionId);
+  const decision = artifact(fx, "decisions", result.checkpoint.ids.decision);
+  assert.equal(question.resolution, "answered");
+  assert.equal(question.answer, "CSV only.");
+  assert.deepEqual(question.answeredBy, [decision.id]);
+  assert.deepEqual(decision.addresses, [questionId]);
+  assert.equal(decision.reviewStatus, "approved");
+  assert.deepEqual(artifact(fx, "requirements", fx.requirementId).openQuestions, [questionId]);
+  // No question was created, and no question id was consumed.
+  assert.deepEqual(readdirSync(join(fx.contentRoot, "data", "questions")), [`${questionId}.json`]);
+  assert.equal(readHighWaterMarks(fx.contentRoot).QST, Number(questionId.slice(4)));
+  assert.deepEqual(readdirSync(join(fx.contentRoot, "data", "decisions")), [`${decision.id}.json`]);
+}
+
+test("⚠️ a bundle may settle an existing question: no create-question, and the question's hash is a precondition", async () => {
+  const fx = await project();
+  const { questionId, request } = await withExistingQuestion(fx);
+  const before = snapshot(fx.base);
+  const planned = await planDecisionBundle(request, optionsFor(fx));
+  assertUnchanged(before, snapshot(fx.base), "planning");
+
+  const { plan } = planned;
+  assert.deepEqual(plan.operations.map((op) => op.kind), EXISTING_KINDS);
+  assert.deepEqual(plan.ids, { question: questionId, decision: "DEC-0001" });
+  assert.match(plan.targets[questionId], /^sha256:[0-9a-f]{64}$/, "the existing question must still be as it was when approved");
+  assert.equal(plan.highWater.question, null, "no question id is reserved");
+  assert.deepEqual(plan.question, { id: questionId, statement: "Which export formats are in scope?" });
+  assert.deepEqual(plan.operations[0].args.artifact.addresses, [questionId]);
+  assert.deepEqual(plan.operations[3].args.targets, [questionId], "$question is the existing id");
+
+  const writers = instrumented();
+  assertAppliedToExisting(fx, await executeDecisionBundle(plan, optionsFor(fx, writers)), questionId);
+  assert.deepEqual(writers.calls, EXISTING_KINDS);
+});
+
+test("⚠️ exactly one of question or questionId, and the existing question must exist and be unresolved", async () => {
+  const fx = await project();
+  const { questionId, request } = await withExistingQuestion(fx);
+  const before = snapshot(fx.base);
+  const refusals = [
+    ["both", { ...request, question: { title: "t", statement: "s" } }, "BundleRefusal"],
+    ["neither", (({ questionId: _q, ...rest }) => rest)(request), "BundleRefusal"],
+    ["not a question id", { ...request, questionId: fx.requirementId }, "BundleRefusal"],
+    ["a question that does not exist", { ...request, questionId: "QST-0999" }, "ValidationError"],
+  ];
+  for (const [label, bad, name] of refusals) {
+    await assert.rejects(planDecisionBundle(bad, optionsFor(fx)), (e) => e.name === name, label);
+    assertUnchanged(before, snapshot(fx.base), label);
+  }
+
+  for (const resolution of ["answered", "deferred", "moot"]) {
+    const other = await TYPED_TOOLS.question({ title: "Other", statement: "Another question?" }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+    await MUTATION_TOOLS.resolveQuestion(other.id, resolution, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators, answer: "Settled already." });
+    await assert.rejects(
+      planDecisionBundle({ ...request, questionId: other.id }, optionsFor(fx)),
+      (e) => e instanceof BundleRefusal && e.code === BUNDLE_REFUSAL.INVALID_REQUEST && e.message.includes(`already ${resolution}`),
+      resolution
+    );
+  }
+  assert.equal(artifact(fx, "questions", questionId).resolution, "unanswered");
+});
+
+test("⚠️ an existing question that changes while the operator is deciding invalidates the plan", async () => {
+  const fx = await project();
+  const { questionId, request } = await withExistingQuestion(fx);
+  const planned = await planDecisionBundle(request, optionsFor(fx));
+  await MUTATION_TOOLS.reviseArtifact("question", questionId, { statement: "Which formats, and for whom?" }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+  const before = snapshot(fx.base);
+  await assert.rejects(executeDecisionBundle(planned.plan, optionsFor(fx)), (e) => e.code === BUNDLE_REFUSAL.STATE_MISMATCH);
+  assertUnchanged(before, snapshot(fx.base), "a changed question");
+});
+
+for (const [index, kind] of EXISTING_KINDS.entries()) {
+  test(`⚠️ existing question: stopped before operation ${index + 1} (${kind}), then an unrecorded write, both resume without repeating`, async () => {
+    // Aborted between operations.
+    const fx = await project();
+    const { questionId, request } = await withExistingQuestion(fx);
+    const controller = new AbortController();
+    if (index === 0) controller.abort();
+    const stopping = instrumented({ after: (k) => { if (k === EXISTING_KINDS[index - 1]) controller.abort(); } });
+    const stopped = await apply(request, optionsFor(fx, { ...stopping, signal: controller.signal }));
+    assert.equal(stopped.code, BUNDLE_REFUSAL.INTERRUPTED);
+    assert.equal(stopped.checkpoint.firstIncomplete, index);
+    const resumedWriters = instrumented();
+    assertAppliedToExisting(fx, await resumeDecisionBundle(stopped.checkpoint.digest, optionsFor(fx, resumedWriters)), questionId);
+    assert.deepEqual(resumedWriters.calls, EXISTING_KINDS.slice(index));
+
+    // The operation ran and the journal could not record it.
+    const fx2 = await project();
+    const second = await withExistingQuestion(fx2);
+    let writes = 0;
+    const journalWriteFile = async (path, text) => {
+      if (++writes === index + 2) throw new Error(LEAKY);
+      return atomicWrite(path, text);
+    };
+    const crashed = await apply(second.request, optionsFor(fx2, { journalWriteFile }));
+    assert.equal(crashed.code, BUNDLE_REFUSAL.JOURNAL_UNWRITABLE);
+    const after = instrumented();
+    assertAppliedToExisting(fx2, await resumeDecisionBundle(crashed.checkpoint.digest, optionsFor(fx2, after)), second.questionId);
+    assert.deepEqual(after.calls, EXISTING_KINDS.slice(index + 1));
+  });
+}
+
+test("⚠️ existing question: resolved by someone else during a stop, the resume refuses and leaves it alone", async () => {
+  const fx = await project();
+  const { questionId, request } = await withExistingQuestion(fx);
+  const controller = new AbortController();
+  const stopping = instrumented({ after: (k) => { if (k === "create-decision") controller.abort(); } });
+  const stopped = await apply(request, optionsFor(fx, { ...stopping, signal: controller.signal }));
+  await MUTATION_TOOLS.resolveQuestion(questionId, "moot", { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+
+  const refused = await resumeDecisionBundle(stopped.checkpoint.digest, optionsFor(fx));
+  assert.equal(refused.code, BUNDLE_REFUSAL.STATE_MISMATCH);
+  assert.equal(refused.checkpoint.operations[1].status, "blocked");
+  assert.equal(artifact(fx, "questions", questionId).resolution, "moot");
+});
+
 test("the stage target is the only non-artifact a bundle touches", () => {
   assert.equal(STAGE_TARGET, `stage:${BUNDLE_STAGE}`);
 });

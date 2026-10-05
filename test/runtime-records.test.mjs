@@ -537,7 +537,7 @@ test("nothing outside `key` can become a determinant by accident", () => {
 
 /* ================================================================ decision-bundle-journal ====== */
 
-/** The smallest legal journal: one authorised bundle of the four core operations, none run yet (#173). */
+/** A legal journal: one authorised bundle of the four core operations of a new question, none run yet (#173). */
 const BUNDLE_JOURNAL = {
   stage: "04-requirement-gaps",
   digest: `sha256:${"a".repeat(64)}`,
@@ -567,7 +567,8 @@ test("the bundle journal holds identifiers, statuses and codes, and refuses anyt
   rejects("decision-bundle-journal", { ...journal, targets: { "C:/Users/someone/x.json": null } }, "a target key is an artifact id or the stage");
   rejects("decision-bundle-journal", { ...journal, stage: "05-solution-design" }, "the journal belongs to Stage 4");
   rejects("decision-bundle-journal", { ...journal, status: "rolled-back" }, "there is no rollback status");
-  rejects("decision-bundle-journal", { ...journal, operations: journal.operations.slice(0, 3) }, "a bundle has at least its four core operations");
+  ok("decision-bundle-journal", { ...journal, operations: journal.operations.slice(1) });
+  rejects("decision-bundle-journal", { ...journal, operations: journal.operations.slice(2) }, "a bundle has at least the three core operations of an existing question");
   rejects("decision-bundle-journal", { ...journal, ids: { ...journal.ids, path: "x" } }, "ids are the two reserved ids");
 });
 
