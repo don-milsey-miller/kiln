@@ -145,6 +145,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
         // ⚠️ WHAT PI ACTUALLY HOLDS after loading: the two read tools, by name, registered into the
         // session rather than merely declared in a file.
         tools: [
+          "kiln_apply_stage4_decision_bundle",
           "kiln_capability",
           "kiln_compare_artifacts",
           "kiln_create_acceptance_criterion",

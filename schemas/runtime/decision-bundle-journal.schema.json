@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/decision-bundle-journal.schema.json",
+  "x-runtimeRecord": "decision-bundle-journal",
+  "x-location": "<local-state>/runtime/decision-bundle-journal.json",
+  "x-committed": false,
+  "title": "Stage 4 decision bundle journal",
+  "description": "The one decision bundle the operator most recently authorised, and how far its operations got (#173). ⚠️ WRITTEN BEFORE THE FIRST PROJECT MUTATION AND AFTER EVERY OPERATION, so a crash or a compaction between two operations leaves a record of exactly which ones ran. ⚠️ IT HOLDS THE APPROVED WORDING AND NOTHING KILN OBSERVED: operation arguments are what the operator confirmed, and a failure is recorded as a stable code, never as an error message, a path or a tool result. ⚠️ HOST-LOCAL AND NEVER COMMITTED. An authorisation is one operator's answer on one computer; a clone that inherited it would resume a bundle nobody there approved.",
+  "type": "object",
+  "required": ["recordVersion", "stage", "digest", "status", "authorizedAt", "ids", "targets", "operations"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "stage": { "const": "04-requirement-gaps" },
+    "digest": {
+      "$ref": "runtime-common.schema.json#/$defs/digest",
+      "description": "SHA-256 over the canonical stage, reserved ids and ordered operations. A request whose digest differs is a different bundle and needs its own approval."
+    },
+    "status": {
+      "enum": ["authorized", "completed", "failed", "blocked"],
+      "description": "`authorized` and `failed` are resumable under the same digest. `blocked` means the project no longer matches what was approved, so the authorisation is spent."
+    },
+    "code": { "$ref": "#/$defs/code" },
+    "authorizedAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" },
+    "ids": {
+      "type": "object",
+      "required": ["question", "decision"],
+      "additionalProperties": false,
+      "properties": {
+        "question": { "type": "string", "pattern": "^QST-[0-9]{4,}$" },
+        "decision": { "type": "string", "pattern": "^DEC-[0-9]{4,}$" }
+      }
+    },
+    "targets": {
+      "type": "object",
+      "description": "Every artifact or stage document this bundle touches, with the content hash it must have right now: `null` while an artifact is still to be created. A resume compares these before continuing.",
+      "propertyNames": { "$ref": "#/$defs/target" },
+      "additionalProperties": {
+        "oneOf": [{ "type": "null" }, { "$ref": "runtime-common.schema.json#/$defs/digest" }]
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "required": ["kind", "target", "args", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "create-question",
+              "create-decision",
+              "resolve-question",
+              "revise-artifact",
+              "link-trace",
+              "unlink-trace",
+              "approve-decision",
+              "write-stage-note"
+            ]
+          },
+          "target": { "$ref": "#/$defs/target" },
+          "args": {
+            "type": "object",
+            "description": "The operation's approved arguments, exactly as the confirmation showed them. Open because each typed writer validates its own."
+          },
+          "status": { "enum": ["pending", "completed", "failed", "blocked"] },
+          "code": { "$ref": "#/$defs/code" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,80}$",
+      "description": "A stable refusal code. ⚠️ A CODE AND NEVER A MESSAGE: an error message can carry a path or a credential."
+    },
+    "target": {
+      "type": "string",
+      "pattern": "^(?:[A-Z]{3}-[0-9]{4,}|stage:04-requirement-gaps)$"
+    }
+  }
+}

@@ -231,7 +231,7 @@ test("⚠️ D62 delegate is allowed if and only if a delegation is declared", (
 /* ============================================================ the mutation vocabulary ========= */
 
 test("⚠️ D54 mayMutate names canonical non-creation operations, sorted and unique", () => {
-  assert.equal(NON_CREATION_WRITE_OPERATIONS.length, 12);
+  assert.equal(NON_CREATION_WRITE_OPERATIONS.length, 13);
   assert.deepEqual([...NON_CREATION_WRITE_OPERATIONS], [...NON_CREATION_WRITE_OPERATIONS].sort());
 
   refuses((def) => (def.mutationBoundary.mayMutate = "linkEvidence"), "mutationBoundary.mayMutate", "must be an array");
@@ -245,7 +245,7 @@ test("⚠️ D54 mayMutate names canonical non-creation operations, sorted and u
 });
 
 test("⚠️ D54 non-registry writes have operation identifiers, and the tool names derive from them", () => {
-  assert.deepEqual(Object.keys(OTHER_WRITE_OPERATIONS).sort(), ["setTypeActivation", "writePayload", "writeStageAttestation", "writeStageDocument"]);
+  assert.deepEqual(Object.keys(OTHER_WRITE_OPERATIONS).sort(), ["applyStage4DecisionBundle", "setTypeActivation", "writePayload", "writeStageAttestation", "writeStageDocument"]);
   // ⚠️ DERIVED, NOT WRITTEN OUT TWICE: the wire names are this table's values.
   assert.deepEqual([...OTHER_WRITE_TOOL_NAMES], Object.values(OTHER_WRITE_OPERATIONS));
   for (const operation of Object.keys(OTHER_WRITE_OPERATIONS)) assert.ok(NON_CREATION_WRITE_OPERATIONS.includes(operation), operation);

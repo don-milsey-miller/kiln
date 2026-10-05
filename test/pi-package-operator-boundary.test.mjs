@@ -463,7 +463,8 @@ test("⚠️ ACC-0070 the operations the wrapper records are the ones the librar
 
   assert.deepEqual(
     readBoundaryRefusals(fx.contentRoot).refusals.map((r) => r.operation).sort(),
-    Object.values(BOUNDARY_OPERATION).sort()
+    // The decision bundle has its own fixture; `test/pi-package-decision-bundle.test.mjs` holds it to its spelling.
+    Object.values(BOUNDARY_OPERATION).filter((operation) => operation !== BOUNDARY_OPERATION.APPLY_DECISION_BUNDLE).sort()
   );
 });
 
