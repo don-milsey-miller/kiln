@@ -35,7 +35,7 @@ Register each gap with its options and tradeoffs, ask, and record each decision 
 1. Read the unknowns Stage 3 classified here and the requirements they block.
 2. Author one register entry per blocking gap, with its options and their tradeoffs.
 3. Ask the operator to decide one gap at a time.
-4. Record the operator's answer with `kiln_write_stage_document`, then call `kiln_apply_stage4_decision_bundle` directly with the question, the decision, the answer, and every revision, link change and working note the decision causes.
+4. Record the operator's answer with `kiln_write_stage_document`, then call `kiln_apply_stage4_decision_bundle` directly with the new question or the id of the existing unresolved question, the decision, the answer, and every revision, link change and working note the decision causes.
 5. Do not ask for approval in chat before that call: its one confirmation dialog shows every operation and is the approval for all of them.
 6. Do not create the question, create the decision, resolve the question or approve the decision as separate calls or separate approvals.
 7. Run optional advisory review at most once, on the decision's wording, and never on the question's resolution or the approval.

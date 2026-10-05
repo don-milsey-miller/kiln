@@ -270,6 +270,42 @@ test("the real stage derivation refuses a bundle outside Stage 4, and a session 
   assert.equal(ui.asked.length, 0);
 });
 
+/* ============================================================ an existing question ============ */
+
+test("⚠️ a bundle settles an existing question under one confirmation, and the dialog shows what is being answered", async () => {
+  const fx = await project();
+  const made = await TYPED_TOOLS.question({ title: "Export format", statement: "EXISTING-STATEMENT Which export formats are in scope?" }, { contentRoot: fx.contentRoot, schemasDir: SCHEMAS, schemas, validators });
+  const { question: _new, ...rest } = request(fx);
+  const ui = channel(true);
+  const { tool, handlers } = session(fx);
+
+  // Both, or neither, is refused before the operator is asked.
+  assert.equal((await invoke(tool, fx, { ...rest, questionId: made.id, question: { title: "t", statement: "s" } }, { ctx: ui.ctx })).code, "invalid-request");
+  assert.equal((await invoke(tool, fx, rest, { ctx: ui.ctx })).code, "invalid-request");
+  assert.equal(ui.asked.length, 0);
+
+  const stop = stoppingAfter(1);
+  const stopped = await invoke(session(fx, stop.deps).tool, fx, { ...rest, questionId: made.id }, { ctx: ui.ctx, signal: stop.signal });
+  assert.equal(ui.asked.length, 1);
+  const { message } = ui.asked[0];
+  for (const shown of ["6 operations", "1. Create decision DEC-0001, addressing QST-0001", "2. Resolve existing question QST-0001 as answered by DEC-0001", "EXISTING-STATEMENT Which export formats are in scope?", "CSV only."])
+    assert.ok(message.includes(shown), `the dialog does not show: ${shown}`);
+  assert.ok(!message.includes("Create question"));
+  assert.deepEqual(stopped.changed, [{ operation: "create-decision", target: "DEC-0001" }]);
+
+  // The checkpoint's current question is the existing artifact's own statement.
+  const { compaction } = await inProject(fx, () => compact(handlers, fx));
+  assert.ok(compaction.summary.includes("Current question: EXISTING-STATEMENT Which export formats are in scope?"));
+  assert.equal(compaction.details.kilnCheckpoint.firstIncomplete, 1);
+
+  const resumed = await invoke(tool, fx, { resumeDigest: stopped.digest }, { ctx: ui.ctx });
+  assert.equal(resumed.ok, true, JSON.stringify(resumed));
+  assert.deepEqual(resumed.changed.map((c) => c.operation), KINDS.slice(1));
+  assert.equal(ui.asked.length, 1, "no second confirmation");
+  assert.equal(artifact(fx, "questions", made.id).resolution, "answered");
+  assert.deepEqual(readdirSync(join(fx.contentRoot, "data", "questions")), [`${made.id}.json`]);
+});
+
 /* ============================================================ authorisation is exact ========== */
 
 test("⚠️ a resume asks nothing, and a changed bundle is refused rather than merged", async () => {
@@ -350,15 +386,106 @@ const preparation = (fx) => ({
   turnPrefixMessages: [],
 });
 
-const compact = (handlers, fx, over = {}) => handlers.get("session_before_compact")({ type: "session_before_compact", preparation: { ...preparation(fx), ...over }, branchEntries: [], reason: "threshold", willRetry: false }, {});
+const compact = (handlers, fx, over = {}, { branchEntries = [] } = {}) => handlers.get("session_before_compact")({ type: "session_before_compact", preparation: { ...preparation(fx), ...over }, branchEntries, reason: "threshold", willRetry: false }, {});
 
-test("with no bundle in flight, compaction is left to Pi", async () => {
+/** The same, with the session standing in this fixture's project, as a supervised Pi is. */
+async function inProject(fx, run) {
+  const saved = process.env.PLANNING_CONTENT_DIR;
+  process.env.PLANNING_CONTENT_DIR = fx.contentRoot;
+  try {
+    return await run();
+  } finally {
+    if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
+    else process.env.PLANNING_CONTENT_DIR = saved;
+  }
+}
+
+test("⚠️ an ordinary compaction keeps the stage and the open question or proposal, with no bundle in flight", async () => {
   const fx = await project();
   const { tool, handlers } = session(fx);
-  assert.equal(await compact(handlers, fx), undefined, "no journal");
+
+  const { compaction } = await inProject(fx, () => compact(handlers, fx));
+  // The boundary is Pi's.
+  assert.equal(compaction.firstKeptEntryId, "entry-0042");
+  assert.equal(compaction.tokensBefore, 245_351);
+  // Identifiers and enums only. This fixture has attested nothing, so its derived stage is 01-intake.
+  assert.deepEqual(compaction.details, { kilnCheckpoint: { checkpointVersion: 1, stage: "01-intake", status: "none", pending: "summarized" } });
+
+  const { summary } = compaction;
+  for (const kept of [
+    "## Earlier summary",
+    "Earlier the operator described the export feature.",
+    "## Recent conversation",
+    "Operator: CSV only, please.",
+    "## Pending question or proposal",
+    "Recording that.",
+    "## Kiln workflow checkpoint",
+    "Stage: 01-intake (Intake)",
+    "No approved decision bundle is in flight.",
+    "If it asked the operator something or proposed a change, that is still open.",
+    "do not treat a proposal as approved unless they approved it",
+  ])
+    assert.ok(summary.includes(kept), `the summary lacks: ${kept}`);
+  assert.ok(summary.indexOf("## Pending question or proposal") < summary.indexOf("## Kiln workflow checkpoint"));
+
+  const whole = JSON.stringify(compaction);
+  for (const forbidden of ["RETRIEVED-PAGE-BODY", "TOOL-RESULT-PROSE", SECRET, fx.base, fx.base.split("\\").join("/"), homedir(), "resumeDigest"])
+    assert.ok(!whole.includes(forbidden), `the compaction entry carries ${forbidden}`);
+
+  // The frame announces a checkpoint only for an unfinished bundle.
+  const framed = await inProject(fx, () => handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {}));
+  assert.ok(!framed.systemPrompt.includes("Kiln workflow checkpoint"));
+
+  // A finished bundle is not in flight: the next compaction is an ordinary one again.
   assertApplied(fx, await invoke(tool, fx, request(fx), { ctx: channel(true).ctx }));
-  assert.equal(await compact(handlers, fx), undefined, "a completed journal");
-  assert.equal(await compact(session(fx, { decisionBundleJournal: () => null }).handlers, fx), undefined, "no runtime state");
+  assert.equal((await inProject(fx, () => compact(handlers, fx))).compaction.details.kilnCheckpoint.status, "none");
+});
+
+test("⚠️ an ordinary compaction is bounded, however much was said", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  const big = "word ".repeat(40_000);
+  const messages = Array.from({ length: 40 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: [{ type: "text", text: `message-${i} ${big}` }] }));
+  const { compaction } = await inProject(fx, () => compact(handlers, fx, { previousSummary: big, messagesToSummarize: messages }));
+  assert.ok(Buffer.byteLength(compaction.summary) < 32 * 1024, `${Buffer.byteLength(compaction.summary)} bytes`);
+  assert.ok(compaction.summary.includes("message-39"), "the newest message is kept");
+  assert.ok(!compaction.summary.includes("message-0 "), "the oldest is not");
+});
+
+test("⚠️ a question Pi keeps verbatim is not copied into the summary", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  const branchEntries = [
+    { type: "message", id: "entry-0001", message: { role: "user", content: [{ type: "text", text: "CSV only, please." }] } },
+    { type: "message", id: "entry-0042", message: { role: "user", content: [{ type: "text", text: "And the delimiter?" }] } },
+    { type: "message", id: "entry-0043", message: { role: "assistant", content: [{ type: "text", text: "KEPT-QUESTION Comma or tab?" }] } },
+  ];
+  const { compaction } = await inProject(fx, () => compact(handlers, fx, {}, { branchEntries }));
+  assert.equal(compaction.details.kilnCheckpoint.pending, "kept");
+  assert.ok(!compaction.summary.includes("## Pending question or proposal"));
+  assert.ok(!compaction.summary.includes("KEPT-QUESTION"));
+  assert.ok(compaction.summary.includes("The assistant's latest message follows this summary unchanged."));
+
+  // Nothing from the assistant at all.
+  const silent = await inProject(fx, () => compact(handlers, fx, { messagesToSummarize: [{ role: "user", content: "Hello." }] }));
+  assert.equal(silent.compaction.details.kilnCheckpoint.pending, "none");
+});
+
+test("with no readable Kiln project, or a boundary Kiln cannot copy, an ordinary compaction is left to Pi", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  // No project named for this session at all.
+  const saved = process.env.PLANNING_CONTENT_DIR;
+  process.env.PLANNING_CONTENT_DIR = join(fx.base, "no-such-planning-content");
+  try {
+    assert.equal(await compact(handlers, fx), undefined);
+  } finally {
+    if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
+    else process.env.PLANNING_CONTENT_DIR = saved;
+  }
+  // Nothing approved is at risk, so a malformed preparation falls back rather than cancelling.
+  for (const over of [{ firstKeptEntryId: undefined }, { tokensBefore: "many" }])
+    assert.equal(await inProject(fx, () => compact(handlers, fx, over)), undefined, JSON.stringify(over));
 });
 
 for (const [index, kind] of KINDS.entries()) {
@@ -419,7 +546,7 @@ for (const [index, kind] of KINDS.entries()) {
     assert.equal(later.asked.length, 0, "no repeated confirmation");
     assert.equal(first.asked.length, 1);
 
-    assert.equal(await compact(restarted.handlers, fx), undefined, "once complete, compaction is Pi's again");
+    assert.equal((await inProject(fx, () => compact(restarted.handlers, fx))).compaction.details.kilnCheckpoint.status, "none", "once complete, compaction is an ordinary one again");
     const after = await restarted.handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {});
     assert.ok(!after.systemPrompt.includes("Kiln workflow checkpoint"));
   });
@@ -441,8 +568,10 @@ test("⚠️ a compaction after a project-state mismatch does not offer a resume
   assert.equal(later.asked.length, 0);
   assert.equal(artifact(fx, "requirements", fx.requirementId).statement, "The system exports results.", "the mismatched target was left alone");
 
-  // The authorisation is spent, so there is nothing for a compaction to preserve or a frame to announce.
-  assert.equal(await compact(handlers, fx), undefined);
+  // The authorisation is spent, so a compaction is an ordinary one and offers no resume.
+  const ordinary = await inProject(fx, () => compact(handlers, fx));
+  assert.equal(ordinary.compaction.details.kilnCheckpoint.status, "none");
+  assert.ok(!ordinary.compaction.summary.includes("resumeDigest"));
 
   // The next proposal is asked afresh, and its dialog says what the earlier bundle already did.
   const again = channel(true);
