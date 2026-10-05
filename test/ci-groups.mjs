@@ -127,6 +127,7 @@ export const CI_GROUPS = Object.freeze({
     "pi-package.test.mjs",
     "pi-provider-canary.test.mjs",
     "pi-provider-credentials.test.mjs",
+    "pi-session-compaction.test.mjs",
     "pi-session-guard.test.mjs",
     "pi-session-orchestrator.test.mjs",
     "pi-session-tools.test.mjs",
