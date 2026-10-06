@@ -13,7 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -352,6 +353,59 @@ test("the same request sent again after a stop is the same bundle", async () => 
   assertApplied(fx, await invoke(session(fx).tool, fx, params, { ctx: later.ctx }));
   assert.equal(later.asked.length, 0);
 });
+
+/** Refuse every rename onto `target` with `code`, as the filesystem would, for as long as `run` takes. */
+async function refusingRenameOnto(target, code, run) {
+  const original = fs.renameSync;
+  fs.renameSync = function (from, to) {
+    if (to !== target) return original.call(this, from, to);
+    throw Object.assign(new Error(`${code}: operation refused, rename '${from}' -> '${to}'`), { code, syscall: "rename" });
+  };
+  syncBuiltinESMExports();
+  try {
+    return await run();
+  } finally {
+    fs.renameSync = original;
+    syncBuiltinESMExports();
+  }
+}
+
+for (const [refusedWith, code, why] of [
+  ["EPERM", "stage-document-write-contended", "another program has the stage document open for the whole retry budget"],
+  ["EIO", "stage-document-write-failed", "the filesystem refuses the rename for a reason retrying cannot help"],
+])
+  test(`⚠️ #179 a bundle whose stage note cannot be written stops with ${code}, and resumes there`, async () => {
+    // ${why}
+    const fx = await project();
+    const document = join(fx.contentRoot, "stages", `${STAGE}.md`);
+    const before = readFileSync(document, "utf-8");
+    const { tool } = session(fx);
+
+    const stopped = await refusingRenameOnto(document, refusedWith, () => invoke(tool, fx, request(fx), { ctx: channel(true).ctx }));
+    assert.equal(stopped.status, "blocked");
+    assert.equal(stopped.code, "bundle-operation-failed");
+    // ⚠️ THE STAGE DOCUMENT'S OWN CODE, not the general one the bundle used for any failed write before #179.
+    assert.deepEqual(stopped.failed, [{ operation: "write-stage-note", target: `stage:${STAGE}`, code }]);
+    assert.deepEqual(stopped.changed.map((c) => c.operation), KINDS.slice(0, 6));
+    assert.deepEqual(stopped.pending, []);
+    for (const absent of [refusedWith, fx.base, fx.base.split("\\").join("/"), homedir()]) assert.ok(!JSON.stringify(stopped).includes(absent), `the result says ${absent}`);
+
+    // The journal keeps the code against the one operation, and nothing of the failure's words.
+    const journal = JSON.parse(readFileSync(fx.journal.path, "utf-8"));
+    assert.deepEqual(journal.operations.map((op) => op.status), [...KINDS.slice(0, 6).map(() => "completed"), "failed"]);
+    assert.equal(journal.operations[6].code, code);
+    assert.ok(!readFileSync(fx.journal.path, "utf-8").includes(refusedWith));
+    // The document is as it was, with no temporary file beside it and no content lock left.
+    assert.equal(readFileSync(document, "utf-8"), before);
+    assert.deepEqual(readdirSync(join(fx.contentRoot, "stages")).filter((name) => name.includes(".vpw-tmp")), []);
+    assert.equal(existsSync(join(fx.contentRoot, ".planning.lock")), false);
+
+    // Once the document can be replaced, the approved bundle finishes from that operation with no second confirmation.
+    const later = channel(true);
+    assertApplied(fx, await invoke(session(fx).tool, fx, { resumeDigest: stopped.digest }, { ctx: later.ctx }));
+    assert.equal(later.asked.length, 0);
+    assert.deepEqual(stageDocuments.readWorkingNotes(fx.contentRoot, STAGE).subsections.map((entry) => entry.name), ["export-format"]);
+  });
 
 test("⚠️ a failure is reported in full, cleaned of this machine, and the journal keeps only a code", async () => {
   const fx = await project();

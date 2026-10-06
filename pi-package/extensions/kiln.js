@@ -3750,7 +3750,7 @@ export default function register(pi, deps = {}) {
       ],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, params, signal, onUpdate, ctx) => {
       let context;
       try {
         context = await projectContext(deps);
@@ -3759,6 +3759,19 @@ export default function register(pi, deps = {}) {
       }
 
       const documents = deps.stageDocuments ?? (await import("../../lib/stage-documents.mjs"));
+      // ⚠️ **PI'S SIGNAL GOES TO THE WRITER, AND NOTHING IS RACED AGAINST IT HERE (#179).** The writer knows whether
+      // its rename has happened; this handler does not. An ordinary write says nothing while it runs. One update is
+      // sent only when another writer has held the content lock for a second.
+      const writing = {
+        signal: signal ?? null,
+        onLockWait: () => {
+          try {
+            onUpdate?.({ content: [{ type: "text", text: "Waiting for another Kiln write to this project to finish (up to 10 seconds)." }], details: { waiting: "content-lock" } });
+          } catch {
+            // The wait goes on whether or not it could be shown.
+          }
+        },
+      };
       try {
         if (params?.action === "read-working-notes") {
           const notes = documents.readWorkingNotes(context.contentRoot, params?.stage);
@@ -3772,7 +3785,7 @@ export default function register(pi, deps = {}) {
           });
         }
         if (params?.action === "append-working-note" || params?.action === "replace-working-note") {
-          const written = await documents.writeWorkingNotes(context.contentRoot, params?.stage, params);
+          const written = await documents.writeWorkingNotes(context.contentRoot, params?.stage, params, writing);
           return rendered({
             ok: true,
             action: written.action,
@@ -3783,10 +3796,12 @@ export default function register(pi, deps = {}) {
             revision: written.revision,
           });
         }
-        const written = await documents.writeStageDocumentEntry(context.contentRoot, params?.stage, {
-          verbatim: params?.verbatim,
-          interpretation: params?.interpretation,
-        });
+        const written = await documents.writeStageDocumentEntry(
+          context.contentRoot,
+          params?.stage,
+          { verbatim: params?.verbatim, interpretation: params?.interpretation },
+          writing
+        );
         return rendered({
           ok: true,
           stage: written.stageId,
@@ -3799,7 +3814,9 @@ export default function register(pi, deps = {}) {
         //
         // ⚠️ CLASSIFIED BY CLASS, NOT BY `name`, WHICH IS WRITABLE. Anything else carrying that name would
         // otherwise hand a model one of this module's codes for a failure that is not about the document.
-        if (e instanceof documents.StageDocumentRefusal) return rendered(refusal(e.code, scrub(e.message, context.contentRoot)));
+        // A refusal of the write itself also names the document and the lock, relative to the content root, and
+        // says what to do next. Those are the module's own fixed fields.
+        if (e instanceof documents.StageDocumentRefusal) return rendered({ ...refusal(e.code, scrub(e.message, context.contentRoot)), ...(e.details ?? {}) });
         return rendered(refusal(PROJECT_REFUSAL_CODES[e?.name] ?? "refused", scrub(e?.message ?? String(e), context.contentRoot)));
       }
     },
