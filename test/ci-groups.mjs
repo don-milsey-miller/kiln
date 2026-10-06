@@ -180,6 +180,7 @@ export const CI_GROUPS = Object.freeze({
     "setup-command.test.mjs",
     "setup-connections.test.mjs",
     "setup-engine.test.mjs",
+    "setup-fix-ignore-pty.test.mjs",
     "setup-input.test.mjs",
     "setup-renderer.test.mjs",
     "setup-transaction.test.mjs",
