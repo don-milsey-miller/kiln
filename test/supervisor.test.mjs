@@ -966,6 +966,10 @@ test("⚠️ bin/start-kiln.mjs exposes no way to name a different program", () 
     "the agent comes from the pinned-package resolver, constrained to the declared tools and held to the checked selection"
   );
   assert.ok(!/dist[\/](bundle[\/])?cli\.js/.test(src), "and the wrapper names no entry-point path of its own");
+  // ⚠️ #177: THE STRUCTURED MODE CHANGES HOW THAT SAME AGENT TALKS, NEVER WHICH PROGRAM IT IS. It is added to the
+  // composed launch by the one function that appends Pi's mode flag, and only when the flag was given.
+  assert.match(src, /args\.rpc \? \{ \.\.\.launch, agent: withRpcMode\(launch\.agent\), structuredStdout: true \} : launch/);
+  assert.equal(src.split("withRpcMode(").length - 1, 2, "the mode is applied in exactly one place besides its definition");
 });
 
 /* ============================================== ACC-0102: shutdown ============================= */
@@ -3414,13 +3418,16 @@ test("⚠️ --self-host with no override reaches the SELF-HOST refusal, through
 });
 
 test("the command line takes --self-host and the one-run override, and refuses anything else", () => {
-  assert.deepEqual(parseArgs([]), { selfHost: false, override: {} });
-  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true, override: {} });
+  assert.deepEqual(parseArgs([]), { selfHost: false, rpc: false, override: {} });
+  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true, rpc: false, override: {} });
+  // #177: the structured integration mode is an explicit flag, never inferred from the terminal.
+  assert.deepEqual(parseArgs(["--rpc"]), { selfHost: false, rpc: true, override: {} });
   assert.deepEqual(parseArgs(["--provider", "openai", "--model", "gpt-5", "--thinking", "high"]), {
     selfHost: false,
+    rpc: false,
     override: { provider: "openai", model: "gpt-5", thinking: "high" },
   });
-  assert.deepEqual(parseArgs(["--thinking", "low", "--self-host"]), { selfHost: true, override: { thinking: "low" } });
+  assert.deepEqual(parseArgs(["--thinking", "low", "--self-host"]), { selfHost: true, rpc: false, override: { thinking: "low" } });
   // A flag with no value, or given twice, would leave a billable model to chance.
   for (const bad of [["--model"], ["--provider", "--model", "x"], ["--thinking", ""], ["--model", "a", "--model", "b"]])
     assert.match(parseArgs(bad).error ?? "", /needs a value|more than once/, `must refuse ${JSON.stringify(bad)}`);

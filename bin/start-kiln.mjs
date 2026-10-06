@@ -45,7 +45,14 @@ import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
 import { startInJob } from "../lib/windows-job.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
-const say = (msg) => console.log(`[kiln] ${msg}`);
+/**
+ * Kiln's own notices.
+ *
+ * ⚠️ **IN `--rpc` THEY GO TO STDERR, BECAUSE STDOUT IS THEN PI'S PROTOCOL (#177).** An integration reads one JSON
+ * object per line from standard output. A `[kiln]` line there is a line that does not parse.
+ */
+let structuredOutput = false;
+const say = (msg) => (structuredOutput ? console.error : console.log)(`[kiln] ${msg}`);
 
 /**
  * One line from the operator, or `null` if there is not going to be one.
@@ -139,12 +146,16 @@ export function exitStatusFor(result) {
 export const OVERRIDE_FLAGS = Object.freeze({ "--provider": "provider", "--model": "model", "--thinking": "thinking" });
 
 export function parseArgs(argv) {
-  const out = { selfHost: false, override: {} };
-  const usage = "This command takes --self-host, and --provider <id> --model <id> --thinking <level> for a one-run override.";
+  const out = { selfHost: false, rpc: false, override: {} };
+  const usage = "This command takes --self-host, --rpc for a structured integration, and --provider <id> --model <id> --thinking <level> for a one-run override.";
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--self-host") {
       out.selfHost = true;
+      continue;
+    }
+    if (arg === "--rpc") {
+      out.rpc = true;
       continue;
     }
     const key = Object.hasOwn(OVERRIDE_FLAGS, arg) ? OVERRIDE_FLAGS[arg] : null;
@@ -239,6 +250,28 @@ export async function piToolAllowlist(toolRoot = TOOL_ROOT) {
 }
 
 /** Pi's own flags for the model it runs. */
+/** The flag Pi reads its mode from, and the mode an integration selects with `--rpc`. */
+export const MODE_FLAG = "--mode";
+export const RPC_MODE = "rpc";
+
+/**
+ * The agent, started in Pi's own RPC mode - #177.
+ *
+ * ⚠️ **PI'S EXISTING PROTOCOL, AND NOTHING OF KILN'S.** RPC mode reads one JSON command per line on standard input
+ * and writes one JSON event per line on standard output, with no terminal rendering at all. Kiln adds the flag and
+ * keeps its own notices off that stream. It does not implement a client, translate an event or change the default:
+ * without `--rpc` a terminal still gets Pi's interactive display.
+ *
+ * ⚠️ **AN ARGUMENT LIST THAT ALREADY NAMES A MODE IS REFUSED**, for the reason `withToolAllowlist` refuses a second
+ * tool policy: two modes on one command line is a session whose mode depends on which one Pi reads last.
+ */
+export function withRpcMode(agent) {
+  const args = agent.args ?? [];
+  const conflict = args.findIndex((a) => String(a) === MODE_FLAG || String(a).startsWith(`${MODE_FLAG}=`));
+  if (conflict !== -1) throw new Error(`The agent's argument list already names a mode at position ${conflict}, so the structured mode cannot be added to it.`);
+  return { ...agent, args: [...args, MODE_FLAG, RPC_MODE] };
+}
+
 export const SELECTION_FLAGS = Object.freeze(["--provider", "--model", "--thinking"]);
 
 /**
@@ -305,8 +338,15 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
   // on the flag and the environment is decided here; `runSupervisor` re-checks it with the roots.
   assertSelfHostOptIn({ toolRoot: TOOL_ROOT, selfHost: args.selfHost });
 
+  // ⚠️ SET BEFORE THE FIRST NOTICE. Everything this command says from here on goes where `say` sends it.
+  structuredOutput = args.rpc;
+
   const projectRoot = canonicalPath(resolveProjectRoot());
-  const interactive = Boolean(process.stdin.isTTY);
+  // ⚠️ A STRUCTURED RUN ASKS NOTHING ON THE TERMINAL, WHATEVER STANDARD INPUT IS. Its standard input is the
+  // protocol's, so a question printed for an operator would be read by a client and answered by a command.
+  const interactive = !args.rpc && Boolean(process.stdin.isTTY);
+  // Pi's own test for an interactive display: a terminal on both ends. A structured run has none by definition.
+  const terminal = !args.rpc && Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
   // ⚠️ **THE LAUNCH CHECKS, BEFORE ANY PROCESS STARTS, AND BEFORE PI IS EVEN LOADED.** Consent is checked before any
   // credential is read, and a refusal leaves nothing to stop. Pi's agent directory is not resolved here: resolving
@@ -333,7 +373,12 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
       `${checked.overridden ? ", one-run override" : ""}; compatibility proved by ${checked.proof === "record" ? "this computer's record" : "this run's live check"}`
   );
 
-  const result = await supervise({
+  // ⚠️ THE STRUCTURED MODE IS APPLIED TO THE COMPOSED LAUNCH, AFTER THE AGENT IS RESOLVED, ALLOWLISTED AND HELD TO
+  // THE CHECKED SELECTION (#177). It adds Pi's mode flag to that agent and reserves standard output for it: the
+  // launcher's standard output goes to standard error instead. Without `--rpc` the launch is passed on unchanged.
+  const forMode = (launch) => (args.rpc ? { ...launch, agent: withRpcMode(launch.agent), structuredStdout: true } : launch);
+
+  const result = await supervise(forMode({
     projectRoot,
     // ⚠️ **THE TOOL ROOT IS PASSED RATHER THAN LEFT TO THE SUPERVISOR'S DEFAULT.** This file already
     // resolved it canonically to pick the launcher and the agent out of THIS checkout, and the
@@ -368,9 +413,9 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     randomBytes,
     interactive,
     // ⚠️ BOTH ENDS, BECAUSE THAT IS PI'S OWN TEST: with either one not a terminal it runs in print mode.
-    startPrompt: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    startPrompt: terminal,
     // ⚠️ THE SAME TEST, FOR THE SAME REASON: only an interactive Pi reads Ctrl+C as a key, so only then is it Kiln's stop.
-    keyboardStop: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    keyboardStop: terminal,
     // ⚠️ ACC-0081's 8,000 ms deadline, stated here so the command's budget is the one its evidence measures.
     ...SHUTDOWN_BUDGET,
     // ⚠️ **ON WINDOWS BOTH TREES ALWAYS START INSIDE A JOB ITS HOST HOLDS (F130, ACC-0081's launch prerequisite).** A process
@@ -381,7 +426,7 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     ask,
     askLine,
     log: say,
-  });
+  }));
 
   say(stoppedSummary(result));
   process.exit(exitStatusFor(result));

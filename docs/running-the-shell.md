@@ -9,6 +9,36 @@ node .planning/bin/start-kiln.mjs
 Guided setup offers this handoff when configuration is complete. The lower-level browser-only shell
 command below remains useful for inspection and contributor work.
 
+## Structured mode for integrations
+
+By default the launcher gives a terminal Pi's interactive display. A program that drives Kiln, such as an
+automation harness or another tool reading the session, should not read that display: an interactive
+terminal repaints as it works, so its output is much larger than what was actually said. Start the same
+launcher with `--rpc` instead:
+
+```
+node .planning/bin/start-kiln.mjs --rpc
+```
+
+- Standard input and standard output carry Pi's own RPC protocol: one JSON command per line in, one JSON
+  event per line out, with no terminal rendering. Kiln adds the flag and nothing else; it does not
+  translate events or provide a client. Send a `prompt` command with `/kiln-start` to begin a new
+  session, and close standard input to end the run.
+- Kiln's own `[kiln]` notices and the browser launcher's output go to standard error, so every line of
+  standard output is one JSON event.
+- A confirmation arrives as one `extension_ui_request` event and takes one `extension_ui_response`. Kiln
+  still expires it after five minutes.
+- Terminal shortcuts are unavailable: there is no Ctrl+C stop and no voice shortcut. Use the protocol's
+  `abort` command to interrupt a turn.
+- Nothing is asked on the terminal. A launch that would need an answer, such as a missing consent, refuses
+  instead.
+
+RPC is not guaranteed to emit fewer bytes. It provides structured, replay-free events so integrations
+can select what they consume.
+
+The mode is selected only by the flag. A pseudo-terminal without `--rpc` still gets the interactive
+display, because a terminal is also how a person uses Kiln.
+
 One command, from a clone with Node present:
 
 ```
