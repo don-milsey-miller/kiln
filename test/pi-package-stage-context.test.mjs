@@ -109,7 +109,7 @@ function hookFor(fx, toolRoot = fx.tool) {
   register({ registerTool: () => {}, on: (event, handler) => hooks.push([event, handler]) }, { toolRoot });
   assert.deepEqual(
     hooks.map(([event]) => event),
-    ["session_start", "message_end", "session_shutdown", "session_before_compact", "session_compact", "before_agent_start"],
+    ["session_start", "message_end", "session_shutdown", "session_before_switch", "session_before_compact", "session_compact_failed", "session_compact", "before_agent_start"],
     "exactly these hooks"
   );
   return hooks.find(([event]) => event === "before_agent_start")[1];

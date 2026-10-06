@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/workflow-carryover.schema.json",
+  "x-runtimeRecord": "workflow-carryover",
+  "x-location": "<local-state>/runtime/workflow-carryover.json",
+  "x-committed": false,
+  "title": "Workflow carry-over",
+  "description": "What a session that is being replaced hands to the one that replaces it (#178). ⚠️ ONLY WHAT PROJECT STATE CANNOT SAY. The current stage and an unfinished decision bundle are derived again in the new session from the project and the journal. What would otherwise be lost is the question or proposal that was open, and which bundle operation completed last. ⚠️ BOUNDED, AND CLEANED BEFORE IT IS WRITTEN. The pending text is the assistant's own latest message, cut to a fixed size with paths and credentials removed. No operator input, tool result or retrieved page is copied. ⚠️ A CARRIED PROPOSAL IS STILL PENDING. This record never says anything was approved, and nothing reading it may treat it as approval. ⚠️ BOUND TO THE REPLACEMENT SESSION, BY THE SUPERVISOR. The leaving session writes the record with its run's id and no session id. The supervisor adds the id of the session it recorded in its place. Only that session is told what this says, in this launch or a later one, until it has answered once. A record with no session id is told to nobody.",
+  "type": "object",
+  "required": ["recordVersion", "runId", "reason", "createdAt"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "runId": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "The supervisor run the leaving session belonged to. Only that run's supervisor may bind the record." },
+    "sessionId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "description": "The session that replaced the writer, added by the supervisor after it recorded that session." },
+    "reason": { "enum": ["operator-new-session", "compaction-failed", "compaction-boundary-invalid", "input-exceeds-context-window"] },
+    "createdAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" },
+    "pending": {
+      "type": "object",
+      "required": ["source", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": ["assistant-message", "compaction-checkpoint"],
+          "description": "The assistant's latest message on the branch, or, when there is none after the latest compaction, what that compaction's checkpoint carried."
+        },
+        "text": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "lastOperation": {
+      "type": "object",
+      "required": ["index", "kind", "target", "status"],
+      "additionalProperties": false,
+      "description": "The last decision-bundle operation that completed: identifiers, a kind, a status and a fixed code, and nothing of what it wrote.",
+      "properties": {
+        "index": { "type": "integer", "minimum": 0, "maximum": 24 },
+        "kind": { "enum": ["create-question", "create-decision", "resolve-question", "revise-artifact", "link-trace", "unlink-trace", "approve-decision", "write-stage-note"] },
+        "target": { "type": "string", "pattern": "^(?:[A-Z]{3}-[0-9]{4,}|stage:04-requirement-gaps)$" },
+        "status": { "enum": ["completed"] },
+        "code": { "type": "string", "pattern": "^[a-z0-9-]{1,80}$" }
+      }
+    }
+  }
+}

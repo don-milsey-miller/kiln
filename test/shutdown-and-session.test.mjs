@@ -60,6 +60,7 @@ import {
   sessionPrecondition,
 } from "../lib/session-record.mjs";
 import { resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
+import { CARRYOVER_FILE } from "../lib/workflow-carryover.mjs";
 
 const PROJECT_ID = "abcdef0123456789abcdef0123456789";
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "supervisor");
@@ -1667,4 +1668,100 @@ test("the tracker keeps the UNION, so a child seen once is not lost by a later p
   await tracker.sample();
   assert.deepEqual(tracker.snapshot().pids.sort(), [200, 300], "both, not just the latest");
   await tracker.stop();
+});
+
+/* ------------------------------------------- a recorded session Pi has not written yet, #178 */
+
+const RUN_ID = "0123456789abcdef0123456789abcdef";
+const UNRELATED_ID = "22222222-2222-4222-8222-222222222222";
+/** A carry-over as the supervisor leaves it: valid, and bound to `sessionId`. */
+const boundCarryover = (sessionId, over = {}) => ({
+  recordVersion: 1,
+  runId: RUN_ID,
+  sessionId,
+  reason: "operator-new-session",
+  createdAt: "2026-10-06T12:00:00.000Z",
+  pending: { source: "assistant-message", text: "Shall I record CSV export as the decision?" },
+  ...over,
+});
+const carryoverPath = (root) => join(root, "runtime", CARRYOVER_FILE);
+
+test("⚠️ #178 a recorded session with no transcript is started under its own id only when a valid carry-over is bound to exactly that id", async () => {
+  // Another session is stored, as after a `/new`: the one that was replaced is still on disk.
+  const root = stateRoot({ record: valid(), sessions: [UNRELATED_ID] });
+  try {
+    const recordBytes = readFileSync(join(root, SESSION_RECORD), "utf-8");
+    writeFileSync(carryoverPath(root), JSON.stringify(boundCarryover(SESSION_ID)));
+    const carryoverBytes = readFileSync(carryoverPath(root), "utf-8");
+
+    const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
+    assert.equal(p.action, SESSION.START);
+    assert.equal(p.sessionId, SESSION_ID, "the plan does not name the recorded id");
+    assert.equal(p.problem, SESSION_PROBLEM.NOT_YET_WRITTEN);
+    // A new session: no transcript and no digest, so nothing for a guard to be told to expect.
+    assert.equal(p.sessionFile, undefined);
+    assert.equal(p.digest, undefined);
+
+    // ⚠️ RECORDED AS THE ID ALREADY ON DISK, whatever id the caller brought, and the record is not rewritten.
+    const recorded = await recordSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", projectRoot: PROJECT_CWD, lister: fakeLister, sessionDir: sessionDirOf(root), sessionId: "a-freshly-minted-id" });
+    assert.deepEqual([recorded.ok, recorded.action, recorded.sessionId], [true, SESSION.START, SESSION_ID]);
+    assert.equal(readFileSync(join(root, SESSION_RECORD), "utf-8"), recordBytes);
+    // Planning reads the carry-over and changes nothing.
+    assert.equal(readFileSync(carryoverPath(root), "utf-8"), carryoverBytes);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ #178 every other missing transcript is still a question: absent, invalid, unbound or mismatched carry-over", async () => {
+  const unbound = boundCarryover(SESSION_ID);
+  delete unbound.sessionId;
+  const cases = [
+    ["no carry-over", null],
+    ["a carry-over that is not JSON", "{ not json"],
+    ["a carry-over outside its schema", JSON.stringify(boundCarryover(SESSION_ID, { approved: true }))],
+    ["a carry-over of another record version", JSON.stringify(boundCarryover(SESSION_ID, { recordVersion: 2 }))],
+    ["a carry-over nobody bound", JSON.stringify(unbound)],
+    ["a carry-over bound to another session", JSON.stringify(boundCarryover(UNRELATED_ID))],
+    ["a carry-over bound to an id that only starts the same", JSON.stringify(boundCarryover(SESSION_ID.replace(/1$/, "2")))],
+    ["a carry-over too large to be one", JSON.stringify(boundCarryover(SESSION_ID, { pad: "x".repeat(40_000) }))],
+  ];
+  for (const sessions of [[], [UNRELATED_ID]])
+    for (const [name, text] of cases) {
+      const root = stateRoot({ record: valid(), sessions });
+      try {
+        if (text !== null) writeFileSync(carryoverPath(root), text);
+        const p = await plan({ stateRoot: root, sessionDir: sessionDirOf(root) });
+        assert.equal(p.action, SESSION.ASK, name);
+        assert.equal(p.problem, SESSION_PROBLEM.GONE, name);
+        assert.equal(p.recoverable, true, name);
+        assert.equal(p.sessionId, undefined, name);
+        // And nothing is recorded or started on its strength: a question is not written over.
+        const recorded = await recordSession({ stateRoot: root, projectId: PROJECT_ID, stateMode: "project", projectRoot: PROJECT_CWD, lister: fakeLister, sessionDir: sessionDirOf(root), sessionId: SESSION_ID });
+        assert.deepEqual([recorded.ok, recorded.action, recorded.problem], [false, SESSION.ASK, SESSION_PROBLEM.GONE], name);
+        // Planning removes nothing, valid or not.
+        assert.equal(existsSync(carryoverPath(root)), text !== null, name);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+});
+
+test("#178 a bound carry-over changes nothing once the transcript exists, or when the record itself is not trusted", async () => {
+  // The session took a turn that did not complete: Pi wrote it, the carry-over is still there, and it is a resume.
+  const written = stateRoot({ record: valid(), sessions: [SESSION_ID] });
+  // The record is another project's. The carry-over does not make it this one's.
+  const foreign = stateRoot({ record: valid({ projectId: "0".repeat(32) }) });
+  // No record at all, and sessions stored.
+  const missing = stateRoot({ sessions: [UNRELATED_ID] });
+  try {
+    for (const root of [written, foreign, missing]) writeFileSync(carryoverPath(root), JSON.stringify(boundCarryover(SESSION_ID)));
+    const resumed = await plan({ stateRoot: written, sessionDir: sessionDirOf(written) });
+    assert.deepEqual([resumed.action, resumed.sessionId, resumed.problem], [SESSION.RESUME, SESSION_ID, SESSION_PROBLEM.NONE]);
+    assert.ok(resumed.sessionFile && resumed.digest, "a resume without the transcript the guard is told to expect");
+    assert.equal((await plan({ stateRoot: foreign, sessionDir: sessionDirOf(foreign) })).action, SESSION.ASK);
+    assert.equal((await plan({ stateRoot: missing, sessionDir: sessionDirOf(missing) })).action, SESSION.ASK);
+  } finally {
+    for (const root of [written, foreign, missing]) rmSync(root, { recursive: true, force: true });
+  }
 });

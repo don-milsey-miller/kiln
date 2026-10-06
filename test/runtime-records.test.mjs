@@ -584,6 +584,8 @@ test("every record requires its own version, and versions are per record", () =>
       "kiln-session": { projectId: PROJECT_ID, sessionId: "x", stateMode: "project" },
       "model-compatibility": { key: COMPAT_KEY, result: { outcome: "passed", observedAt: NOW } },
       "decision-bundle-journal": BUNDLE_JOURNAL,
+      "recovery-request": { runId: PROJECT_ID, reason: "operator-new-session", requestedAt: NOW },
+      "workflow-carryover": { runId: PROJECT_ID, reason: "operator-new-session", createdAt: NOW },
     }[kind];
     rejects(kind, minimal, `${kind} must require recordVersion`);
     ok(kind, { recordVersion: 1, ...minimal });
