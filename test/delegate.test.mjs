@@ -693,3 +693,97 @@ test("⚠️ D46 the gate reads the JUDGED report, never the raw one the child s
   assert.equal(result.ok, false);
   assert.equal(result.observation.childReportReason, "child-report-duplicated");
 });
+
+/* ============================================================ the executable, #176 ============ */
+
+/** A tool root with this checkout's pin and role definition, and nothing installed. */
+function toolRootWith() {
+  const root = mkdtempSync(join(tmpdir(), "kiln delegate tool root "));
+  const pinned = JSON.parse(readFileSync(join(REPO, "package.json"), "utf-8")).dependencies["@earendil-works/pi-coding-agent"];
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "@earendil-works/pi-coding-agent": pinned } }));
+  mkdirSync(join(root, "specialists"));
+  writeFileSync(join(root, "specialists", "research.md"), readFileSync(join(REPO, "specialists", "research.md")));
+  return { root, pinned };
+}
+
+/** The scripted dependencies with the two launch seams taken out again, as the package's wrapper leaves them. */
+const withoutSeams = (script, keep = []) => {
+  const all = deps(script);
+  for (const seam of ["resolveAgent", "spawn"]) if (!keep.includes(seam)) delete all[seam];
+  return all;
+};
+
+test("⚠️ #176 with no resolver injected, the shared pinned resolver is the default, and a miss says which package and why", async () => {
+  const cases = [
+    [undefined, { reason: "not-installed" }],
+    [{ name: "@earendil-works/pi-coding-agent", version: "0.0.1", bin: { pi: "cli.js" } }, { reason: "version-mismatch", installedVersion: "0.0.1" }],
+    [{ name: "@earendil-works/pi-coding-agent", version: "PINNED" }, { reason: "manifest-unusable" }],
+    [{ name: "@earendil-works/pi-coding-agent", version: "PINNED", bin: { pi: "missing.js" } }, { reason: "entry-point-unusable" }],
+  ];
+  for (const [installed, why] of cases) {
+    const fx = toolRootWith();
+    try {
+      if (installed) {
+        const pkg = join(fx.root, "node_modules", "@earendil-works", "pi-coding-agent");
+        mkdirSync(pkg, { recursive: true });
+        writeFileSync(join(pkg, "package.json"), JSON.stringify({ ...installed, version: installed.version === "PINNED" ? fx.pinned : installed.version }));
+      }
+      const script = scriptedChild();
+      const result = await delegateToSpecialist(request({ toolRoot: fx.root }), withoutSeams(script, ["spawn"]));
+      assert.equal(result.code, DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND, why.reason);
+      assert.deepEqual(result.executable, { package: "@earendil-works/pi-coding-agent", version: fx.pinned, strategy: "pinned-package-bin", resolved: false, ...why });
+      assert.equal(script.calls.length, 0, "a child was started without an executable");
+
+      // ⚠️ AN IDENTITY, NEVER A LOCATION: the tool root has a space in it and appears nowhere in the refusal.
+      const text = JSON.stringify(result);
+      assert.equal(text.includes("kiln delegate tool root"), false, `${why.reason}: the refusal carries the tool root`);
+      assert.equal(/[A-Za-z]:[\/]|\/tmp\/|node_modules|cli\.js|missing\.js/.test(text), false, `${why.reason}: the refusal carries a path: ${text}`);
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("⚠️ #176 the default resolver finds this checkout's pinned agent, once, and Node's own spawn is the default too", async () => {
+  // The resolver's answer is observed through the spawn seam: the command and entry it was handed.
+  const script = scriptedChild();
+  const viaDefaultResolver = await delegateToSpecialist(request(), withoutSeams(script, ["spawn"]));
+  assert.equal(viaDefaultResolver.ok, true, JSON.stringify(viaDefaultResolver));
+  assert.equal(script.calls.length, 1);
+  assert.equal(script.calls[0].command, process.execPath, "the pinned agent runs under this process's Node, not a shim");
+  assert.match(script.calls[0].args[0], /pi-coding-agent/);
+  assert.equal(script.calls[0].args[0].includes(".bin"), false, "a .bin shim was used");
+  assert.equal("executable" in viaDefaultResolver, false, "a successful run reports no executable diagnostics");
+
+  // Resolved once per delegation.
+  let resolutions = 0;
+  const counted = scriptedChild();
+  await delegateToSpecialist(request(), { ...deps(counted), resolveAgent: () => (resolutions++, { command: "node", args: ["cli.js"] }) });
+  assert.equal(resolutions, 1);
+
+  // And with no spawn injected either, a real process is started: one that is not a specialist, so it is refused
+  // as a child and not as a launch.
+  const real = await delegateToSpecialist(request({ timeoutMs: 30_000 }), { ...withoutSeams(scriptedChild()), resolveAgent: () => ({ command: process.execPath, args: ["-e", "0"] }) });
+  assert.equal(real.ok, false);
+  for (const launchClass of [DELEGATION_REFUSED.LAUNCH, DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND, DELEGATION_REFUSED.EXECUTABLE_NOT_RUNNABLE, DELEGATION_REFUSED.INVALID_ARGUMENTS])
+    assert.notEqual(real.code, launchClass, "the default spawn did not start a process");
+});
+
+test("⚠️ #176 an injected resolver stays a test seam, and its failure leaks nothing it said", async () => {
+  const hostile = `C:\Users\operator\node_modules\.bin\pi --flag sk-ant-PLANTED`;
+  const script = scriptedChild();
+  const result = await delegateToSpecialist(request(), { ...deps(script), resolveAgent: () => { throw Object.assign(new Error(hostile), { detail: { pkgDir: hostile, entry: hostile, installed: hostile } }); } });
+  assert.equal(result.code, DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND);
+  assert.deepEqual(result.executable, { package: null, version: null, strategy: "injected", resolved: false, reason: "resolver-failed" });
+  const text = JSON.stringify(result);
+  for (const leaked of ["operator", "sk-ant-PLANTED", ".bin", "--flag"]) assert.equal(text.includes(leaked), false, leaked);
+});
+
+test("⚠️ #176 a launch that fails after resolution still names the executable it had resolved", async () => {
+  const failing = { ...withoutSeams(scriptedChild()), spawn: () => { throw Object.assign(new Error("spawn C:\Users\operator\node.exe ENOENT"), { code: "ENOENT" }); } };
+  const result = await delegateToSpecialist(request(), failing);
+  assert.equal(result.code, DELEGATION_REFUSED.EXECUTABLE_NOT_FOUND);
+  const pinned = JSON.parse(readFileSync(join(REPO, "package.json"), "utf-8")).dependencies["@earendil-works/pi-coding-agent"];
+  assert.deepEqual(result.executable, { package: "@earendil-works/pi-coding-agent", version: pinned, strategy: "pinned-package-bin", resolved: true });
+  assert.equal(JSON.stringify(result).includes("operator"), false);
+});

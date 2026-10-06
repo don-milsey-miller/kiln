@@ -416,8 +416,31 @@ const refusedResult = (result) => ({
   ok: false,
   code: result?.code ?? "refused",
   message: result?.message ?? "The delegation was refused.",
+  ...(executableForModel(result?.executable) ? { executable: executableForModel(result.executable) } : {}),
   observed: observedForModel(result?.observation),
 });
+
+/**
+ * Which child executable a refused launch looked for - #176.
+ *
+ * ⚠️ **AN IDENTITY, FIELD BY FIELD, AND NEVER A LOCATION.** The package's name, the version this checkout pins,
+ * the strategy that looked for it and a fixed reason. Each is copied only when it has the shape of what it claims
+ * to be, so nothing that could be a path, a command or an error message passes through under one of these names.
+ */
+function executableForModel(executable) {
+  if (executable === null || typeof executable !== "object") return null;
+  const shaped = (value, pattern) => (typeof value === "string" && value.length <= 214 && pattern.test(value) ? value : null);
+  const version = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/;
+  const word = /^[a-z][a-z-]{0,39}$/;
+  return {
+    package: shaped(executable.package, /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/),
+    version: shaped(executable.version, version),
+    strategy: shaped(executable.strategy, word),
+    resolved: executable.resolved === true,
+    ...(shaped(executable.reason, word) ? { reason: executable.reason } : {}),
+    ...(shaped(executable.installedVersion, version) ? { installedVersion: executable.installedVersion } : {}),
+  };
+}
 
 /** The part of an observation a model may see. Identifiers and booleans only. */
 function observedForModel(observation) {
