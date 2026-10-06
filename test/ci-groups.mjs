@@ -102,6 +102,7 @@ export const CI_GROUPS = Object.freeze({
     "voice-stt-elevenlabs.test.mjs",
     "voice-tts-elevenlabs.test.mjs",
     "voice.test.mjs",
+    "workflow-carryover.test.mjs",
   ]),
   node: Object.freeze([
     "change-stream.test.mjs",
@@ -161,6 +162,7 @@ export const CI_GROUPS = Object.freeze({
     "reap.test.mjs",
     "rpc-start.test.mjs",
     "server-port.test.mjs",
+    "session-new.test.mjs",
     "session-recovery.test.mjs",
     "setup-pty.test.mjs",
     "shutdown-and-session.test.mjs",

@@ -28,6 +28,11 @@ const huge = (tag) => `${tag}-START ${"x".repeat(LIMIT_CHARS + 120_000)} ${tag}-
 
 const settled = (event) => event.type === "agent_settled";
 const conversation = (request) => request.messages.filter((m) => m.role !== "system" && m.role !== "developer").map((m) => textOf(m.content)).join("\n");
+/**
+ * One line for every time the supervisor starts Pi: the session it starts it on. Said on every platform, which the
+ * Windows job's own "agent started" notice is not.
+ */
+const AGENT_START = "\\[kiln\\] session [0-9a-f-]{36} \\(";
 const RECOVERED = "\\[kiln\\] session (\\S+) \\(new, recorded; recovery: ([a-z-]+)\\)";
 
 test("⚠️ #178 an input that exceeds the window ends that session, and the supervisor starts one new recorded session, once", { timeout: 12 * 60_000 }, async () => {
@@ -53,7 +58,6 @@ test("⚠️ #178 an input that exceeds the window ends that session, and the su
         assert.notEqual(recoveredTo, first);
 
         // The relaunched agent is usable, on the new session, and was not handed the oversized input.
-        await io.said("\\[kiln\\] agent started", { count: 2 });
         const before = fx.provider.requests.length;
         // Both agents write to the one event stream, so the wait is for one more settle than has been seen.
         const settledSoFar = io.events().filter(settled).length;
@@ -72,8 +76,8 @@ test("⚠️ #178 an input that exceeds the window ends that session, and the su
 
       assert.equal(run.exit.signal, null, run.stderr.slice(-3000));
       assert.equal([...run.stderr.matchAll(new RegExp(RECOVERED, "g"))].length, 1, "the supervisor recovered more than once");
-      assert.equal([...run.stderr.matchAll(/\[kiln\] agent started/g)].length, 2, "the agent was started other than twice");
-      assert.equal([...run.stderr.matchAll(/\[kiln\] launcher started/g)].length, 1, "the browser launcher was restarted");
+      assert.equal([...run.stderr.matchAll(new RegExp(AGENT_START, "g"))].length, 2, "the agent was started other than twice");
+      assert.equal([...run.stderr.matchAll(/\[kiln\] ready — identity confirmed/g)].length, 1, "the browser launcher was restarted");
       assert.equal(run.stdout.split("\n").filter((line) => line.trim() && !line.trim().startsWith("{")).length, 0, "the protocol stream was corrupted across the relaunch");
 
       // Both transcripts exist, each under its own id, and the record still names the recovered one.
@@ -119,7 +123,7 @@ test("⚠️ #178 a recovery request left by another run is discarded unread and
       assert.equal(run.exit.status, 0, run.stderr.slice(-3000));
       assert.ok(run.stderr.includes("a session recovery request from an earlier run was discarded unread"), run.stderr.slice(-2000));
       assert.equal(existsSync(join(fx.runtimeDir, RECOVERY_REQUEST_FILE)), false, "the stale request was left for the next run");
-      assert.equal([...run.stderr.matchAll(/\[kiln\] agent started/g)].length, 1, "the stale request started a second agent");
+      assert.equal([...run.stderr.matchAll(new RegExp(AGENT_START, "g"))].length, 1, "the stale request started a second agent");
       assert.doesNotMatch(run.stderr, new RegExp(RECOVERED));
       assert.equal(fx.transcripts().length, 1);
     });

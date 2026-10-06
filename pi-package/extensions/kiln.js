@@ -1941,6 +1941,70 @@ const RECOVERY_FRAME = Object.freeze({
   default: "this session could not be compacted safely. Tell the operator, and call kiln_project_status before continuing.",
 });
 
+/** The operator asked for a new session. A request reason like the codes above, and not a failure. */
+const OPERATOR_NEW_SESSION = "operator-new-session";
+
+/** What the session that replaces another is told about why it exists. */
+const CARRYOVER_FRAME = Object.freeze({
+  "operator-new-session": "the operator started this session in place of an earlier one. The earlier conversation is not available here.",
+  "input-exceeds-context-window":
+    "this session replaces one in which the operator's last input was larger than this model's context window. That input was not sent and was not carried here. Tell the operator it was too large and ask for it in smaller parts.",
+  default: "this session replaces one that could not be compacted safely. Tell the operator, and call kiln_project_status before continuing.",
+});
+
+/** The id of the session Pi has open, or `null`. */
+const sessionIdOf = (ctx) => {
+  try {
+    const id = ctx?.sessionManager?.getSessionId?.();
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+const assistantText = (entry) => (entry?.type === "message" && entry.message?.role === "assistant" ? textOf(entry.message) : "");
+
+/**
+ * The question or proposal a session leaves open when it is replaced - #178.
+ *
+ * The assistant's latest message on the branch. When nothing was said after the latest compaction, it is the
+ * message that compaction's checkpoint recorded as pending, which is still on the branch because a compaction
+ * removes nothing from the session.
+ *
+ * ⚠️ **ONLY THE ASSISTANT'S OWN WORDS.** Operator input, tool results and retrieved pages are never read here.
+ *
+ * @returns {{source: "assistant-message"|"compaction-checkpoint", text: string}|null} the text is not yet bounded
+ */
+function pendingOnBranch(branch) {
+  const entries = Array.isArray(branch) ? branch : [];
+  const compactedAt = entries.findLastIndex((entry) => entry?.type === "compaction");
+  const said = (from, to) => entries.slice(from, to).map(assistantText).filter((text) => text.length > 0).at(-1) ?? null;
+  const later = said(compactedAt + 1);
+  if (later !== null) return { source: "assistant-message", text: later };
+  if (compactedAt === -1) return null;
+  const carried = entries[compactedAt]?.details?.kilnCheckpoint?.pending;
+  if (carried !== "summarized" && carried !== "kept") return null;
+  const earlier = said(0, compactedAt);
+  return earlier === null ? null : { source: "compaction-checkpoint", text: earlier };
+}
+
+/** The carry-over as the new session's frame reads it. A proposal in it is pending, and is said to be. */
+function carryoverLines(carried) {
+  const last = carried.lastOperation;
+  return [
+    `Kiln session carry-over (${carried.reason}): ${CARRYOVER_FRAME[carried.reason] ?? CARRYOVER_FRAME.default}`,
+    ...(last ? [`Last completed bundle operation: ${last.index + 1}. ${last.kind} ${last.target} (${last.status}).`] : []),
+    ...(carried.pending
+      ? [
+          "The assistant's last message in the earlier session follows. If it asked the operator something or proposed a change, that is STILL PENDING: the operator has not answered it and has not approved it. Put it to the operator again before acting on it.",
+          "--- pending question or proposal (earlier session) ---",
+          carried.pending.text,
+          "--- end ---",
+        ]
+      : ["No question or proposal was pending in the earlier session."]),
+  ];
+}
+
 /** Whether this session is Kiln's: planning content resolves, or Kiln's runtime state is named. */
 async function kilnSession(deps = {}) {
   try {
@@ -1973,16 +2037,71 @@ export default function register(pi, deps = {}) {
    * ⚠️ **ONCE PER SESSION.** The first outcome stands. A second failure in a session that is already leaving would
    * only overwrite the reason the supervisor is about to read.
    */
-  const enterRecovery = async (code, ctx) => {
-    if (recoveryOutcome !== null) return;
-    recoveryOutcome = code;
-    let requested = false;
+  const requestNewSession = async (reason, ctx) => {
+    let outcome = { written: false, code: "recovery-request-unavailable" };
     try {
       const recovery = deps.recoveryRequest ?? (await import("../../lib/recovery-request.mjs"));
-      requested = (await recovery.requestRecovery(code)).written === true;
+      outcome = await recovery.requestRecovery(reason);
     } catch {
       // Outside a supervised run, or with no runtime state, there is nobody to ask. The outcome is still reported.
     }
+    // ⚠️ ONLY A SESSION THAT IS REALLY LEAVING HANDS ANYTHING ON. Without a request there is no session to hand it to.
+    if (outcome?.written === true) await carryForward(reason, ctx);
+    return outcome ?? { written: false, code: "recovery-request-unavailable" };
+  };
+
+  /**
+   * What the next session needs and project state cannot tell it - #178: the open question or proposal, and the
+   * last bundle operation that completed. The stage and an unfinished bundle are derived again there.
+   *
+   * ⚠️ **BEST EFFORT, AND NEVER IN THE WAY.** A session that must be replaced is replaced whether or not this
+   * could be written.
+   */
+  const carryForward = async (reason, ctx) => {
+    try {
+      const carryover = deps.carryover ?? (await import("../../lib/workflow-carryover.mjs"));
+      let branch = [];
+      try {
+        branch = ctx?.sessionManager?.getBranch?.() ?? [];
+      } catch {
+        branch = [];
+      }
+      let pending = pendingOnBranch(branch);
+      if (pending !== null) {
+        // Bounded, then cleaned of paths and credentials, as a compaction's pending text is.
+        const text = (await renderForModel(capUtf8(pending.text, WORKFLOW_PENDING_MAX_BYTES).text)).trim();
+        pending = text.length > 0 ? { source: pending.source, text } : null;
+      } else if (!branch.some((entry) => assistantText(entry).length > 0)) {
+        // A session replaced before it said anything passes on what it was itself handed, unchanged.
+        pending = carryover.readCarryover({ sessionId: sessionIdOf(ctx) })?.pending ?? null;
+      }
+
+      let lastOperation = null;
+      try {
+        const checkpoints = await import("../../lib/workflow-checkpoint.mjs");
+        const injected = typeof deps.decisionBundleJournal === "function";
+        const built = await checkpoints.buildWorkflowCheckpoint({
+          toolRoot: deps.toolRoot,
+          journalLocation: injected ? await bundleJournalLocation(deps) : null,
+          journalFromEnv: !injected,
+          ...(deps.checkpointBoundMs ? { boundMs: deps.checkpointBoundMs } : {}),
+          ...(deps.checkpointWorker ? { worker: deps.checkpointWorker } : {}),
+        });
+        const last = built?.bundle?.lastOperation ?? null;
+        if (last) lastOperation = { index: last.index, kind: last.kind, target: last.target, status: last.status };
+      } catch {
+        lastOperation = null;
+      }
+      await carryover.writeCarryover({ reason, pending, lastOperation });
+    } catch {
+      // The request stands without it.
+    }
+  };
+
+  const enterRecovery = async (code, ctx) => {
+    if (recoveryOutcome !== null) return;
+    recoveryOutcome = code;
+    const requested = (await requestNewSession(code, ctx)).written === true;
     try {
       ctx?.ui?.notify?.(`${RECOVERY_NOTICE[code] ?? RECOVERY_NOTICE.default}${requested ? " Kiln is starting a new session." : ""}`, "warning");
     } catch {
@@ -2152,12 +2271,27 @@ export default function register(pi, deps = {}) {
 
   // `message_end` is Pi's finalized-message boundary. Enqueue is deliberately synchronous: this
   // hook never waits for ElevenLabs or speaker playback and returns no content to the session.
-  pi?.on?.("message_end", (event) => {
+  pi?.on?.("message_end", (event, ctx) => {
     try {
       voiceSession?.handleMessage?.(event?.message);
     } catch {
       // Voice output cannot interrupt or alter Pi's message lifecycle.
     }
+    // ⚠️ **THE CARRY-OVER ENDS WITH THIS SESSION'S FIRST COMPLETED ANSWER (#178).** Pi writes the session's transcript
+    // at its first assistant message, and from then on the conversation itself holds what was carried. Removing the
+    // record here, and not at some later turn, is what lets session planning read a bound record as "this session
+    // has not yet taken a turn". A message that failed, was stopped, or said nothing is not an answer.
+    const message = event?.message;
+    if (message?.role !== "assistant" || message.stopReason === "error" || message.stopReason === "aborted" || textOf(message).length === 0) return undefined;
+    const sessionId = sessionIdOf(ctx);
+    if (sessionId === null) return undefined;
+    return (async () => {
+      try {
+        (deps.carryover ?? (await import("../../lib/workflow-carryover.mjs"))).clearCarryover({ sessionId });
+      } catch {
+        // The frame goes on saying it, which costs a repeat and loses nothing.
+      }
+    })();
   });
 
   pi?.on?.("session_shutdown", async (_event, ctx) => {
@@ -2175,6 +2309,44 @@ export default function register(pi, deps = {}) {
       }
       voiceSession = null;
     }
+  });
+
+  /**
+   * The operator's `/new` - #178.
+   *
+   * ⚠️ **PI'S OWN SWITCH IS CANCELLED, AND THE SUPERVISOR MAKES THE NEW SESSION.** Left to Pi, `/new` opens a
+   * session the project's record does not name: on a first run the record goes on naming the old one and the new
+   * transcript is orphaned, and on a resumed run the session guard stops Pi, as it should. So Kiln leaves a request
+   * bound to the run and asks Pi to shut down. The supervisor records a new session under the session lock and
+   * starts Pi on it. The guard is not involved and not changed.
+   *
+   * ⚠️ **A SWITCH KILN CANNOT REQUEST IS REFUSED, NOT ALLOWED THROUGH.** Under a supervisor, a request that could
+   * not be written leaves the operator where they were, with a code. Only a Pi that Kiln's supervisor did not
+   * start, which has no session record to diverge from, is left to switch as Pi does.
+   */
+  pi?.on?.("session_before_switch", async (event, ctx) => {
+    if (event?.reason !== "new") return undefined;
+    if (!(await kilnSession(deps))) return undefined;
+    const outcome = await requestNewSession(OPERATOR_NEW_SESSION, ctx);
+    if (outcome.written !== true && outcome.code === "recovery-not-supervised") return undefined;
+    try {
+      ctx?.ui?.notify?.(
+        outcome.written === true
+          ? "Kiln is starting a new session. This one is kept as it is."
+          : `Kiln could not start a new session (${outcome.code ?? "recovery-request-unavailable"}), so this session continues.`,
+        outcome.written === true ? "info" : "warning"
+      );
+    } catch {
+      // The switch is cancelled either way.
+    }
+    if (outcome.written === true) {
+      try {
+        ctx?.shutdown?.();
+      } catch {
+        // The request is written; the supervisor acts on it whenever Pi does exit.
+      }
+    }
+    return { cancel: true };
   });
 
   /**
@@ -2262,7 +2434,7 @@ export default function register(pi, deps = {}) {
     researchSession.lastCompactionTokensBefore = event?.compactionEntry?.tokensBefore ?? null;
   });
 
-  pi?.on?.("before_agent_start", async (event) => {
+  pi?.on?.("before_agent_start", async (event, ctx) => {
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
     // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.
     let block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
@@ -2275,6 +2447,18 @@ export default function register(pi, deps = {}) {
       // The stage context stands on its own.
     }
     if (recoveryOutcome !== null) block += `\n\nKiln recovery (${recoveryOutcome}): ${RECOVERY_FRAME[recoveryOutcome] ?? RECOVERY_FRAME.default}`;
+    // ⚠️ WHAT THE SESSION THIS ONE REPLACED LEFT OPEN, FOR AS LONG AS THE RECORD BOUND TO THIS SESSION EXISTS (#178).
+    // It is still here when the session is closed and started again before its first turn. `message_end` removes it
+    // at this session's first completed answer, after which the conversation itself holds it.
+    try {
+      const sessionId = sessionIdOf(ctx);
+      if (sessionId !== null) {
+        const carried = (deps.carryover ?? (await import("../../lib/workflow-carryover.mjs"))).readCarryover({ sessionId });
+        if (carried) block += `\n\n${carryoverLines(carried).join("\n")}`;
+      }
+    } catch {
+      // The stage context stands on its own.
+    }
     return { systemPrompt: `${base}${framedStageContext(block)}` };
   });
 
