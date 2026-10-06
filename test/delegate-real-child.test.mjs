@@ -374,3 +374,75 @@ test("⚠️ ACC-0075 a real child that answers confidently with none of Kiln's 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+/* ============================================================ the production wrapper, #176 ==== */
+
+/**
+ * `kiln_delegate` exactly as a session reaches it: `register(pi)` with no second argument.
+ *
+ * ⚠️ **NOTHING IS INJECTED, AND THAT IS THE TEST (#176).** Every case above hands the runtime a `resolveAgent`
+ * and a `spawn`, which is how the defect stayed hidden: the wrapper passes the runtime no dependencies at all,
+ * and with none it had no way to find or start the child. v26.9.0 refused every delegation with
+ * `child-executable-not-found` after a setup preflight that had just run the same pinned agent.
+ *
+ * The provider is a custom one in the isolated agent directory's own `models.json`, on the loopback interface
+ * with an inline placeholder key, so the child needs no extension and no credential.
+ */
+async function throughTheWrapper({ toolRoot = REPO } = {}) {
+  const { default: register } = await import("../pi-package/extensions/kiln.js");
+  const base = mkdtempSync(join(tmpdir(), "kiln-wrapper-child-"));
+  const agentDir = join(base, "agent");
+  const contentRoot = join(base, "planning-content");
+  mkdirSync(agentDir, { recursive: true });
+  mkdirSync(contentRoot, { recursive: true });
+  writeFileSync(join(contentRoot, "project.yaml"), "name: wrapper fixture\n");
+
+  const provider = await loopback();
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "kiln-loopback": {
+          baseUrl: `http://127.0.0.1:${provider.port}/v1`,
+          api: "openai-completions",
+          apiKey: PLANTED,
+          models: [{ id: "loopback-model", name: "Loopback", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 1024 }],
+        },
+      },
+    })
+  );
+  writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProvider: "kiln-loopback", defaultModel: "loopback-model", defaultProjectTrust: "always" }));
+
+  // The host registry is measured from what registration itself produced, as `pi.getAllTools()` reports it.
+  const tools = [];
+  const deps = toolRoot === REPO ? undefined : { toolRoot };
+  register({ registerTool: (tool) => tools.push(tool), getAllTools: () => tools.map((tool) => ({ name: tool.name })) }, ...(deps ? [deps] : []));
+  const delegate = tools.find((tool) => tool.name === "kiln_delegate");
+
+  const saved = { content: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR };
+  process.env.PLANNING_CONTENT_DIR = contentRoot;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  try {
+    const result = await delegate.execute("call-1", { role: "planning", task: TASK }, undefined, undefined, { model: { provider: "kiln-loopback", id: "loopback-model" }, thinkingLevel: "medium" });
+    return { result: result.details, requests: provider.seen, base };
+  } finally {
+    for (const [name, value] of [["PLANNING_CONTENT_DIR", saved.content], ["PI_CODING_AGENT_DIR", saved.agent]])
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    await provider.close();
+  }
+}
+
+test("⚠️ #176 kiln_delegate with nothing injected finds the pinned agent, starts it, and returns its answer", { timeout: 180_000 }, async () => {
+  const run = await throughTheWrapper();
+  try {
+    assert.notEqual(run.result.code, "child-executable-not-found", "the wrapper could not find the executable setup had just used");
+    assert.equal(run.result.ok, true, `the delegation was refused: ${JSON.stringify(run.result)}`);
+    assert.equal(run.result.role, "planning");
+    assert.equal(run.result.output, "The port office needs same-day figures.");
+    assert.equal(run.result.observed.taskBindingObserved, true);
+    assert.equal(run.requests.length, 1, "the child made other than one provider request");
+  } finally {
+    rmSync(run.base, { recursive: true, force: true });
+  }
+});

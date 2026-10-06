@@ -187,6 +187,7 @@ export const CI_GROUPS = Object.freeze({
   ]),
   consumer: Object.freeze([
     "clean-consumer-journey.test.mjs",
+    "consumer-delegation.test.mjs",
     "consumer-flow.test.mjs",
     "custom-provider-start.test.mjs",
     "piped-stage1-route.test.mjs",

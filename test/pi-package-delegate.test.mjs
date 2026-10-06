@@ -278,6 +278,35 @@ test("⚠️ ACC-0111 a refusal is structured data with a stable code, and carri
   }
 });
 
+test("⚠️ #176 a launch refusal carries the executable's identity, field by field, and nothing shaped like a location", async () => {
+  const f = project();
+  const hostile = "C:\Users\operator\node_modules\.bin\pi.cmd --mode json";
+  const refused = (executable) => ({ ok: false, code: "child-executable-not-found", message: "The specialist executable could not be found.", executable });
+  try {
+    const named = await invoke(
+      tool(deps(runtime(refused({ package: "@earendil-works/pi-coding-agent", version: "0.87.1", strategy: "pinned-package-bin", resolved: false, reason: "version-mismatch", installedVersion: "0.86.0" })))),
+      f.contentRoot,
+      { role: "research", task: TASK }
+    );
+    assert.deepEqual(named.details.executable, { package: "@earendil-works/pi-coding-agent", version: "0.87.1", strategy: "pinned-package-bin", resolved: false, reason: "version-mismatch", installedVersion: "0.86.0" });
+
+    // A runtime that said more than an identity is not repeated: every field is held to its own shape.
+    const leaky = await invoke(
+      tool(deps(runtime(refused({ package: hostile, version: hostile, strategy: hostile, resolved: "yes", reason: hostile, installedVersion: hostile, command: hostile, args: [hostile], cwd: hostile, entry: hostile, error: hostile })))),
+      f.contentRoot,
+      { role: "research", task: TASK }
+    );
+    assert.deepEqual(leaky.details.executable, { package: null, version: null, strategy: null, resolved: false });
+    assert.equal(JSON.stringify(leaky).includes("operator"), false);
+
+    // And a refusal with no executable has no such field.
+    const plain = await invoke(tool(deps(runtime({ ok: false, code: "unknown-role", message: "x" }))), f.contentRoot, { role: "research", task: TASK });
+    assert.equal("executable" in plain.details, false);
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
 test("⚠️ ACC-0111 no refusal carries a credential, a path, a nonce, a digest or raw child output", async () => {
   const f = project();
   const saved = process.env.ANTHROPIC_API_KEY;
