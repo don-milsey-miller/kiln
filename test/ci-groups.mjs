@@ -152,6 +152,7 @@ export const CI_GROUPS = Object.freeze({
     "job-shutdown.test.mjs",
     "keyboard-stop-terminal.test.mjs",
     "launcher.test.mjs",
+    "pi-pty-confirmation.test.mjs",
     "process-table-priming.test.mjs",
     "process-table-windows.test.mjs",
     "reap.test.mjs",

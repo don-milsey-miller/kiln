@@ -238,8 +238,17 @@ function toolContentRefused(error, ctx) {
  * call rather than refuse it, which is a worse failure than the one this gate exists to prevent.
  *
  * Kiln owns the timer so expiry is observable and retryable. Every other non-approval still fails closed.
+ *
+ * ⚠️ **AND PI IS NOT ASKED TO COUNT IT DOWN (#177).** Given a `timeout`, Pi's dialog rewrites its last message
+ * line once a second for the whole wait. That is output with no new information in it, and when that line sits
+ * above the visible rows Pi's renderer clears the screen and replays the entire transcript on every tick. Kiln's
+ * own timer and abort signal already bound the wait, so the dialog states the limit once and then stays still.
  */
 const CONFIRM_TIMEOUT_MS = 300_000;
+
+/** The one line that tells the operator the dialog will not wait for ever. Static: it is drawn once. */
+const expiryLine = (timeoutMs) =>
+  `This confirmation expires after ${timeoutMs === CONFIRM_TIMEOUT_MS ? "five minutes" : `${Math.max(1, Math.round(timeoutMs / 1000))} seconds`}.`;
 const OPERATOR_ACTOR = "operator via Pi UI";
 const CONFIRMATION_NOT_GRANTED = "operator-confirmation-not-granted";
 const CONFIRMATION_EXPIRED = "operator-confirmation-expired";
@@ -307,10 +316,8 @@ async function askOperator(ctx, signal, title, lines, timeoutMs) {
       }, timeoutMs);
     });
     const asked = Promise.resolve(
-      ctx.ui.confirm(title, lines.join("\n"), {
-        signal: controller.signal,
-        timeout: timeoutMs,
-      })
+      // ⚠️ NO `timeout` OPTION. The signal closes the dialog when Kiln's timer fires or the invocation is abandoned.
+      ctx.ui.confirm(title, [...lines, "", expiryLine(timeoutMs)].join("\n"), { signal: controller.signal })
     ).then((granted) => (granted === true ? "granted" : "not-granted"), () => "not-granted");
     return await Promise.race([asked, expired, abandoned]);
   } catch {
