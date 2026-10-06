@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visual-project-workflow.local/schemas/runtime/recovery-request.schema.json",
+  "x-runtimeRecord": "recovery-request",
+  "x-location": "<local-state>/runtime/recovery-request.json",
+  "x-committed": false,
+  "title": "Session recovery request",
+  "description": "What Kiln's extension inside Pi asks the supervisor for when the current session cannot go on, or when the operator asked for a new one (#178). ⚠️ THE EXTENSION ASKS; ONLY THE SUPERVISOR CHANGES WHICH SESSION IS RECORDED. The session record is written under the session lock by the process that owns it, so the agent leaves a request and exits, and the supervisor mints and records the new session before starting Pi on it. ⚠️ BOUND TO ONE RUN AND CONSUMED ONCE. A request names the run that wrote it; one left by an earlier run is discarded unread by any later one. ⚠️ A REASON FROM A FIXED LIST AND NOTHING ELSE. No path, no credential, no prompt, no tool result and no error text: the reason says which recovery, and the project's own state says the rest.",
+  "type": "object",
+  "required": ["recordVersion", "runId", "reason", "requestedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "recordVersion": { "$ref": "runtime-common.schema.json#/$defs/recordVersion" },
+    "runId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "The supervisor run this request belongs to. A request whose run is not the reader's is stale."
+    },
+    "reason": {
+      "enum": ["operator-new-session", "compaction-failed", "compaction-boundary-invalid", "input-exceeds-context-window"],
+      "description": "`operator-new-session` is the operator's own request. The other three are failures Kiln recovers from automatically, at most once per launch."
+    },
+    "requestedAt": { "$ref": "runtime-common.schema.json#/$defs/isoTimestamp" }
+  }
+}

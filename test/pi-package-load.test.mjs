@@ -197,7 +197,7 @@ test("⚠️ ACC-0063 a trusted project loads exactly the package's extension, i
         commands: 1,
         // Session start owns terminal setup, session shutdown releases voice/input resources, and
         // stage context is added before each agent start.
-        handlers: [["session_start", 1], ["message_end", 1], ["session_shutdown", 1], ["session_before_compact", 1], ["session_compact", 1], ["before_agent_start", 1]],
+        handlers: [["session_start", 1], ["message_end", 1], ["session_shutdown", 1], ["session_before_compact", 1], ["session_compact_failed", 1], ["session_compact", 1], ["before_agent_start", 1]],
       },
     ]);
 

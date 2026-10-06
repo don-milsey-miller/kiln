@@ -496,7 +496,8 @@ test("⚠️ #178 in a Kiln project a boundary Kiln cannot copy cancels the comp
     );
     assert.deepEqual(result, { cancel: true }, JSON.stringify(over));
   }
-  assert.equal(notices.length, 3);
+  // Every one is cancelled. The outcome is recorded and said once: the first reason stands for the session.
+  assert.equal(notices.length, 1);
   assert.equal(notices[0][0], "warning");
   // The outcome is said to the model on the next turn, as a code and an instruction.
   const framed = await inProject(fx, () => handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {}));

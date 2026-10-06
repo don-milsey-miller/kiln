@@ -1927,6 +1927,7 @@ function workflowCheckpointLines({ details, stageName }, pending) {
 const RECOVERY_CODE = Object.freeze({
   BOUNDARY_INVALID: "compaction-boundary-invalid",
   INPUT_EXCEEDS: "input-exceeds-context-window",
+  COMPACTION_FAILED: "compaction-failed",
 });
 
 const RECOVERY_NOTICE = Object.freeze({
@@ -1964,12 +1965,35 @@ export default function register(pi, deps = {}) {
   let voiceSession = null;
   // The typed outcome of a compaction Kiln had to cancel, said to the operator once and to the model on every turn.
   let recoveryOutcome = null;
+  /**
+   * ⚠️ **THE EXTENSION ASKS FOR A NEW SESSION; IT NEVER MAKES ONE (#178).** Which session the project records is the
+   * supervisor's, written under the session lock. So this leaves a request bound to the current run and asks Pi to
+   * shut down. The supervisor reads the request after Pi exits, records a new session, and starts Pi on it.
+   *
+   * ⚠️ **ONCE PER SESSION.** The first outcome stands. A second failure in a session that is already leaving would
+   * only overwrite the reason the supervisor is about to read.
+   */
   const enterRecovery = async (code, ctx) => {
+    if (recoveryOutcome !== null) return;
     recoveryOutcome = code;
+    let requested = false;
     try {
-      ctx?.ui?.notify?.(RECOVERY_NOTICE[code] ?? RECOVERY_NOTICE.default, "warning");
+      const recovery = deps.recoveryRequest ?? (await import("../../lib/recovery-request.mjs"));
+      requested = (await recovery.requestRecovery(code)).written === true;
+    } catch {
+      // Outside a supervised run, or with no runtime state, there is nobody to ask. The outcome is still reported.
+    }
+    try {
+      ctx?.ui?.notify?.(`${RECOVERY_NOTICE[code] ?? RECOVERY_NOTICE.default}${requested ? " Kiln is starting a new session." : ""}`, "warning");
     } catch {
       // The outcome stands whether or not it could be shown.
+    }
+    if (requested) {
+      try {
+        ctx?.shutdown?.();
+      } catch {
+        // The request is written; the supervisor acts on it whenever Pi does exit.
+      }
     }
   };
   let researchToolsPromise = null;
@@ -2216,6 +2240,19 @@ export default function register(pi, deps = {}) {
         },
       };
     }
+  });
+
+  /**
+   * A compaction Pi could not complete - #178.
+   *
+   * ⚠️ **NOT ONE KILN CANCELLED, AND NOT ONE THE OPERATOR STOPPED.** Kiln's own cancel has already recorded its reason,
+   * and an abort is somebody's decision. What is left is a compaction that failed, most often an overflow that was
+   * still over the limit after its one retry. That session cannot go on, so a new one is asked for.
+   */
+  pi?.on?.("session_compact_failed", async (event, ctx) => {
+    if (recoveryOutcome !== null || event?.aborted === true) return;
+    if (!(await kilnSession(deps))) return;
+    await enterRecovery(RECOVERY_CODE.COMPACTION_FAILED, ctx);
   });
 
   pi?.on?.("session_compact", (event) => {

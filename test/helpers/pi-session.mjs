@@ -61,7 +61,9 @@ export async function scriptedProvider() {
         res.writeHead(400, { "content-type": "application/json" });
         return res.end(JSON.stringify({ error: { message: `This model's maximum context length is ${limit.tokens} tokens. However, your messages resulted in ${Math.round(chars / 4)} tokens. Please reduce the length of the messages.`, type: "invalid_request_error", code: "context_length_exceeded" } }));
       }
-      const reply = script.shift() ?? { text: "Noted." };
+      // A scripted reply may be a function of the request, for an answer that depends on what was asked.
+      const scripted = script.shift() ?? { text: "Noted." };
+      const reply = typeof scripted === "function" ? scripted(parsed) : scripted;
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "close" });
       const finish = (reason) => {
         res.write(chunk({}, reason));
