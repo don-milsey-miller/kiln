@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { installReaper, reapLater } from "./helpers/reap.mjs";
 import { providerVisible } from "./helpers/provider-visible.mjs";
@@ -471,10 +471,10 @@ test("⚠️ a question Pi keeps verbatim is not copied into the summary", async
   assert.equal(silent.compaction.details.kilnCheckpoint.pending, "none");
 });
 
-test("with no readable Kiln project, or a boundary Kiln cannot copy, an ordinary compaction is left to Pi", async () => {
+test("⚠️ #178 only a session that is not Kiln's is left to Pi's own compaction", async () => {
   const fx = await project();
-  const { handlers } = session(fx);
-  // No project named for this session at all.
+  // No planning content resolves and no runtime state is named: this is not a Kiln session.
+  const { handlers } = session(fx, { decisionBundleJournal: () => null });
   const saved = process.env.PLANNING_CONTENT_DIR;
   process.env.PLANNING_CONTENT_DIR = join(fx.base, "no-such-planning-content");
   try {
@@ -483,9 +483,128 @@ test("with no readable Kiln project, or a boundary Kiln cannot copy, an ordinary
     if (saved === undefined) delete process.env.PLANNING_CONTENT_DIR;
     else process.env.PLANNING_CONTENT_DIR = saved;
   }
-  // Nothing approved is at risk, so a malformed preparation falls back rather than cancelling.
-  for (const over of [{ firstKeptEntryId: undefined }, { tokensBefore: "many" }])
-    assert.equal(await inProject(fx, () => compact(handlers, fx, over)), undefined, JSON.stringify(over));
+});
+
+test("⚠️ #178 in a Kiln project a boundary Kiln cannot copy cancels the compaction with a typed outcome, never a fall-through", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  const notices = [];
+  const ctx = { ui: { notify: (message, level) => notices.push([level, message]) } };
+  for (const over of [{ firstKeptEntryId: undefined }, { firstKeptEntryId: "" }, { tokensBefore: "many" }]) {
+    const result = await inProject(fx, () =>
+      handlers.get("session_before_compact")({ type: "session_before_compact", preparation: { ...preparation(fx), ...over }, branchEntries: [], reason: "threshold", willRetry: false }, ctx)
+    );
+    assert.deepEqual(result, { cancel: true }, JSON.stringify(over));
+  }
+  assert.equal(notices.length, 3);
+  assert.equal(notices[0][0], "warning");
+  // The outcome is said to the model on the next turn, as a code and an instruction.
+  const framed = await inProject(fx, () => handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {}));
+  assert.ok(framed.systemPrompt.includes("Kiln recovery (compaction-boundary-invalid):"));
+});
+
+test("⚠️ #178 when the stage cannot be derived the compaction is a minimal typed checkpoint, still Kiln's", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  // A tool root with no schemas or stages: the derivation fails inside the worker.
+  const broken = session(fx, { toolRoot: join(fx.base, "no-such-tool-root") });
+  const { compaction } = await inProject(fx, () => compact(broken.handlers, fx));
+  assert.equal(compaction.firstKeptEntryId, "entry-0042");
+  assert.equal(compaction.tokensBefore, 245_351);
+  assert.deepEqual(compaction.details, { kilnCheckpoint: { checkpointVersion: 1, stage: null, status: "minimal", code: "stage-unavailable", pending: "summarized" } });
+  assert.ok(compaction.summary.includes("Stage: not derived (stage-unavailable). Call kiln_project_status before continuing."));
+  assert.ok(compaction.summary.includes("Operator: CSV only, please."), "the bounded conversation is still carried");
+  // The same session with a working tool root derives the stage.
+  assert.equal((await inProject(fx, () => compact(handlers, fx))).compaction.details.kilnCheckpoint.stage, "01-intake");
+});
+
+test("⚠️ #178 a checkpoint build that never returns is stopped at its bound, and the compaction still completes", async () => {
+  const fx = await project();
+  // A worker that spins for ever in synchronous code: only terminating the thread can end it.
+  const hung = join(fx.base, "hung-worker.mjs");
+  writeFileSync(hung, "for (;;) {}\n");
+  const { handlers } = session(fx, { checkpointWorker: pathToFileURL(hung), checkpointBoundMs: 400 });
+  const started = Date.now();
+  const { compaction } = await inProject(fx, () => compact(handlers, fx));
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= 350 && elapsed < 3_000, `the hook took ${elapsed} ms against a 400 ms bound`);
+  assert.deepEqual(compaction.details, { kilnCheckpoint: { checkpointVersion: 1, stage: null, status: "minimal", code: "checkpoint-timeout", pending: "summarized" } });
+  assert.ok(compaction.summary.includes("Stage: not derived (checkpoint-timeout)."));
+});
+
+test("⚠️ #178 a finished bundle's last operation is carried as identifiers and a status", async () => {
+  const fx = await project();
+  const { tool, handlers } = session(fx);
+  assertApplied(fx, await invoke(tool, fx, request(fx), { ctx: channel(true).ctx }));
+  const { compaction } = await inProject(fx, () => compact(handlers, fx));
+  assert.deepEqual(compaction.details.kilnCheckpoint.lastOperation, { index: 6, kind: "write-stage-note", target: `stage:${STAGE}`, status: "completed" });
+  assert.ok(compaction.summary.includes(`Last completed bundle operation: 7. write-stage-note stage:${STAGE} (completed).`));
+});
+
+/* ---------------------------------------------------------- the turn an overflow retries, #178 F5 */
+
+/** An overflow compaction of a split turn: the operator's request is before Pi's boundary, a tool result after it. */
+const overflow = (fx, request, { keptResult = "RESULT ".repeat(200), tokensBefore = 30_000 } = {}) => ({
+  type: "session_before_compact",
+  reason: "overflow",
+  willRetry: true,
+  preparation: {
+    firstKeptEntryId: "e3",
+    tokensBefore,
+    isSplitTurn: true,
+    settings: { reserveTokens: 4_000, keepRecentTokens: 2_000 },
+    messagesToSummarize: [{ role: "user", content: "An earlier question." }, { role: "assistant", content: [{ type: "text", text: "An earlier answer." }] }],
+    turnPrefixMessages: [{ role: "user", content: [{ type: "text", text: request }] }, { role: "assistant", content: [{ type: "toolCall", name: "kiln_project_status", arguments: {} }] }],
+  },
+  branchEntries: [
+    { type: "message", id: "e0", message: { role: "user", content: "An earlier question." } },
+    { type: "message", id: "e1", message: { role: "user", content: [{ type: "text", text: request }] } },
+    { type: "message", id: "e3", message: { role: "toolResult", toolName: "kiln_project_status", content: [{ type: "text", text: keptResult }] } },
+  ],
+});
+
+test("⚠️ #178 F5 an overflow retry carries the operator's request whole when it fits", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  // Longer than the 1 KB a summarised message is cut to, with a path and a credential-shaped run that must survive.
+  const asked = `CURRENT-REQUEST ${"Reconcile every dock fee against its invoice. ".repeat(60)} See ${join(fx.base, "notes.md")} and ${SECRET}. END-OF-REQUEST`;
+  const { compaction } = await inProject(fx, () => handlers.get("session_before_compact")(overflow(fx, asked), { model: { contextWindow: 60_000 } }));
+  assert.equal(compaction.firstKeptEntryId, "e3", "Pi's boundary was moved");
+  assert.ok(compaction.summary.includes(`## Current request (the operator's words, unchanged)\n${asked}\n`), "the request is not carried byte for byte");
+  // The bounded narrative beside it is still cleaned and still cut.
+  const narrative = compaction.summary.slice(0, compaction.summary.indexOf("## Current request"));
+  assert.ok(!narrative.includes("END-OF-REQUEST") && !narrative.includes(SECRET));
+});
+
+test("⚠️ #178 F5 an input that alone exceeds the window is not retried cut down: typed outcome, nothing copied", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  const notices = [];
+  const huge = `HUGE-INPUT ${"x".repeat(400_000)}`;
+  const result = await inProject(fx, () =>
+    handlers.get("session_before_compact")(overflow(fx, huge, { tokensBefore: 130_000 }), { model: { contextWindow: 60_000 }, ui: { notify: (message) => notices.push(message) } })
+  );
+  assert.deepEqual(result, { cancel: true }, "a compaction was composed for an input that cannot fit");
+  assert.equal(notices.length, 1);
+  assert.ok(notices[0].includes("larger than this model's context window"));
+  const framed = await inProject(fx, () => handlers.get("before_agent_start")({ type: "before_agent_start", systemPrompt: "base" }, {}));
+  assert.ok(framed.systemPrompt.includes("Kiln recovery (input-exceeds-context-window):"));
+  assert.ok(!framed.systemPrompt.includes("HUGE-INPUT") && !notices[0].includes("HUGE-INPUT"), "the input was copied into a notice or the frame");
+});
+
+test("#178 F5 a request Pi keeps is left to Pi, and an unknown window never cuts", async () => {
+  const fx = await project();
+  const { handlers } = session(fx);
+  // The request is after the boundary: Pi keeps it, and the summary does not repeat it.
+  const kept = overflow(fx, "KEPT-REQUEST");
+  kept.preparation.firstKeptEntryId = "e1";
+  kept.preparation.turnPrefixMessages = [];
+  const first = await inProject(fx, () => handlers.get("session_before_compact")(kept, { model: { contextWindow: 60_000 } }));
+  assert.ok(!first.compaction.summary.includes("## Current request"));
+  // No context window known: the request is carried whole rather than judged too large.
+  const big = `UNKNOWN-WINDOW ${"y".repeat(300_000)}`;
+  const second = await inProject(fx, () => handlers.get("session_before_compact")(overflow(fx, big), {}));
+  assert.ok(second.compaction.summary.includes(big));
 });
 
 for (const [index, kind] of KINDS.entries()) {
