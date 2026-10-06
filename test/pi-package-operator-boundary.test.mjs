@@ -247,10 +247,11 @@ test("⚠️ ACC-0070 the dialog is bounded at five minutes and carries a Kiln-o
   });
 
   assert.equal(ui.asked.length, 1);
-  // ⚠️ WITHOUT THE TIMEOUT AN RPC CLIENT THAT NEVER ANSWERS WOULD HANG THE TOOL CALL rather than refuse
-  // it: `confirm` has no bound of its own there.
-  assert.deepEqual(Object.keys(ui.asked[0].opts).sort(), ["signal", "timeout"]);
-  assert.equal(ui.asked[0].opts.timeout, 300_000);
+  // ⚠️ THE SIGNAL IS THE BOUND, AND PI IS GIVEN NO `timeout` (#177). Kiln's own timer aborts this signal after five
+  // minutes, so an RPC client that never answers still cannot hang the tool call. A `timeout` option would have Pi
+  // redraw a countdown every second for the whole wait.
+  assert.deepEqual(Object.keys(ui.asked[0].opts), ["signal"]);
+  assert.ok(ui.asked[0].message.endsWith("\n\nThis confirmation expires after five minutes."), ui.asked[0].message.slice(-120));
   assert.ok(ui.asked[0].opts.signal instanceof AbortSignal);
   assert.notEqual(ui.asked[0].opts.signal, agents.signal, "the agent's signal was passed directly");
 });
@@ -551,7 +552,7 @@ test("declined, cancelled, timed out and lost dialogs write no approval, single 
       const ui = channel(false);
       ui.ctx.ui.confirm = async (title, message, opts) => {
         ui.asked.push({ title, message, opts });
-        return new Promise((resolve) => setTimeout(() => resolve(false), Math.min(opts.timeout, 5)));
+        return new Promise((resolve) => setTimeout(() => resolve(false), 5));
       };
       return ui;
     },
