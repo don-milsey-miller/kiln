@@ -70,7 +70,7 @@ test("5c: the evidence slice end to end, with the negative control first", async
         instruction: "Set wal_level=logical and create the publication.",
         expectedOutcome: "The subscriber receives changes to the customer table.",
         restsOn: [ast.id],
-        destructive: true, // a mutating step: #58's floor, and the higher rung under #99
+        actionClass: "destructive", // #58's floor, and the higher rung under #99
         remediation: "Drop the publication and restore wal_level.",
       },
       o

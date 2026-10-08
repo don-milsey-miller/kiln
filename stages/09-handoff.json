@@ -30,6 +30,7 @@
       "Read the task set, the acceptance criteria and the evidence behind them.",
       "Enumerate the handoff's operational actions; if there are none, state why before proposing n/a for `runbook-steps-above-threshold`.",
       "Author one runbook step per action, each resting on an assertion at or above the threshold (#57); the handoff projects the aggregate runbook from those steps (DEC-0011).",
+      "Classify every new step with `actionClass`: `informational` when it only inspects and changes nothing, `mutating` when it changes state that can be put back, `destructive` when it can destroy something. The class decides the rung the step's assertions must reach under the project's `confidence.thresholds`; tags and wording do not.",
       "Do not create a typed `runbook` or substitute another type for one; DEC-0011 keeps it deactivated until a multi-step destructive procedure needs rollback state that spans steps.",
       "Read the stage Working notes to obtain its revision, then append or replace the named `developer-runbook` subsection with the rendered Markdown runbook and role-slice instructions.",
       "Delegate to the planning specialist where a slice needs its steps written for a role.",

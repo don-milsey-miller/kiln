@@ -527,14 +527,17 @@
         "minimum": 1,
         "description": "Position within its runbook. Ordering only — dependencies are trace edges, not numbers."
       },
-      "destructive": {
-        "type": "boolean",
-        "default": false,
-        "description": "#58: whether this step can destroy something. Classified per step; the schema requires remediation and a backing claim when true."
+      "actionClass": {
+        "enum": [
+          "informational",
+          "mutating",
+          "destructive"
+        ],
+        "description": "#181: what kind of action this step is, which decides the confidence its backing claims must have. `informational` only inspects and changes nothing. `mutating` changes state that can be put back. `destructive` can destroy something, and requires remediation and a backing claim. The project's `confidence.thresholds` gives the rung each class requires. Required when a step is authored. A stored step without it predates the field and is read from `destructive`: true is destructive, anything else is mutating, never informational."
       },
       "remediation": {
         "type": "string",
-        "description": "What to do if this step fails or must be undone. Required when destructive (#58's floor)."
+        "description": "What to do if this step fails or must be undone. Required when the step is destructive (#58's floor)."
       },
       "restsOn": {
         "type": "array",
@@ -602,6 +605,7 @@
       }
     },
     "required": [
+      "actionClass",
       "expectedOutcome",
       "instruction",
       "restsOn",

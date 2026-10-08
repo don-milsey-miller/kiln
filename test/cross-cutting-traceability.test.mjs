@@ -61,6 +61,7 @@ test("#29 a fresh project can carry one typed Stage 3 → Stage 6 → Stage 9 ev
         title: "Perform operation",
         instruction: "Run the validated operation.",
         expectedOutcome: "The operation completes.",
+        actionClass: "mutating",
         restsOn: [assertion.id],
       },
       toolOpts

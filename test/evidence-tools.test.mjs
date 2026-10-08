@@ -123,7 +123,7 @@ test("linking is idempotent, refuses unknown targets, and refuses contradictory 
 test("REQ-0009: a runbook step cannot be created without restsOn", async () => {
   const { base, contentRoot, o } = fresh();
   try {
-    const step = { title: "Enable replication", instruction: "Run the thing", expectedOutcome: "It is enabled" };
+    const step = { title: "Enable replication", instruction: "Run the thing", expectedOutcome: "It is enabled", actionClass: "mutating" };
     await assert.rejects(() => createRunbookStep(step, o), ValidationError);
     await assert.rejects(() => createRunbookStep({ ...step, restsOn: [] }, o), ValidationError);
     assert.equal(readHighWaterMarks(contentRoot).RBS ?? 0, 0, "no ID consumed");
@@ -134,7 +134,7 @@ test("REQ-0009: a runbook step cannot be created without restsOn", async () => {
 
     // #58: destructive still needs remediation, enforced by the schema at boundary 2.
     await assert.rejects(
-      () => createRunbookStep({ ...step, restsOn: [ast.id], destructive: true }, o),
+      () => createRunbookStep({ ...step, restsOn: [ast.id], actionClass: "destructive" }, o),
       /remediation|Invalid|assembled/
     );
   } finally {
@@ -159,7 +159,7 @@ test("REQ-0009 in the lint: one refuted premise blocks, however strong the other
     await linkEvidence(bad.id, refuting.id, "refute", o);
 
     const step = await createRunbookStep(
-      { title: "Step", instruction: "Do it", expectedOutcome: "Done", restsOn: [good.id, bad.id] },
+      { title: "Step", instruction: "Do it", expectedOutcome: "Done", actionClass: "mutating", restsOn: [good.id, bad.id] },
       o
     );
 
@@ -190,8 +190,8 @@ test("REQ-0009 in the lint: contested and unresolved premises block for distingu
 
     const bare = await createAssertion({ ...AST_IN, title: "Nothing bears on it" }, o);
 
-    const s1 = await createRunbookStep({ title: "A", instruction: "x", expectedOutcome: "y", restsOn: [contested.id] }, o);
-    const s2 = await createRunbookStep({ title: "B", instruction: "x", expectedOutcome: "y", restsOn: [bare.id] }, o);
+    const s1 = await createRunbookStep({ title: "A", instruction: "x", expectedOutcome: "y", actionClass: "mutating", restsOn: [contested.id] }, o);
+    const s2 = await createRunbookStep({ title: "B", instruction: "x", expectedOutcome: "y", actionClass: "mutating", restsOn: [bare.id] }, o);
 
     const all = lintProject(ctxOf(contentRoot)).findings;
     const r1 = all.find((f) => f.artifactId === s1.id && f.ruleId.startsWith("instruction/"));
@@ -213,9 +213,9 @@ test("#57: a destructive step demands a higher rung than an ordinary one", async
     const partial = await createEvidence(EXPERIMENT({ os: "RHEL 10" }), o);
     await linkEvidence(ast.id, partial.id, "support", o);
 
-    const ordinary = await createRunbookStep({ title: "A", instruction: "x", expectedOutcome: "y", restsOn: [ast.id] }, o);
+    const ordinary = await createRunbookStep({ title: "A", instruction: "x", expectedOutcome: "y", actionClass: "mutating", restsOn: [ast.id] }, o);
     const destructive = await createRunbookStep(
-      { title: "B", instruction: "drop it", expectedOutcome: "gone", restsOn: [ast.id], destructive: true, remediation: "restore" },
+      { title: "B", instruction: "drop it", expectedOutcome: "gone", restsOn: [ast.id], actionClass: "destructive", remediation: "restore" },
       o
     );
 
@@ -236,7 +236,7 @@ test("a fully evidenced step lints clean end to end", async () => {
     const ast = await createAssertion(AST_IN, o);
     const ev = await createEvidence(EXPERIMENT({ os: "RHEL 10", postgres: "17" }), o);
     await linkEvidence(ast.id, ev.id, "support", o);
-    await createRunbookStep({ title: "Step", instruction: "Do it", expectedOutcome: "Done", restsOn: [ast.id] }, o);
+    await createRunbookStep({ title: "Step", instruction: "Do it", expectedOutcome: "Done", actionClass: "mutating", restsOn: [ast.id] }, o);
 
     const findings = lintProject(ctxOf(contentRoot)).findings;
     assert.deepEqual(findings, [], JSON.stringify(findings, null, 2));
