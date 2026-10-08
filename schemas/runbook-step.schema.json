@@ -9,15 +9,29 @@
       "$ref": "common.schema.json#/$defs/artifactEnvelope"
     },
     {
-      "$comment": "#58's destructive floor. Nested inside allOf per #82.",
+      "$comment": "#58's destructive floor. Nested inside allOf per #82. #181: it applies to a step that declares the destructive class and to a legacy step that says `destructive: true`, which are the two ways a step is destructive.",
       "if": {
-        "properties": {
-          "destructive": {
-            "const": true
+        "anyOf": [
+          {
+            "properties": {
+              "actionClass": {
+                "const": "destructive"
+              }
+            },
+            "required": [
+              "actionClass"
+            ]
+          },
+          {
+            "properties": {
+              "destructive": {
+                "const": true
+              }
+            },
+            "required": [
+              "destructive"
+            ]
           }
-        },
-        "required": [
-          "destructive"
         ]
       },
       "then": {
@@ -30,6 +44,51 @@
           }
         },
         "$comment": "A destructive step with no remediation and no backing claim is the single most dangerous thing this system could emit. The schema refuses it; #57's threshold and #96's verdict are then checked by the lint, which can see the evidence graph."
+      }
+    },
+    {
+      "$comment": "#181: `actionClass` is the authority and `destructive` is the legacy field. A stored step that carries both must say one thing. A legacy `true` beside any class but destructive is refused.",
+      "if": {
+        "properties": {
+          "destructive": {
+            "const": true
+          }
+        },
+        "required": [
+          "destructive",
+          "actionClass"
+        ]
+      },
+      "then": {
+        "properties": {
+          "actionClass": {
+            "const": "destructive"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "#181: and a legacy `false` beside the destructive class is refused.",
+      "if": {
+        "properties": {
+          "destructive": {
+            "const": false
+          }
+        },
+        "required": [
+          "destructive",
+          "actionClass"
+        ]
+      },
+      "then": {
+        "properties": {
+          "actionClass": {
+            "enum": [
+              "informational",
+              "mutating"
+            ]
+          }
+        }
       }
     }
   ],
@@ -56,15 +115,23 @@
       "description": "Position within its runbook. Ordering only — dependencies are trace edges, not numbers.",
       "x-materiality": "advisory"
     },
+    "actionClass": {
+      "enum": [
+        "informational",
+        "mutating",
+        "destructive"
+      ],
+      "description": "#181: what kind of action this step is, which decides the confidence its backing claims must have. `informational` only inspects and changes nothing. `mutating` changes state that can be put back. `destructive` can destroy something, and requires remediation and a backing claim. The project's `confidence.thresholds` gives the rung each class requires. Required when a step is authored. A stored step without it predates the field and is read from `destructive`: true is destructive, anything else is mutating, never informational.",
+      "x-materiality": "structural"
+    },
     "destructive": {
       "type": "boolean",
-      "default": false,
-      "description": "#58: whether this step can destroy something. Classified per step; the schema requires remediation and a backing claim when true.",
+      "description": "LEGACY (#58, superseded by `actionClass` in #181). Steps written before `actionClass` carry this, and it is still read for them. New steps do not write it, and revising a step's `actionClass` removes it. A stored step that carries both must not contradict itself.",
       "x-materiality": "structural"
     },
     "remediation": {
       "type": "string",
-      "description": "What to do if this step fails or must be undone. Required when destructive (#58's floor).",
+      "description": "What to do if this step fails or must be undone. Required when the step is destructive (#58's floor).",
       "x-materiality": "semantic"
     },
     "restsOn": {

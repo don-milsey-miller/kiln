@@ -46,7 +46,7 @@ async function seeded() {
   await linkEvidence(contested.id, stale.id, "refute", o);
 
   const step = await createRunbookStep(
-    { title: "Blocked", instruction: "Do it", expectedOutcome: "Done", restsOn: [contested.id] }, o);
+    { title: "Blocked", instruction: "Do it", expectedOutcome: "Done", actionClass: "mutating", restsOn: [contested.id] }, o);
 
   const ctx = { ...makeContext(contentRoot), activated: ["assertion", "evidence", "runbook-step", "requirement"] };
   return { base, contentRoot, ctx, ids: { good: good.id, contested: contested.id, step: step.id, stale: stale.id } };
