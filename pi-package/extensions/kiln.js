@@ -2518,7 +2518,9 @@ export default function register(pi, deps = {}) {
     label: "Kiln write canonical payload",
     description:
       "Create a validated JSON Schema or OpenAPI 3.0/3.1 JSON payload beneath this project's planning " +
-      "content. Parent directories are created. This is create-only: an existing file is never overwritten.",
+      "content. Parent directories are created. This is create-only: an existing file is never overwritten. " +
+      "Keep one payload under about 32 KiB of compact JSON. A larger one is still accepted, but it takes far " +
+      "longer to send. Split a larger schema into several valid files that refer to each other with relative $ref.",
     parameters: {
       type: "object",
       properties: {
@@ -2539,7 +2541,7 @@ export default function register(pi, deps = {}) {
       ],
       additionalProperties: false,
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       let context;
       try {
         context = await projectContext(deps);
@@ -2549,14 +2551,20 @@ export default function register(pi, deps = {}) {
 
       try {
         const writer = deps.payloadWriter ?? (await import("../../lib/payload-write.mjs"));
-        const result = await writer.writePayload(params ?? {}, { contentRoot: context.contentRoot });
+        // ⚠️ PI'S SIGNAL GOES TO THE WRITER, AND NOTHING IS RACED AGAINST IT HERE (#180). The writer knows whether its
+        // link, the commit point, has happened; this handler does not.
+        const result = await writer.writePayload(params ?? {}, { contentRoot: context.contentRoot, signal: signal ?? null });
         return rendered({ ok: true, format: result.format, path: result.path, reference: result.reference, writeMode: result.writeMode });
       } catch (e) {
-        const code = {
-          PayloadValidationError: "invalid-payload",
-          PayloadExistsError: "payload-exists",
-          PathEscapeError: "payload-path-outside-content-root",
-        }[e?.name] ?? "refused";
+        // ⚠️ **THE WRITER'S OWN REFUSALS ARE RETURNED AS THEY ARE, NOT SCRUBBED.** Their words are fixed or bounded
+        // and name no machine path, and the scrubber reads a JSON pointer or a relative payload path as a filesystem
+        // path and replaces it. The payload's path is a field of its own, already content-relative.
+        const where = typeof e?.path === "string" ? { path: e.path } : {};
+        if (e?.name === "PayloadValidationError")
+          return rendered({ ...refusal("invalid-payload", e.message), ...where, ...(Array.isArray(e.errors) ? { errorCount: e.errorCount, errors: e.errors } : {}) });
+        if (e?.name === "PayloadExistsError") return rendered({ ...refusal("payload-exists", e.message), ...where });
+        if (e?.name === "PayloadWriteError") return rendered({ ...refusal(e.code, e.message), ...where, retry: e.retry });
+        const code = { PathEscapeError: "payload-path-outside-content-root" }[e?.name] ?? "refused";
         return rendered(refusal(code, scrub(e?.message ?? String(e), context.contentRoot)));
       }
     },

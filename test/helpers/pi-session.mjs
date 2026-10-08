@@ -35,6 +35,7 @@ const chunk = (delta, finish = null) =>
  *
  * A reply is `{text}`, `{tool, arguments}`, or `{stream: string[], everyMs}`, which sends one content chunk per
  * entry. `payloadBytes` is the total of content bytes sent, so a test can compare output against what was new.
+ * A tool reply with `pieces` sends its arguments in that many deltas, one every `everyMs`, as a model does.
  */
 export async function scriptedProvider() {
   const requests = [];
@@ -72,8 +73,24 @@ export async function scriptedProvider() {
       };
       if (reply.tool) {
         res.write(chunk({ role: "assistant", content: "" }));
-        res.write(chunk({ tool_calls: [{ index: 0, id: `call_${requests.length}`, type: "function", function: { name: reply.tool, arguments: JSON.stringify(reply.arguments ?? {}) } }] }));
-        return finish("tool_calls");
+        const args = JSON.stringify(reply.arguments ?? {});
+        if (!reply.pieces) {
+          res.write(chunk({ tool_calls: [{ index: 0, id: `call_${requests.length}`, type: "function", function: { name: reply.tool, arguments: args } }] }));
+          return finish("tool_calls");
+        }
+        // The arguments as a model sends them: in `pieces` deltas, one every `everyMs`.
+        let sent = 0;
+        let pending = null;
+        res.on("close", () => clearTimeout(pending));
+        const piece = () => {
+          if (sent >= reply.pieces) return finish("tool_calls");
+          const from = Math.floor((sent * args.length) / reply.pieces);
+          const to = Math.floor(((sent + 1) * args.length) / reply.pieces);
+          res.write(chunk({ tool_calls: [{ index: 0, ...(sent === 0 ? { id: `call_${requests.length}`, type: "function" } : {}), function: { ...(sent === 0 ? { name: reply.tool } : {}), arguments: args.slice(from, to) } }] }));
+          sent++;
+          sent >= reply.pieces ? finish("tool_calls") : (pending = setTimeout(piece, reply.everyMs ?? 0));
+        };
+        return piece();
       }
       res.write(chunk({ role: "assistant", content: "" }));
       const parts = reply.stream ?? [reply.text];
