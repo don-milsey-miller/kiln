@@ -167,6 +167,8 @@ export const CI_GROUPS = Object.freeze({
     "reap.test.mjs",
     "rpc-start.test.mjs",
     "server-port.test.mjs",
+    "session-chooser-pty.test.mjs",
+    "session-chooser.test.mjs",
     "session-new.test.mjs",
     "session-recovery.test.mjs",
     "setup-pty.test.mjs",

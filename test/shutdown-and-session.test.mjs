@@ -581,6 +581,7 @@ test("⚠️ the listing keeps what the picker shows, and never a session's text
         createdMs: created.getTime(),
         modifiedMs: modified.getTime(),
         messageCount: 12,
+        openBy: "id",
       },
     ]);
     assert.equal(JSON.stringify(listed).includes("SECRET"), false, "no message text survives the listing");
@@ -627,7 +628,7 @@ test("⚠️ a session name cannot drive the terminal it is printed on", () => {
   }
 });
 
-test("⚠️ the choices are numbered lines with no id, no path and no message text", () => {
+test("⚠️ the choices are numbered lines with eight characters of the id, and no path and no message text", () => {
   const E = String.fromCharCode(0x1b);
   const lines = renderSessionChoices([
     {
@@ -642,12 +643,13 @@ test("⚠️ the choices are numbered lines with no id, no path and no message t
     { id: "third", path: "/q", name: "x", createdMs: 1, modifiedMs: 1, messageCount: null },
   ]);
   assert.deepEqual(lines, [
-    "  1. planning | created 2026-09-14 10:05 UTC | modified 2026-09-16 09:00 UTC | 12 messages",
-    "  2. (unnamed) | created unknown | modified unknown | 1 message",
-    "  3. x | created 1970-01-01 00:00 UTC | modified 1970-01-01 00:00 UTC | message count unknown",
+    `  1. ${SESSION_ID.slice(0, 8)} | planning | created 2026-09-14 10:05 UTC | modified 2026-09-16 09:00 UTC | 12 messages | unrecorded`,
+    `  2. ${OTHER_ID.slice(0, 8)} | (unnamed) | created unknown | modified unknown | 1 message | unrecorded`,
+    "  3. third | x | created 1970-01-01 00:00 UTC | modified 1970-01-01 00:00 UTC | message count unknown | unrecorded",
   ]);
   const text = lines.join("");
-  for (const leak of [SESSION_ID, OTHER_ID, "/home", "/p", "/q", "third"]) assert.equal(text.includes(leak), false, leak);
+  // #182: the first eight characters of the header's id, and never the whole of it.
+  for (const leak of [SESSION_ID, OTHER_ID, SESSION_ID.slice(0, 9), "/home", "/p", "/q"]) assert.equal(text.includes(leak), false, leak);
 });
 
 test("⚠️ S2 the choices are numbered, nothing is preselected, and every non-answer cancels", async () => {
@@ -671,11 +673,11 @@ test("⚠️ S2 the choices are numbered, nothing is preselected, and every non-
 
   const first = await run(["1"]);
   assert.deepEqual(first.choice, { action: RECOVERY.RESUME, sessionId: SESSION_ID }, "a position names a session");
-  // ⚠️ THE LIST IS THE OFFER: no id, no path, and nothing marked as the one to take.
+  // ⚠️ THE LIST IS THE OFFER: no whole id, no path, and nothing marked as the one to take.
   const shown = first.said.join(String.fromCharCode(10));
-  assert.ok(shown.includes("1. planning"));
-  assert.ok(shown.includes("2. (unnamed)"));
-  assert.equal(shown.includes(SESSION_ID), false, "no session id is shown");
+  assert.ok(shown.includes(`1. ${SESSION_ID.slice(0, 8)} | planning`));
+  assert.ok(shown.includes(`2. ${OTHER_ID.slice(0, 8)} | (unnamed)`));
+  assert.equal(shown.includes(SESSION_ID), false, "no whole session id is shown");
   assert.doesNotMatch(shown, /default|\[Y\/n\]|recommended/i, "and nothing is preselected");
   assert.equal(first.asked.length, 1);
 
