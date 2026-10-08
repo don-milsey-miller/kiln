@@ -145,9 +145,12 @@ export function exitStatusFor(result) {
  */
 export const OVERRIDE_FLAGS = Object.freeze({ "--provider": "provider", "--model": "model", "--thinking": "thinking" });
 
+/** Passed to the browser launcher and to nothing else: it builds even when the build on disk could be reused (#184). */
+export const REBUILD_FLAG = "--rebuild";
+
 export function parseArgs(argv) {
-  const out = { selfHost: false, rpc: false, override: {} };
-  const usage = "This command takes --self-host, --rpc for a structured integration, and --provider <id> --model <id> --thinking <level> for a one-run override.";
+  const out = { selfHost: false, rpc: false, rebuild: false, override: {} };
+  const usage = "This command takes --self-host, --rpc for a structured integration, --rebuild to build the browser shell even when its build could be reused, and --provider <id> --model <id> --thinking <level> for a one-run override.";
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--self-host") {
@@ -156,6 +159,12 @@ export function parseArgs(argv) {
     }
     if (arg === "--rpc") {
       out.rpc = true;
+      continue;
+    }
+    // #184: the one flag that is the browser launcher's and not this command's. Given twice it is refused.
+    if (arg === REBUILD_FLAG) {
+      if (out.rebuild) return { error: `${arg} was given more than once.\n${usage}` };
+      out.rebuild = true;
       continue;
     }
     const key = Object.hasOwn(OVERRIDE_FLAGS, arg) ? OVERRIDE_FLAGS[arg] : null;
@@ -389,7 +398,8 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
     selfHost: args.selfHost,
     // ⚠️ Both commands are `process.execPath` plus a script resolved from THIS checkout, so neither
     // depends on PATH and neither is a shell string that could be re-parsed.
-    launcher: { command: process.execPath, args: [join(TOOL_ROOT, "bin", "start-shell.mjs")], cwd: TOOL_ROOT },
+    // ⚠️ `--rebuild` GOES TO THE LAUNCHER AND NOWHERE ELSE (#184). It is the launcher's decision; Pi is never shown it.
+    launcher: { command: process.execPath, args: [join(TOOL_ROOT, "bin", "start-shell.mjs"), ...(args.rebuild ? [REBUILD_FLAG] : [])], cwd: TOOL_ROOT },
     // ⚠️ Resolved from the installed package's OWN `bin.pi` declaration, with its name and
     // version checked against this checkout's pin and the path contained inside the package.
     // Guessing an entry point is how you run a different file than the one `pi` would.

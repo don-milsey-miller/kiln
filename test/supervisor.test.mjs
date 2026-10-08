@@ -3418,16 +3418,17 @@ test("⚠️ --self-host with no override reaches the SELF-HOST refusal, through
 });
 
 test("the command line takes --self-host and the one-run override, and refuses anything else", () => {
-  assert.deepEqual(parseArgs([]), { selfHost: false, rpc: false, override: {} });
-  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true, rpc: false, override: {} });
+  assert.deepEqual(parseArgs([]), { selfHost: false, rpc: false, rebuild: false, override: {} });
+  assert.deepEqual(parseArgs(["--self-host"]), { selfHost: true, rpc: false, rebuild: false, override: {} });
   // #177: the structured integration mode is an explicit flag, never inferred from the terminal.
-  assert.deepEqual(parseArgs(["--rpc"]), { selfHost: false, rpc: true, override: {} });
+  assert.deepEqual(parseArgs(["--rpc"]), { selfHost: false, rpc: true, rebuild: false, override: {} });
   assert.deepEqual(parseArgs(["--provider", "openai", "--model", "gpt-5", "--thinking", "high"]), {
     selfHost: false,
     rpc: false,
+    rebuild: false,
     override: { provider: "openai", model: "gpt-5", thinking: "high" },
   });
-  assert.deepEqual(parseArgs(["--thinking", "low", "--self-host"]), { selfHost: true, rpc: false, override: { thinking: "low" } });
+  assert.deepEqual(parseArgs(["--thinking", "low", "--self-host"]), { selfHost: true, rpc: false, rebuild: false, override: { thinking: "low" } });
   // A flag with no value, or given twice, would leave a billable model to chance.
   for (const bad of [["--model"], ["--provider", "--model", "x"], ["--thinking", ""], ["--model", "a", "--model", "b"]])
     assert.match(parseArgs(bad).error ?? "", /needs a value|more than once/, `must refuse ${JSON.stringify(bad)}`);
