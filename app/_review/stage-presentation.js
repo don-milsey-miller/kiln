@@ -9,16 +9,26 @@ export const STAGE_PRESENTATION = Object.freeze({
   blocked: Object.freeze({ state: "blocked", label: "BLOCKED", shortLabel: "blocked", colour: "#c62828" }),
 });
 
+/**
+ * `criteria` on the result is what holds the gate, in the order the stage definition lists them: each one's id and
+ * the definition's own description of it (#183). `criterionIds` is the same list as ids alone.
+ */
 export function deriveStagePresentation(criteria = [], ready = false) {
-  if (ready) return { ...STAGE_PRESENTATION.ready, criterionIds: [] };
+  const holding = (result) =>
+    criteria
+      .filter((criterion) => criterion.result === result)
+      .map((criterion) => ({ id: criterion.id, describe: typeof criterion.describe === "string" ? criterion.describe : "" }));
+  const withIds = (presentation, held) => ({ ...presentation, criterionIds: held.map((criterion) => criterion.id), criteria: held });
 
-  const blocked = criteria.filter((criterion) => criterion.result === "not-satisfied").map((criterion) => criterion.id);
-  if (blocked.length > 0) return { ...STAGE_PRESENTATION.blocked, criterionIds: blocked };
+  if (ready) return withIds(STAGE_PRESENTATION.ready, []);
 
-  const awaiting = criteria.filter((criterion) => criterion.result === "unattested").map((criterion) => criterion.id);
-  if (awaiting.length > 0) return { ...STAGE_PRESENTATION["awaiting-attestation"], criterionIds: awaiting };
+  const blocked = holding("not-satisfied");
+  if (blocked.length > 0) return withIds(STAGE_PRESENTATION.blocked, blocked);
+
+  const awaiting = holding("unattested");
+  if (awaiting.length > 0) return withIds(STAGE_PRESENTATION["awaiting-attestation"], awaiting);
 
   // A mechanised rule or another gate input may keep the authoritative gate closed even when every
   // human criterion is attested. That is blocked work, not an attestation the operator forgot.
-  return { ...STAGE_PRESENTATION.blocked, criterionIds: [] };
+  return withIds(STAGE_PRESENTATION.blocked, []);
 }

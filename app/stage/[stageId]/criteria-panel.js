@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { readStageCriteria } from "../../_read/planning.js";
 import { deriveStagePresentation } from "../../_review/stage-presentation.js";
+import CriterionLabel from "../../_review/criterion-label.js";
 
 /**
  * A stage's exit criteria with their recorded attestations — the first of the stage view's two
@@ -67,20 +68,22 @@ export default async function CriteriaPanel({ stageId }) {
         </summary>
         <div data-vpw-criteria-details style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <p style={{ margin: 0, color: "#666", fontSize: ".82rem" }}>
-            Live attestation status is shown here. Canonical criterion definitions remain in the stage document above.
+            Each criterion is shown with its live attestation status. The stage document above holds the canonical definitions.
           </p>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
           {stage.criteria.map((c) => {
             const v = VERDICT[c.result] ?? VERDICT.unattested;
             return (
-              <div
+              <li
                 key={c.id}
                 data-vpw-criterion={c.id}
                 style={{ borderLeft: `4px solid ${v.colour}`, padding: "8px 10px", background: "#fff", display: "flex", flexDirection: "column", gap: "5px" }}
               >
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
-                  <code style={{ background: "#f6f6f6", padding: "0 .25rem", borderRadius: "3px", fontSize: ".85em", overflowWrap: "anywhere", fontWeight: 500 }}>
-                    {c.id}
-                  </code>
+                  {/* #183: the definition's description first, and the stable id as smaller secondary text. */}
+                  <span style={{ flex: "1 1 16rem", minWidth: 0, fontWeight: 500 }}>
+                    <CriterionLabel id={c.id} describe={c.describe} />
+                  </span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: ".78rem", whiteSpace: "nowrap", color: v.colour }}>
                     <Mark result={c.result} />
                     {v.label}
@@ -92,9 +95,10 @@ export default async function CriteriaPanel({ stageId }) {
                     {c.reason.length > 320 ? `${c.reason.slice(0, 320)}…` : c.reason}
                   </div>
                 ) : null}
-              </div>
+              </li>
             );
           })}
+          </ul>
         </div>
       </details>
     </section>

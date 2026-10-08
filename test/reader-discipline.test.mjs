@@ -147,9 +147,33 @@ test("⚠️ the stage view's reads sit behind DISTINCT boundaries with distinct
   );
 });
 
-test("the live criteria panel reports attestation state without repeating canonical definitions", () => {
-  const src = readFileSync(join(ROOT, "app", "stage", "[stageId]", "criteria-panel.js"), "utf-8");
-  assert.doesNotMatch(src, /c[.]describe/, "criterion descriptions already appear in the canonical stage document");
-  assert.match(src, /<details\b/, "attestation detail must use a native keyboard-accessible disclosure");
-  assert.match(src, /data-vpw-criteria-summary/, "the collapsed disclosure must retain a stable live-state summary");
+test("#183 a criterion is labelled by its description on both views, through one component, with the id as detail", () => {
+  // ⚠️ THIS REPLACES A TEST THAT FORBADE THE DESCRIPTION HERE. That rule left the criterion's id as the only label a
+  // reader was given, on the page whose job is to say why a stage is blocked.
+  const stage = readFileSync(join(ROOT, "app", "stage", "[stageId]", "criteria-panel.js"), "utf-8");
+  const project = readFileSync(join(ROOT, "app", "stages-panel.js"), "utf-8");
+  const label = readFileSync(join(ROOT, "app", "_review", "criterion-label.js"), "utf-8");
+
+  // Both views hand a criterion's id and description to the same component, and neither prints an id of its own.
+  assert.match(stage, /<CriterionLabel id=\{c[.]id\} describe=\{c[.]describe\} \/>/, "the stage view does not label a criterion by its description");
+  assert.match(project, /<CriterionLabel id=\{criterion[.]id\} describe=\{criterion[.]describe\} \/>/, "the project view does not label a blocker by its description");
+  assert.doesNotMatch(project, /criterionIds/, "the project view still prints the ids as the label");
+  assert.doesNotMatch(stage, /\{c[.]id\}\s*<\/code>/, "the stage view still prints the id as the primary label");
+  // More than one blocker is a list.
+  assert.match(project, /<ul\b[^>]*aria-labelledby=/, "several blockers are not a labelled list");
+  assert.match(stage, /<ul\b/, "the criteria are not a list");
+  // The mechanised-gate fallback is still said when no human criterion is pending.
+  assert.match(project, /Blocked on: another gate requirement[.]/);
+
+  // In the component: the description comes first, the id after it in `<code>`, smaller, and named for a reader
+  // who cannot see that it is set apart.
+  const described = label.slice(label.lastIndexOf("return ("));
+  assert.ok(described.indexOf("data-vpw-criterion-description") < described.indexOf("data-vpw-criterion-id"), "the id is rendered before the description");
+  assert.match(described, /<code data-vpw-criterion-id=\{id\} style=\{ID_STYLE\}>/);
+  assert.match(label, /fontSize: "[.]78em"/, "the id is not smaller than the description");
+  assert.match(label, /Criterion ID: /, "the id is not named for assistive technology");
+  assert.match(label, /overflowWrap: "anywhere"/, "a long id cannot wrap");
+
+  assert.match(stage, /<details\b/, "attestation detail must use a native keyboard-accessible disclosure");
+  assert.match(stage, /data-vpw-criteria-summary/, "the collapsed disclosure must retain a stable live-state summary");
 });
