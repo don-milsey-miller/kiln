@@ -41,11 +41,30 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { contentRootCandidate, resolveContentRoot, ContentRootError } from "../lib/content-root.mjs";
+import { BUILD_REASON, decideBuild, invalidateBuildMarker, recordBuild, validateBuildOutput } from "../lib/build-cache.mjs";
 import { dependencyState } from "../lib/dependency-freshness.mjs";
 import { PROJECT_ID_ENV, RUN_ID_ENV, parsePort, readSuppliedIdentity } from "../lib/run-identity.mjs";
 
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const NEXT = join(ROOT, "node_modules", "next", "dist", "bin", "next");
+
+/**
+ * The command line: `--rebuild`, once, or nothing (#184).
+ *
+ * ⚠️ **AN ARGUMENT THIS DOES NOT KNOW IS A REFUSAL.** This file used to read no arguments at all, so anything
+ * typed after it was dropped without a word, and a flag that looked accepted did nothing. `--rebuild` twice is
+ * refused for the same reason a typo is: the command line is not what its author thinks it is.
+ */
+const REBUILD_FLAG = "--rebuild";
+const USAGE = `This command takes ${REBUILD_FLAG}, to build even when the build on disk could be reused, and nothing else.`;
+const given = process.argv.slice(2);
+const unknown = given.find((arg) => arg !== REBUILD_FLAG);
+if (unknown !== undefined || given.length > 1) {
+  console.error(`[vpw] ${unknown !== undefined ? `Unrecognised argument: ${unknown}` : `${REBUILD_FLAG} was given more than once.`}`);
+  console.error(`[vpw] ${USAGE}`);
+  process.exit(2);
+}
+const REBUILD = given.length === 1;
 
 /**
  * ⚠️ **PARSED AND REFUSED, NOT COERCED.** This was `Number(process.env.PORT ?? 3000)`, so `PORT=abc`
@@ -187,7 +206,34 @@ async function main() {
   if (deps.install) installDependencies(env);
   else say(`dependencies present; skipping install (${deps.why})`);
 
-  runToCompletion("building (production)…", [NEXT, "build"], env);
+  // ⚠️ **THE BUILD ON DISK IS SERVED AGAIN WHEN IT IS THE ONE THIS START WOULD MAKE (#184).** Decided after the install
+  // decision above, and separately from it: an install that just ran changes the installed tree, which is one of
+  // the things the decision reads. Either way it says which it did and why, as a code.
+  const decision = decideBuild({ root: ROOT, env: process.env, forced: REBUILD });
+  if (decision.action === "reuse") say(`build reused (${decision.reason}); the production compiler was not run`);
+  else {
+    say(`build required (${decision.reason})`);
+    // ⚠️ THE MARKER GOES BEFORE THE COMPILER STARTS, so a build that fails or is interrupted leaves nothing that
+    // vouches for whatever it left behind.
+    try {
+      invalidateBuildMarker(ROOT);
+    } catch (e) {
+      console.error(`[vpw] the previous build's marker could not be removed (${e?.code ?? "unknown"}); not building over it`);
+      process.exit(1);
+    }
+    runToCompletion("building (production)…", [NEXT, "build"], env);
+    // ⚠️ A COMPILER THAT EXITED 0 HAS NOT THEREBY LEFT A BUILD. What it left is checked the way a reused build is, and
+    // output that fails is not served: the server is never started over it.
+    const output = validateBuildOutput(ROOT);
+    if (!output.ok) {
+      console.error(`[vpw] the build finished but its output is not usable (${output.reason}); not starting`);
+      process.exit(1);
+    }
+    // Recording is a different matter: a build that is whole and cannot be recorded is still served, and is
+    // built again next time.
+    const recorded = await recordBuild({ root: ROOT, decision }).catch(() => ({ recorded: false, reason: BUILD_REASON.MARKER_NOT_WRITTEN }));
+    say(recorded.recorded ? "build recorded; an unchanged checkout will reuse it" : `build not recorded (${recorded.reason}); the next start will build again`);
+  }
 
   say(`starting on http://${HOST}:${PORT}`);
 

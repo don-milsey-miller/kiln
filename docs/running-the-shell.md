@@ -46,19 +46,98 @@ npm start
 ```
 
 That is `node bin/start-shell.mjs`. It installs dependencies if they are missing or older than
-`package-lock.json`, builds the application for production, starts it, and prints where it is
-listening and which planning content it is reading.
+`package-lock.json`, builds the application for production unless the build on disk can be reused,
+starts it, and prints where it is listening and which planning content it is reading.
+
+The first start, or a start after anything the build depends on has changed:
 
 ```
-[vpw] dependencies present; skipping install
-[vpw] building (production)…
 [vpw] planning content root: D:\visual-project-workflow\planning-content
+[vpw] standalone (no supervisor identity)
+[vpw] dependencies present; skipping install (the installed tree matches the lockfile)
+[vpw] build required (no-build-marker)
+[vpw] building (production)…
+[vpw] build recorded; an unchanged checkout will reuse it
 [vpw] starting on http://127.0.0.1:3000
 [vpw] run directory: C:\Users\…\Temp\vpw-launch-a1b2c3
 [vpw] ready — http://127.0.0.1:3000
 ```
 
+A later start with nothing changed does not run the compiler:
+
+```
+[vpw] build reused (build-reused); the production compiler was not run
+```
+
 Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.
+
+## When the build is reused
+
+A completed build is recorded in `.next/kiln-build.json`. A start reuses the build only when that
+record matches the checkout as it is now and the build output is whole. Anything else builds again.
+The install decision is made first and is separate.
+
+What the record is compared against:
+
+- The contents of `app/`, `lib/`, `schemas/`, `stages/`, `package.json`, `package-lock.json` and the
+  Next configuration file. Contents are compared, not modification times, and uncommitted edits count.
+- Whether each optional Next input exists: `pages/`, `src/`, `public/`, `middleware.*`, `proxy.*`,
+  `instrumentation.*`, `instrumentation-client.*`, every `next.config.*` name, `jsconfig.json` and
+  `tsconfig.json`. Adding one builds again.
+- The installed dependency tree, the Next version, the full Node version, the platform and the
+  processor architecture.
+- Where the checkout is. A copied or moved checkout builds again.
+- The build output: every file Next lists as required must be a file inside `.next`, and the build
+  ID must be the one recorded.
+
+Three things disable reuse for as long as they hold, and a build made under them is not recorded:
+
+- A `.env` or `.env.*` file in the tool root.
+- A non-empty `NODE_OPTIONS`.
+- A `NEXT_PUBLIC_` reference in anything the build reads.
+
+The record holds versions, digests, the platform, the architecture and the build ID. It holds no
+environment variable name or value and no path.
+
+### Forcing a build
+
+```
+node bin/start-shell.mjs --rebuild
+node .planning/bin/start-kiln.mjs --rebuild
+```
+
+`--rebuild` runs the compiler whatever is on disk. `start-kiln.mjs` passes it to the browser
+launcher and to nothing else, and it can be combined with `--rpc`. Either command refuses
+`--rebuild` given twice, and `start-shell.mjs` refuses any other argument, with exit code 2.
+
+### Reason codes
+
+Each start prints one code saying why it built or reused. A code names the kind of thing that
+differed and never the value.
+
+| Code | Meaning |
+| --- | --- |
+| `build-reused` | The recorded build matches and its output is whole. |
+| `rebuild-requested` | `--rebuild` was given. |
+| `no-build-marker` | No build has been recorded, or the last one did not complete. |
+| `build-marker-invalid`, `build-marker-version`, `build-key-mismatch` | The record cannot be read, is from another version of this contract, or does not agree with itself. |
+| `source-changed` | A build input's contents changed, or one was added or removed. |
+| `optional-inputs-changed` | An optional Next input appeared or went away. |
+| `installed-tree-changed`, `next-version-changed`, `node-version-changed` | The installed dependencies, Next or Node differ. |
+| `platform-changed`, `arch-changed`, `checkout-moved`, `build-mode-changed` | The machine, the checkout's location or the build mode differ. |
+| `env-file-present`, `node-options-set`, `public-env-referenced` | Reuse is disabled, as described above. |
+| `required-files-manifest-missing`, `required-files-manifest-invalid`, `build-made-elsewhere` | Next's list of required files is absent, unreadable or names another directory. |
+| `required-file-missing`, `required-file-outside-build` | A required file is absent, is not a file, or is not really inside `.next`. |
+| `build-id-empty`, `build-id-mismatch` | The build ID is blank or is not the recorded one. |
+| `build-marker-not-written` | The build is whole and is served, but could not be recorded. The next start builds again. |
+
+### When a start stops instead
+
+- The compiler fails: the launcher exits with the compiler's exit code.
+- The compiler exits 0 but its output fails the check above: the launcher prints
+  `the build finished but its output is not usable (<code>); not starting` and exits 1. No server
+  is started.
+- The previous record cannot be removed before a build: the launcher exits 1 without building.
 
 ## What it reads, and how you know
 
@@ -84,7 +163,8 @@ not starting.
 
 ## Production mode only
 
-`next build` then `next start`, per DEC-0018. The development server is a contributor workflow and
+`next build` then `next start`, per DEC-0018. A reused build is a production build made by an
+earlier start, so only the `next build` step is skipped. The development server is a contributor workflow and
 is not a shipped configuration: AST-0015 measured the two producing different artifacts, so shipping
 `next dev` would mean shipping something this project can never validate.
 

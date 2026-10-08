@@ -107,8 +107,8 @@ export async function kilnProject({ contextWindow = 128_000, label = "kiln launc
      * One run of `start-kiln.mjs --rpc`. `drive` gets `send`, `waitFor` (an RPC event), `said` (a supervisor notice
      * on standard error) and `events`. Standard input is closed when `drive` returns, which ends the run.
      */
-    async launch(drive, { boundMs = 4 * 60_000 } = {}) {
-      const child = spawn(process.execPath, [join(ROOT, "bin", "start-kiln.mjs"), "--rpc"], { cwd: dir, env, stdio: ["pipe", "pipe", "pipe"] });
+    async launch(drive, { boundMs = 4 * 60_000, args = [] } = {}) {
+      const child = spawn(process.execPath, [join(ROOT, "bin", "start-kiln.mjs"), "--rpc", ...args], { cwd: dir, env, stdio: ["pipe", "pipe", "pipe"] });
       let stdout = "";
       let stderr = "";
       child.stdout.on("data", (d) => (stdout += d));

@@ -147,6 +147,7 @@ export const CI_GROUPS = Object.freeze({
   ]),
   platform: Object.freeze([
     "browser-startup.test.mjs",
+    "build-reuse.test.mjs",
     "cleanup-diagnostics.test.mjs",
     "connection-inspection.test.mjs",
     "delegate-real-child.test.mjs",
@@ -186,6 +187,7 @@ export const CI_GROUPS = Object.freeze({
     "windows-job.test.mjs",
   ]),
   setup: Object.freeze([
+    "build-cache.test.mjs",
     "content-root.test.mjs",
     "isolation-match.test.mjs",
     "local-state.test.mjs",
