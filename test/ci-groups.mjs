@@ -201,6 +201,7 @@ export const CI_GROUPS = Object.freeze({
     "setup-transaction.test.mjs",
   ]),
   consumer: Object.freeze([
+    "blocker-labels-browser.test.mjs",
     "clean-consumer-journey.test.mjs",
     "consumer-delegation.test.mjs",
     "consumer-flow.test.mjs",

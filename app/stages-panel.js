@@ -1,6 +1,7 @@
 import { readProjectOverview } from "./_read/planning.js";
 import { deriveStagePresentation, STAGE_PRESENTATION } from "./_review/stage-presentation.js";
 import StageStateMark from "./_review/stage-state-mark.js";
+import CriterionLabel from "./_review/criterion-label.js";
 
 /**
  * The project view's stage navigation — CMP-0015, TSK-0007.
@@ -54,11 +55,30 @@ export default async function StagesPanel() {
                 {currentPresentation.label}
               </span>
             </div>
-            <div style={{ color: "#444" }}>
-              {currentPresentation.state === "awaiting-attestation" ? "Awaiting: " : "Blocked on: "}
-              {currentPresentation.criterionIds.join(", ") || "another gate requirement"}
-              .
-            </div>
+            {/* #183: what holds the gate, in the definition's own words, with each stable id beside it as detail. */}
+            {currentPresentation.criteria.length === 0 ? (
+              <div data-vpw-blockers="0" style={{ color: "#444" }}>
+                Blocked on: another gate requirement.
+              </div>
+            ) : currentPresentation.criteria.length === 1 ? (
+              <div data-vpw-blockers="1" style={{ color: "#444", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <span>{currentPresentation.state === "awaiting-attestation" ? "Awaiting:" : "Blocked on:"}</span>
+                {" "}
+                <CriterionLabel id={currentPresentation.criteria[0].id} describe={currentPresentation.criteria[0].describe} />
+              </div>
+            ) : (
+              <div data-vpw-blockers={String(currentPresentation.criteria.length)} style={{ color: "#444", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <span id="vpw-blockers-heading">{currentPresentation.state === "awaiting-attestation" ? "Awaiting:" : "Blocked on:"}</span>
+                {" "}
+                <ul aria-labelledby="vpw-blockers-heading" style={{ margin: 0, paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {currentPresentation.criteria.map((criterion) => (
+                    <li key={criterion.id} data-vpw-blocker={criterion.id}>
+                      <CriterionLabel id={criterion.id} describe={criterion.describe} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

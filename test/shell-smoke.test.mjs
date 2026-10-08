@@ -398,7 +398,16 @@ async function runSmokeCheck(t) {
     const blockedHome = await overviewOf();
     assert.match(blockedHome, /data-vpw-current="01-intake" data-vpw-gate-state="blocked"/);
     assert.match(blockedHome, /BLOCKED/);
-    assert.match(blockedHome, new RegExp(`Blocked on: [^<]*${firstCriterion}`));
+    // #183: the blocker is labelled by the definition's description, with its id after it as `<code>`.
+    const firstDescription = JSON.parse(readFileSync(join(ROOT, "stages", "01-intake.json"), "utf-8")).exitCriteria.find((c) => c.id === firstCriterion).describe;
+    const labelled = (html) => {
+      const description = html.indexOf(`data-vpw-criterion-description="${firstCriterion}"`);
+      const id = html.indexOf(`data-vpw-criterion-id="${firstCriterion}"`);
+      return description !== -1 && id > description;
+    };
+    assert.match(blockedHome, /Blocked on:/);
+    assert.ok(labelled(blockedHome), "the blocked criterion is not labelled by its description before its id");
+    assert.ok(blockedHome.includes(firstDescription.slice(0, 40).replaceAll("'", "&#x27;")), "the criterion's description is not on the project view");
 
     // Remove the explicit negative decision. The same closed gate is now waiting for a human
     // attestation, which must not retain the failure state merely because both states are non-ready.
@@ -409,7 +418,8 @@ async function runSmokeCheck(t) {
     const awaitingHome = await overviewOf();
     assert.match(awaitingHome, /data-vpw-current="01-intake" data-vpw-gate-state="awaiting-attestation"/);
     assert.match(awaitingHome, /AWAITING ATTESTATION/);
-    assert.match(awaitingHome, new RegExp(`Awaiting: [^<]*${firstCriterion}`));
+    assert.match(awaitingHome, /Awaiting:/);
+    assert.ok(labelled(awaitingHome), "the awaited criterion is not labelled by its description before its id");
 
     const awaitingStage = await (
       await fetch(`http://127.0.0.1:${PORT}/stage/01-intake`, { signal: AbortSignal.timeout(15_000) })
