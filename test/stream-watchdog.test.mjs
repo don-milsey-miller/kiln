@@ -43,23 +43,37 @@ function fakeEventSource() {
 
 function fakeTimers() {
   let pending = null;
+  let pendingMs = null;
   let id = 0;
+  let set = 0;
   return {
     api: {
-      setTimeout(fn) {
+      setTimeout(fn, ms) {
         pending = fn;
+        pendingMs = ms;
+        set += 1;
         return ++id;
       },
       clearTimeout() {
         pending = null;
+        pendingMs = null;
       },
     },
     get armed() {
       return pending !== null;
     },
+    /** The delay of the one timer that is waiting, or null. */
+    get ms() {
+      return pendingMs;
+    },
+    /** How many timers were ever set. */
+    get set() {
+      return set;
+    },
     expire() {
       const fn = pending;
       pending = null;
+      pendingMs = null;
       fn?.();
     },
   };
@@ -204,7 +218,135 @@ test("a change hint after unmount does not reload", () => {
   assert.equal(h.reloadCount(), 0, "an unmounted page must not navigate");
 });
 
+/* ------------------------------------------------------------------ a page that is leaving (#213) */
+
+test("⚠️ #213 once a navigation has started, the stream and the deadline are closed and the page says it is stale", () => {
+  const h = harness();
+  h.wd.start();
+  const s = h.source();
+  s.fire("open");
+  assert.equal(h.timers.ms, 15000, "the heartbeat deadline is armed before leaving");
+
+  h.wd.leaving();
+  assert.equal(s.closed, true, "the stream is closed");
+  assert.equal(h.wd.connected, false);
+  assert.equal(h.timers.armed, false, "the heartbeat deadline is cleared, and no other timer takes its place");
+  assert.equal(h.wd.state, STATE.STALE, "a page that stays after all must not go on claiming a stream it closed");
+  assert.equal(h.states.at(-1), STATE.STALE, "and the component is told");
+});
+
+test("⚠️ #213 leaving is final: no reload, no timer, no new stream and no return to live, whatever arrives", () => {
+  const h = harness();
+  h.wd.start();
+  const s = h.source();
+  s.fire("open");
+  h.wd.leaving();
+  const timersSet = h.timers.set;
+  const statesSeen = h.states.length;
+
+  // Everything that reloads or revives a page that is staying, delivered to one that is leaving.
+  for (const event of ["change", "error", "open", "heartbeat", "failure", "open", "change"]) s.fire(event);
+  h.timers.expire();
+  h.wd.start();
+  h.wd.leaving();
+
+  assert.equal(h.reloadCount(), 0, "a reload requested now would run after the new page commits");
+  assert.equal(h.timers.set, timersSet, "no timer is set after leaving");
+  assert.equal(h.timers.armed, false);
+  assert.equal(h.made.length, 1, "no second stream is opened, by an event or by start()");
+  assert.equal(h.wd.connected, false);
+  assert.equal(h.wd.state, STATE.STALE, "the state does not come back to live");
+  assert.equal(h.states.length, statesSeen, "and the component is told nothing more");
+});
+
+test("⚠️ #213 the same change hint reloads a page that is staying and not one that is leaving", () => {
+  // The order CI and the local reproduction recorded: the navigation starts, then the hint arrives.
+  const leaving = harness();
+  leaving.wd.start();
+  leaving.source().fire("open");
+  leaving.wd.leaving();
+  leaving.source().fire("change");
+  assert.equal(leaving.reloadCount(), 0);
+
+  const staying = harness();
+  staying.wd.start();
+  staying.source().fire("open");
+  staying.source().fire("change");
+  assert.equal(staying.reloadCount(), 1);
+});
+
+test("⚠️ #213 a reconnection reloads a page that is staying and not one that is leaving", () => {
+  const leaving = harness();
+  leaving.wd.start();
+  leaving.source().fire("open");
+  leaving.source().fire("error");
+  leaving.wd.leaving();
+  leaving.source().fire("open");
+  assert.equal(leaving.reloadCount(), 0);
+
+  const staying = harness();
+  staying.wd.start();
+  staying.source().fire("open");
+  staying.source().fire("error");
+  staying.source().fire("open");
+  assert.equal(staying.reloadCount(), 1);
+});
+
+test("#213 the watchdog's own reload is requested once, and leaving after it changes nothing", () => {
+  const h = harness();
+  h.wd.start();
+  h.source().fire("open");
+  h.source().fire("change"); // the watchdog's own reload, which then fires beforeunload
+  h.wd.leaving();
+  h.source().fire("change");
+  assert.equal(h.reloadCount(), 1);
+  assert.equal(h.timers.armed, false);
+});
+
+test("#213 a page that leaves before its stream ever opened is closed and stale, and stays so", () => {
+  const h = harness();
+  h.wd.start();
+  h.wd.leaving();
+  assert.equal(h.source().closed, true);
+  assert.equal(h.wd.state, STATE.STALE);
+  h.source().fire("open");
+  assert.equal(h.wd.state, STATE.STALE);
+  assert.equal(h.reloadCount(), 0);
+  assert.equal(h.timers.set, 0, "no timer was ever set");
+});
+
+test("#213 leaving before start() opens nothing, and stop() after leaving is still clean", () => {
+  const h = harness();
+  h.wd.leaving();
+  h.wd.start();
+  assert.equal(h.made.length, 0, "a document that is leaving never opens a stream");
+  assert.equal(h.wd.state, STATE.STALE);
+  h.wd.stop();
+  assert.equal(h.timers.armed, false);
+  assert.equal(h.wd.connected, false);
+});
+
+test("#213 leaving after stop() does nothing, not even to the state", () => {
+  const h = harness();
+  h.wd.start();
+  h.source().fire("open");
+  h.wd.stop();
+  const state = h.wd.state;
+  h.wd.leaving();
+  assert.equal(h.wd.state, state);
+  assert.equal(h.timers.armed, false);
+});
+
 /* ------------------------------------------------------------------ the component's own rules */
+
+test("#213 the component tells the watchdog when a navigation starts, and stops listening on unmount", () => {
+  const src = readFileSync(join(ROOT, "app", "_stream", "watchdog.js"), "utf-8");
+  assert.ok(src.includes(`const leaving = () => wd.leaving();`));
+  assert.ok(src.includes(`window.addEventListener("beforeunload", leaving);`), "beforeunload is the event that says a navigation has started");
+  assert.ok(src.includes(`window.removeEventListener("beforeunload", leaving);`));
+  // ⚠️ Preventing the event, or returning a value from it, makes the browser ask the operator whether to leave.
+  assert.ok(!/preventDefault|returnValue|onbeforeunload/.test(src), "the handler must not turn into a leave-page prompt");
+});
 
 test("the component reloads in place, preserving the URL", () => {
   const src = readFileSync(join(ROOT, "app", "_stream", "watchdog.js"), "utf-8");
