@@ -480,7 +480,7 @@ test("⚠️ the bootstrap install is confined to this checkout, and a lockfile 
     assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
     assert.ok(o.printed.some((l) => l.startsWith("dependencies installed")));
     assert.equal(o.seen.repairs, 1, "setup did not verify the repaired dependency after its bootstrap install");
-    assert.ok(o.printed.some((l) => l === "Pi dependency 5.0.12 verified"));
+    assert.ok(o.printed.some((l) => l === "Pi dependency brace-expansion 5.0.12 verified"));
 
     // A real install that rewrites the lockfile is not the locked install this command promised.
     const { installDependencies } = await import("../bin/setup.mjs");
@@ -530,9 +530,34 @@ test("⚠️ #100 the script-free bootstrap repairs Pi before project mutation, 
       },
     });
     assert.equal(ok.code, EXIT.OK, ok.printed.join("\n"));
-    assert.ok(ok.printed.some((l) => l === "Pi dependency 5.0.12 repaired"));
+    assert.ok(ok.printed.some((l) => l === "Pi dependency brace-expansion 5.0.12 repaired"));
   } finally {
     rmSync(p.root, { recursive: true, force: true });
+  }
+
+  // ⚠️ #185: npm's ADVISORY COUNT IS FROM BEFORE THE REPAIR, AND THE WARNING SAYS WHICH TREE IT DESCRIBES. It is
+  // reported either way: repairing one package does not show the others were clean.
+  for (const [advisories, repaired, said] of [
+    [1, true, "npm reported 1 dependency advisory before repairing brace-expansion; run npm --prefix .planning audit for the current result."],
+    [3, true, "npm reported 3 dependency advisories before repairing brace-expansion; run npm --prefix .planning audit for the current result."],
+    [1, false, "1 dependency advisory found — run npm --prefix .planning audit for details."],
+    [2, false, "2 dependency advisories found — run npm --prefix .planning audit for details."],
+    [undefined, true, null],
+    [undefined, false, null],
+  ]) {
+    const q = project({ ignored: true });
+    try {
+      const o = await setup(q, [], {
+        install: () => ({ installed: true, why: "the test's bootstrap", ...(advisories ? { advisories } : {}) }),
+        repairDependencies: () => ({ repaired, version: "5.0.12" }),
+      });
+      assert.equal(o.code, EXIT.OK, o.printed.join("\n"));
+      assert.ok(o.printed.some((l) => l === `Pi dependency brace-expansion 5.0.12 ${repaired ? "repaired" : "verified"}`));
+      const about = o.warned.filter((l) => /advisor/.test(l));
+      assert.deepEqual(about, said ? [`[kiln] ${said}`] : [], `advisories ${advisories}, repaired ${repaired}`);
+    } finally {
+      rmSync(q.root, { recursive: true, force: true });
+    }
   }
 
   const refused = project({ ignored: true });
