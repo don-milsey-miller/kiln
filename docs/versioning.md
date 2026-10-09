@@ -27,7 +27,11 @@ and known limitations in its release notes.
 
 1. Choose the next version from the release date and that month's existing tags.
 2. Update `package.json`, `package-lock.json`, and current-version documentation together.
-3. Run the repository's generated-file checks, production audit, and relevant tests.
+3. Run the repository's generated-file checks, production audit, and relevant tests. On the release
+   candidate, run `npm run test:ci:consumer`: its clean-consumer journey clones the candidate into a
+   new project's `.planning`, builds it there, and inspects every `.nft.json` trace the build wrote.
+   A trace that names a file outside the clone, or inside it but outside the compiled output and the
+   listed runtime packages, fails the candidate, as does exceeding the trace ceilings (#186).
 4. Merge the release change into `main` only after pull-request CI passes.
 5. Wait for the `main` merge-commit CI run to pass.
 6. Create the immutable `vYY.M.N` tag and GitHub release from that verified `main` commit.
