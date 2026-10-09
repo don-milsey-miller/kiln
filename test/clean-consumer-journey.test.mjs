@@ -24,7 +24,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -32,6 +32,7 @@ import { dirname, join, relative } from "node:path";
 import { FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
 import { findBrowser, launchBrowser, until } from "./helpers/browser.mjs";
 import { withBuildLock } from "./helpers/build-lock.mjs";
+import { describeTraceFailures, inspectBuildTraces } from "./helpers/build-trace.mjs";
 import { resolvePinnedSdk } from "../lib/pi-runtime.mjs";
 import { removeTestTree } from "./helpers/cleanup.mjs";
 
@@ -52,6 +53,8 @@ const Q2 = "JOURNEY-Q2-e5d0: who feels that most?";
 const FOLLOWUP = "JOURNEY-FOLLOWUP-19bb: the people who inherit a plan";
 const Q3 = "JOURNEY-Q3-06fa: what would change for them?";
 const CRITERION = "ask-without-solution";
+/** #186: names the operator's files that no build trace may contain. */
+const TRACE_SENTINEL = "kiln186-sentinel";
 
 const browserPath = findBrowser();
 
@@ -195,6 +198,10 @@ test(
       await withBuildLock(async () => {
         const source = trackedSnapshot(join(base, "tool-source"));
         mkdirSync(project);
+        // #186: the operator's own files, beside the clone and above it, which no build trace may name.
+        mkdirSync(join(project, "src"));
+        for (const sentinel of [join(base, `${TRACE_SENTINEL}-above.txt`), join(project, `${TRACE_SENTINEL}-root.txt`), join(project, `.env.${TRACE_SENTINEL}`), join(project, "src", `${TRACE_SENTINEL}-source.js`)])
+          writeFileSync(sentinel, "the operator's, not Kiln's\n");
         mkdirSync(agentDir);
         writeFileSync(join(agentDir, "auth.json"), "{}");
         writeFileSync(join(agentDir, "models.json"), JSON.stringify(modelsJson(fixture.url)));
@@ -376,6 +383,18 @@ test(
 
         // The outer repository still has no commit: nothing in the journey committed on the operator's behalf.
         assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: project }).status, 0, "a commit was made in the operator's repository");
+
+        // ---- #186: what the clone's production build recorded in its traces ------------------------------------------
+        // ⚠️ THE MANIFESTS, NOT THE BUILD'S OUTPUT. The launcher built the shell inside the clone on run 1, from
+        // nothing. Every entry of every trace is resolved to the file it names: none may be outside the clone, none
+        // may be inside it except under a justified runtime root, and together they stay under the ceilings.
+        const traces = inspectBuildTraces(join(project, ".planning"));
+        // Printed on every run: the ceilings are set from these totals, and they differ by platform.
+        console.log(`[#186] trace totals on ${process.platform}: ${traces.manifests} manifests, ${traces.files} files, ${traces.bytes} bytes, ${traces.platformBytes} bytes of platform binaries`);
+        assert.ok(traces.manifests >= 5,`the clone's build left ${traces.manifests} trace manifests to inspect`);
+        assert.equal(traces.violations.length + traces.ceilings.length, 0, `the production build traced files it has no reason to:\n${describeTraceFailures(traces)}`);
+        const realContent = realpathSync.native(contentRoot);
+        assert.deepEqual(traces.resolved.filter((file) => file.includes(TRACE_SENTINEL) || file.startsWith(realContent)), [], "a trace names the operator's files");
 
         // ---- #185: the gate reads what is installed, which npm's audit does not ---------------------------------------
         // ⚠️ THE NEGATIVE CONTROL, AND THE LAST THING DONE TO THE CLONE. The passing audits above would pass over an
