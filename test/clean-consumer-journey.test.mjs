@@ -234,6 +234,44 @@ test(
           "5.0.12",
           "setup's trusted post-install repair did not replace Pi's vulnerable shrinkwrapped brace-expansion"
         );
+        // ⚠️ #185: SETUP NAMES THE PACKAGE AND THE VERSION IT LEFT, and says which of the two things it did. Pi's
+        // shrinkwrap decides which, so either is accepted here; `setup-command.test.mjs` holds each form.
+        const did = /^(?:\[kiln\] )?Pi dependency brace-expansion 5\.0\.12 (repaired|verified)$/m.exec(setup.out)?.[1];
+        assert.ok(did, setup.out);
+        // npm's advisory count is from before the repair. When a repair was made, setup says so and does not call
+        // the count a finding about the tree it left.
+        if (did === "repaired") assert.equal(/dependency advisor(?:y|ies) found/.test(setup.out), false, `setup reported npm's pre-repair count as current:\n${setup.out}`);
+        if (/dependency advisor/.test(setup.out) && did === "repaired")
+          assert.match(setup.out, /npm reported \d+ dependency advisor(?:y|ies) before repairing brace-expansion; run npm --prefix \.planning audit for the current result\./, setup.out);
+
+        // ⚠️ #185: BOTH AUDITS, AFTER THE REAL SETUP PATH. These say what a consumer who runs either is told, and that
+        // npm's own answer and Kiln's gate over it are the same answer. Run before anything else touches the clone.
+        //
+        // ⚠️ THE TWO DO NOT SEE THE SAME THING, AND THE VERSION ASSERTION ABOVE IS NOT REDUNDANT. `npm audit` reads
+        // `package-lock.json`, not `node_modules`: measured on a clone whose nested package was the vulnerable 5.0.9
+        // while the lockfile named 5.0.12, it reported nothing. It is the lockfile's answer. What is installed is
+        // checked by the assertion above and by the gate, which reads the installed package before it audits.
+        const npm = (args) => spawnSync(`npm ${args}`, { cwd: join(project, ".planning"), env, encoding: "utf8", shell: true, windowsHide: true, timeout: 5 * 60_000 });
+        const raw = npm("audit --omit=dev --json");
+        let report = null;
+        try {
+          report = JSON.parse(raw.stdout);
+        } catch {
+          assert.fail(`npm audit --omit=dev --json did not return a report (exit ${raw.status}): ${raw.stdout.slice(0, 1500)}\n${raw.stderr.slice(0, 1500)}`);
+        }
+        assert.equal(report.error, undefined, `npm audit could not reach an answer: ${JSON.stringify(report.error)}`);
+        const counts = report.metadata?.vulnerabilities;
+        assert.ok(counts && Number.isInteger(counts.high) && Number.isInteger(counts.critical), `npm audit returned no severity counts: ${raw.stdout.slice(0, 1500)}`);
+        const serious = Object.entries(report.vulnerabilities ?? {}).filter(([, v]) => v.severity === "high" || v.severity === "critical").map(([name, v]) => `${name} (${v.severity}, ${(v.nodes ?? []).join(", ")})`);
+        assert.deepEqual(serious, [], "a clean setup left a high or critical production advisory in the installed tree");
+        assert.deepEqual([counts.high, counts.critical], [0, 0]);
+        const gated = npm("run audit:production");
+        assert.equal(gated.status, 0, `npm run audit:production failed after a clean setup:\n${gated.stdout}\n${gated.stderr}`);
+        // The same result, read from the gate: no advisory, and none waved through by an exception.
+        assert.match(gated.stdout, /\[production-audit\] pass: 0 high\/critical production advisories, 0 excepted\./, gated.stdout);
+        assert.equal(/\[production-audit\] (?:blocked|temporary exception|invalid exception)/.test(`${gated.stdout}\n${gated.stderr}`), false, `${gated.stdout}\n${gated.stderr}`);
+        // Auditing changed nothing in the clone: the lockfile is still the committed one.
+        assert.equal(git(["status", "--porcelain", "--", "package.json", "package-lock.json"], join(project, ".planning")), "", "setup or an audit rewrote the clone's manifest or lockfile");
         const ignore = readFileSync(join(project, ".gitignore"), "utf8");
         assert.match(ignore, /^\/?\.planning\/?$/m, `setup did not ignore .planning: ${ignore}`);
 
@@ -333,9 +371,25 @@ test(
         assert.equal(again.status, 0, again.out);
         assert.deepEqual(changedBetween(projectBefore, fingerprint(project, project, new Set([".planning", ".git"]))), [], "setup's rerun changed the project");
         assert.equal(git(["status", "--porcelain"], join(project, ".planning")), "", "the clone's tracked files changed");
+        // #185: a second setup finds the dependency already as it should be, and says that instead.
+        assert.match(again.out, /^(?:\[kiln\] )?Pi dependency brace-expansion 5\.0\.12 verified$/m, again.out);
 
         // The outer repository still has no commit: nothing in the journey committed on the operator's behalf.
         assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: project }).status, 0, "a commit was made in the operator's repository");
+
+        // ---- #185: the gate reads what is installed, which npm's audit does not ---------------------------------------
+        // ⚠️ THE NEGATIVE CONTROL, AND THE LAST THING DONE TO THE CLONE. The passing audits above would pass over an
+        // unrepaired tree too, as far as `npm audit` goes: it reads the lockfile. So the installed nested package is
+        // made to say it is the vulnerable release, and the gate must refuse on that alone. Nothing uses the clone
+        // after this.
+        const nestedManifest = join(project, ".planning", "node_modules", "@earendil-works", "pi-coding-agent", "node_modules", "brace-expansion", "package.json");
+        writeFileSync(nestedManifest, JSON.stringify({ ...JSON.parse(readFileSync(nestedManifest, "utf8")), version: "5.0.9" }, null, 2));
+        const refused = npm("run audit:production");
+        assert.equal(refused.status, 1, `the gate passed a clone whose nested brace-expansion says 5.0.9:\n${refused.stdout}\n${refused.stderr}`);
+        assert.ok(refused.stderr.includes("[production-audit] installed dependency check failed: Pi has brace-expansion 5.0.9; expected 5.0.12."), `${refused.stdout}\n${refused.stderr}`);
+        // And npm's own audit of the same clone still reports nothing, which is why the control is on the gate.
+        const blind = JSON.parse(npm("audit --omit=dev --json").stdout);
+        assert.deepEqual([blind.metadata.vulnerabilities.high, blind.metadata.vulnerabilities.critical], [0, 0], "npm audit now reads the installed package; the comments here and the reason for this control are out of date");
       });
     } finally {
       if (browser) await browser.close();

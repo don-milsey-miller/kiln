@@ -1740,13 +1740,23 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // 4. The locked dependencies, inside this checkout only.
       const installed = await engine.phase("install", () => install({ toolRoot: paths.toolRoot, verbose: args.verbose === true, print }));
       print(installed.installed ? "dependencies installed" : `dependencies present (${installed.why})`);
-      if (installed.advisories) warning(`${installed.advisories} dependency advisor${installed.advisories === 1 ? "y" : "ies"} found — run npm --prefix .planning audit for details.`);
 
       // Pi's own shrinkwrap can reinstall brace-expansion 5.0.9 even though this checkout pins 5.0.12. The
       // bootstrap deliberately suppresses lifecycle scripts, so invoke only Kiln's reviewed repair before any
       // installed module is imported or any consumer-project phase can begin.
       const repaired = await engine.phase("dependency-repair", () => repairDependencies({ toolRoot: paths.toolRoot }));
-      print(repaired.repaired ? `Pi dependency ${repaired.version} repaired` : `Pi dependency ${repaired.version} verified`);
+      print(repaired.repaired ? `Pi dependency brace-expansion ${repaired.version} repaired` : `Pi dependency brace-expansion ${repaired.version} verified`);
+      // ⚠️ npm's COUNT IS FROM BEFORE THE REPAIR, AND IS SAID AS SUCH (#185). When the repair replaced a package, the
+      // count describes a tree that is no longer the installed one, so "found" would be a claim about the present
+      // that nothing here checked. It is still reported: repairing one package does not show the others were clean.
+      if (installed.advisories) {
+        const count = `${installed.advisories} dependency advisor${installed.advisories === 1 ? "y" : "ies"}`;
+        warning(
+          repaired.repaired
+            ? `npm reported ${count} before repairing brace-expansion; run npm --prefix .planning audit for the current result.`
+            : `${count} found — run npm --prefix .planning audit for details.`
+        );
+      }
 
       // Clack is a post-install presentation layer. Embedders keep their supplied adapter, while redirected
       // terminals, automation and --plain remain on the dependency-free renderer.
