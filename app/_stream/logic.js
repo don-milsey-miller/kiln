@@ -21,6 +21,19 @@
  * ⚠️ **A RECONNECTION RELOADS BECAUSE THE GAP IS UNRECOVERABLE.** The server sends no ids and keeps
  * no buffer (#73): a change during the disconnected window is simply not delivered. Reloading on
  * reconnect is what makes that harmless, and it is why the server can stay that simple.
+ *
+ * ⚠️ **A PAGE THAT HAS STARTED TO LEAVE REQUESTS NO RELOAD (#213).** A reload requested after a
+ * navigation away has started and before it commits is not dropped by the browser. Chromium runs it
+ * after the new page commits, and the operator ends on the page they left. Measured in headless
+ * Chrome: `Page.navigate` to `/`, a `change` event on the stage view 0.8 seconds before `/` answered,
+ * then `frameNavigated /` followed by `frameNavigated` back to the stage view. So `leaving()`, which
+ * the component calls on `beforeunload`, closes the stream, clears the deadline and suppresses every
+ * reload.
+ *
+ * ⚠️ **LEAVING IS FINAL FOR THE DOCUMENT.** A download, a stopped load and a response with no content
+ * all fire `beforeunload` and leave the page where it was, and no event reports that. The watchdog
+ * does not guess: it sets no timer and never reconnects. A page whose navigation was cancelled says
+ * "Not receiving updates" until the operator reloads it.
  */
 
 export const STATE = { CONNECTING: "connecting", LIVE: "live", STALE: "stale" };
@@ -57,6 +70,7 @@ export function createStreamWatchdog({
   let sawTrouble = false; // an error or failure since the last successful open
   let reloading = false; // ⚠️ one reload per lifetime; the page is leaving either way
   let stopped = false;
+  let left = false; // ⚠️ a navigation away has started; final for this document (#213)
 
   const setState = (next) => {
     if (state === next) return;
@@ -89,10 +103,20 @@ export function createStreamWatchdog({
   };
 
   const doReload = () => {
-    if (reloading || stopped) return;
+    if (reloading || stopped || left) return;
     reloading = true;
     clearWatchdog();
     reload();
+  };
+
+  const closeSource = () => {
+    if (!source) return;
+    try {
+      source.close();
+    } catch {
+      /* already gone */
+    }
+    source = null;
   };
 
   return {
@@ -106,10 +130,14 @@ export function createStreamWatchdog({
     start() {
       // ⚠️ One EventSource per watchdog, ever. React may invoke an effect twice; a second source
       // would double every heartbeat and leave one connection with nothing to close it.
-      if (source || stopped) return;
-      source = new EventSourceImpl(url);
+      if (source || stopped || left) return;
+      const mine = new EventSourceImpl(url);
+      source = mine;
+      // ⚠️ A source this watchdog has closed is not listened to. A real one fires nothing after
+      // `close()`; this guard makes the same true of anything else passed as `EventSourceImpl`.
+      const on = (type, handle) => mine.addEventListener(type, () => (source === mine ? handle() : undefined));
 
-      source.addEventListener("open", () => {
+      on("open", () => {
         if (everOpened && sawTrouble) {
           // A RECONNECTION. Anything that changed while the stream was down was never delivered,
           // so the only way to be correct is to start again.
@@ -124,35 +152,40 @@ export function createStreamWatchdog({
 
       // The NAMED heartbeat. A comment frame fires nothing here (AST-0036), which is why the server
       // sends an event rather than a keepalive.
-      source.addEventListener("heartbeat", () => {
+      on("heartbeat", () => {
         sawTrouble = false;
         setState(STATE.LIVE);
         armWatchdog();
       });
 
-      source.addEventListener("change", () => doReload());
+      on("change", () => doReload());
 
       // The server said its watcher died. Nothing will arrive again, so say so immediately rather
       // than waiting a whole watchdog window to infer it.
-      source.addEventListener("failure", () => goStale());
+      on("failure", () => goStale());
 
-      source.addEventListener("error", () => goStale());
+      on("error", () => goStale());
 
       return this;
+    },
+
+    /**
+     * A navigation away has started (#213). Close the stream, clear the deadline, and from here on
+     * request no reload, open no stream and set no timer. If the page stays after all, it says so.
+     */
+    leaving() {
+      if (stopped || left) return;
+      left = true;
+      clearWatchdog();
+      closeSource();
+      setState(STATE.STALE);
     },
 
     /** Close the connection and clear the timer. Called on unmount. */
     stop() {
       stopped = true;
       clearWatchdog();
-      if (source) {
-        try {
-          source.close();
-        } catch {
-          /* already gone */
-        }
-        source = null;
-      }
+      closeSource();
     },
   };
 }

@@ -60,9 +60,18 @@ export default function StreamWatchdog() {
       onState: setState,
     });
     wd.start();
+    // ⚠️ `beforeunload` IS THE EVENT THAT SAYS A NAVIGATION HAS STARTED (#213). A reload requested
+    // after it is run once the new page commits, and brings the operator back here. So the watchdog
+    // is told the page is leaving. Nothing is prevented and nothing is returned, so the browser asks
+    // the operator nothing.
+    const leaving = () => wd.leaving();
+    window.addEventListener("beforeunload", leaving);
     // ⚠️ The cleanup closes the connection and clears the timer. Without it, a navigation would
     // leave a socket open and a deadline armed against a page that is gone.
-    return () => wd.stop();
+    return () => {
+      window.removeEventListener("beforeunload", leaving);
+      wd.stop();
+    };
   }, []);
 
   const look = LOOK[state] ?? LOOK[STATE.CONNECTING];
