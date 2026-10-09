@@ -48,6 +48,7 @@ export const CI_GROUPS = Object.freeze({
     "kiln-start-entry.test.mjs",
     "launch-checks.test.mjs",
     "link-trace.test.mjs",
+    "lint-plan-cli.test.mjs",
     "lint.test.mjs",
     "live-canary.test.mjs",
     "live-model-check.test.mjs",

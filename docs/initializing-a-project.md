@@ -265,5 +265,11 @@ macOS or Linux:
 PLANNING_CONTENT_DIR="$PWD/planning-content" npm run lint:plan
 ```
 
+For a machine reader, `npm run lint:plan -- --json` prints a summary, the findings, and the gate result when
+`--gate handoff` or `--gate stage:<id>` is given. The summary counts artifacts by type and findings by
+severity. The output grows with the findings and not with the plan: it does not contain the artifacts
+themselves. Add `--include-records` to `--json` to also get every parsed artifact record, for debugging
+the lint itself. `--include-records` without `--json` is refused with exit code 2.
+
 `init-project.mjs` refuses to initialize this repository for the same reason: the target would be the
 tool directory.
