@@ -50,10 +50,12 @@ test("⚠️ any client component must not hold the selection", () => {
   // ⚠️ Recorded so the count moving is a visible event rather than a silent one. It moved from 0 to
   // 1 with TSK-0017: the stream watchdog holds transient stream health. Source ingestion added the
   // upload panel, which holds transient file/progress/job-polling state; a reload loses no planning
-  // record and the server-side job continues. Both correctness-critical selections stay in the URL.
+  // record and the server-side job continues. #188 added the wireframe viewer, which holds the
+  // zoom, the position and the selected element of one drawing; a reload returns the declared
+  // viewport and loses no planning record. Both correctness-critical selections stay in the URL.
   assert.deepEqual(
     clients.map((f) => relative(ROOT, f).split("\\").join("/")).sort(),
-    ["app/_stream/watchdog.js", "app/ingest-panel.js"],
+    ["app/_stream/watchdog.js", "app/ingest-panel.js", "app/stage/[stageId]/wireframe-viewer.js"],
     "a new client component is a deliberate act; say why it needs to be one"
   );
 });
