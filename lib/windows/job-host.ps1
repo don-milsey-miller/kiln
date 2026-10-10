@@ -111,7 +111,9 @@ while (-not $released) {
   if ($exitCode -eq $null -and $n::WaitForSingleObject($hProcess, 0) -eq 0) {
     $codeBuf = $m::AllocHGlobal(4)
     [void]$n::GetExitCodeProcess($hProcess, $codeBuf)
-    $exitCode = [uint32]$m::ReadInt32($codeBuf, 0)
+    # ⚠️ THE CODE IS 32 BITS, READ UNSIGNED. A crash status is 0x80000000 or above, which a signed read makes negative
+    # and a cast to UInt32 refuses (#200). The same bits are handed back signed at the host's own exit below.
+    $exitCode = [BitConverter]::ToUInt32([BitConverter]::GetBytes($m::ReadInt32($codeBuf, 0)), 0)
     $m::FreeHGlobal($codeBuf)
     Write-Control 'exited' ([ordered]@{ code = $exitCode; ms = $clock.ElapsedMilliseconds })
   }
@@ -136,4 +138,4 @@ while (-not $released) {
 }
 [void]$n::CloseHandle($job)
 if ($exitCode -eq $null) { exit 1 }
-exit [int]$exitCode
+exit [BitConverter]::ToInt32([BitConverter]::GetBytes([uint32]$exitCode), 0)
