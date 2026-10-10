@@ -88,6 +88,32 @@ test("⚠️ F130 PROTOTYPE the agent receives its exact arguments, input, outpu
   }
 });
 
+test("⚠️ #200 an exit code at or above 0x80000000 reaches the exited record and the host's own exit, and the shutdown completes", windowsOnly, async () => {
+  const dir = workspace("crash-code");
+  // STATUS_STACK_BUFFER_OVERRUN, the code a libuv assertion ends a process with. Signed, it is -1073740791.
+  const CRASH = 0xc0000409;
+  try {
+    const job = await startInJob({ command: process.execPath, args: ["-e", `process.exit(${CRASH})`], controlDir: dir, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    job.host.stderr.on("data", (d) => (stderr += d));
+    const hostExit = new Promise((r) => job.host.once("exit", (code) => r(code)));
+    const exited = await until(() => job.exited(), 30_000);
+    assert.ok(exited, `the host wrote no exited record: ${stderr}`);
+    assert.equal(exited.code, 3221226505, "the record holds the unsigned code");
+
+    const members = await job.list();
+    assert.equal(members.ok, true);
+    assert.deepEqual(members.pids, [], "nothing is left in the job");
+    assert.equal((await job.release()).ok, true, "the host released the job");
+    // Node may report a code this large as signed: the 32-bit pattern is what is compared.
+    assert.equal((await hostExit) >>> 0, CRASH, "the host's own exit carries the same 32 bits");
+    assert.equal(stderr, "", "the host wrote no error");
+    assert.ok(await until(() => !alive(job.pid) && !alive(job.host.pid), 3000), "the agent or its host outlived the release");
+  } finally {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 17, retryDelay: 100 });
+  }
+});
+
 test("⚠️ F130 PROTOTYPE the job names a detached survivor after the agent exits, and ending the job ends it within a bound", windowsOnly, async () => {
   const dir = workspace("survivor");
   try {
