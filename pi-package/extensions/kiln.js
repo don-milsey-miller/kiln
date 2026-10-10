@@ -428,6 +428,22 @@ const refusedResult = (result) => ({
 });
 
 /**
+ * A delegation refused because its credential route cannot work - #194.
+ *
+ * ⚠️ **THE CODE AND THE MESSAGE ARE THIS FILE'S, AND THE REASON IS ONE OF SIX WORDS OR ABSENT.** Nothing the route
+ * resolver returned is copied through: a reason outside this list is dropped, so no variable name, path, command or
+ * error text can arrive under it. No child was started, so nothing was observed.
+ */
+const ROUTE_REASONS = Object.freeze(["no-contract", "not-granted", "route-mismatch", "variable-unset", "stored-unavailable", "consent-unreadable"]);
+const routeRefused = (route) => ({
+  ok: false,
+  code: "credential-route-unavailable",
+  message: "This session's provider has no usable credential route for a delegated child, so none was started.",
+  ...(ROUTE_REASONS.includes(route?.reason) ? { reason: route.reason } : {}),
+  observed: null,
+});
+
+/**
  * Which child executable a refused launch looked for - #176.
  *
  * ⚠️ **AN IDENTITY, FIELD BY FIELD, AND NEVER A LOCATION.** The package's name, the version this checkout pins,
@@ -3347,6 +3363,18 @@ export default function register(pi, deps = {}) {
       const hostRegistry = measureHostRegistry(deps, pi);
       if (hostRegistry === null) return refuse("no-host-registry", "This host's tool registry could not be measured.");
 
+      // ⚠️ **THE CREDENTIAL ROUTE IS DECIDED FROM TRUSTED STATE, BEFORE ANY CHILD (#194).** The contract is Kiln's
+      // table or the declaration this computer's grant recorded, never an argument, and a route that cannot work
+      // is refused here rather than discovered inside a child's first model turn.
+      let route;
+      try {
+        const resolveRoute = deps.providerRoute ?? (await import("../../lib/specialists/provider-route.mjs")).sessionProviderRoute;
+        route = await resolveRoute({ provider: selection.provider, model: selection.model, agentDir, toolRoot: context.toolRoot });
+      } catch {
+        route = null;
+      }
+      if (route?.ok !== true) return rendered(await renderForModel(routeRefused(route), roots));
+
       const runtime = deps.delegate ?? specialists.delegateToSpecialist;
       let result;
       try {
@@ -3361,6 +3389,7 @@ export default function register(pi, deps = {}) {
             model: selection.model,
             thinkingLevel: selection.thinkingLevel,
             hostRegistry,
+            providerContract: route.contract ?? null,
             signal,
           },
           {}

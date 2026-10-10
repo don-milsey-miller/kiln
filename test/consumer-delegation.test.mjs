@@ -12,7 +12,11 @@
  * it starts the pinned agent as a child process.
  *
  * ⚠️ **THE ONLY THING REPLACED IS THE PROVIDER.** The isolated agent directory's `models.json` names a provider on
- * the loopback interface with a placeholder key, so nothing billable can be reached and no credential exists.
+ * the loopback interface, so nothing billable can be reached.
+ *
+ * ⚠️ **THE KEY IS ONLY IN THE ENVIRONMENT (#194).** `models.json` reads it from a variable, the variable is declared
+ * on a model-use grant the clone's own modules record, and the child is handed that one name. The value is a
+ * placeholder the loopback provider compares. No file holds it.
  */
 
 import { test } from "node:test";
@@ -22,7 +26,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { FIXTURE_KEY, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
+import { FIXTURE_KEY, FIXTURE_KEY_VAR, FIXTURE_MODEL, FIXTURE_PROVIDER, modelsJson, startProviderFixture } from "./helpers/provider-fixture.mjs";
 import { removeTestTree } from "./helpers/cleanup.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -85,17 +89,20 @@ test("⚠️ #176 a clean consumer clone in a path with spaces delegates once, f
     mkdirSync(join(project, "planning-content"));
     writeFileSync(join(project, "planning-content", "project.yaml"), "name: consumer delegation\n");
 
-    // ⚠️ THE KEY IS WRITTEN INLINE, BECAUSE A DELEGATED CHILD IS NOT HANDED THE HOST'S VARIABLES. Its environment is
-    // built name by name, so a `$VARIABLE` reference would resolve to nothing in the child. It is a placeholder.
+    // ⚠️ THE KEY IS A `$VARIABLE` REFERENCE, AND NOTHING ON DISK HOLDS ITS VALUE. A child's environment is built name by
+    // name, so the request below is authorised only if the declared name was handed to it.
     const models = modelsJson(fixture.url);
-    models.providers[FIXTURE_PROVIDER].apiKey = FIXTURE_KEY;
+    assert.equal(models.providers[FIXTURE_PROVIDER].apiKey, `$${FIXTURE_KEY_VAR}`);
     writeFileSync(join(agentDir, "auth.json"), "{}");
     writeFileSync(join(agentDir, "models.json"), JSON.stringify(models));
 
-    const env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" };
+    const env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1", [FIXTURE_KEY_VAR]: FIXTURE_KEY };
+    // The driver names the project itself, as the supervisor does; an inherited one would be another run's.
+    delete env.KILN_PROJECT_ROOT;
+    delete env.KILN_STATE_MODE;
     // ⚠️ THE CONTENT ROOT IS THE CONSUMER LAYOUT'S, resolved beside the clone as an operator gets it.
     delete env.PLANNING_CONTENT_DIR;
-    env.KILN_CONSUMER_DELEGATION = JSON.stringify({ toolRoot, role: "planning", task: TASK, provider: FIXTURE_PROVIDER, model: FIXTURE_MODEL });
+    env.KILN_CONSUMER_DELEGATION = JSON.stringify({ toolRoot, projectRoot: project, role: "planning", task: TASK, provider: FIXTURE_PROVIDER, model: FIXTURE_MODEL, credentialVar: FIXTURE_KEY_VAR });
 
     // The driver is copied beside the project, so it imports only from the clone it is told about.
     const driver = join(base, "delegate once.mjs");
@@ -110,8 +117,11 @@ test("⚠️ #176 a clean consumer clone in a path with spaces delegates once, f
     const pinned = JSON.parse(readFileSync(join(toolRoot, "package.json"), "utf-8")).dependencies["@earendil-works/pi-coding-agent"];
     assert.equal(outcome.preflightVersion, pinned);
 
+    assert.equal(outcome.grantWritten, true, "the clone's own modules did not record the model-use grant");
+
     // ⚠️ THE REGRESSION: the delegation that follows that preflight starts the same agent and returns its answer.
     const { result } = outcome;
+    assert.notEqual(result.code, "credential-route-unavailable", `the environment-backed route was refused: ${JSON.stringify(result)}`);
     assert.notEqual(result.code, "child-executable-not-found", `the wrapper could not find the executable the preflight had just resolved: ${JSON.stringify(result)}`);
     assert.equal(result.ok, true, `the delegation was refused: ${JSON.stringify(result)}`);
     assert.equal(result.role, "planning");
@@ -128,8 +138,8 @@ test("⚠️ #176 a clean consumer clone in a path with spaces delegates once, f
     assert.ok(messages.filter((m) => m.role === "system" || m.role === "developer").map(text).join("\n").includes("Planning specialist"), "the role definition did not reach the child");
     assert.ok(messages.filter((m) => m.role === "user").map(text).join("\n").includes(TASK), "the task did not reach the child");
 
-    // No path of this machine is in what a model would be shown.
-    for (const leaked of [base, base.split("\\").join("/"), "node_modules"]) assert.equal(JSON.stringify(result).includes(leaked), false, `the result carries ${leaked}`);
+    // No path of this machine, and nothing of the credential, is in what a model would be shown.
+    for (const leaked of [base, base.split("\\").join("/"), "node_modules", FIXTURE_KEY, FIXTURE_KEY_VAR]) assert.equal(JSON.stringify(result).includes(leaked), false, `the result carries ${leaked}`);
   } finally {
     await fixture.close();
     await removeTestTree(base);

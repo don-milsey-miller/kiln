@@ -75,6 +75,8 @@ const tool = (deps, { measured = HOST_TOOLS } = {}) => {
   return tools.get("kiln_delegate");
 };
 
+const ROUTE_CONTRACT = Object.freeze({ id: "openai-codex", authSources: ["stored"], required: [], anyOf: [], optional: [] });
+
 /** A recording runtime double. It is the only thing the wrapper is allowed to call. */
 function runtime(result) {
   const calls = [];
@@ -91,6 +93,9 @@ const deps = (rt, extra = {}) => ({
   delegate: rt.delegate,
   specialists: { sessionAgentDirectory: () => "/an/isolated/agent/dir", delegateToSpecialist: rt.delegate },
   agentDir: "/an/isolated/agent/dir",
+  // ⚠️ THE CREDENTIAL ROUTE IS RESOLVED FROM TRUSTED STATE (#194), which `delegation-provider-route.test.mjs` holds
+  // to its rules. Here it is a fixed answer, so these cases stay about the wrapper.
+  providerRoute: async () => ({ ok: true, contract: ROUTE_CONTRACT, route: "stored" }),
   ...extra,
 });
 
@@ -178,6 +183,9 @@ test("⚠️ ACC-0111 the wrapper calls the runtime exactly once, with everythin
     assert.ok(Array.isArray(request.hostRegistry) && request.hostRegistry.length > 0);
     // ⚠️ THE TIMEOUT IS THE RUNTIME'S. A wrapper that named one would own a rule that is not its.
     assert.equal("timeoutMs" in request, false, "the wrapper set a timeout of its own");
+    // ⚠️ #194 THE CONTRACT IS THE RESOLVER'S, and the wrapper hands over no environment and no research setting.
+    assert.equal(request.providerContract, ROUTE_CONTRACT, "the runtime was not given the resolved provider contract");
+    for (const absent of ["hostEnv", "researchEnabled"]) assert.equal(absent in request, false, `the wrapper passed ${absent}`);
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
