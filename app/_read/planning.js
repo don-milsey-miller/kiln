@@ -21,6 +21,7 @@ import {
   parseWorkingNotes,
 } from "../server/stages.js";
 import { artifactReviewChoices, artifactReviewSearch } from "../_review/artifact-review-choices.js";
+import { projectWireframe } from "../_review/wireframe-projection.js";
 import { readSourcePreview } from "../server/content.js";
 
 /**
@@ -353,7 +354,13 @@ export async function readArtifactSummary(id) {
   };
 }
 
-/** Full validated artifact content for an informed review, plus a bounded source preview. */
+/**
+ * One artifact's full content for an informed review, plus a bounded source preview.
+ *
+ * ⚠️ `doc` IS THE RECORD AS READ, WHETHER OR NOT IT PASSED ITS SCHEMA. Lint records keep invalid documents for
+ * diagnosis. So a wireframe also comes back as `wireframe`: the projection that checked it, or the bounded reason
+ * it was refused (#188). The interactive viewer is given that and never `doc`.
+ */
 export async function readArtifactDetail(id) {
   await connection();
   const { projectRoot, contentRoot } = planningRoots();
@@ -363,7 +370,10 @@ export async function readArtifactDetail(id) {
   if (!doc) return null;
   let sourcePreview = null;
   if (doc.type === "source") sourcePreview = readSourcePreview(doc, { contentRoot });
-  return { doc, sourcePreview };
+  let wireframe = null;
+  if (doc.type === "wireframe")
+    wireframe = projectWireframe(doc, { validate: ctx.validators.wireframe, knownIds: records.map((r) => r.doc?.id).filter((known) => typeof known === "string") });
+  return { doc, sourcePreview, wireframe };
 }
 
 /** Reviewable artifacts for the no-selection state; inactive and retired records stay absent. */

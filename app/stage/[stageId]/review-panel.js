@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { readArtifactDetail, searchArtifactSummaries } from "../../_read/planning.js";
 import { submitReviewStatus } from "../../_write/review-action.js";
 import { REVIEW_MESSAGE } from "../../_write/review-logic.js";
+import WireframeViewer from "./wireframe-viewer.js";
 
 /**
  * The artifact-scoped review panel — identity and current status only.
@@ -144,6 +145,23 @@ export default async function ReviewPanel({ artifactId, stageId, reviewError, re
           {artifact.reviewStatus}
         </span>
       </div>
+
+      {/* #188. Keyed by the artifact, so another wireframe starts with its own view and no selection. */}
+      {detail.wireframe?.ok ? <WireframeViewer key={artifact.id} view={detail.wireframe.view} stageId={stageId} /> : null}
+      {detail.wireframe && !detail.wireframe.ok ? (
+        <div data-vpw-wireframe-refused={detail.wireframe.refusal.code} role="status" style={{ border: "1px solid #d8cfa8", background: "#fdfaf2", borderRadius: "4px", padding: "9px 12px", fontSize: ".82rem" }}>
+          <div style={{ fontWeight: 600 }}>
+            This wireframe cannot be drawn. <code>{detail.wireframe.refusal.code}</code>
+          </div>
+          <ul style={{ margin: "6px 0 0", paddingLeft: "18px" }}>
+            {detail.wireframe.refusal.messages.map((reason, i) => (
+              <li key={i} style={{ overflowWrap: "anywhere" }}>{reason}</li>
+            ))}
+          </ul>
+          {detail.wireframe.refusal.omitted > 0 ? <div style={{ marginTop: "6px" }}>{detail.wireframe.refusal.omitted} more not shown.</div> : null}
+          <div style={{ marginTop: "6px", color: "#666" }}>The record is shown below as it was written.</div>
+        </div>
+      ) : null}
 
       <details open style={{ borderTop: "1px solid #eee", paddingTop: "12px" }}>
         <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: ".85rem" }}>Artifact content and provenance</summary>

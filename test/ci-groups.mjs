@@ -106,6 +106,7 @@ export const CI_GROUPS = Object.freeze({
     "voice-stt-elevenlabs.test.mjs",
     "voice-tts-elevenlabs.test.mjs",
     "voice.test.mjs",
+    "wireframe-projection.test.mjs",
     "workflow-carryover.test.mjs",
   ]),
   node: Object.freeze([
@@ -212,6 +213,7 @@ export const CI_GROUPS = Object.freeze({
     "custom-provider-start.test.mjs",
     "piped-stage1-route.test.mjs",
     "shell-smoke.test.mjs",
+    "wireframe-viewer-browser.test.mjs",
   ]),
 });
 

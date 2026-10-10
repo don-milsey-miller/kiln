@@ -12,6 +12,7 @@
   "$defs": {
     "bounds": {
       "type": "object",
+      "description": "A rectangle in viewport coordinates. x and y are measured from the top-left corner of the wireframe's viewport at every depth, never from the parent region. A region's bounds do not offset the regions and components inside it.",
       "properties": {
         "x": { "type": "number" },
         "y": { "type": "number" },
