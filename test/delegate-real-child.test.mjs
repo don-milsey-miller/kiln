@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { contractFor } from "../lib/specialists/contract.mjs";
 import { delegateToSpecialist, loadSupervisorPrimitives } from "../lib/specialists/delegate.mjs";
 import { resolvePinnedAgent } from "../lib/pi-runtime.mjs";
+import { projectForDelegation } from "./helpers/delegation-project.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PLANTED = "sk-ant-REALCHILD-PLANTED-3f0c";
@@ -385,17 +386,21 @@ test("⚠️ ACC-0075 a real child that answers confidently with none of Kiln's 
  * and with none it had no way to find or start the child. v26.9.0 refused every delegation with
  * `child-executable-not-found` after a setup preflight that had just run the same pinned agent.
  *
- * The provider is a custom one in the isolated agent directory's own `models.json`, on the loopback interface
- * with an inline placeholder key, so the child needs no extension and no credential.
+ * The provider is a custom one in the isolated agent directory's own `models.json`, on the loopback interface. Its key
+ * is a placeholder held in an environment variable, declared on a recorded model-use grant, which is the only way a
+ * custom provider's credential reaches a child (#194).
  */
+const LOOPBACK_KEY_VAR = "KILN_LOOPBACK_PROVIDER_KEY";
 async function throughTheWrapper({ toolRoot = REPO } = {}) {
   const { default: register } = await import("../pi-package/extensions/kiln.js");
   const base = mkdtempSync(join(tmpdir(), "kiln-wrapper-child-"));
   const agentDir = join(base, "agent");
-  const contentRoot = join(base, "planning-content");
+  const project = join(base, "project");
+  const contentRoot = join(project, "planning-content");
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(contentRoot, { recursive: true });
   writeFileSync(join(contentRoot, "project.yaml"), "name: wrapper fixture\n");
+  await projectForDelegation(project, { grant: { model: { provider: "kiln-loopback", model: "loopback-model", credentialVar: LOOPBACK_KEY_VAR } } });
 
   const provider = await loopback();
   writeFileSync(
@@ -405,7 +410,7 @@ async function throughTheWrapper({ toolRoot = REPO } = {}) {
         "kiln-loopback": {
           baseUrl: `http://127.0.0.1:${provider.port}/v1`,
           api: "openai-completions",
-          apiKey: PLANTED,
+          apiKey: `$${LOOPBACK_KEY_VAR}`,
           models: [{ id: "loopback-model", name: "Loopback", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 1024 }],
         },
       },
@@ -419,14 +424,15 @@ async function throughTheWrapper({ toolRoot = REPO } = {}) {
   register({ registerTool: (tool) => tools.push(tool), getAllTools: () => tools.map((tool) => ({ name: tool.name })) }, ...(deps ? [deps] : []));
   const delegate = tools.find((tool) => tool.name === "kiln_delegate");
 
-  const saved = { content: process.env.PLANNING_CONTENT_DIR, agent: process.env.PI_CODING_AGENT_DIR };
-  process.env.PLANNING_CONTENT_DIR = contentRoot;
-  process.env.PI_CODING_AGENT_DIR = agentDir;
+  // What the supervisor gives the agent: the content root, the agent directory and the project the grant is read for.
+  const session = { PLANNING_CONTENT_DIR: contentRoot, PI_CODING_AGENT_DIR: agentDir, KILN_PROJECT_ROOT: project, [LOOPBACK_KEY_VAR]: PLANTED };
+  const saved = Object.fromEntries(Object.keys(session).map((name) => [name, process.env[name]]));
+  Object.assign(process.env, session);
   try {
     const result = await delegate.execute("call-1", { role: "planning", task: TASK }, undefined, undefined, { model: { provider: "kiln-loopback", id: "loopback-model" }, thinkingLevel: "medium" });
     return { result: result.details, requests: provider.seen, base };
   } finally {
-    for (const [name, value] of [["PLANNING_CONTENT_DIR", saved.content], ["PI_CODING_AGENT_DIR", saved.agent]])
+    for (const [name, value] of Object.entries(saved))
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     await provider.close();
@@ -442,6 +448,7 @@ test("⚠️ #176 kiln_delegate with nothing injected finds the pinned agent, st
     assert.equal(run.result.output, "The port office needs same-day figures.");
     assert.equal(run.result.observed.taskBindingObserved, true);
     assert.equal(run.requests.length, 1, "the child made other than one provider request");
+    assert.equal(JSON.stringify(run.result).includes(PLANTED), false, "the key reached the result");
   } finally {
     rmSync(run.base, { recursive: true, force: true });
   }
