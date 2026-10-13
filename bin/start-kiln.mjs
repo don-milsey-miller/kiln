@@ -42,6 +42,7 @@ import { REFUSAL, SHUTDOWN_BUDGET, SupervisorRefusal, assertSelfHostOptIn, runSu
 import { declaredToolNames, packageRootFor } from "../lib/pi-package.mjs";
 import { resolvePinnedAgent, resolvePinnedAgentDir, resolvePinnedSessionLister } from "../lib/pi-runtime.mjs";
 import { isEntryPoint as isModuleEntryPoint } from "../lib/entry-point.mjs";
+import { rpcNodeRefusal } from "../lib/rpc-node-range.mjs";
 import { startInJob } from "../lib/windows-job.mjs";
 
 const TOOL_ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -332,10 +333,26 @@ export function liveCanaryRunner() {
  *   could only be checked by testing the helper that composes it, which is not the same claim as the
  *   command applying it. It is reachable from neither an argument nor an environment variable.
  */
-export async function main(argv = process.argv.slice(2), { runSupervisor: supervise = runSupervisor, checkLaunch = checkLaunchDefault } = {}) {
+export async function main(argv = process.argv.slice(2), { runSupervisor: supervise = runSupervisor, checkLaunch = checkLaunchDefault, runtime = {} } = {}) {
   const args = parseArgs(argv);
   if (args.error) {
     for (const line of args.error.split("\n")) console.error(`[kiln] ${line}`);
+    process.exit(2);
+  }
+
+  // ⚠️ SET BEFORE THE FIRST NOTICE. Everything this command says from here on goes where `say` sends it.
+  structuredOutput = args.rpc;
+
+  // ⚠️ **A NODE RELEASE THAT CRASHES AN `--rpc` SESSION AT EXIT IS REFUSED HERE, BEFORE ANYTHING ELSE (#218).** Only
+  // the flag, the platform and this process's own version are read: no project, consent, credential or Pi state, and
+  // nothing is started. Pi runs under this same executable, so this version is the one it would exit on. The notice
+  // is on standard error, where every notice of an `--rpc` run goes, and standard output stays empty. `runtime` is
+  // a test's way to name a platform and version, and like the other two it is reachable from no argument or variable.
+  // ⚠️ THE MODE IS THE PARSED FLAG AND NOTHING ELSE. Only those two names are taken from `runtime`, so it cannot say
+  // a launch is not `--rpc` when the command line said it was.
+  const unsafeNode = rpcNodeRefusal({ platform: runtime?.platform, nodeVersion: runtime?.nodeVersion, rpc: args.rpc });
+  if (unsafeNode !== null) {
+    console.error(`[kiln] ${unsafeNode.message}`);
     process.exit(2);
   }
 
@@ -346,9 +363,6 @@ export async function main(argv = process.argv.slice(2), { runSupervisor: superv
   // with a hint that does not mention the flag they typed. The half of the opt-in that depends only
   // on the flag and the environment is decided here; `runSupervisor` re-checks it with the roots.
   assertSelfHostOptIn({ toolRoot: TOOL_ROOT, selfHost: args.selfHost });
-
-  // ⚠️ SET BEFORE THE FIRST NOTICE. Everything this command says from here on goes where `say` sends it.
-  structuredOutput = args.rpc;
 
   const projectRoot = canonicalPath(resolveProjectRoot());
   // ⚠️ A STRUCTURED RUN ASKS NOTHING ON THE TERMINAL, WHATEVER STANDARD INPUT IS. Its standard input is the

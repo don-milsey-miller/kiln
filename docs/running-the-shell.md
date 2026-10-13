@@ -33,6 +33,30 @@ node .planning/bin/start-kiln.mjs --rpc
 - Nothing is asked on the terminal. A launch that would need an answer, such as a missing consent, refuses
   instead.
 
+### Node versions for structured mode on Windows
+
+On Windows, some Node releases can crash as an `--rpc` session exits, after its work is done. The cause is
+a Node defect ([nodejs/node#56645](https://github.com/nodejs/node/issues/56645)), and the launch would end
+with a crash status although nothing in it failed. The launcher refuses `--rpc` on those releases before it
+starts anything. It exits with status 2, writes nothing to standard output, and prints the code
+`node-version-unsafe-for-rpc` on standard error. There is no override.
+
+| Node on Windows | `--rpc` |
+|---|---|
+| 22.19.0 and newer 22.x | supported |
+| every 23.x | refused |
+| 24.0 through 24.19 | refused |
+| 24.20.0 and newer 24.x | supported |
+| every 25.x | refused |
+| 26.0 through 26.6 | refused |
+| 26.7.0 and newer 26.x | supported |
+| stable 27 and later | supported |
+
+A prerelease build of 24.20.0, of 26.7.0 or of 27.0.0, such as a release candidate or a nightly, is refused
+as well: it was cut before the stable release, and was not measured to carry the fix.
+
+A terminal launch, a piped launch, and every launch on Linux or macOS are not affected and are not refused.
+
 RPC is not guaranteed to emit fewer bytes. It provides structured, replay-free events so integrations
 can select what they consume.
 
