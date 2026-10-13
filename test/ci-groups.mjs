@@ -154,6 +154,7 @@ export const CI_GROUPS = Object.freeze({
     "cleanup-diagnostics.test.mjs",
     "connection-inspection.test.mjs",
     "delegate-real-child.test.mjs",
+    "delegate-research-child.test.mjs",
     "f119-query-diagnostic.test.mjs",
     "first-run-workspace.test.mjs",
     "job-mode-launch.test.mjs",

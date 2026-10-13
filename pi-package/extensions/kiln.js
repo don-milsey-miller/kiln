@@ -418,11 +418,16 @@ const deliveredResult = (result) => ({
  *
  * ⚠️ **NO CHILD OUTPUT ON A REFUSAL.** The whole point of the gate is that unverified prose is not an
  * answer, and returning it beside the refusal would hand a caller the very text it was told not to use.
+ *
+ * ⚠️ **ONE REASON IS PASSED ON, BY NAME (#215).** A research child that was not started because research is permitted
+ * and no key could be resolved says so, since that is a thing an operator fixes. Any other reason is dropped.
  */
+const ENVIRONMENT_REASONS = Object.freeze(["research-credential-missing"]);
 const refusedResult = (result) => ({
   ok: false,
   code: result?.code ?? "refused",
   message: result?.message ?? "The delegation was refused.",
+  ...(result?.code === "child-environment-refused" && ENVIRONMENT_REASONS.includes(result?.reason) ? { reason: result.reason } : {}),
   ...(executableForModel(result?.executable) ? { executable: executableForModel(result.executable) } : {}),
   observed: observedForModel(result?.observation),
 });
@@ -3375,6 +3380,20 @@ export default function register(pi, deps = {}) {
       }
       if (route?.ok !== true) return rendered(await renderForModel(routeRefused(route), roots));
 
+      // ⚠️ **ONLY THE RESEARCH ROLE, AND FROM THE SAME TWO RECORDS (#215).** The parent asks whether research is
+      // permitted, and only then resolves its key, from the environment or the system vault. The runtime hands the
+      // child that one named variable. A check that fails leaves research off: the child starts without the key and
+      // its own tools give the reason.
+      let research = null;
+      if (params?.role === "research") {
+        try {
+          const resolveResearch = deps.researchRoute ?? (await import("../../lib/specialists/research-route.mjs")).sessionResearchRoute;
+          research = await resolveResearch();
+        } catch {
+          research = null;
+        }
+      }
+
       const runtime = deps.delegate ?? specialists.delegateToSpecialist;
       let result;
       try {
@@ -3390,6 +3409,9 @@ export default function register(pi, deps = {}) {
             thinkingLevel: selection.thinkingLevel,
             hostRegistry,
             providerContract: route.contract ?? null,
+            ...(research?.researchEnabled === true && research.hostEnv && typeof research.hostEnv === "object"
+              ? { researchEnabled: true, hostEnv: research.hostEnv }
+              : {}),
             signal,
           },
           {}
