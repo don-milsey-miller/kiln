@@ -113,6 +113,7 @@ export const CI_GROUPS = Object.freeze({
     "change-stream.test.mjs",
     "custom-provider-compat.test.mjs",
     "delegate.test.mjs",
+    "delegated-child-prompt.test.mjs",
     "delegation-provider-route.test.mjs",
     "environment-model.test.mjs",
     "keyboard-stop.test.mjs",

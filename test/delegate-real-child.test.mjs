@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { contractFor } from "../lib/specialists/contract.mjs";
 import { delegateToSpecialist, loadSupervisorPrimitives } from "../lib/specialists/delegate.mjs";
 import { resolvePinnedAgent } from "../lib/pi-runtime.mjs";
+import { MATERIAL_CHANGE_RULE } from "../pi-package/extensions/kiln.js";
 import { projectForDelegation } from "./helpers/delegation-project.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -391,7 +392,7 @@ test("⚠️ ACC-0075 a real child that answers confidently with none of Kiln's 
  * custom provider's credential reaches a child (#194).
  */
 const LOOPBACK_KEY_VAR = "KILN_LOOPBACK_PROVIDER_KEY";
-async function throughTheWrapper({ toolRoot = REPO } = {}) {
+async function throughTheWrapper({ toolRoot = REPO, role = "planning" } = {}) {
   const { default: register } = await import("../pi-package/extensions/kiln.js");
   const base = mkdtempSync(join(tmpdir(), "kiln-wrapper-child-"));
   const agentDir = join(base, "agent");
@@ -429,7 +430,7 @@ async function throughTheWrapper({ toolRoot = REPO } = {}) {
   const saved = Object.fromEntries(Object.keys(session).map((name) => [name, process.env[name]]));
   Object.assign(process.env, session);
   try {
-    const result = await delegate.execute("call-1", { role: "planning", task: TASK }, undefined, undefined, { model: { provider: "kiln-loopback", id: "loopback-model" }, thinkingLevel: "medium" });
+    const result = await delegate.execute("call-1", { role, task: TASK }, undefined, undefined, { model: { provider: "kiln-loopback", id: "loopback-model" }, thinkingLevel: "medium" });
     return { result: result.details, requests: provider.seen, base };
   } finally {
     for (const [name, value] of Object.entries(saved))
@@ -438,6 +439,44 @@ async function throughTheWrapper({ toolRoot = REPO } = {}) {
     await provider.close();
   }
 }
+
+/* ============================================================ the child's own prompt, #219 ==== */
+
+/** One recognisable piece of each part of the operator session's augmentation. None belongs in a child. */
+const SESSION_PARTS = [MATERIAL_CHANGE_RULE.split("\n")[0], "Kiln stage context", "kiln:stage-context", "Kiln workflow checkpoint", "Kiln recovery (", "Kiln session carry-over", "Tell the operator"];
+const textOf = (content) => (typeof content === "string" ? content : (content ?? []).map((part) => part?.text ?? "").join(""));
+
+for (const role of ["research", "planning", "validation"])
+  test(`⚠️ #219 a real ${role} child's system prompt is its role definition, with none of the operator session's frame`, { timeout: 180_000 }, async () => {
+    const run = await throughTheWrapper({ role });
+    try {
+      assert.equal(run.result.ok, true, `the delegation was refused: ${JSON.stringify(run.result)}`);
+      assert.equal(run.result.role, role);
+      assert.equal(run.result.observed.taskBindingObserved, true);
+      assert.equal(run.requests.length, 1);
+
+      const messages = run.requests[0].messages;
+      // A reasoning model is sent its instructions as `developer`, any other as `system`. Either way there is one.
+      const instructions = messages.filter((m) => m.role === "developer" || m.role === "system");
+      assert.equal(instructions.length, 1);
+      const system = textOf(instructions[0].content);
+      const definition = readFileSync(join(REPO, "specialists", `${role}.md`), "utf-8");
+      // The role definition, byte for byte, and after it only the working directory Pi itself appends.
+      assert.ok(system.startsWith(definition), "the system prompt does not begin with the role definition");
+      assert.match(system.slice(definition.length), /^\s*<cwd>\n[^\n]+\n<\/cwd>\s*$/, `something other than Pi's own note follows the role definition: ${JSON.stringify(system.slice(definition.length).slice(0, 300))}`);
+
+      // The delegated task reached it, framed, as the one user message.
+      const users = messages.filter((m) => m.role === "user").map((m) => textOf(m.content));
+      assert.equal(users.length, 1);
+      assert.match(users[0], /^<<<KILN-TASK nonce=[0-9a-f]+ units=\d+ sha256=[0-9a-f]{64}>>>\n/);
+      assert.ok(users[0].includes(TASK), "the delegated task is not in the child's conversation");
+
+      const sent = JSON.stringify(run.requests[0]);
+      for (const part of SESSION_PARTS) assert.equal(sent.includes(part), false, `the operator session's frame reached a ${role} child: ${part}`);
+    } finally {
+      rmSync(run.base, { recursive: true, force: true });
+    }
+  });
 
 test("⚠️ #176 kiln_delegate with nothing injected finds the pinned agent, starts it, and returns its answer", { timeout: 180_000 }, async () => {
   const run = await throughTheWrapper();
