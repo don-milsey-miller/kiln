@@ -96,6 +96,8 @@ const deps = (rt, extra = {}) => ({
   // ⚠️ THE CREDENTIAL ROUTE IS RESOLVED FROM TRUSTED STATE (#194), which `delegation-provider-route.test.mjs` holds
   // to its rules. Here it is a fixed answer, so these cases stay about the wrapper.
   providerRoute: async () => ({ ok: true, contract: ROUTE_CONTRACT, route: "stored" }),
+  // And research is not permitted here (#215), which `delegate-research-child.test.mjs` holds to its rules.
+  researchRoute: async () => ({ researchEnabled: false, hostEnv: {} }),
   ...extra,
 });
 
@@ -281,6 +283,34 @@ test("⚠️ ACC-0111 a refusal is structured data with a stable code, and carri
     assert.equal(result.details.code, "task-not-delivered");
     assert.equal("output" in result.details, false, "a refusal carried the child's output");
     assert.ok(Array.isArray(result.content) && result.content[0].type === "text");
+  } finally {
+    rmSync(f.base, { recursive: true, force: true });
+  }
+});
+
+test("⚠️ #215 an environment refusal passes on research-credential-missing, and no other reason", async () => {
+  const f = project();
+  const refusedFor = (over) => ({ ok: false, code: "child-environment-refused", message: "The child's environment could not be built.", ...over });
+  const details = async (result) => (await invoke(tool(deps(runtime(result))), f.contentRoot, { role: "research", task: TASK })).details;
+  try {
+    const named = await details(refusedFor({ reason: "research-credential-missing" }));
+    assert.equal(named.code, "child-environment-refused");
+    assert.equal(named.reason, "research-credential-missing");
+
+    // A reason outside the wrapper's own list is dropped, whatever it says: another of the runtime's codes, text
+    // that names a variable or a path, a value that is not a string, or no reason at all.
+    const HOSTILE = "TAVILY_API_KEY=tvly-PLANTED-9d2c at C:\Users\operator\agent";
+    for (const reason of ["agent-directory-missing", "provider-credential-missing", HOSTILE, { reason: "research-credential-missing" }, ["research-credential-missing"], 7, null, undefined]) {
+      const result = await invoke(tool(deps(runtime(refusedFor(reason === undefined ? {} : { reason })))), f.contentRoot, { role: "research", task: TASK });
+      assert.equal(result.details.ok, false);
+      assert.equal(result.details.code, "child-environment-refused");
+      assert.equal("reason" in result.details, false, `a reason outside the list was passed on: ${JSON.stringify(reason)}`);
+      assert.equal(JSON.stringify(result).includes("PLANTED"), false, "the runtime's text reached the result");
+    }
+
+    // The same reason under another code is not this refusal, and is dropped too.
+    const other = await details({ ok: false, code: "task-not-delivered", message: "No task binding was observed.", reason: "research-credential-missing" });
+    assert.equal("reason" in other, false);
   } finally {
     rmSync(f.base, { recursive: true, force: true });
   }
