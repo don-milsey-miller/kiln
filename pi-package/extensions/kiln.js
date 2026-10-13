@@ -2037,6 +2037,22 @@ async function kilnSession(deps = {}) {
   }
 }
 
+/**
+ * Whether this process is a delegated specialist child, asked of the library because this file reads no environment.
+ *
+ * ⚠️ **A CHILD IS ONLY EVER GIVEN LESS (#219).** The answer removes the operator session's prompt augmentation and
+ * nothing else depends on it. If it cannot be asked, the process is treated as a session, which is what it was
+ * before the question existed.
+ */
+async function delegatedChild(deps = {}) {
+  try {
+    if (typeof deps.delegatedChild === "function") return (await deps.delegatedChild()) === true;
+    return (await import("../../lib/specialists/delegated-child.mjs")).isDelegatedChild() === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function register(pi, deps = {}) {
   // ⚠️ NOTHING RUNS AT REGISTRATION: `lib/`, project state and skill bytes are loaded when a hook fires.
   //
@@ -2456,6 +2472,11 @@ export default function register(pi, deps = {}) {
   });
 
   pi?.on?.("before_agent_start", async (event, ctx) => {
+    // ⚠️ **EVERYTHING BELOW IS THE OPERATOR'S SESSION, AND A DELEGATED CHILD GETS NONE OF IT (#219).** A child's system
+    // prompt is its role definition and its conversation is one task. The material-change rule, the stage frame, the
+    // workflow checkpoint, the recovery text and the carry-over all address an operator a child does not have, and
+    // the frame told a child to stop and report to one. Returning nothing leaves Pi's prompt exactly as it was.
+    if (await delegatedChild(deps)) return undefined;
     const base = withoutStageContextFrame(typeof event?.systemPrompt === "string" ? event.systemPrompt : "");
     // ⚠️ ONE PLACE, SO IT IS EXACTLY ONCE AND ALWAYS FIRST, whichever of the three outcomes the block is.
     let block = `${MATERIAL_CHANGE_RULE}\n\n${await stageContextBlock(event, deps)}`;
