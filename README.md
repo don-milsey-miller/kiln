@@ -4,7 +4,7 @@ Kiln is a local-first project-planning system that turns an early idea into a st
 reviewable implementation handoff. It combines a Pi-powered planning agent with a browser workspace
 and keeps requirements, decisions, evidence, tasks, and approvals in version-controlled files.
 
-> **Current release:** `v26.9.0`, the first official Kiln release. Kiln uses calendar versions in
+> **Current release:** `v26.10.0`, the October 2026 Kiln release. Kiln uses calendar versions in
 > `YY.M.N` form. Its setup, planning-agent package, browser workspace, validation, research, and
 > handoff workflows are implemented and tested. Review release notes before updating an active
 > project.
@@ -29,7 +29,7 @@ Run these commands from an empty project directory:
 
 ```sh
 git init
-git clone --branch v26.9.0 --depth 1 https://github.com/don-milsey-miller/kiln.git .planning
+git clone --branch v26.10.0 --depth 1 https://github.com/don-milsey-miller/kiln.git .planning
 node .planning/bin/setup.mjs
 ```
 
@@ -127,11 +127,11 @@ project intent.
 ### Update Kiln
 
 Review the target release notes, then move the ignored tool clone to that immutable release tag. For
-example, after a later `v26.9.1` release:
+example, after a later `v26.10.1` release:
 
 ```sh
 git -C .planning fetch --tags origin
-git -C .planning checkout v26.9.1
+git -C .planning checkout v26.10.1
 ```
 
 The next setup or start checks the locked dependency tree. A release checkout is intentionally
