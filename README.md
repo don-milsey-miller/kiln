@@ -12,7 +12,9 @@ and keeps requirements, decisions, evidence, tasks, and approvals in version-con
 ## Prerequisites
 
 - Git.
-- Node.js 22.19.0 or newer. CI tests Node.js 22 and 24.
+- Node.js 22.19.0 or newer. CI tests Node.js 22 and 24. On Windows, structured mode (`--rpc`) also needs a
+  release without a Node exit crash: 22.19.0 or newer 22.x, 24.20.0 or newer 24.x, 26.7.0 or newer 26.x, or
+  stable 27 and later. See [running the shell](docs/running-the-shell.md#structured-mode-for-integrations).
 - npm, which is included with Node.js.
 - An interactive terminal for first-time trust and provider authentication.
 - Internet access for cloning, dependency installation, and cloud-model authentication. A local

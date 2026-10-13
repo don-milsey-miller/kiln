@@ -171,6 +171,7 @@ export const CI_GROUPS = Object.freeze({
     "process-table-priming.test.mjs",
     "process-table-windows.test.mjs",
     "reap.test.mjs",
+    "rpc-node-range.test.mjs",
     "rpc-start.test.mjs",
     "server-port.test.mjs",
     "session-chooser-pty.test.mjs",
